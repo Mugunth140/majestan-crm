@@ -5,7 +5,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted/40">
       <div className="w-full max-w-sm rounded-xl border bg-card p-8 shadow">
         <div className="flex flex-col items-center gap-3">
-        <Image src={"/logo/logo.png"} alt="Majestan Logo" width={80} height={80} className="filter saturate-0 contrast-200"/>
+        <Image src={"/logo/logo.png"} alt="Majestan Logo" width={80} height={80} />
         <h1 className="text-2xl font-bold mb-6 text-center">Majestan CRM</h1>
         </div>
         {/* Placeholder Form */}
