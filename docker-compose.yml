@@ -1,0 +1,52 @@
+services:
+  crm-frontend:
+    build:
+      context: ./crm-frontend
+      target: builder
+    command: ["bun", "run", "dev"]
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+      - PORT=4000
+    networks:
+      - majestan_network
+    develop:
+      watch:
+        - action: sync
+          path: ./crm-frontend
+          target: /app
+          ignore:
+            - node_modules/
+            - .next/
+        - action: rebuild
+          path: ./crm-frontend/package.json
+
+  crm-backend:
+    build: 
+      context: ./crm-backend
+      target: builder
+    command: ["bun", "run", "start:dev"]
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+    env_file:
+      - ./crm-backend/.env
+    networks:
+      - majestan_network
+    develop:
+      watch:
+        - action: sync
+          path: ./crm-backend
+          target: /app
+          ignore:
+            - node_modules/
+            - dist/
+        - action: rebuild
+          path: ./crm-backend/package.json
+
+networks:
+  majestan_network:
+    external: true
