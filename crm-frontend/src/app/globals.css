@@ -118,13 +118,10 @@
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
+  *, *::before, *::after {
+    @apply border-border outline-ring/50 transition-colors duration-500 ease-in-out;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
-  html {
-    @apply font-sans;
+  html, body {
+    @apply transition-colors duration-500 ease-in-out bg-background text-foreground font-sans;
   }
 }
