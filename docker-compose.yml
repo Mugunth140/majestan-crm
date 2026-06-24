@@ -10,6 +10,10 @@ services:
       - NODE_ENV=development
       - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
       - PORT=4000
+    volumes:
+      - ./crm-frontend:/app
+      - /app/node_modules
+      - /app/.next
     networks:
       - majestan_network
     develop:
@@ -34,6 +38,9 @@ services:
       - PORT=8000
     env_file:
       - ./crm-backend/.env
+    volumes:
+      - ./crm-backend:/app
+      - /app/node_modules
     networks:
       - majestan_network
     develop:
