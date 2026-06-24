@@ -72,11 +72,11 @@ export function Sidebar() {
                 href={item.href}
                 title={isCollapsed ? item.name : undefined}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all",
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-300",
                   isActive 
-                    ? "bg-primary/10 text-primary" 
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                  isCollapsed && "justify-center px-0"
+                    ? "bg-accent-foreground text-accent transition-colors duration-300" 
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors duration-300",
+                  isCollapsed && "justify-center px-0 transition-colors duration-300"
                 )}
               >
                 <item.icon className="h-5 w-5 shrink-0" />

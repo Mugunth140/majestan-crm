@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LottieAnimation } from "@/components/shared/LottieAnimation";
-import { MonitorSmartphone, Mail, Lock, Loader2 } from "lucide-react";
+import { Mail, Lock, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 // Reusable SVG Cloud Component
@@ -68,19 +68,8 @@ export default function LoginPage() {
 
   return (
     <>
-      {/* Mobile Blocker - Only visible on small screens (< 768px) */}
-      <div className="flex md:hidden h-screen w-screen flex-col items-center justify-center bg-background p-8 text-center z-50 fixed inset-0">
-        <div className="rounded-full bg-blue-900/10 p-5 mb-6">
-          <MonitorSmartphone className="h-12 w-12 text-blue-900" />
-        </div>
-        <h1 className="text-3xl font-bold tracking-tight mb-3">Desktop Required</h1>
-        <p className="text-muted-foreground max-w-sm text-[15px] leading-relaxed">
-          Majestan CRM is a professional tool optimized for larger screens. Please open this application on a tablet or desktop device.
-        </p>
-      </div>
-
       {/* Main Login UI - Full Screen Background */}
-      <div className="hidden md:flex h-screen w-screen overflow-hidden relative bg-linear-to-br from-[#D4F1FF] via-[#A8E0FF] to-[#87CEEB]">
+      <div className="flex h-screen w-screen overflow-hidden relative bg-linear-to-br from-[#D4F1FF] via-[#A8E0FF] to-[#87CEEB]">
         
         {/* Background Clouds & Elements (Visible globally, optimized for right side on desktop) */}
         <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
