@@ -13,16 +13,29 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
 
 export function Topbar() {
   const { setTheme, theme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Auto-close dropdown after a certain duration (e.g., 4 seconds)
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    if (isDropdownOpen) {
+      timeoutId = setTimeout(() => {
+        setIsDropdownOpen(false);
+      }, 3000);
+    }
+    return () => clearTimeout(timeoutId);
+  }, [isDropdownOpen]);
 
   const handleLogout = () => {
     localStorage.removeItem("crm_token");
@@ -54,18 +67,19 @@ export function Topbar() {
           <span className="sr-only">Toggle notifications</span>
         </Button>
 
-        <DropdownMenu>
+        <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
           <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 w-9 rounded-full">
             <UserCircle size={20} />
             <span className="sr-only">Toggle user menu</span>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+          <DropdownMenuContent align="center" className="w-40 mr-10">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="border-b p-1 text-center">My Account</DropdownMenuLabel>
+              <DropdownMenuItem className="text-center">Profile</DropdownMenuItem>
+              <DropdownMenuItem>Settings</DropdownMenuItem>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Profile</DropdownMenuItem>
-            <DropdownMenuItem>Settings</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950 cursor-pointer">
+            <DropdownMenuItem onClick={handleLogout} className="flex justify-center text-red-600 focus:text-white focus:bg-red-600 dark:focus:bg-red-800  dark:focus:text-white cursor-pointer">
               <LogOut className="mr-2 h-4 w-4" />
               <span>Log out</span>
             </DropdownMenuItem>
