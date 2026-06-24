@@ -48,9 +48,10 @@ export default function LoginPage() {
         throw new Error(data.message || "Failed to sign in");
       }
 
-      // Store token in localStorage for immediate client-side access
+      // Store token in localStorage and cookies for client/server-side access
       localStorage.setItem("crm_token", data.data.access_token);
       localStorage.setItem("crm_user", JSON.stringify(data.data.user));
+      document.cookie = `crm_token=${data.data.access_token}; path=/; max-age=86400`;
 
       toast.success("Welcome back!", {
         description: "You have successfully signed in.",

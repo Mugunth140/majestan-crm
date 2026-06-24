@@ -2,8 +2,8 @@
 
 import dynamic from 'next/dynamic';
 
-const DotLottiePlayer = dynamic(
-  () => import('@dotlottie/react-player').then((mod) => mod.DotLottiePlayer),
+const DotLottieReact = dynamic(
+  () => import('@lottiefiles/dotlottie-react').then((mod) => mod.DotLottieReact),
   { ssr: false }
 );
 
@@ -15,7 +15,7 @@ interface LottieAnimationProps {
 export function LottieAnimation({ src, className }: LottieAnimationProps) {
   return (
     <div className={className}>
-      <DotLottiePlayer
+      <DotLottieReact
         src={src}
         autoplay
         loop
