@@ -20,23 +20,29 @@ const columns: ColumnDef<any>[] = [
   {
     id: "select",
     header: ({ table }) => (
-      <Checkbox
-        checked={table.getIsAllPageRowsSelected()}
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        aria-label="Select all"
-      />
+      <div className="flex items-center justify-center">
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected()}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+          className="data-[state=checked]:bg-[#0052FF] data-[state=checked]:border-[#0052FF]"
+        />
+      </div>
     ),
     cell: ({ row }) => (
-      <Checkbox
-        checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
-        aria-label="Select row"
-      />
+      <div className="flex items-center justify-center">
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+          className="data-[state=checked]:bg-[#0052FF] data-[state=checked]:border-[#0052FF]"
+        />
+      </div>
     ),
     enableSorting: false,
     enableHiding: false,
   },
-  { accessorKey: "sno", header: "S.No" },
+  { accessorKey: "sno", header: "#" },
   { accessorKey: "id", header: "Id" },
   { accessorKey: "date", header: "Date" },
   {
@@ -145,34 +151,27 @@ export default function LeadsPage() {
           <div className="flex items-center gap-2 px-6 pt-5 animate-in slide-in-from-top-2 fade-in duration-200">
             {actionFilters.map(filter => {
               const isActive = actionFilter === filter;
-              let dotColor = "bg-gray-400";
               let activeClass = "bg-primary/10 text-primary border-primary/30";
               
-              if (filter === "Overdue") {
-                dotColor = "bg-red-500";
-                if (isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
-              } else if (filter === "Today") {
-                dotColor = "bg-amber-500";
-                if (isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
-              } else if (filter === "Tomorrow") {
-                dotColor = "bg-blue-500";
-              } else if (filter === "All Scheduled") {
-                dotColor = "bg-primary";
+              if (filter === "Overdue" && isActive) {
+                activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
+              } else if (filter === "Today" && isActive) {
+                activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
               }
 
               return (
-                <Badge
+                <button
                   key={filter}
-                  variant="outline"
                   className={
-                    "cursor-pointer hover:bg-muted px-3 py-1.5 rounded-full text-xs font-semibold transition-colors " +
-                    (isActive ? activeClass : "text-muted-foreground border-border/60")
+                    "flex items-center justify-center cursor-pointer px-5 py-2 rounded-full text-[13.5px] font-medium transition-colors border " +
+                    (isActive 
+                      ? activeClass 
+                      : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")
                   }
                   onClick={() => setActionFilter(filter)}
                 >
-                  <span className={"mr-1.5 h-2 w-2 rounded-full " + dotColor} />
                   {filter}
-                </Badge>
+                </button>
               );
             })}
           </div>

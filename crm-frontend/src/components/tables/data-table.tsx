@@ -76,12 +76,15 @@ export function DataTable<TData, TValue>({
 
       <div className="rounded-md border bg-card">
         <Table>
-          <TableHeader className="bg-muted/30">
+          <TableHeader className="bg-muted/40 border-b">
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="hover:bg-transparent">
+              <TableRow key={headerGroup.id} className="hover:bg-transparent border-none">
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                    <TableHead 
+                      key={header.id} 
+                      className="text-[13px] h-11 font-semibold tracking-wide text-muted-foreground whitespace-nowrap border-r border-border/60 last:border-r-0 px-4"
+                    >
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -101,10 +104,13 @@ export function DataTable<TData, TValue>({
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
                   onClick={() => onRowClick && onRowClick(row.original)}
-                  className="hover:bg-muted/50 transition-colors cursor-pointer"
+                  className="hover:bg-muted/50 transition-colors cursor-pointer border-b border-border/60"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="py-3 text-[14px]">
+                    <TableCell 
+                      key={cell.id} 
+                      className="py-2.5 px-4 text-[14px] border-r border-border/60 last:border-r-0"
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
