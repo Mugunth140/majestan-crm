@@ -46,11 +46,8 @@ export function Topbar() {
   };
 
   return (
-    <header className="absolute right-0 flex h-16 items-center gap-4 pt-4 px-8 justify-between bg-transparent z-50">
-      <div className="w-full flex-1">
-        {/* Search or Breadcrumbs can go here */}
-      </div>
-      <div className="flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 shadow-sm">
+    <header className="absolute right-8 top-8 z-50 flex items-center justify-end bg-transparent pointer-events-none">
+      <div className="flex items-center gap-1 rounded-full border bg-card px-2 py-1.5 shadow-sm pointer-events-auto">
         {mounted && (
           <Button 
             variant="ghost" 

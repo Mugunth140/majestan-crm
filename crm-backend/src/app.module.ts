@@ -19,6 +19,10 @@ import { Permission } from './database/entities/permission.entity';
 import { RolePermission } from './database/entities/role-permission.entity';
 import { Role } from './database/entities/role.entity';
 import { User } from './database/entities/user.entity';
+import { LeadStatus } from './database/entities/lead-status.entity';
+import { Lead } from './database/entities/lead.entity';
+import { LeadInquiry } from './database/entities/lead-inquiry.entity';
+import { LeadFollowUp } from './database/entities/lead-follow-up.entity';
 
 @Module({
   imports: [
@@ -38,7 +42,7 @@ import { User } from './database/entities/user.entity';
         username: configService.get<string>('DB_USERNAME', 'root'),
         password: configService.get<string>('DB_PASSWORD', '8220'),
         database: configService.get<string>('CRM_DB_NAME', 'majestan_crm'),
-        entities: [User, Role, Permission, RolePermission, Department, ActivityLog],
+        entities: [User, Role, Permission, RolePermission, Department, ActivityLog, LeadStatus, Lead, LeadInquiry, LeadFollowUp],
         synchronize: true, // DEV ONLY
       }),
     }),
