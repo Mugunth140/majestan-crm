@@ -1,33 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, Edit, Trash2, Plus, FileSpreadsheet, UploadCloud } from "lucide-react";
+import { MoreHorizontal, Edit, Trash2, Plus, FileSpreadsheet, UploadCloud, RefreshCw } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Separator } from "@/components/ui/separator";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
-import { useLeadsStore } from "@/stores/leadsStore";
 import Link from "next/link";
+import { TableSkeleton } from "@/components/tables/table-skeleton";
 
-// Initial Dummy Data exactly like the image
-const initialDummyData = [
-  { sno: 1, id: "L10001", date: "17 Dec 2024", name: "Esther Kiehn", mobile: "9994661767", propertyType: "Apartment", staff: "John Doe", source: "Website", status: "NEW", notes: "Looking for 3BHK" },
-  { sno: 2, id: "L10002", date: "16 Dec 2024", name: "Denise Kuhn", mobile: "9876543210", propertyType: "Villa", staff: "Jane Smith", source: "Facebook", status: "SITE VISIT DONE", notes: "Budget 1Cr" },
-  { sno: 3, id: "L10003", date: "16 Dec 2024", name: "Clint Hoppe", mobile: "9123456780", propertyType: "Commercial", staff: "Mike Ross", source: "Referral", status: "BOOKED", notes: "Closed deal" },
-  { sno: 4, id: "L10004", date: "15 Dec 2024", name: "Jacquelyn Robel", mobile: "9988776655", propertyType: "Plot", staff: "John Doe", source: "Direct Walk-in", status: "OPPORTUNITY", notes: "Wants corner plot" },
-];
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+
+const STATUS_STYLES: Record<string, string> = {
+  "INCOMING":         "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300",
+  "NEW":              "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300",
+  "OPPORTUNITY":      "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400",
+  "SITE VISIT DONE":  "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400",
+  "RSV DONE":         "bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400",
+  "RSV SCHEDULE":     "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
+  "PROSPECTIVE":      "bg-lime-100 text-lime-800 border-lime-200 dark:bg-lime-900/30 dark:text-lime-400",
+  "DROPPED":          "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400",
+  "BOOKED":           "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400",
+  "SV SCHEDULE":      "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400",
+  "REJECT":           "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400",
+};
 
 const columns: ColumnDef<any>[] = [
   {
@@ -63,12 +65,12 @@ const columns: ColumnDef<any>[] = [
     header: "Name",
     cell: ({ row }) => (
       <div className="flex items-center justify-center gap-3">
-        <div className="h-7 w-7 rounded-full bg-blue-100 flex items-center justify-center font-bold text-xs text-blue-900 shrink-0">
-          {row.original.name.charAt(0)}
+        <div className="h-7 w-7 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center font-bold text-xs text-blue-900 dark:text-blue-300 shrink-0">
+          {row.original.name.charAt(0).toUpperCase()}
         </div>
         <span className="font-medium text-foreground">{row.original.name}</span>
       </div>
-    )
+    ),
   },
   { accessorKey: "mobile", header: "Mobile Number" },
   { accessorKey: "propertyType", header: "Property Type" },
@@ -78,42 +80,51 @@ const columns: ColumnDef<any>[] = [
     accessorKey: "status",
     header: "Status",
     cell: ({ row }) => {
-      const s = row.original.status;
-      let badgeClass = "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-yellow-200";
-      if (s === "BOOKED") badgeClass = "bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border-emerald-200";
-      if (s === "NEW") badgeClass = "bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200";
-      if (s === "SITE VISIT DONE") badgeClass = "bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-200";
-
-      return (
-        <Badge className={"font-medium shadow-sm " + badgeClass}>
-          {s}
-        </Badge>
-      );
-    }
+      const s = row.original.status as string;
+      const cls = STATUS_STYLES[s] ?? "bg-gray-100 text-gray-800 border-gray-200";
+      return <Badge className={"font-medium shadow-sm border " + cls}>{s}</Badge>;
+    },
   },
   { accessorKey: "notes", header: "Notes" },
   {
     id: "actions",
     header: "Action",
-    cell: ({ row }) => (
+    cell: () => (
       <div className="flex items-center justify-center gap-2">
         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"><Edit size={16} /></Button>
         <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"><Trash2 size={16} /></Button>
         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"><MoreHorizontal size={16} /></Button>
       </div>
-    )
-  }
+    ),
+  },
 ];
 
 export default function LeadsPage() {
   const [activeTab, setActiveTab] = useState("All Leads");
   const [actionFilter, setActionFilter] = useState("Today");
-  
-  const { leads, addBulkLeads } = useLeadsStore();
+  const [leads, setLeads] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isImportOpen, setIsImportOpen] = useState(false);
-  
+
   const tabs = ["All Leads", "Open Pipeline", "Action Required"];
   const actionFilters = ["Overdue", "Today", "Tomorrow", "All Scheduled"];
+
+  const fetchLeads = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const res = await fetch(API_URL + "/leads");
+      const data = await res.json();
+      if (data.success) setLeads(data.data);
+    } catch {
+      toast.error("Failed to load leads.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLeads();
+  }, [fetchLeads]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -123,32 +134,18 @@ export default function LeadsPage() {
     reader.onload = (evt) => {
       try {
         const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wb = XLSX.read(bstr, { type: "binary" });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws) as any[];
 
         if (data.length > 0) {
-          const importedLeads = data.map((row, index) => ({
-            sno: leads.length + index + 1,
-            id: "L" + (10000 + leads.length + index + 1),
-            date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-            name: row.Name || "Unknown",
-            mobile: row.MobileNumber || "N/A",
-            propertyType: row.Remarks || "Unspecified",
-            staff: row.Staffid || "Unassigned",
-            source: row.Source || "Excel Import",
-            status: "NEW",
-            notes: row.Email ? ("Email: " + row.Email) : "No notes"
-          }));
-
-          addBulkLeads(importedLeads);
+          toast.info("Bulk import from Excel — API integration coming soon. " + data.length + " rows detected.");
           setIsImportOpen(false);
-          toast.success("Successfully imported " + importedLeads.length + " leads!");
         } else {
           toast.error("The uploaded Excel file appears to be empty.");
         }
-      } catch (err) {
+      } catch {
         toast.error("Failed to parse Excel file. Please ensure it's a valid format.");
       }
     };
@@ -157,17 +154,20 @@ export default function LeadsPage() {
 
   return (
     <div className="flex flex-col space-y-6">
-      {/* 
-        We add pr-[150px] to ensure these buttons perfectly align 
-        beside the global absolute Topbar pill without overlapping! 
-        h-[48px] ensures pixel-perfect vertical alignment with the Topbar.
-      */}
       <div className="flex h-[48px] items-center justify-between pr-[150px]">
         <h1 className="text-[28px] font-bold tracking-tight">Leads Dashboard</h1>
-        
-        {/* Distinct Action Buttons */}
+
         <div className="flex items-center gap-3">
-          
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-10 w-10 rounded-full border-border/60"
+            onClick={fetchLeads}
+            title="Refresh"
+          >
+            <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+          </Button>
+
           <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
             <DialogTrigger className="inline-flex h-10 rounded-full bg-card px-5 text-[14px] font-medium shadow-sm border border-border/60 hover:bg-muted/50 items-center gap-2">
               <FileSpreadsheet size={16} className="text-muted-foreground" />
@@ -184,36 +184,36 @@ export default function LeadsPage() {
                 <UploadCloud className="h-10 w-10 text-muted-foreground mb-4" />
                 <p className="text-sm font-medium text-foreground mb-1">Click to upload or drag and drop</p>
                 <p className="text-xs text-muted-foreground mb-4">.xlsx, .xls, or .csv files</p>
-                <Input 
-                  type="file" 
-                  accept=".xlsx, .xls, .csv" 
-                  className="max-w-[250px] cursor-pointer" 
+                <Input
+                  type="file"
+                  accept=".xlsx, .xls, .csv"
+                  className="max-w-[250px] cursor-pointer"
                   onChange={handleFileUpload}
                 />
               </div>
             </DialogContent>
           </Dialog>
 
-          <Link href="/leads/new" className="inline-flex h-10 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
+          <Link
+            href="/leads/new"
+            className="inline-flex h-10 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95"
+          >
             <Plus size={18} />
             Add New Lead
           </Link>
-
         </div>
       </div>
 
       <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
         {/* Top Tabs */}
         <div className="flex items-center gap-8 px-6 border-b bg-muted/10 pt-4 overflow-x-auto scrollbar-hide relative">
-          {tabs.map(tab => (
+          {tabs.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={
                 "relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " +
-                (activeTab === tab 
-                  ? "text-[#0052FF]" 
-                  : "text-muted-foreground hover:text-foreground")
+                (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")
               }
             >
               {tab}
@@ -232,24 +232,17 @@ export default function LeadsPage() {
         {/* Secondary Filters for "Action Required" */}
         {activeTab === "Action Required" && (
           <div className="flex items-center gap-2 px-6 pt-5 animate-in slide-in-from-top-2 fade-in duration-200">
-            {actionFilters.map(filter => {
+            {actionFilters.map((filter) => {
               const isActive = actionFilter === filter;
               let activeClass = "bg-primary/10 text-primary border-primary/30";
-              
-              if (filter === "Overdue" && isActive) {
-                activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
-              } else if (filter === "Today" && isActive) {
-                activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
-              }
-
+              if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
+              else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
               return (
                 <button
                   key={filter}
                   className={
                     "flex items-center justify-center cursor-pointer px-5 py-2 rounded-full text-[13.5px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " +
-                    (isActive 
-                      ? activeClass 
-                      : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")
+                    (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")
                   }
                   onClick={() => setActionFilter(filter)}
                 >
@@ -260,9 +253,13 @@ export default function LeadsPage() {
           </div>
         )}
 
-        {/* Excel-like Data Table */}
+        {/* Table */}
         <div className="p-6">
-          <DataTable columns={columns} data={leads} showToolbar={true} />
+          {isLoading ? (
+            <TableSkeleton />
+          ) : (
+            <DataTable columns={columns} data={leads} showToolbar={true} />
+          )}
         </div>
       </div>
     </div>

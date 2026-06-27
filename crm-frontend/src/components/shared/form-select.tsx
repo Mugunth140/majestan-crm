@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
@@ -9,30 +10,39 @@ interface FormSelectProps {
   options: { label: string; value: string }[];
   required?: boolean;
   className?: string;
-  value?: string;
+  value?: string | null;
   onValueChange?: (value: string | null) => void;
   disabled?: boolean;
 }
 
-export function FormSelect({ 
-  name, 
-  placeholder, 
-  options, 
-  required, 
+export function FormSelect({
+  name,
+  placeholder,
+  options,
+  required,
   className,
   value,
   onValueChange,
-  disabled 
+  disabled,
 }: FormSelectProps) {
+  // Build a value→label lookup so Select.Value can show the label, not the raw value string.
+  // @base-ui resolves display text by calling the children render prop with the current value.
+  const labelMap = useMemo(
+    () => Object.fromEntries(options.map((o) => [o.value, o.label])),
+    [options]
+  );
+
   return (
     <Select name={name} required={required} value={value} onValueChange={onValueChange} disabled={disabled}>
-      <SelectTrigger 
+      <SelectTrigger
         className={cn(
           "h-12! min-w-64! max-w-full! rounded-xl bg-muted/30 border-border/60 focus:ring-2 focus:ring-[#0052FF]/20 focus:border-[#0052FF] transition-all text-[15px]",
           className
         )}
       >
-      <SelectValue placeholder={placeholder} />
+        <SelectValue placeholder={placeholder}>
+          {(val: string | null) => (val ? (labelMap[val] ?? val) : placeholder)}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent className="max-h-75">
         {options.map((opt) => (

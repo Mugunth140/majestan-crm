@@ -5,6 +5,7 @@ import * as bcrypt from 'bcrypt';
 import { Role } from './database/entities/role.entity';
 import { User } from './database/entities/user.entity';
 import { LeadStatus } from './database/entities/lead-status.entity';
+import { LeadSource } from './database/entities/lead-source.entity';
 
 @Injectable()
 export class AppService implements OnModuleInit {
@@ -16,6 +17,7 @@ export class AppService implements OnModuleInit {
     try {
       await this.seedRolesAndAdmin();
       await this.seedLeadStatuses();
+      await this.seedLeadSources();
     } catch (e) {
       this.logger.error('Failed to seed database:', e);
     }
@@ -45,6 +47,29 @@ export class AppService implements OnModuleInit {
       if (!exists) {
         await statusRepo.save(statusRepo.create(status));
         this.logger.log(`Seeded lead status: ${status.name}`);
+      }
+    }
+  }
+
+  private async seedLeadSources() {
+    const sourceRepo = this.dataSource.getRepository(LeadSource);
+    const defaults = [
+      'Direct Walk-in',
+      'Website',
+      'Referral',
+      'Social Media',
+      'Phone Inquiry',
+      'Email',
+      'Property Portal',
+      'Advertisement',
+      'Cold Call',
+    ];
+
+    for (const name of defaults) {
+      const exists = await sourceRepo.findOne({ where: { name } });
+      if (!exists) {
+        await sourceRepo.save(sourceRepo.create({ name }));
+        this.logger.log(`Seeded lead source: ${name}`);
       }
     }
   }
