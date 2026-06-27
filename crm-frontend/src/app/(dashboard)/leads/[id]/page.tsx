@@ -83,7 +83,7 @@ export default function LeadViewPage() {
       <div className="flex items-center justify-between pr-35 min-h-12">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" onClick={() => router.push("/leads")}>
-            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+            <ArrowLeft className="h-5 w-6/29/2026 at 13:23:005 text-muted-foreground" />
           </Button>
           <div>
             <div className="flex items-center gap-3">
