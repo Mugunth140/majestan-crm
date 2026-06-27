@@ -24,8 +24,8 @@ const columns: ColumnDef<any>[] = [
     cell: ({ row }) => {
       const color = row.original.color;
       return (
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full border shadow-sm" style={{ backgroundColor: color }} />
+        <div className="flex items-center justify-center gap-2">
+          <div className="w-4 h-4 rounded-full border shadow-sm shrink-0" style={{ backgroundColor: color }} />
           <span className="text-muted-foreground uppercase text-xs">{color}</span>
         </div>
       );
@@ -44,7 +44,7 @@ const columns: ColumnDef<any>[] = [
     id: "actions",
     header: "Action",
     cell: ({ row }) => (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-center gap-2">
         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-[#0052FF] hover:bg-blue-50"><Edit size={16} /></Button>
         <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"><Trash2 size={16} /></Button>
       </div>

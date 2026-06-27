@@ -10,10 +10,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
 
 export function Topbar() {
@@ -70,11 +68,9 @@ export function Topbar() {
             <span className="sr-only">Toggle user menu</span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="center" className="w-40 mr-10">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel className="border-b p-1 text-center">My Account</DropdownMenuLabel>
-              <DropdownMenuItem className="text-center">Profile</DropdownMenuItem>
-              <DropdownMenuItem>Settings</DropdownMenuItem>
-            </DropdownMenuGroup>
+            <div className="px-2 py-1.5 text-sm font-semibold text-center border-b mb-1 text-muted-foreground">My Account</div>
+            <DropdownMenuItem className="text-center justify-center">Profile</DropdownMenuItem>
+            <DropdownMenuItem className="text-center justify-center">Settings</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} className="flex justify-center text-red-600 focus:text-white focus:bg-red-600 dark:focus:bg-red-800  dark:focus:text-white cursor-pointer">
               <LogOut className="mr-2 h-4 w-4" />

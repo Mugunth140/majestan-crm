@@ -126,3 +126,11 @@
     @apply transition-colors duration-300 ease-in-out bg-background text-foreground font-sans;
   }
 }
+
+@layer utilities {
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+}

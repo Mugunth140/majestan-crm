@@ -5,11 +5,24 @@ import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, Edit, Trash2, Plus, FileSpreadsheet } from "lucide-react";
+import { MoreHorizontal, Edit, Trash2, Plus, FileSpreadsheet, UploadCloud } from "lucide-react";
+import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Separator } from "@/components/ui/separator";
+import * as XLSX from "xlsx";
+import { toast } from "sonner";
+import { useLeadsStore } from "@/stores/leadsStore";
+import Link from "next/link";
 
-// Dummy Data exactly like the image
-const dummyData = [
+// Initial Dummy Data exactly like the image
+const initialDummyData = [
   { sno: 1, id: "L10001", date: "17 Dec 2024", name: "Esther Kiehn", mobile: "9994661767", propertyType: "Apartment", staff: "John Doe", source: "Website", status: "NEW", notes: "Looking for 3BHK" },
   { sno: 2, id: "L10002", date: "16 Dec 2024", name: "Denise Kuhn", mobile: "9876543210", propertyType: "Villa", staff: "Jane Smith", source: "Facebook", status: "SITE VISIT DONE", notes: "Budget 1Cr" },
   { sno: 3, id: "L10003", date: "16 Dec 2024", name: "Clint Hoppe", mobile: "9123456780", propertyType: "Commercial", staff: "Mike Ross", source: "Referral", status: "BOOKED", notes: "Closed deal" },
@@ -49,8 +62,8 @@ const columns: ColumnDef<any>[] = [
     accessorKey: "name",
     header: "Name",
     cell: ({ row }) => (
-      <div className="flex items-center gap-3">
-        <div className="h-7 w-7 rounded-full bg-blue-100 flex items-center justify-center font-bold text-xs text-blue-900">
+      <div className="flex items-center justify-center gap-3">
+        <div className="h-7 w-7 rounded-full bg-blue-100 flex items-center justify-center font-bold text-xs text-blue-900 shrink-0">
           {row.original.name.charAt(0)}
         </div>
         <span className="font-medium text-foreground">{row.original.name}</span>
@@ -83,7 +96,7 @@ const columns: ColumnDef<any>[] = [
     id: "actions",
     header: "Action",
     cell: ({ row }) => (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-center gap-2">
         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"><Edit size={16} /></Button>
         <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"><Trash2 size={16} /></Button>
         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"><MoreHorizontal size={16} /></Button>
@@ -96,8 +109,51 @@ export default function LeadsPage() {
   const [activeTab, setActiveTab] = useState("All Leads");
   const [actionFilter, setActionFilter] = useState("Today");
   
+  const { leads, addBulkLeads } = useLeadsStore();
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  
   const tabs = ["All Leads", "Open Pipeline", "Action Required"];
   const actionFilters = ["Overdue", "Today", "Tomorrow", "All Scheduled"];
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
+
+        if (data.length > 0) {
+          const importedLeads = data.map((row, index) => ({
+            sno: leads.length + index + 1,
+            id: "L" + (10000 + leads.length + index + 1),
+            date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+            name: row.Name || "Unknown",
+            mobile: row.MobileNumber || "N/A",
+            propertyType: row.Remarks || "Unspecified",
+            staff: row.Staffid || "Unassigned",
+            source: row.Source || "Excel Import",
+            status: "NEW",
+            notes: row.Email ? ("Email: " + row.Email) : "No notes"
+          }));
+
+          addBulkLeads(importedLeads);
+          setIsImportOpen(false);
+          toast.success("Successfully imported " + importedLeads.length + " leads!");
+        } else {
+          toast.error("The uploaded Excel file appears to be empty.");
+        }
+      } catch (err) {
+        toast.error("Failed to parse Excel file. Please ensure it's a valid format.");
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
 
   return (
     <div className="flex flex-col space-y-6">
@@ -111,37 +167,64 @@ export default function LeadsPage() {
         
         {/* Distinct Action Buttons */}
         <div className="flex items-center gap-3">
-          <Button 
-            variant="outline" 
-            className="h-10 rounded-full bg-card px-5 text-[14px] font-medium shadow-sm border-border/60 hover:bg-muted/50 flex items-center gap-2"
-          >
-            <FileSpreadsheet size={16} className="text-muted-foreground" />
-            Bulk Import (Excel)
-          </Button>
-          <Button 
-            className="h-10 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 flex items-center gap-2"
-          >
+          
+          <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
+            <DialogTrigger className="inline-flex h-10 rounded-full bg-card px-5 text-[14px] font-medium shadow-sm border border-border/60 hover:bg-muted/50 items-center gap-2">
+              <FileSpreadsheet size={16} className="text-muted-foreground" />
+              Bulk Import (Excel)
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Import Leads</DialogTitle>
+                <DialogDescription>
+                  Upload your Excel file to bulk import leads into the system.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-xl bg-muted/20 border-border/60">
+                <UploadCloud className="h-10 w-10 text-muted-foreground mb-4" />
+                <p className="text-sm font-medium text-foreground mb-1">Click to upload or drag and drop</p>
+                <p className="text-xs text-muted-foreground mb-4">.xlsx, .xls, or .csv files</p>
+                <Input 
+                  type="file" 
+                  accept=".xlsx, .xls, .csv" 
+                  className="max-w-[250px] cursor-pointer" 
+                  onChange={handleFileUpload}
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Link href="/leads/new" className="inline-flex h-10 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
             <Plus size={18} />
             Add New Lead
-          </Button>
+          </Link>
+
         </div>
       </div>
 
       <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
         {/* Top Tabs */}
-        <div className="flex items-center gap-8 px-6 border-b bg-muted/20 pt-4 overflow-x-auto scrollbar-hide">
+        <div className="flex items-center gap-8 px-6 border-b bg-muted/10 pt-4 overflow-x-auto scrollbar-hide relative">
           {tabs.map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={
-                "pb-4 text-[15px] whitespace-nowrap font-semibold transition-all border-b-[3px] " +
+                "relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " +
                 (activeTab === tab 
-                  ? "border-primary text-primary" 
-                  : "border-transparent text-muted-foreground hover:text-foreground")
+                  ? "text-[#0052FF]" 
+                  : "text-muted-foreground hover:text-foreground")
               }
             >
               {tab}
+              {activeTab === tab && (
+                <motion.div
+                  layoutId="activeTabUnderline"
+                  className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full"
+                  initial={false}
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                />
+              )}
             </button>
           ))}
         </div>
@@ -163,7 +246,7 @@ export default function LeadsPage() {
                 <button
                   key={filter}
                   className={
-                    "flex items-center justify-center cursor-pointer px-5 py-2 rounded-full text-[13.5px] font-medium transition-colors border " +
+                    "flex items-center justify-center cursor-pointer px-5 py-2 rounded-full text-[13.5px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " +
                     (isActive 
                       ? activeClass 
                       : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")
@@ -179,7 +262,7 @@ export default function LeadsPage() {
 
         {/* Excel-like Data Table */}
         <div className="p-6">
-          <DataTable columns={columns} data={dummyData} showToolbar={true} />
+          <DataTable columns={columns} data={leads} showToolbar={true} />
         </div>
       </div>
     </div>

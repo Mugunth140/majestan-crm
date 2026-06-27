@@ -82,9 +82,9 @@ export function Sidebar() {
                   href={item.href || (item.subItems ? item.subItems[0].href : "#")}
                   title={isCollapsed ? item.name : undefined}
                   className={cn(
-                    "flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300",
+                    "flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-200 ease-out active:scale-[0.98] hover:scale-[1.01]",
                     isActive 
-                      ? "bg-blue-50 text-[#0052FF] font-semibold dark:bg-blue-900/20" 
+                      ? "bg-blue-50 text-[#0052FF] font-semibold dark:bg-blue-900/20 shadow-sm" 
                       : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
                     isCollapsed && "justify-center px-0"
                   )}

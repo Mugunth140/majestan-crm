@@ -83,7 +83,7 @@ export function DataTable<TData, TValue>({
                   return (
                     <TableHead 
                       key={header.id} 
-                      className="text-[13px] h-11 font-semibold tracking-wide text-muted-foreground whitespace-nowrap border-r border-border/60 last:border-r-0 px-4"
+                      className="text-[13px] h-11 font-semibold tracking-wide text-muted-foreground whitespace-nowrap border-r border-border/60 last:border-r-0 px-4 text-center"
                     >
                       {header.isPlaceholder
                         ? null
@@ -104,12 +104,12 @@ export function DataTable<TData, TValue>({
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
                   onClick={() => onRowClick && onRowClick(row.original)}
-                  className="hover:bg-muted/50 transition-colors cursor-pointer border-b border-border/60"
+                  className="hover:bg-muted/50 transition-colors duration-150 cursor-pointer border-b border-border/60 active:scale-[0.998]"
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell 
                       key={cell.id} 
-                      className="py-2.5 px-4 text-[14px] border-r border-border/60 last:border-r-0"
+                      className="py-2.5 px-4 text-[14px] border-r border-border/60 last:border-r-0 text-center"
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
