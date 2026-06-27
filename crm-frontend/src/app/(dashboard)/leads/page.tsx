@@ -120,7 +120,13 @@ export default function LeadsPage() {
       ),
     },
     { accessorKey: "mobile", header: "Mobile Number" },
-    { accessorKey: "propertyType", header: "Property Type" },
+    {
+      accessorKey: "propertyType",
+      header: "Property Type",
+      cell: ({ row }) => (
+        <span className="capitalize">{row.original.propertyType?.replace(/_/g, ' ')}</span>
+      ),
+    },
     { accessorKey: "staff", header: "Staff" },
     { accessorKey: "source", header: "Lead Source" },
     {

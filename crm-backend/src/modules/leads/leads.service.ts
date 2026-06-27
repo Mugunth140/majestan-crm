@@ -185,7 +185,7 @@ export class LeadsService {
   async getLeads(): Promise<any[]> {
     const leadRepo = this.dataSource.getRepository(Lead);
     const leads = await leadRepo.find({
-      relations: { status: true, assigned_staff: true },
+      relations: { status: true, assigned_staff: true, inquiries: true },
       order: { created_at: 'DESC' },
     });
 
@@ -200,7 +200,7 @@ export class LeadsService {
       }),
       name: lead.name,
       mobile: lead.mobile_number,
-      propertyType: '',
+      propertyType: lead.inquiries?.[0]?.property_type || '—',
       staff: lead.assigned_staff?.name ?? 'Unassigned',
       source: lead.lead_source ?? '',
       status: lead.status?.name ?? 'INCOMING',
