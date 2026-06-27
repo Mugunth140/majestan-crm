@@ -11,6 +11,7 @@ interface FormSelectProps {
   required?: boolean;
   className?: string;
   value?: string | null;
+  defaultValue?: string | null;
   onValueChange?: (value: string | null) => void;
   disabled?: boolean;
 }
@@ -22,6 +23,7 @@ export function FormSelect({
   required,
   className,
   value,
+  defaultValue,
   onValueChange,
   disabled,
 }: FormSelectProps) {
@@ -33,7 +35,7 @@ export function FormSelect({
   );
 
   return (
-    <Select name={name} required={required} value={value} onValueChange={onValueChange} disabled={disabled}>
+    <Select name={name} required={required} value={value} defaultValue={defaultValue} onValueChange={onValueChange} disabled={disabled}>
       <SelectTrigger
         className={cn(
           "h-12! min-w-64! max-w-full! rounded-xl bg-muted/30 border-border/60 focus:ring-2 focus:ring-[#0052FF]/20 focus:border-[#0052FF] transition-all text-[15px]",

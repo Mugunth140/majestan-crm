@@ -15,7 +15,7 @@ export class Lead {
   @Column({ unique: true })
   mobile_number: string;
 
-  @Column({ unique: true, nullable: true })
+  @Column({ nullable: true })
   email: string;
 
   @Column({ nullable: true })

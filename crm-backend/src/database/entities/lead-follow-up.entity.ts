@@ -26,6 +26,9 @@ export class LeadFollowUp {
   @Column({ nullable: true })
   priority: string;
 
+  @Column({ nullable: true })
+  rnr: string;
+
   @Column({ type: 'text', nullable: true })
   notes: string;
 

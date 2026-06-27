@@ -23,6 +23,9 @@ export class LeadInquiry {
   property_type: string;
 
   @Column({ nullable: true })
+  property_category: string;
+
+  @Column({ nullable: true })
   funder: string;
 
   @CreateDateColumn()

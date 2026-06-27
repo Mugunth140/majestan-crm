@@ -74,26 +74,21 @@ export function DataTable<TData, TValue>({
         </div>
       )}
 
-      <div className="rounded-md border bg-card">
-        <Table>
+      <div className="rounded-md border bg-card overflow-x-auto">
+        <Table className="min-w-max w-full">
           <TableHeader className="bg-muted/40 border-b">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent border-none">
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <TableHead 
-                      key={header.id} 
-                      className="text-[13px] h-11 font-semibold tracking-wide text-muted-foreground whitespace-nowrap border-r border-border/60 last:border-r-0 px-4 text-center"
-                    >
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                    </TableHead>
-                  );
-                })}
+                {headerGroup.headers.map((header) => (
+                  <TableHead
+                    key={header.id}
+                    className="text-[13px] h-11 font-semibold tracking-wide text-muted-foreground whitespace-nowrap border-r border-border/60 last:border-r-0 px-4 text-center"
+                  >
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
               </TableRow>
             ))}
           </TableHeader>
@@ -107,8 +102,8 @@ export function DataTable<TData, TValue>({
                   className="hover:bg-muted/50 transition-colors duration-150 cursor-pointer border-b border-border/60 active:scale-[0.998]"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell 
-                      key={cell.id} 
+                    <TableCell
+                      key={cell.id}
                       className="py-2.5 px-4 text-[14px] border-r border-border/60 last:border-r-0 text-center"
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -129,7 +124,11 @@ export function DataTable<TData, TValue>({
 
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
-          Showing {table.getFilteredRowModel().rows.length > 0 ? (table.getState().pagination.pageIndex * table.getState().pagination.pageSize) + 1 : 0} to{" "}
+          Showing{" "}
+          {table.getFilteredRowModel().rows.length > 0
+            ? table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1
+            : 0}{" "}
+          to{" "}
           {Math.min(
             (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
             table.getFilteredRowModel().rows.length
