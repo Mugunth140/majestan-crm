@@ -6,8 +6,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  FRONTEND_IMAGE_NAME: ${{ github.repository_owner }}/crm-frontend
-  BACKEND_IMAGE_NAME: ${{ github.repository_owner }}/crm-backend
+  FRONTEND_IMAGE_NAME: mugunth140/crm-frontend
+  BACKEND_IMAGE_NAME: mugunth140/crm-backend
 
 jobs:
   build-and-push:
