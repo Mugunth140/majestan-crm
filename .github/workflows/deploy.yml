@@ -1,0 +1,64 @@
+name: Deploy CRM Stack
+
+on:
+  push:
+    branches: [ "main" ]
+
+env:
+  REGISTRY: ghcr.io
+  FRONTEND_IMAGE_NAME: ${{ github.repository_owner }}/crm-frontend
+  BACKEND_IMAGE_NAME: ${{ github.repository_owner }}/crm-backend
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./crm-frontend
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}:latest
+
+      - name: Build and push Backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./crm-backend
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}:latest
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Execute Swarm Rolling Update via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            # Ensure the server is authenticated with GHCR
+            echo "${{ secrets.GH_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            
+            # Pull latest images
+            docker pull ghcr.io/${{ env.FRONTEND_IMAGE_NAME }}:latest
+            docker pull ghcr.io/${{ env.BACKEND_IMAGE_NAME }}:latest
+            
+            # Execute rolling update via Docker Swarm
+            docker service update --with-registry-auth --image ghcr.io/${{ env.FRONTEND_IMAGE_NAME }}:latest crm_crm-frontend
+            docker service update --with-registry-auth --image ghcr.io/${{ env.BACKEND_IMAGE_NAME }}:latest crm_crm-backend

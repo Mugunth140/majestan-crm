@@ -1,0 +1,50 @@
+version: "3.8"
+
+services:
+  crm-frontend:
+    image: ghcr.io/${GH_USER:-majestan}/crm-frontend:latest
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://147.93.168.178:8000/api/v1
+      - PORT=4000
+    networks:
+      - majestan_network
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+        failure_action: rollback
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+
+  crm-backend:
+    image: ghcr.io/${GH_USER:-majestan}/crm-backend:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - NODE_ENV=production
+      - PORT=8000
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - CRM_DB_NAME=majestan_crm
+      - SITE_DB_NAME=majestan
+      # We assume DB credentials are provided via a secure .env on the server
+    env_file:
+      - .env
+    networks:
+      - majestan_network
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+        failure_action: rollback
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+
+networks:
+  majestan_network:
+    external: true
