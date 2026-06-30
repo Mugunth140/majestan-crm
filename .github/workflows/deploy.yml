@@ -45,20 +45,14 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
-      - name: Execute Swarm Rolling Update via SSH
+      - name: Deploy CRM stack via compose
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            # Ensure the server is authenticated with GHCR
             echo "${{ secrets.GH_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            
-            # Pull latest images
-            docker pull ghcr.io/${{ env.FRONTEND_IMAGE_NAME }}:latest
-            docker pull ghcr.io/${{ env.BACKEND_IMAGE_NAME }}:latest
-            
-            # Execute rolling update via Docker Swarm
-            docker service update --with-registry-auth --image ghcr.io/${{ env.FRONTEND_IMAGE_NAME }}:latest crm_crm-frontend
-            docker service update --with-registry-auth --image ghcr.io/${{ env.BACKEND_IMAGE_NAME }}:latest crm_crm-backend
+            cd ${{ secrets.SERVER_REPO_PATH }}
+            git pull
+            ./scripts/deploy.sh crm

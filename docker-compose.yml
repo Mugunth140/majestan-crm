@@ -1,21 +1,20 @@
 services:
   crm-frontend:
+    image: ghcr.io/mugunth140/crm-frontend:latest
     build:
       context: ./crm-frontend
       target: builder
     command: ["bun", "run", "dev"]
     ports:
       - "4000:4000"
+    env_file: ../.env
     environment:
-      - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+      - NODE_ENV=${NODE_ENV:-development}
+      - NEXT_PUBLIC_API_URL=${CRM_NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
       - PORT=4000
-    volumes:
-      - ./crm-frontend:/app
-      - /app/node_modules
-      - /app/.next
     networks:
       - majestan_network
+    restart: unless-stopped
     develop:
       watch:
         - action: sync
@@ -28,21 +27,29 @@ services:
           path: ./crm-frontend/package.json
 
   crm-backend:
-    build: 
+    image: ghcr.io/mugunth140/crm-backend:latest
+    build:
       context: ./crm-backend
       target: builder
     command: ["bun", "run", "start:dev"]
     ports:
       - "8000:8000"
+    env_file: ../.env
     environment:
+      - NODE_ENV=${NODE_ENV:-development}
       - PORT=8000
-    env_file:
-      - ./crm-backend/.env
-    volumes:
-      - ./crm-backend:/app
-      - /app/node_modules
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USERNAME=root
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - DB_NAME=${CRM_DB_NAME:-majestan_crm}
+      - CRM_DB_NAME=${CRM_DB_NAME:-majestan_crm}
+      - SITE_DB_NAME=${SITE_DB_NAME:-majestan}
+      - JWT_SECRET=${CRM_JWT_SECRET}
+      - FRONTEND_URL=${CRM_FRONTEND_URL:-http://localhost:4000}
     networks:
       - majestan_network
+    restart: unless-stopped
     develop:
       watch:
         - action: sync
