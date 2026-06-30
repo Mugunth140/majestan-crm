@@ -134,3 +134,7 @@ dist
 
 # Bun
 bun.lockb
+
+# Docker Compose — lives in the infra repo (majestan-infra), not here
+docker-compose.yml
+
