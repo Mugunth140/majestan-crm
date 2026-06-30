@@ -45,7 +45,7 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy CRM stack via infra repo
+      - name: Deploy CRM stack via compose
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_IP }}
@@ -54,4 +54,5 @@ jobs:
           script: |
             echo "${{ secrets.GH_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             cd ${{ secrets.SERVER_PATH }}
-            docker compose -f crm-compose.yml pull && docker compose -f crm-compose.yml up -d --no-build crm
+            docker compose -f crm-compose.yml --env-file .env pull
+            docker compose -f crm-compose.yml --env-file .env up -d --no-build --remove-orphans
