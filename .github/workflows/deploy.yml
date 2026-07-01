@@ -25,7 +25,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GH_PAT }}
 
       - name: Build and push Frontend
         uses: docker/build-push-action@v5
@@ -45,14 +45,7 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy CRM stack via compose
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          script: |
-            echo "${{ secrets.GH_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            cd ${{ secrets.SERVER_PATH }}
-            docker compose -f crm-compose.yml --env-file .env pull
-            docker compose -f crm-compose.yml --env-file .env up -d --no-build --remove-orphans
+      - name: Trigger VPS Webhook
+        run: |
+          curl -X POST "http://${{ secrets.VPS_IP }}:9000/hooks/deploy-majestan" \
+               -H "X-Deploy-Token: ${{ secrets.WEBHOOK_SECRET }}"
