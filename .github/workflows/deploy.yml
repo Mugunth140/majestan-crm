@@ -47,5 +47,5 @@ jobs:
     steps:
       - name: Trigger VPS Webhook
         run: |
-          curl -X POST "http://${{ secrets.VPS_IP }}:9000/hooks/deploy-majestan" \
+          curl -X POST "http://${{ secrets.SERVER_IP }}:9000/hooks/deploy-majestan" \
                -H "X-Deploy-Token: ${{ secrets.WEBHOOK_SECRET }}"
