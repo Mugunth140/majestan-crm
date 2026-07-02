@@ -120,10 +120,16 @@
 
 @layer base {
   *, *::before, *::after {
-    @apply border-border outline-ring/50 transition-colors duration-300 ease-in-out;
+    @apply border-border outline-ring/50;
   }
-  html, body {
-    @apply transition-colors duration-300 ease-in-out bg-background text-foreground font-sans;
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    overscroll-behavior-y: none;
   }
 }
 

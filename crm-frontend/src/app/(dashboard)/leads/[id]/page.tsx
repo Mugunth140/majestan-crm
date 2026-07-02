@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { FormSelect } from "@/components/shared/form-select";
 import { toast } from "sonner";
@@ -321,10 +322,140 @@ export default function LeadViewPage() {
   };
 
   if (isLoading) return (
-    <div className="flex h-[60vh] w-full items-center justify-center">
-      <div className="flex flex-col items-center gap-4">
-        <Loader2 className="h-8 w-8 animate-spin text-[#0052FF]" />
-        <p className="text-muted-foreground font-medium">Loading Lead Details...</p>
+    <div className="space-y-6 pb-16 animate-in fade-in duration-500">
+      {/* Header Skeleton */}
+      <div className="flex items-center justify-between pr-[150px] min-h-[48px]">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-9 w-9 rounded-full shrink-0" />
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-6 w-24 rounded-md" />
+              <Skeleton className="h-5 w-20" />
+            </div>
+            <Skeleton className="h-4 w-40" />
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-9 w-9 rounded-full" />
+          <Skeleton className="h-10 w-28 rounded-lg" />
+        </div>
+      </div>
+
+      {/* Row 1: Customer Info & Assignment */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="xl:col-span-2 space-y-6">
+          {/* Customer Info */}
+          <div className="bg-card border rounded-2xl p-6 shadow-sm">
+            <Skeleton className="h-5 w-48 mb-6" />
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-y-6 gap-x-6">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className={i === 4 ? "col-span-2 lg:col-span-3" : ""}>
+                  <Skeleton className="h-3 w-20 mb-2" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Quick Actions */}
+          <div className="bg-card border rounded-2xl p-6 shadow-sm">
+            <Skeleton className="h-5 w-32 mb-6" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div>
+                <Skeleton className="h-3 w-24 mb-2" />
+                <Skeleton className="h-11 w-full rounded-xl" />
+              </div>
+              <div>
+                <Skeleton className="h-3 w-32 mb-2" />
+                <Skeleton className="h-12 w-full rounded-xl" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right column */}
+        <div className="space-y-6">
+          <div className="bg-card border rounded-2xl p-6 shadow-sm">
+            <Skeleton className="h-5 w-40 mb-6" />
+            <Skeleton className="h-3 w-28 mb-2" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+          <div className="bg-card border rounded-2xl p-6 shadow-sm">
+            <Skeleton className="h-5 w-32 mb-6" />
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex justify-between items-center py-1">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-3 w-28" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Contact Log Timeline */}
+      <div className="bg-card border rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center justify-between border-b pb-4 mb-6">
+          <Skeleton className="h-5 w-32" />
+          <div className="flex gap-2">
+            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-7 w-16 rounded-full" />)}
+          </div>
+        </div>
+        <div className="space-y-6">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="flex gap-4">
+              <Skeleton className="h-10 w-10 rounded-full shrink-0" />
+              <div className="space-y-2 flex-1 pt-1">
+                <Skeleton className="h-4 w-1/3" />
+                <Skeleton className="h-12 w-full max-w-md rounded-lg" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Follow-Up History */}
+      <div className="bg-card border rounded-2xl p-6 shadow-sm">
+        <Skeleton className="h-5 w-48 mb-6" />
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="flex items-center gap-6 border-b pb-4">
+              <Skeleton className="h-4 w-4 shrink-0" />
+              <Skeleton className="h-6 w-24 rounded-full shrink-0" />
+              <Skeleton className="h-6 w-20 rounded-full shrink-0" />
+              <div className="space-y-1.5 shrink-0">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+              <Skeleton className="h-10 w-full rounded-lg" />
+              <div className="flex gap-2 shrink-0">
+                <Skeleton className="h-8 w-8 rounded-md" />
+                <Skeleton className="h-8 w-8 rounded-md" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {/* Log New Follow-Up */}
+      <div className="bg-card border rounded-2xl p-6 shadow-sm">
+        <Skeleton className="h-5 w-40 mb-6" />
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+          {[...Array(7)].map((_, i) => (
+            <div key={i}>
+              <Skeleton className="h-3 w-28 mb-2" />
+              <Skeleton className="h-11 w-full rounded-xl" />
+            </div>
+          ))}
+          <div className="xl:col-span-4">
+            <Skeleton className="h-3 w-24 mb-2" />
+            <Skeleton className="h-24 w-full rounded-xl" />
+          </div>
+        </div>
+        <div className="flex justify-end mt-5">
+          <Skeleton className="h-11 w-40 rounded-xl" />
+        </div>
       </div>
     </div>
   );
