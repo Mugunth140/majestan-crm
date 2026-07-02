@@ -83,6 +83,20 @@ export class LeadsService {
     });
   }
 
+  async bulkCreateLeads(leads: any[]) {
+    let count = 0;
+    for (const body of leads) {
+      try {
+        await this.createLead(body);
+        count++;
+      } catch (err) {
+        // Skip existing/failed leads in bulk import
+        console.error("Bulk import error for lead", body.mobile, err);
+      }
+    }
+    return { count };
+  }
+
   async createLead(body: any): Promise<CreateLeadResult> {
     return this.dataSource.transaction(async (manager: EntityManager) => {
       // ── Check for existing customer by mobile number ──────────────────────

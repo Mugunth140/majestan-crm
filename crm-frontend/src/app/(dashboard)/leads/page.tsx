@@ -40,6 +40,11 @@ export default function LeadsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [pendingImports, setPendingImports] = useState<any[]>([]);
+  const [isInserting, setIsInserting] = useState(false);
 
   const tabs = ["All Leads", "Open Pipeline", "Action Required"];
   const actionFilters = ["Overdue", "Today", "Tomorrow", "All Scheduled"];
@@ -150,35 +155,39 @@ export default function LeadsPage() {
       id: "actions",
       header: "Action",
       cell: ({ row }) => (
-        <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-            title="View Details"
-            onClick={() => router.push("/leads/" + row.original.rawId)}
-          >
-            <Eye size={15} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-            title="Edit"
-            onClick={() => router.push("/leads/new?edit=" + row.original.rawId)}
-          >
-            <Edit size={15} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-            title="Delete"
-            onClick={() => setDeleteId(row.original.rawId)}
-          >
-            <Trash2 size={15} />
-          </Button>
-        </div>
+        row.original.isPendingImport ? (
+          <Badge variant="outline" className="text-xs bg-amber-50 text-amber-600 border-amber-200">Pending</Badge>
+        ) : (
+          <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              title="View Details"
+              onClick={() => router.push("/leads/" + row.original.rawId)}
+            >
+              <Eye size={15} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              title="Edit"
+              onClick={() => router.push("/leads/new?edit=" + row.original.rawId)}
+            >
+              <Edit size={15} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+              title="Delete"
+              onClick={() => setDeleteId(row.original.rawId)}
+            >
+              <Trash2 size={15} />
+            </Button>
+          </div>
+        )
       ),
     },
   ];
@@ -186,6 +195,10 @@ export default function LeadsPage() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    setIsImporting(true);
+    setImportProgress(0);
+    
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
@@ -194,17 +207,90 @@ export default function LeadsPage() {
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws) as any[];
+        
         if (data.length > 0) {
-          toast.info("Bulk import — API integration coming soon. " + data.length + " rows detected.");
-          setIsImportOpen(false);
+          const total = data.length;
+          let processed = 0;
+          const chunkSize = Math.max(10, Math.floor(total / 20));
+          const formattedData: any[] = [];
+          
+          const processChunk = () => {
+             const nextChunk = Math.min(processed + chunkSize, total);
+             
+             for (let i = processed; i < nextChunk; i++) {
+                const row = data[i];
+                formattedData.push({
+                    rawId: `import-${i}`,
+                    id: `IMPORT-${i+1}`,
+                    date: new Date().toLocaleDateString(),
+                    name: row.Name || row.name || row["Customer Name"] || "Unknown",
+                    mobile: row.Mobile || row.mobile || row["Mobile Number"] || "",
+                    email: row.Email || row.email || "",
+                    propertyType: row["Property Type"] || row.propertyType || "apartment",
+                    staff: "Unassigned",
+                    source: row.Source || row.source || "Bulk Import",
+                    status: "NEW",
+                    isPendingImport: true,
+                    rawData: row
+                });
+             }
+             
+             processed = nextChunk;
+             setImportProgress(Math.floor((processed / total) * 100));
+             
+             if (processed < total) {
+                 setTimeout(processChunk, 20); // allow UI to update
+             } else {
+                 setPendingImports(formattedData);
+                 setIsImporting(false);
+                 setIsImportOpen(false);
+                 setActiveTab("Open Pipeline");
+                 toast.success(`${formattedData.length} leads parsed. Please review and insert.`);
+             }
+          };
+          processChunk();
         } else {
           toast.error("The uploaded Excel file appears to be empty.");
+          setIsImporting(false);
         }
       } catch {
         toast.error("Failed to parse Excel file.");
+        setIsImporting(false);
       }
     };
     reader.readAsBinaryString(file);
+  };
+
+  const handleBulkInsert = async () => {
+    try {
+      setIsInserting(true);
+      const payload = pendingImports.map(p => ({
+         name: p.name,
+         mobile: String(p.mobile),
+         email: p.email,
+         source: p.source,
+         propertyType: p.propertyType,
+      }));
+      
+      const res = await fetch(API_URL + "/leads/bulk", {
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({ leads: payload })
+      });
+      const data = await res.json();
+      if (data.success) {
+         toast.success(`Successfully inserted ${data.count} leads.`);
+         setPendingImports([]);
+         fetchLeads();
+         setActiveTab("All Leads");
+      } else {
+         toast.error(data.message || "Bulk insert failed");
+      }
+    } catch(err) {
+      toast.error("An error occurred during bulk insert.");
+    } finally {
+      setIsInserting(false);
+    }
   };
 
   return (
@@ -228,10 +314,24 @@ export default function LeadsPage() {
                 <DialogDescription>Upload your Excel file to bulk import leads.</DialogDescription>
               </DialogHeader>
               <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-xl bg-muted/20 border-border/60">
-                <UploadCloud className="h-10 w-10 text-muted-foreground mb-4" />
-                <p className="text-sm font-medium text-foreground mb-1">Click to upload or drag and drop</p>
-                <p className="text-xs text-muted-foreground mb-4">.xlsx, .xls, or .csv files</p>
-                <Input type="file" accept=".xlsx, .xls, .csv" className="max-w-[250px] cursor-pointer" onChange={handleFileUpload} />
+                {isImporting ? (
+                  <div className="w-full space-y-4">
+                    <div className="flex items-center justify-between text-sm font-medium">
+                      <span>Processing...</span>
+                      <span>{importProgress}%</span>
+                    </div>
+                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-[#0052FF] transition-all duration-200" style={{ width: `${importProgress}%` }}></div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <UploadCloud className="h-10 w-10 text-muted-foreground mb-4" />
+                    <p className="text-sm font-medium text-foreground mb-1">Click to upload or drag and drop</p>
+                    <p className="text-xs text-muted-foreground mb-4">.xlsx, .xls, or .csv files</p>
+                    <Input type="file" accept=".xlsx, .xls, .csv" className="max-w-[250px] cursor-pointer" onChange={handleFileUpload} />
+                  </>
+                )}
               </div>
             </DialogContent>
           </Dialog>
@@ -280,7 +380,21 @@ export default function LeadsPage() {
         )}
 
         <div className="p-6">
-          {isLoading ? <TableSkeleton /> : <DataTable columns={columns} data={leads} showToolbar={true} />}
+          {pendingImports.length > 0 && activeTab === "Open Pipeline" && (
+             <div className="mb-6 p-5 bg-blue-50/50 border border-blue-200 rounded-xl flex items-center justify-between shadow-sm">
+                <div>
+                   <h3 className="text-blue-900 font-bold text-[15px]">Review Pending Imports</h3>
+                   <p className="text-blue-700/80 text-sm mt-0.5">Please review the <strong>{pendingImports.length}</strong> imported leads below. They have not been saved yet.</p>
+                </div>
+                <div className="flex items-center gap-3">
+                   <Button variant="outline" className="border-blue-200 text-blue-800 hover:bg-blue-100" onClick={() => setPendingImports([])}>Cancel Import</Button>
+                   <Button onClick={handleBulkInsert} disabled={isInserting} className="bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md px-6">
+                     {isInserting ? "Inserting Leads..." : "Confirm & Insert All"}
+                   </Button>
+                </div>
+             </div>
+          )}
+          {isLoading ? <TableSkeleton /> : <DataTable columns={columns} data={activeTab === "Open Pipeline" && pendingImports.length > 0 ? pendingImports : leads} showToolbar={true} />}
         </div>
       </div>
 

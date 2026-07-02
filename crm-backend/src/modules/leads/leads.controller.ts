@@ -17,6 +17,12 @@ export class LeadsController {
     return { success: true, data };
   }
 
+  @Post('bulk')
+  async bulkCreateLeads(@Body() body: { leads: any[] }) {
+    const result = await this.leadsService.bulkCreateLeads(body.leads);
+    return { success: true, count: result.count };
+  }
+
   @Post()
   async createLead(@Body() body: any) {
     const result = await this.leadsService.createLead(body);
