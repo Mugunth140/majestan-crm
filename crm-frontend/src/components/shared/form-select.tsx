@@ -38,7 +38,7 @@ export function FormSelect({
     <Select name={name} required={required} value={value} defaultValue={defaultValue} onValueChange={onValueChange} disabled={disabled}>
       <SelectTrigger
         className={cn(
-          "h-12! min-w-64! max-w-full! rounded-xl bg-muted/30 border-border/60 focus:ring-2 focus:ring-[#0052FF]/20 focus:border-[#0052FF] transition-all text-[15px]",
+          "w-full h-12! rounded-xl bg-muted/30 border-border/60 focus:ring-2 focus:ring-[#0052FF]/20 focus:border-[#0052FF] transition-all text-[15px]",
           className
         )}
       >
@@ -46,7 +46,7 @@ export function FormSelect({
           {(val: string | null) => (val ? (labelMap[val] ?? val) : placeholder)}
         </SelectValue>
       </SelectTrigger>
-      <SelectContent className="max-h-75">
+      <SelectContent className="max-h-75" alignItemWithTrigger={false} side="bottom" align="start">
         {options.map((opt) => (
           <SelectItem key={opt.value} value={opt.value} className="text-[14.5px] py-2.5 px-5 cursor-pointer">
             {opt.label}
