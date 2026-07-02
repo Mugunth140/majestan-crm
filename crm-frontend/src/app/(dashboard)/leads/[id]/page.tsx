@@ -132,6 +132,10 @@ export default function LeadViewPage() {
                   <MapPin className="h-4 w-4 text-muted-foreground" /> {lead.city || "—"}
                 </p>
               </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Lead Source</p>
+                <Badge variant="outline" className="text-sm font-medium">{lead.lead_source || "Unknown"}</Badge>
+              </div>
               <div className="col-span-2">
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Address</p>
                 <p className="text-[15px] font-medium">{lead.address || "—"}</p>
@@ -145,7 +149,7 @@ export default function LeadViewPage() {
             </h3>
             <div className="grid grid-cols-2 gap-y-6 gap-x-4">
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Project / Property</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Project List</p>
                 <p className="text-[15px] font-medium capitalize">{inquiry?.project_list?.replace(/_/g, ' ') || "—"}</p>
               </div>
               <div>
@@ -178,10 +182,6 @@ export default function LeadViewPage() {
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Assigned Staff</p>
                 <p className="text-[15px] font-medium">{lead.assigned_staff?.name || "Unassigned"}</p>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Lead Source</p>
-                <Badge variant="outline" className="text-sm font-medium">{lead.lead_source || "Unknown"}</Badge>
               </div>
             </div>
           </div>
