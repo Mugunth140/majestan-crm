@@ -66,6 +66,44 @@ export default function LeadsPage() {
     fetchLeads();
   }, [fetchLeads]);
 
+  const displayedLeads = () => {
+    if (activeTab === "Open Pipeline") {
+      return pendingImports;
+    }
+
+    if (activeTab === "Action Required") {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      return leads.filter(lead => {
+        if (!lead.nextFollowUpDate) return false;
+        
+        const fDate = new Date(lead.nextFollowUpDate);
+        fDate.setHours(0, 0, 0, 0);
+
+        if (actionFilter === "Overdue") {
+          return fDate < today;
+        }
+        if (actionFilter === "Today") {
+          return fDate.getTime() === today.getTime();
+        }
+        if (actionFilter === "Tomorrow") {
+          return fDate.getTime() === tomorrow.getTime();
+        }
+        if (actionFilter === "All Scheduled") {
+          return fDate > tomorrow;
+        }
+        return false;
+      });
+    }
+
+    // Default: All Leads
+    return leads;
+  };
+
   const handleDelete = async () => {
     if (!deleteId) return;
     try {
@@ -394,7 +432,20 @@ export default function LeadsPage() {
                 </div>
              </div>
           )}
-          {isLoading ? <TableSkeleton /> : <DataTable columns={columns} data={activeTab === "Open Pipeline" && pendingImports.length > 0 ? pendingImports : leads} showToolbar={true} />}
+          {activeTab === "Open Pipeline" && pendingImports.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-border rounded-xl bg-muted/10">
+              <div className="h-16 w-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-4 shadow-sm border border-blue-100">
+                <FileSpreadsheet className="h-8 w-8" />
+              </div>
+              <h3 className="text-xl font-bold text-foreground mb-2">No Imported Leads</h3>
+              <p className="text-muted-foreground max-w-sm mb-6">You haven't imported any leads yet. Use the bulk import feature to add an Excel file.</p>
+              <Button onClick={() => setIsImportOpen(true)} className="bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md px-6">
+                <UploadCloud className="h-4 w-4 mr-2" /> Bulk Import
+              </Button>
+            </div>
+          ) : (
+            isLoading ? <TableSkeleton /> : <DataTable columns={columns} data={displayedLeads()} showToolbar={true} />
+          )}
         </div>
       </div>
 

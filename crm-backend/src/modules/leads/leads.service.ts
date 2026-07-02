@@ -288,26 +288,36 @@ export class LeadsService {
   async getLeads(): Promise<any[]> {
     const leadRepo = this.dataSource.getRepository(Lead);
     const leads = await leadRepo.find({
-      relations: { status: true, assigned_staff: true, inquiries: true },
+      relations: { status: true, assigned_staff: true, inquiries: true, follow_ups: true },
       order: { created_at: 'DESC' },
     });
 
-    return leads.map((lead: Lead, index: number) => ({
-      sno: index + 1,
-      id: 'L' + String(lead.id).padStart(5, '0'),
-      rawId: lead.id,
-      date: new Date(lead.created_at).toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      }),
-      name: lead.name,
-      mobile: lead.mobile_number,
-      propertyType: lead.inquiries?.[0]?.property_type || '—',
-      staff: lead.assigned_staff?.name ?? 'Unassigned',
-      source: lead.lead_source ?? '',
-      status: lead.status?.name ?? 'INCOMING',
-      notes: '',
-    }));
+    return leads.map((lead: Lead, index: number) => {
+      // Find the most recent follow-up that has a next_follow_up_date scheduled
+      const sortedFollowUps = (lead.follow_ups || [])
+        .filter(f => f.next_follow_up_date)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      const latestNextFollowUp = sortedFollowUps[0]?.next_follow_up_date || null;
+
+      return {
+        sno: index + 1,
+        id: 'L' + String(lead.id).padStart(5, '0'),
+        rawId: lead.id,
+        date: new Date(lead.created_at).toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        }),
+        name: lead.name,
+        mobile: lead.mobile_number,
+        propertyType: lead.inquiries?.[0]?.property_type || '—',
+        staff: lead.assigned_staff?.name ?? 'Unassigned',
+        source: lead.lead_source ?? '',
+        status: lead.status?.name ?? 'INCOMING',
+        notes: '',
+        nextFollowUpDate: latestNextFollowUp,
+      };
+    });
   }
 }
