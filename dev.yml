@@ -1,0 +1,28 @@
+services:
+  crm-frontend:
+    build:
+      context: ./crm-frontend
+    ports:
+      - "4000:4000"
+    env_file: .env
+    environment:
+      - PORT=4000
+    networks:
+      - majestan_network
+    restart: unless-stopped
+
+  crm-backend:
+    build:
+      context: ./crm-backend
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      - PORT=8000
+    networks:
+      - majestan_network
+    restart: unless-stopped
+
+networks:
+  majestan_network:
+    external: true

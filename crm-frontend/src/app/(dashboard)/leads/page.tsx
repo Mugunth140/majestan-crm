@@ -105,7 +105,15 @@ export default function LeadsPage() {
       enableHiding: false,
     },
     { accessorKey: "sno", header: "#" },
-    { accessorKey: "id", header: "Id" },
+    {
+      accessorKey: "id",
+      header: "Id",
+      cell: ({ row }) => (
+        <Link href={`/leads/${row.original.rawId}`} className="text-[#0052FF] hover:underline font-medium">
+          {row.getValue("id")}
+        </Link>
+      ),
+    },
     { accessorKey: "date", header: "Date" },
     {
       accessorKey: "name",
