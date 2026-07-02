@@ -118,6 +118,26 @@ export class LeadsService {
     });
   }
 
+  async updateLeadStatus(id: number, body: { status_name?: string; is_unqualified?: boolean }) {
+    const leadRepo = this.dataSource.getRepository(Lead);
+    const existingLead = await leadRepo.findOne({ where: { id } });
+    if (!existingLead) throw new NotFoundException('Lead not found');
+
+    if (body.status_name) {
+      const statusRepo = this.dataSource.getRepository(LeadStatus);
+      const newStatus = await statusRepo.findOne({ where: { name: body.status_name } });
+      if (newStatus) {
+        existingLead.status_id = newStatus.id;
+      }
+    }
+
+    if (body.is_unqualified !== undefined) {
+      existingLead.is_unqualified = body.is_unqualified;
+    }
+
+    return leadRepo.save(existingLead);
+  }
+
   async updateLead(id: number, body: any) {
     return this.dataSource.transaction(async (manager) => {
       const leadRepo = manager.getRepository(Lead);

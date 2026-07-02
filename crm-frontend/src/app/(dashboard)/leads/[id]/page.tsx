@@ -343,16 +343,20 @@ export default function LeadViewPage() {
       {/* ── Header ── */}
       <div className="flex items-center justify-between pr-[150px] min-h-[48px]">
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" className="h-10 w-10 rounded-full shrink-0" onClick={() => router.push("/leads")}>
-            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shrink-0" onClick={() => router.push("/leads")}>
+            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
           </Button>
-          <div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-3xl font-bold tracking-tight">{lead.name}</h1>
-              <Badge className={`font-medium px-3 py-1 shadow-sm border ${badgeCls}`}>{statusName}</Badge>
-              <span className="text-sm font-semibold text-muted-foreground">{`L${String(lead.id).padStart(5, "0")}`}</span>
-            <p className="text-sm text-muted-foreground mt-1">Created on {new Date(lead.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}</p>
-            </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">{lead.name}</h1>
+            {lead.is_unqualified ? 
+              <Badge variant="destructive" className="font-medium px-2.5 py-0.5 shadow-sm border border-red-300">Unqualified</Badge>
+              : <Badge className={`font-medium px-2.5 py-0.5 shadow-sm border ${badgeCls}`}>{statusName}</Badge>
+            }
+            <span className="text-sm font-semibold text-muted-foreground ml-2">L{String(lead.id).padStart(5, "0")}</span>
+            <span className="text-muted-foreground/40 text-xs">•</span>
+            <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+              Created on {new Date(lead.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+            </span>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -368,15 +372,18 @@ export default function LeadViewPage() {
       {/* ── Row 1: Customer Info + Assignment + Follow-Up Snapshot ── */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
-        {/* Customer Information */}
-        <div className="xl:col-span-2 bg-card border rounded-2xl p-6 shadow-sm h-fit">
-          <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-            <User className="h-4 w-4 text-muted-foreground" /> Customer Information
-          </h3>
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-y-6 gap-x-6">
+        {/* Left Column: Customer Information & Quick Actions */}
+        <div className="xl:col-span-2 space-y-6">
+          
+          {/* Customer Information */}
+          <div className="bg-card border rounded-2xl p-6 shadow-sm h-fit">
+            <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
+              <User className="h-4 w-4 text-muted-foreground" /> Customer Information
+            </h3>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-y-6 gap-x-6">
 
-            {/* Mobile – clickable */}
-            <div>
+              {/* Mobile – clickable */}
+              <div>
               <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Mobile</p>
               <div className="flex items-center gap-2 flex-wrap">
                 <button onClick={() => openContact("call", lead.mobile_number)} className="flex items-center gap-1.5 text-[14px] font-medium text-foreground hover:text-[#0052FF] transition-colors group">
@@ -420,9 +427,82 @@ export default function LeadViewPage() {
             </div>
 
             {/* Address */}
-            <div className="col-span-2 lg:col-span-3">
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Address</p>
-              <p className="text-[14px] font-medium text-foreground/80">{lead.address || "—"}</p>
+              <div className="col-span-2 lg:col-span-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Address</p>
+                <p className="text-[14px] font-medium text-foreground/80">{lead.address || "—"}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Actions (Status & Qualify) */}
+          <div className="bg-card border rounded-2xl p-6 shadow-sm h-fit">
+            <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
+              <RefreshCw className="h-4 w-4 text-muted-foreground" /> Quick Actions
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              
+              {/* Change Lead Status */}
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Lead Status</p>
+                <div className="flex items-center gap-2">
+                  <FormSelect 
+                    name="quickLeadStatus" 
+                    placeholder="Select Status" 
+                    options={Object.keys(STATUS_STYLES).map(k => ({ label: k, value: k }))} 
+                    value={lead.status?.name || ""} 
+                    onValueChange={async (v) => {
+                      if (!v) return;
+                      try {
+                        const res = await fetch(`${API_URL}/leads/${id}/status`, {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ status_name: v }),
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                          toast.success("Lead status updated.");
+                          fetchLead(true);
+                        } else toast.error("Failed to update status");
+                      } catch {
+                        toast.error("Failed to update status");
+                      }
+                    }} 
+                  />
+                </div>
+              </div>
+
+              {/* Qualify/Unqualify Toggle */}
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Lead Qualification</p>
+                <div className="flex items-center justify-between h-12 px-4 rounded-xl border border-input bg-muted/20">
+                  <span className="text-[14px] font-medium text-foreground/80">Unqualify Lead</span>
+                  <button 
+                    role="switch" 
+                    aria-checked={lead.is_unqualified || false}
+                    onClick={async () => {
+                      const newVal = !lead.is_unqualified;
+                      try {
+                        const res = await fetch(`${API_URL}/leads/${id}/status`, {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ is_unqualified: newVal }),
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                          toast.success(newVal ? "Lead marked as unqualified." : "Lead marked as qualified.");
+                          fetchLead(true);
+                        } else toast.error("Failed to update qualification status");
+                      } catch {
+                        toast.error("Failed to update qualification status");
+                      }
+                    }}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${lead.is_unqualified ? "bg-red-500" : "bg-muted"}`}
+                  >
+                    <span className={`pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform ${lead.is_unqualified ? "translate-x-5" : "translate-x-0.5"}`} />
+                  </button>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
@@ -455,9 +535,9 @@ export default function LeadViewPage() {
                 { label: "Category", value: inquiry?.property_category?.replace(/_/g, " ") },
                 { label: "Funder", value: inquiry?.funder?.replace(/_/g, " ") },
               ].map(f => (
-                <div key={f.label} className="flex justify-between items-center py-1 border-b border-border/30 last:border-0">
+                <div key={f.label} className="flex justify-between items-center py-1.5 border-b border-border/30 last:border-0">
                   <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{f.label}</span>
-                  <span className="font-medium capitalize text-[13px]">{f.value || "—"}</span>
+                  <span className="font-medium capitalize text-[14px]">{f.value || "—"}</span>
                 </div>
               ))}
             </div>

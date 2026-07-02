@@ -328,42 +328,44 @@ function LeadForm() {
           </div>
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <div className="flex items-center justify-between border-b pb-4 mb-6">
-            <h3 className="text-lg font-bold text-foreground">New Follow Up</h3>
-            <div className="flex items-center gap-3 bg-muted/40 px-4 py-2 rounded-full border border-border/50 transition-colors hover:bg-muted/60">
-              <label htmlFor="unqualified" className="text-sm font-semibold text-muted-foreground cursor-pointer select-none">Mark as Unqualified</label>
-              <Switch id="unqualified" name="unqualified" />
+        {!editId && (
+          <div className="bg-card border rounded-2xl p-8 shadow-sm">
+            <div className="flex items-center justify-between border-b pb-4 mb-6">
+              <h3 className="text-lg font-bold text-foreground">New Follow Up</h3>
+              <div className="flex items-center gap-3 bg-muted/40 px-4 py-2 rounded-full border border-border/50 transition-colors hover:bg-muted/60">
+                <label htmlFor="unqualified" className="text-sm font-semibold text-muted-foreground cursor-pointer select-none">Mark as Unqualified</label>
+                <Switch id="unqualified" name="unqualified" />
+              </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow Up Date</label>
-              <Input name="followUpDate" type="date" defaultValue={leadData?.follow_ups?.[0]?.follow_up_date || ""} className="h-12 rounded-xl bg-muted/30 text-[15px]" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow Up Time</label>
-              <Input name="followUpTime" type="time" defaultValue={leadData?.follow_ups?.[0]?.follow_up_time || ""} className="h-12 rounded-xl bg-muted/30 text-[15px]" />
-            </div>
-            <div className="space-y-2 lg:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Purpose</label>
-              <FormSelect name="purpose" defaultValue={leadData?.follow_ups?.[0]?.purpose || null} placeholder="Select Purpose" options={PURPOSES} />
-            </div>
-            <div className="space-y-2 lg:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Priority Level</label>
-              <FormSelect name="priority" defaultValue={leadData?.follow_ups?.[0]?.priority || null} placeholder="Select Priority" options={PRIORITIES} />
-            </div>
-            <div className="space-y-2 lg:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">RNR Status</label>
-              <FormSelect name="rnr" defaultValue={leadData?.follow_ups?.[0]?.rnr || null} placeholder="Select RNR Status" options={RNR_OPTIONS} />
-            </div>
-            <div className="space-y-2 md:col-span-2 lg:col-span-4">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow Up Notes</label>
-              <Textarea name="notes" defaultValue={leadData?.follow_ups?.[0]?.notes || ""} placeholder="Enter follow up notes..." className="bg-muted/30 rounded-xl resize-none text-[15px] p-4" rows={3} />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow Up Date</label>
+                <Input name="followUpDate" type="date" className="h-12 rounded-xl bg-muted/30 text-[15px]" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow Up Time</label>
+                <Input name="followUpTime" type="time" className="h-12 rounded-xl bg-muted/30 text-[15px]" />
+              </div>
+              <div className="space-y-2 lg:col-span-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Purpose</label>
+                <FormSelect name="purpose" placeholder="Select Purpose" options={PURPOSES} />
+              </div>
+              <div className="space-y-2 lg:col-span-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Priority Level</label>
+                <FormSelect name="priority" placeholder="Select Priority" options={PRIORITIES} />
+              </div>
+              <div className="space-y-2 lg:col-span-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">RNR Status</label>
+                <FormSelect name="rnr" placeholder="Select RNR Status" options={RNR_OPTIONS} />
+              </div>
+              <div className="space-y-2 md:col-span-2 lg:col-span-4">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow Up Notes</label>
+                <Textarea name="notes" placeholder="Enter follow up notes..." className="bg-muted/30 rounded-xl resize-none text-[15px] p-4" rows={3} />
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         <div className="flex justify-end gap-4 pt-4">
           <Button type="button" variant="ghost" className="h-12 px-8 rounded-xl font-medium text-[15px]" onClick={() => router.push("/leads")} disabled={isSubmitting}>

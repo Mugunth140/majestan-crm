@@ -44,6 +44,9 @@ export class Lead {
   @JoinColumn({ name: 'assigned_staff_id' })
   assigned_staff: User;
 
+  @Column({ default: false })
+  is_unqualified: boolean;
+
   @OneToMany(() => LeadInquiry, inquiry => inquiry.lead)
   inquiries: LeadInquiry[];
 

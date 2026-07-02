@@ -34,6 +34,12 @@ export class LeadsController {
     };
   }
 
+  @Put(':id/status')
+  async updateLeadStatus(@Param('id') id: string, @Body() body: any) {
+    const data = await this.leadsService.updateLeadStatus(Number(id), body);
+    return { success: true, data };
+  }
+
   @Put(':id')
   async updateLead(@Param('id') id: string, @Body() body: any) {
     const data = await this.leadsService.updateLead(Number(id), body);
