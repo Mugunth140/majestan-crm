@@ -45,4 +45,37 @@ export class LeadsController {
     await this.leadsService.deleteLead(Number(id));
     return { success: true };
   }
+
+  // ── Contact Logs ───────────────────────────────────────────────────────────
+  @Post(':id/contact-log')
+  async addContactLog(@Param('id') id: string, @Body() body: any) {
+    const data = await this.leadsService.addContactLog(Number(id), body);
+    return { success: true, data };
+  }
+
+  // ── Follow-Up CRUD ─────────────────────────────────────────────────────────
+  @Post(':id/follow-ups')
+  async addFollowUp(@Param('id') id: string, @Body() body: any) {
+    const data = await this.leadsService.addFollowUp(Number(id), body);
+    return { success: true, data };
+  }
+
+  @Put(':id/follow-ups/:followUpId')
+  async updateFollowUp(
+    @Param('id') id: string,
+    @Param('followUpId') followUpId: string,
+    @Body() body: any,
+  ) {
+    const data = await this.leadsService.updateFollowUp(Number(id), Number(followUpId), body);
+    return { success: true, data };
+  }
+
+  @Delete(':id/follow-ups/:followUpId')
+  async deleteFollowUp(
+    @Param('id') id: string,
+    @Param('followUpId') followUpId: string,
+  ) {
+    const data = await this.leadsService.deleteFollowUp(Number(id), Number(followUpId));
+    return { success: true, data };
+  }
 }

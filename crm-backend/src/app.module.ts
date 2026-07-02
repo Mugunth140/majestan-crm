@@ -26,6 +26,7 @@ import { LeadSource } from './database/entities/lead-source.entity';
 import { Lead } from './database/entities/lead.entity';
 import { LeadInquiry } from './database/entities/lead-inquiry.entity';
 import { LeadFollowUp } from './database/entities/lead-follow-up.entity';
+import { ContactLog } from './database/entities/contact-log.entity';
 
 @Module({
   imports: [
@@ -45,7 +46,7 @@ import { LeadFollowUp } from './database/entities/lead-follow-up.entity';
         username: configService.get<string>('DB_USERNAME', 'root'),
         password: configService.get<string>('DB_PASSWORD', '8220'),
         database: configService.get<string>('CRM_DB_NAME', 'majestan_crm'),
-        entities: [User, Role, Permission, RolePermission, Department, ActivityLog, LeadStatus, LeadSource, Lead, LeadInquiry, LeadFollowUp],
+        entities: [User, Role, Permission, RolePermission, Department, ActivityLog, LeadStatus, LeadSource, Lead, LeadInquiry, LeadFollowUp, ContactLog],
         synchronize: true, // DEV ONLY
       }),
     }),

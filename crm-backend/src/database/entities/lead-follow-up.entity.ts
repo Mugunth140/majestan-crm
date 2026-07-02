@@ -14,29 +14,41 @@ export class LeadFollowUp {
   @JoinColumn({ name: 'lead_id' })
   lead: Lead;
 
+  // When the follow-up actually happened
   @Column({ type: 'date', nullable: true })
-  follow_up_date: string;
+  follow_up_date: string | null;
 
   @Column({ type: 'time', nullable: true })
-  follow_up_time: string;
+  follow_up_time: string | null;
 
-  @Column({ nullable: true })
-  purpose: string;
+  // How the lead was contacted this session
+  @Column({ type: 'varchar', nullable: true })
+  contacted_via: string | null; // email | sms | whatsapp | call
 
-  @Column({ nullable: true })
-  priority: string;
+  // When the next follow-up is scheduled
+  @Column({ type: 'date', nullable: true })
+  next_follow_up_date: string | null;
 
-  @Column({ nullable: true })
-  rnr: string;
+  @Column({ type: 'time', nullable: true })
+  next_follow_up_time: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  purpose: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  priority: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  rnr: string | null;
 
   @Column({ type: 'text', nullable: true })
-  notes: string;
+  notes: string | null;
 
   @Column({ default: false })
   is_completed: boolean;
 
-  @Column({ name: 'created_by_id', nullable: true })
-  created_by_id: number;
+  @Column({ type: 'int', name: 'created_by_id', nullable: true })
+  created_by_id: number | null;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'created_by_id' })

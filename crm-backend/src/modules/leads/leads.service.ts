@@ -5,6 +5,7 @@ import { Lead } from '../../database/entities/lead.entity';
 import { LeadFollowUp } from '../../database/entities/lead-follow-up.entity';
 import { LeadInquiry } from '../../database/entities/lead-inquiry.entity';
 import { LeadStatus } from '../../database/entities/lead-status.entity';
+import { ContactLog } from '../../database/entities/contact-log.entity';
 import { User } from '../../database/entities/user.entity';
 
 export interface CreateLeadResult {
@@ -20,16 +21,99 @@ export class LeadsService {
   async getLeadById(id: number) {
     const lead = await this.dataSource.getRepository(Lead).findOne({
       where: { id },
-      relations: { inquiries: true, follow_ups: true, status: true, assigned_staff: true }
+      relations: {
+        inquiries: true,
+        status: true,
+        assigned_staff: true,
+      }
     });
     if (!lead) throw new NotFoundException('Lead not found');
-    return lead;
+
+    // Load follow-ups with created_by relation ordered chronologically
+    const followUps = await this.dataSource.getRepository(LeadFollowUp).find({
+      where: { lead_id: id },
+      relations: { created_by: true },
+      order: { created_at: 'DESC' },
+    });
+
+    // Load contact logs with sent_by relation
+    const contactLogs = await this.dataSource.getRepository(ContactLog).find({
+      where: { lead_id: id },
+      relations: { sent_by: true },
+      order: { created_at: 'DESC' },
+    });
+
+    return { ...lead, follow_ups: followUps, contact_logs: contactLogs };
   }
 
+  // ── Contact Log ────────────────────────────────────────────────────────────
+  async addContactLog(leadId: number, body: { contact_type: string; subject?: string; message?: string; sent_by_id?: number }) {
+    const lead = await this.dataSource.getRepository(Lead).findOne({ where: { id: leadId } });
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    const repo = this.dataSource.getRepository(ContactLog);
+    const log = new ContactLog();
+    log.lead_id = leadId;
+    log.contact_type = body.contact_type;
+    log.subject = body.subject || null;
+    log.message = body.message || null;
+    log.sent_by_id = body.sent_by_id || null;
+    return repo.save(log);
+  }
+
+  // ── Follow-Up CRUD ────────────────────────────────────────────────────────
+  async addFollowUp(leadId: number, body: any) {
+    const lead = await this.dataSource.getRepository(Lead).findOne({ where: { id: leadId } });
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    const repo = this.dataSource.getRepository(LeadFollowUp);
+    const followUp = new LeadFollowUp();
+    followUp.lead_id = leadId;
+    followUp.follow_up_date = body.followUpDate || null;
+    followUp.follow_up_time = body.followUpTime || null;
+    followUp.contacted_via = body.contactedVia || null;
+    followUp.next_follow_up_date = body.nextFollowUpDate || null;
+    followUp.next_follow_up_time = body.nextFollowUpTime || null;
+    followUp.purpose = body.purpose || null;
+    followUp.priority = body.priority || null;
+    followUp.rnr = body.rnr || null;
+    followUp.notes = body.notes || null;
+    followUp.created_by_id = body.createdById || null;
+    return repo.save(followUp);
+  }
+
+  async updateFollowUp(leadId: number, followUpId: number, body: any) {
+    const repo = this.dataSource.getRepository(LeadFollowUp);
+    const followUp = await repo.findOne({ where: { id: followUpId, lead_id: leadId } });
+    if (!followUp) throw new NotFoundException('Follow-up not found');
+
+    followUp.follow_up_date = body.followUpDate ?? followUp.follow_up_date;
+    followUp.follow_up_time = body.followUpTime ?? followUp.follow_up_time;
+    followUp.contacted_via = body.contactedVia ?? followUp.contacted_via;
+    followUp.next_follow_up_date = body.nextFollowUpDate ?? followUp.next_follow_up_date;
+    followUp.next_follow_up_time = body.nextFollowUpTime ?? followUp.next_follow_up_time;
+    followUp.purpose = body.purpose ?? followUp.purpose;
+    followUp.priority = body.priority ?? followUp.priority;
+    followUp.rnr = body.rnr ?? followUp.rnr;
+    followUp.notes = body.notes ?? followUp.notes;
+
+    return repo.save(followUp);
+  }
+
+  async deleteFollowUp(leadId: number, followUpId: number) {
+    const repo = this.dataSource.getRepository(LeadFollowUp);
+    const followUp = await repo.findOne({ where: { id: followUpId, lead_id: leadId } });
+    if (!followUp) throw new NotFoundException('Follow-up not found');
+    await repo.remove(followUp);
+    return { success: true };
+  }
+
+  // ── Existing methods ──────────────────────────────────────────────────────
   async deleteLead(id: number) {
     return this.dataSource.transaction(async (manager) => {
       await manager.getRepository(LeadInquiry).delete({ lead_id: id });
       await manager.getRepository(LeadFollowUp).delete({ lead_id: id });
+      await manager.getRepository(ContactLog).delete({ lead_id: id });
       await manager.getRepository(Lead).delete(id);
     });
   }
@@ -66,19 +150,6 @@ export class LeadsService {
         await manager.save(LeadInquiry, inquiry);
       }
 
-      if (body.followUpDate || body.purpose || body.priority || body.notes || body.rnr) {
-        const followUpRepo = manager.getRepository(LeadFollowUp);
-        let followUp = await followUpRepo.findOne({ where: { lead_id: id } });
-        if (!followUp) followUp = followUpRepo.create({ lead_id: id });
-        followUp.follow_up_date = body.followUpDate || null;
-        followUp.follow_up_time = body.followUpTime || null;
-        followUp.purpose = body.purpose || null;
-        followUp.priority = body.priority || null;
-        followUp.rnr = body.rnr || null;
-        followUp.notes = body.notes || null;
-        await manager.save(LeadFollowUp, followUp);
-      }
-
       return existingLead;
     });
   }
@@ -86,12 +157,17 @@ export class LeadsService {
   async bulkCreateLeads(leads: any[]) {
     let count = 0;
     for (const body of leads) {
+      // Normalize field names from bulk import payload to createLead's expected shape
+      const normalized = {
+        ...body,
+        mobile: body.mobile ?? body.mobile_number ?? null,
+        source: body.source ?? body.lead_source ?? null,
+      };
       try {
-        await this.createLead(body);
+        await this.createLead(normalized);
         count++;
       } catch (err) {
-        // Skip existing/failed leads in bulk import
-        console.error("Bulk import error for lead", body.mobile, err);
+        console.error('Bulk import error for lead', normalized.mobile, err?.message ?? err);
       }
     }
     return { count };
@@ -99,14 +175,12 @@ export class LeadsService {
 
   async createLead(body: any): Promise<CreateLeadResult> {
     return this.dataSource.transaction(async (manager: EntityManager) => {
-      // ── Check for existing customer by mobile number ──────────────────────
       const existingLead = await manager.getRepository(Lead).findOne({
         where: { mobile_number: body.mobile },
         relations: { assigned_staff: true, status: true },
       });
 
       if (existingLead) {
-        // Same customer, new requirement → add a new inquiry to the existing lead
         if (body.purchaseType || body.propertyType || body.funder || body.project || body.propertyCategory) {
           const inquiry = manager.getRepository(LeadInquiry).create({
             lead_id: existingLead.id,
@@ -119,7 +193,6 @@ export class LeadsService {
           await manager.save(inquiry);
         }
 
-        // Also log a new follow-up if one was provided
         if (body.followUpDate || body.purpose || body.priority || body.notes || body.rnr) {
           const followUp = manager.getRepository(LeadFollowUp).create({
             lead_id: existingLead.id,
@@ -140,11 +213,9 @@ export class LeadsService {
         };
       }
 
-      // ── New customer ──────────────────────────────────────────────────────
       const statusRepo = manager.getRepository(LeadStatus);
       const incomingStatus = await statusRepo.findOne({ where: { name: 'INCOMING' } });
 
-      // Resolve the creating staff from userId sent in payload
       let assignedStaffId: number | undefined;
       if (body.userId) {
         const user = await manager.getRepository(User).findOne({ where: { id: body.userId } });
@@ -165,7 +236,6 @@ export class LeadsService {
       });
       const savedLead: Lead = await manager.save(lead);
 
-      // Save inquiry
       if (body.purchaseType || body.propertyType || body.funder || body.project || body.propertyCategory) {
         const inquiry = manager.getRepository(LeadInquiry).create({
           lead_id: savedLead.id,
@@ -178,7 +248,6 @@ export class LeadsService {
         await manager.save(inquiry);
       }
 
-      // Save follow-up
       if (body.followUpDate || body.purpose || body.priority || body.notes || body.rnr) {
         const followUp = manager.getRepository(LeadFollowUp).create({
           lead_id: savedLead.id,
