@@ -55,10 +55,10 @@ const columns: ColumnDef<any>[] = [
 export default function LeadStatusMasterPage() {
   return (
     <div className="flex flex-col space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between pr-[150px] min-h-[48px]">
         <h1 className="text-3xl font-bold tracking-tight">Master: Lead Statuses</h1>
-        <Button className="bg-[#0052FF] text-white">
-          <Plus className="mr-2 h-4 w-4" /> Add Status
+        <Button className="px-4 py-5 rounded-full bg-[#0052FF] text-white">
+          <Plus className="mr-1.5 h-4 w-4" /> Add Status
         </Button>
       </div>
 

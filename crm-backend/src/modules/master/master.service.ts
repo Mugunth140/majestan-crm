@@ -41,16 +41,41 @@ export class MasterService {
   async getLeadSources() {
     const repo = this.crmDataSource.getRepository(LeadSource);
     const sources = await repo.find({ where: { is_active: true }, order: { name: 'ASC' } });
-    return sources.map((s) => ({ label: s.name, value: s.name })); // store source name in Lead.lead_source
+    return sources.map((s) => ({ id: s.id, label: s.name, value: s.name, is_active: s.is_active }));
+  }
+
+  async getAllLeadSources() {
+    const repo = this.crmDataSource.getRepository(LeadSource);
+    const sources = await repo.find({ order: { name: 'ASC' } });
+    return sources.map((s) => ({ id: s.id, label: s.name, value: s.name, is_active: s.is_active, name: s.name }));
   }
 
   async createLeadSource(name: string) {
     const repo = this.crmDataSource.getRepository(LeadSource);
     const existing = await repo.findOne({ where: { name } });
     if (existing) {
-      return { label: existing.name, value: existing.name };
+      return { id: existing.id, label: existing.name, value: existing.name, is_active: existing.is_active };
     }
     const created = await repo.save(repo.create({ name }));
-    return { label: created.name, value: created.name };
+    return { id: created.id, label: created.name, value: created.name, is_active: created.is_active };
+  }
+
+  async updateLeadSource(id: number, data: { name: string; is_active: boolean }) {
+    const repo = this.crmDataSource.getRepository(LeadSource);
+    const source = await repo.findOne({ where: { id } });
+    if (!source) throw new InternalServerErrorException('Source not found');
+    source.name = data.name;
+    source.is_active = data.is_active;
+    const updated = await repo.save(source);
+    return { id: updated.id, label: updated.name, value: updated.name, is_active: updated.is_active };
+  }
+
+  async deleteLeadSource(id: number) {
+    const repo = this.crmDataSource.getRepository(LeadSource);
+    const result = await repo.delete(id);
+    if (result.affected === 0) {
+      throw new InternalServerErrorException('Source not found or could not be deleted');
+    }
+    return { success: true };
   }
 }
