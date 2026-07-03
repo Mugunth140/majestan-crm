@@ -410,7 +410,7 @@ export default function LeadsPage() {
         </div>
 
         {activeTab === "Action Required" && (
-          <div className="flex items-center gap-2 px-6 pt-5 animate-in slide-in-from-top-2 fade-in duration-200 flex-wrap">
+          <div className="flex items-center gap-2 px-6 pt-5 min-h-[60px] animate-in slide-in-from-top-2 fade-in duration-200 flex-wrap">
             <div className="flex items-center gap-2">
               {actionFilters.map((filter) => {
                 const isActive = actionFilter === filter;
@@ -420,7 +420,7 @@ export default function LeadsPage() {
                 return (
                   <button
                     key={filter}
-                    className={"flex items-center justify-center cursor-pointer px-5 py-2 rounded-full text-[13.5px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
+                    className={"h-10 flex items-center justify-center cursor-pointer px-5 rounded-full text-[13.5px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
                     onClick={() => setActionFilter(filter)}
                   >
                     {filter}
@@ -429,34 +429,32 @@ export default function LeadsPage() {
               })}
             </div>
             
-            {actionFilter === "Today" && (
-              <div className="ml-auto flex items-center bg-muted/40 p-1 rounded-full border border-border/50 relative">
-                {[
-                  { id: "pending", label: "Today Follow Up" },
-                  { id: "completed", label: "Today Followed Up" }
-                ].map((mode) => {
-                  const isSelected = todayViewMode === mode.id;
-                  return (
-                    <button
-                      key={mode.id}
-                      onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
-                      className={`relative px-4 py-1.5 rounded-full text-xs font-semibold transition-colors duration-200 z-10 active:scale-[0.96] ${isSelected ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                    >
-                      {isSelected && (
-                        <motion.div
-                          layoutId="todayToggleBg"
-                          className="absolute inset-0 bg-background shadow-sm rounded-full border border-border/20"
-                          initial={false}
-                          transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                          style={{ zIndex: -1 }}
-                        />
-                      )}
-                      <span className="relative z-10">{mode.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            <div className={`ml-auto flex items-center h-10 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+              {[
+                { id: "pending", label: "Follow Up" },
+                { id: "completed", label: "Followed Up" }
+              ].map((mode) => {
+                const isSelected = todayViewMode === mode.id;
+                return (
+                  <button
+                    key={mode.id}
+                    onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
+                    className={`relative h-full flex items-center px-4 rounded-full text-[13px] font-bold transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    {isSelected && (
+                      <motion.div
+                        layoutId="todayToggleBg"
+                        className="absolute inset-0 bg-[#0052FF] shadow-md rounded-full"
+                        initial={false}
+                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                        style={{ zIndex: -1 }}
+                      />
+                    )}
+                    <span className="relative z-10">{mode.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
