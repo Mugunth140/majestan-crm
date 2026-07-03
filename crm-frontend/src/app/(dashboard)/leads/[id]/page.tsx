@@ -9,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { FormSelect } from "@/components/shared/form-select";
+import { DateTimePicker } from "@/components/shared/datetime-picker";
+import { format } from "date-fns";
 import { toast } from "sonner";
 import {
   ArrowLeft, Loader2, User, Phone, MapPin, Building2, Calendar,
@@ -246,6 +248,41 @@ export default function LeadViewPage() {
     acc[log.contact_type] = (acc[log.contact_type] || 0) + 1;
     return acc;
   }, {}) ?? {};
+
+  // Convert string date/time to Date object
+  const getFuDateObj = (d: string, t: string) => {
+    if (!d) return undefined;
+    const date = new Date(d);
+    if (t) {
+      const [hh, mm] = t.split(":");
+      date.setHours(parseInt(hh, 10), parseInt(mm, 10), 0, 0);
+    }
+    return date;
+  };
+
+  const handleFuDateTimeChange = (fieldPrefix: "followUp" | "nextFollowUp", dateObj: Date | undefined) => {
+    if (!dateObj) {
+      setFuForm(f => ({ ...f, [`${fieldPrefix}Date`]: "", [`${fieldPrefix}Time`]: "" }));
+      return;
+    }
+    setFuForm(f => ({
+      ...f,
+      [`${fieldPrefix}Date`]: format(dateObj, "yyyy-MM-dd"),
+      [`${fieldPrefix}Time`]: format(dateObj, "HH:mm"),
+    }));
+  };
+
+  const handleEditDateTimeChange = (fieldPrefix: "followUp" | "nextFollowUp", dateObj: Date | undefined) => {
+    if (!dateObj) {
+      setEditFuForm((f: any) => ({ ...f, [`${fieldPrefix}Date`]: "", [`${fieldPrefix}Time`]: "" }));
+      return;
+    }
+    setEditFuForm((f: any) => ({
+      ...f,
+      [`${fieldPrefix}Date`]: format(dateObj, "yyyy-MM-dd"),
+      [`${fieldPrefix}Time`]: format(dateObj, "HH:mm"),
+    }));
+  };
 
   // Save new follow-up
   const handleSaveFollowUp = async () => {
@@ -812,12 +849,18 @@ export default function LeadViewPage() {
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
           <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow-Up Date</label>
-            <Input type="date" value={fuForm.followUpDate} onChange={e => setFuForm(f => ({ ...f, followUpDate: e.target.value }))} className="h-11 rounded-xl bg-muted/30" />
+            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow-Up Date & Time</label>
+            <DateTimePicker 
+              value={getFuDateObj(fuForm.followUpDate, fuForm.followUpTime)}
+              onChange={(date) => handleFuDateTimeChange("followUp", date)}
+            />
           </div>
           <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow-Up Time</label>
-            <Input type="time" value={fuForm.followUpTime} onChange={e => setFuForm(f => ({ ...f, followUpTime: e.target.value }))} className="h-11 rounded-xl bg-muted/30" />
+            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Follow-Up Date & Time</label>
+            <DateTimePicker 
+              value={getFuDateObj(fuForm.nextFollowUpDate, fuForm.nextFollowUpTime)}
+              onChange={(date) => handleFuDateTimeChange("nextFollowUp", date)}
+            />
           </div>
           <div className="space-y-2">
             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contacted Via *</label>
@@ -828,18 +871,10 @@ export default function LeadViewPage() {
             <FormSelect name="priority" placeholder="Select Priority" options={PRIORITIES} value={fuForm.priority} onValueChange={v => setFuForm(f => ({ ...f, priority: v || "" }))} />
           </div>
           <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Follow-Up Date</label>
-            <Input type="date" value={fuForm.nextFollowUpDate} onChange={e => setFuForm(f => ({ ...f, nextFollowUpDate: e.target.value }))} className="h-11 rounded-xl bg-muted/30" />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Follow-Up Time</label>
-            <Input type="time" value={fuForm.nextFollowUpTime} onChange={e => setFuForm(f => ({ ...f, nextFollowUpTime: e.target.value }))} className="h-11 rounded-xl bg-muted/30" />
-          </div>
-          <div className="space-y-2">
             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">RNR Status</label>
             <FormSelect name="rnr" placeholder="Select RNR" options={RNR_OPTIONS} value={fuForm.rnr} onValueChange={v => setFuForm(f => ({ ...f, rnr: v || "" }))} />
           </div>
-          <div className="space-y-2 xl:col-span-4">
+          <div className="space-y-2 xl:col-span-3">
             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Notes</label>
             <Textarea value={fuForm.notes} onChange={e => setFuForm(f => ({ ...f, notes: e.target.value }))} placeholder="What was discussed? Any outcome or next steps..." className="bg-muted/30 rounded-xl resize-none text-[14px] p-3.5" rows={4} />
           </div>
@@ -870,13 +905,19 @@ export default function LeadViewPage() {
             <DialogDescription>Update the details for this follow-up record.</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 py-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow-Up Date</label>
-              <Input type="date" value={editFuForm.followUpDate} onChange={e => setEditFuForm((f: any) => ({ ...f, followUpDate: e.target.value }))} className="h-11 rounded-xl bg-muted/30" />
+            <div className="space-y-1.5 col-span-2 sm:col-span-1">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow-Up Date & Time</label>
+              <DateTimePicker 
+                value={getFuDateObj(editFuForm.followUpDate, editFuForm.followUpTime)}
+                onChange={(date) => handleEditDateTimeChange("followUp", date)}
+              />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow-Up Time</label>
-              <Input type="time" value={editFuForm.followUpTime} onChange={e => setEditFuForm((f: any) => ({ ...f, followUpTime: e.target.value }))} className="h-11 rounded-xl bg-muted/30" />
+            <div className="space-y-1.5 col-span-2 sm:col-span-1">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Follow-Up Date & Time</label>
+              <DateTimePicker 
+                value={getFuDateObj(editFuForm.nextFollowUpDate, editFuForm.nextFollowUpTime)}
+                onChange={(date) => handleEditDateTimeChange("nextFollowUp", date)}
+              />
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contacted Via</label>
@@ -885,14 +926,6 @@ export default function LeadViewPage() {
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Priority</label>
               <FormSelect name="editPriority" placeholder="Priority" options={PRIORITIES} value={editFuForm.priority} onValueChange={v => setEditFuForm((f: any) => ({ ...f, priority: v || "" }))} />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Follow-Up Date</label>
-              <Input type="date" value={editFuForm.nextFollowUpDate} onChange={e => setEditFuForm((f: any) => ({ ...f, nextFollowUpDate: e.target.value }))} className="h-11 rounded-xl bg-muted/30" />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Follow-Up Time</label>
-              <Input type="time" value={editFuForm.nextFollowUpTime} onChange={e => setEditFuForm((f: any) => ({ ...f, nextFollowUpTime: e.target.value }))} className="h-11 rounded-xl bg-muted/30" />
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">RNR Status</label>
