@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { format, addDays } from "date-fns";
-import { Calendar as CalendarIcon, ChevronUp, ChevronDown } from "lucide-react";
+import { format, addDays, endOfWeek, nextMonday, addMonths, setHours, setMinutes } from "date-fns";
+import { Calendar as CalendarIcon, Clock, Globe, ChevronUp, ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
 
 interface DateTimePickerProps {
   value?: Date;
@@ -20,96 +21,103 @@ interface DateTimePickerProps {
   className?: string;
 }
 
-export function DateTimePicker({ value, onChange, placeholder = "Pick your date & time", className }: DateTimePickerProps) {
+export function DateTimePicker({ value, onChange, placeholder = "Pick date & time", className }: DateTimePickerProps) {
   const [isOpen, setIsOpen] = React.useState(false);
+  const [internalDate, setInternalDate] = React.useState<Date | undefined>(value);
 
-  // Internal time state for 12-hour format
-  const [hour, setHour] = React.useState(12);
-  const [minute, setMinute] = React.useState(0);
-  const [ampm, setAmpm] = React.useState<"AM" | "PM">("AM");
+  // Time state derived from internalDate
+  const hour24 = internalDate ? internalDate.getHours() : 12;
+  const hour12 = hour24 % 12 || 12;
+  const minute = internalDate ? internalDate.getMinutes() : 0;
+  const ampm = hour24 >= 12 ? "PM" : "AM";
 
-  // Sync internal state with external value
+  // Sync internal state when popover opens
   React.useEffect(() => {
-    if (value) {
-      const h24 = value.getHours();
-      setHour(h24 % 12 || 12);
-      setMinute(value.getMinutes());
-      setAmpm(h24 >= 12 ? "PM" : "AM");
+    if (isOpen) {
+      setInternalDate(value);
     }
-  }, [value]);
+  }, [isOpen, value]);
 
-  const updateExternalValue = (newHour: number, newMinute: number, newAmpm: "AM" | "PM") => {
-    let h24 = newHour;
-    if (newAmpm === "AM" && h24 === 12) h24 = 0;
-    if (newAmpm === "PM" && h24 !== 12) h24 += 12;
-
-    if (value) {
-      const newDate = new Date(value);
-      newDate.setHours(h24, newMinute, 0, 0);
-      onChange?.(newDate);
-    } else {
-      // If no date selected yet, default to today when they change time
-      const newDate = new Date();
-      newDate.setHours(h24, newMinute, 0, 0);
-      onChange?.(newDate);
-    }
-  };
-
-  const handleSelect = (date: Date | undefined) => {
-    if (!date) {
-      onChange?.(undefined);
+  const updateInternalDate = (newDate: Date | undefined) => {
+    if (!newDate) {
+      setInternalDate(undefined);
       return;
     }
-    const newDate = new Date(date);
-    let h24 = hour;
-    if (ampm === "AM" && h24 === 12) h24 = 0;
-    if (ampm === "PM" && h24 !== 12) h24 += 12;
+    // If we only updated the date part, ensure time is preserved
+    if (internalDate) {
+      newDate.setHours(internalDate.getHours(), internalDate.getMinutes(), 0, 0);
+    } else {
+      newDate.setHours(0, 0, 0, 0); // Start of day if no previous time
+    }
+    setInternalDate(newDate);
+  };
+
+  const setTime = (h12: number, min: number, ap: "AM" | "PM") => {
+    let h24 = h12;
+    if (ap === "AM" && h24 === 12) h24 = 0;
+    if (ap === "PM" && h24 !== 12) h24 += 12;
     
-    newDate.setHours(h24, minute, 0, 0);
-    onChange?.(newDate);
+    const targetDate = internalDate ? new Date(internalDate) : new Date();
+    targetDate.setHours(h24, min, 0, 0);
+    setInternalDate(targetDate);
   };
 
-  const setQuickDate = (days: number) => {
-    const targetDate = addDays(new Date(), days);
-    let h24 = hour;
-    if (ampm === "AM" && h24 === 12) h24 = 0;
-    if (ampm === "PM" && h24 !== 12) h24 += 12;
-
-    targetDate.setHours(h24, minute, 0, 0);
-    onChange?.(targetDate);
+  const handleApply = () => {
+    onChange?.(internalDate);
+    setIsOpen(false);
   };
 
-  // Time controls
-  const incrementHour = () => {
-    const newHour = hour === 12 ? 1 : hour + 1;
-    setHour(newHour);
-    updateExternalValue(newHour, minute, ampm);
+  const handleCancel = () => {
+    setIsOpen(false);
   };
-  const decrementHour = () => {
-    const newHour = hour === 1 ? 12 : hour - 1;
-    setHour(newHour);
-    updateExternalValue(newHour, minute, ampm);
+
+  const handleClear = () => {
+    setInternalDate(undefined);
   };
-  const incrementMinute = () => {
-    const newMinute = minute >= 55 ? 0 : minute + 5; // Jump by 5 mins for better UX, or 1? Let's do 1.
-    setMinute(newMinute);
-    updateExternalValue(hour, newMinute, ampm);
+
+  const applyQuickTime = (h24: number, min: number) => {
+    const targetDate = internalDate ? new Date(internalDate) : new Date();
+    targetDate.setHours(h24, min, 0, 0);
+    setInternalDate(targetDate);
   };
-  // Better to increment by 1 for exact precision
+
+  const QUICK_TIMES = [
+    { label: "9:00 AM", h: 9, m: 0 },
+    { label: "10:00 AM", h: 10, m: 0 },
+    { label: "11:00 AM", h: 11, m: 0 },
+    { label: "12:00 PM", h: 12, m: 0 },
+    { label: "2:00 PM", h: 14, m: 0 },
+    { label: "4:00 PM", h: 16, m: 0 },
+  ];
+
+  const SHORTCUTS = [
+    { label: "Today", date: new Date() },
+    { label: "Tomorrow", date: addDays(new Date(), 1) },
+    { label: "Next Week", date: addDays(new Date(), 7) },
+    { label: "End of Week", date: endOfWeek(new Date(), { weekStartsOn: 1 }) },
+    { label: "Next Monday", date: nextMonday(new Date()) },
+    { label: "Next Month", date: addMonths(new Date(), 1) },
+  ];
+
+  // Increment/Decrement handlers
+  const incHour = () => {
+    const newH12 = hour12 === 12 ? 1 : hour12 + 1;
+    setTime(newH12, minute, ampm);
+  };
+  const decHour = () => {
+    const newH12 = hour12 === 1 ? 12 : hour12 - 1;
+    setTime(newH12, minute, ampm);
+  };
   const incMin = () => {
-    const newMinute = minute === 59 ? 0 : minute + 1;
-    setMinute(newMinute);
-    updateExternalValue(hour, newMinute, ampm);
+    const newMin = minute === 59 ? 0 : minute + 1;
+    setTime(hour12, newMin, ampm);
   };
   const decMin = () => {
-    const newMinute = minute === 0 ? 59 : minute - 1;
-    setMinute(newMinute);
-    updateExternalValue(hour, newMinute, ampm);
+    const newMin = minute === 0 ? 59 : minute - 1;
+    setTime(hour12, newMin, ampm);
   };
-  const toggleAmpm = () => {
-    const newAmpm = ampm === "AM" ? "PM" : "AM";
-    setAmpm(newAmpm);
-    updateExternalValue(hour, minute, newAmpm);
+  const toggleAmPm = () => {
+    setTime(hour12, minute, ampm === "AM" ? "PM" : "AM");
   };
 
   return (
@@ -118,79 +126,144 @@ export function DateTimePicker({ value, onChange, placeholder = "Pick your date 
         <Button
           variant="outline"
           className={cn(
-            "w-full justify-start text-left font-normal bg-muted/30 hover:bg-muted/50 rounded-xl h-11 border-border/50 shadow-sm",
-            !value && "text-muted-foreground",
+            "w-full justify-start text-left font-medium bg-background hover:bg-muted/40 rounded-xl h-11 border-border/60 shadow-sm transition-all duration-200",
+            !value && "text-muted-foreground font-normal",
             className
           )}
         >
-          <CalendarIcon className="mr-2 h-4 w-4" />
+          <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
           {value ? format(value, "MMM do, yyyy - hh:mm a") : <span>{placeholder}</span>}
         </Button>
       } />
-      <PopoverContent className="w-auto p-0 rounded-2xl shadow-xl overflow-hidden border-border/60" align="start">
-        
-        {/* Top Quick Actions */}
-        <div className="flex items-center justify-between p-1.5 border-b border-border/40 bg-muted/10">
-          <Button variant="ghost" size="sm" onClick={() => setQuickDate(0)} className="flex-1 rounded-lg text-xs font-medium hover:bg-primary/10 hover:text-primary">Today</Button>
-          <Button variant="ghost" size="sm" onClick={() => setQuickDate(1)} className="flex-1 rounded-lg text-xs font-medium hover:bg-primary/10 hover:text-primary">Tomorrow</Button>
-          <Button variant="ghost" size="sm" onClick={() => setQuickDate(7)} className="flex-1 rounded-lg text-xs font-medium hover:bg-primary/10 hover:text-primary">Next Week</Button>
-        </div>
-
-        <div className="flex">
-          {/* Left Calendar */}
-          <div className="p-3">
-            <Calendar
-              mode="single"
-              selected={value}
-              onSelect={handleSelect}
-              className="p-0 pointer-events-auto"
-              classNames={{
-                today: "bg-transparent border border-primary text-primary font-bold data-[selected=true]:bg-primary data-[selected=true]:text-primary-foreground data-[selected=true]:border-none", 
-              }}
-            />
+      <PopoverContent 
+        className="w-auto p-0 rounded-2xl shadow-2xl border-border/50 bg-background overflow-hidden animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95 duration-150" 
+        align="start"
+      >
+        <div className="flex flex-col md:flex-row">
+          {/* Smart Shortcuts Sidebar */}
+          <div className="flex md:flex-col border-b md:border-b-0 md:border-r border-border/40 p-3 gap-1 bg-muted/10 w-full md:w-44 overflow-x-auto hide-scrollbar">
+            <span className="text-xs font-semibold text-muted-foreground px-2 pb-1.5 pt-1 uppercase tracking-wider hidden md:block">Shortcuts</span>
+            {SHORTCUTS.map((s, i) => (
+              <Button 
+                key={i} 
+                variant="ghost" 
+                onClick={() => updateInternalDate(s.date)}
+                className="justify-start text-[13px] font-medium h-8 rounded-lg text-foreground/80 hover:bg-primary/10 hover:text-blue-600 transition-colors px-3 whitespace-nowrap"
+              >
+                {s.label}
+              </Button>
+            ))}
+            <div className="mt-auto hidden md:block pt-4">
+              <Button variant="ghost" onClick={handleClear} className="w-full justify-start text-[13px] text-muted-foreground hover:text-red-500 hover:bg-red-50 h-8 rounded-lg px-3">
+                Clear Selection
+              </Button>
+            </div>
           </div>
-          
-          {/* Right Time Picker Controls */}
-          <div className="p-3 flex items-center justify-center border-l border-border/40 bg-muted/5">
-            <div className="flex items-center gap-1">
-              {/* Hour */}
-              <div className="flex flex-col items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" onClick={incrementHour}>
-                  <ChevronUp className="h-5 w-5" />
-                </Button>
-                <div className="w-10 h-10 flex items-center justify-center bg-muted/50 rounded-lg text-sm font-semibold border border-border/50 shadow-inner">
-                  {hour.toString().padStart(2, '0')}
-                </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" onClick={decrementHour}>
-                  <ChevronDown className="h-5 w-5" />
-                </Button>
+
+          <div className="flex flex-col">
+            <div className="flex flex-col sm:flex-row">
+              {/* Calendar Section */}
+              <div className="p-4 border-r border-border/40">
+                <Calendar
+                  mode="single"
+                  selected={internalDate}
+                  onSelect={updateInternalDate}
+                  captionLayout="dropdown"
+                  className="p-0"
+                  classNames={{
+                    today: "bg-blue-500/10 text-blue-600 border border-blue-200 font-bold dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30 data-[selected=true]:bg-primary data-[selected=true]:text-primary-foreground data-[selected=true]:border-transparent",
+                  }}
+                  modifiers={{ weekend: { dayOfWeek: [0, 6] } }}
+                  modifiersClassNames={{ weekend: "text-muted-foreground opacity-70" }}
+                />
               </div>
+              
+              {/* Time Section */}
+              <div className="p-4 w-full sm:w-60 bg-muted/5 flex flex-col gap-5">
+                <div>
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 block">Time</span>
+                  
+                  {/* Up/Down Time Picker */}
+                  <div className="flex items-center justify-center gap-2 mb-6">
+                    {/* Hour */}
+                    <div className="flex flex-col items-center gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" onClick={incHour}>
+                        <ChevronUp className="h-5 w-5" />
+                      </Button>
+                      <div className="w-11 h-11 flex items-center justify-center bg-background rounded-xl text-lg font-bold border border-border/50 shadow-sm">
+                        {hour12.toString().padStart(2, '0')}
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" onClick={decHour}>
+                        <ChevronDown className="h-5 w-5" />
+                      </Button>
+                    </div>
 
-              <span className="text-xl font-light text-muted-foreground/50 pb-1">:</span>
+                    <span className="text-xl font-light text-muted-foreground/50 pb-1">:</span>
 
-              {/* Minute */}
-              <div className="flex flex-col items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" onClick={incMin}>
-                  <ChevronUp className="h-5 w-5" />
-                </Button>
-                <div className="w-10 h-10 flex items-center justify-center bg-muted/50 rounded-lg text-sm font-semibold border border-border/50 shadow-inner">
-                  {minute.toString().padStart(2, '0')}
+                    {/* Minute */}
+                    <div className="flex flex-col items-center gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" onClick={incMin}>
+                        <ChevronUp className="h-5 w-5" />
+                      </Button>
+                      <div className="w-11 h-11 flex items-center justify-center bg-background rounded-xl text-lg font-bold border border-border/50 shadow-sm">
+                        {minute.toString().padStart(2, '0')}
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" onClick={decMin}>
+                        <ChevronDown className="h-5 w-5" />
+                      </Button>
+                    </div>
+
+                    {/* AM/PM */}
+                    <div className="flex flex-col items-center gap-1 ml-2">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" onClick={toggleAmPm}>
+                        <ChevronUp className="h-5 w-5" />
+                      </Button>
+                      <div className="w-11 h-11 flex items-center justify-center bg-muted/40 rounded-xl text-sm font-bold border border-border/50 shadow-inner">
+                        {ampm}
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" onClick={toggleAmPm}>
+                        <ChevronDown className="h-5 w-5" />
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {/* Quick Time Chips */}
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Quick Times</span>
+                  <div className="flex flex-wrap gap-2">
+                    {QUICK_TIMES.map((qt, i) => (
+                      <Button
+                        key={i}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => applyQuickTime(qt.h, qt.m)}
+                        className="h-7 text-xs px-2.5 rounded-lg border-border/60 hover:border-blue-500 hover:text-blue-600 font-medium transition-colors"
+                      >
+                        {qt.label}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" onClick={decMin}>
-                  <ChevronDown className="h-5 w-5" />
-                </Button>
+
+                <div className="mt-auto">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                    <Globe className="h-3 w-3" />
+                    <span>{Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
+                  </div>
+                </div>
               </div>
+            </div>
 
-              {/* AM/PM */}
-              <div className="flex flex-col items-center gap-1 ml-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" onClick={toggleAmpm}>
-                  <ChevronUp className="h-5 w-5" />
+            {/* Footer */}
+            <div className="p-3 border-t border-border/40 bg-muted/10 flex items-center justify-between">
+              <div className="text-[13px] font-medium text-foreground/80 px-2">
+                {internalDate ? format(internalDate, "EEEE, d MMMM yyyy • hh:mm a") : "No date selected"}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={handleCancel} className="h-8 rounded-lg text-xs font-semibold px-4 hover:bg-muted">
+                  Cancel
                 </Button>
-                <div className="w-10 h-10 flex items-center justify-center bg-muted/50 rounded-lg text-sm font-semibold border border-border/50 shadow-inner">
-                  {ampm}
-                </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" onClick={toggleAmpm}>
-                  <ChevronDown className="h-5 w-5" />
+                <Button size="sm" onClick={handleApply} className="h-8 rounded-lg text-xs font-semibold px-5 bg-blue-500 hover:bg-blue-600 text-white shadow-md">
+                  Apply
                 </Button>
               </div>
             </div>
