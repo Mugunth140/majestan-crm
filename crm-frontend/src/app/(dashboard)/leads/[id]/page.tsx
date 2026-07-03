@@ -14,8 +14,9 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import {
   ArrowLeft, Loader2, User, Phone, MapPin, Building2, Calendar,
-  FileText, Briefcase, Mail, MessageSquare, Edit, Trash2, Plus,
-  Clock, Send, RefreshCw, ChevronDown, ChevronUp
+  Briefcase, Mail, MessageSquare, Edit, Plus,
+  Clock, Send, RefreshCw,
+  ArrowUpRight
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
@@ -672,7 +673,7 @@ export default function LeadViewPage() {
                     }}
                     className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${lead.is_unqualified ? "bg-red-500" : "bg-muted"}`}
                   >
-                    <span className={`pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform ${lead.is_unqualified ? "translate-x-5" : "translate-x-0.5"}`} />
+                    <span className={`pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform ${lead.is_unqualified ? "translate-x-5.5" : "translate-x-0.5"}`} />
                   </button>
                 </div>
               </div>
@@ -765,80 +766,77 @@ export default function LeadViewPage() {
       </div>
 
       {/* ── Follow-Up History ── */}
-      <div className="bg-card border rounded-2xl p-6 shadow-sm">
-        <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" /> Follow-Up History
-          <Badge variant="secondary" className="ml-auto text-xs">{followUps.length} records</Badge>
-        </h3>
+      <div className="bg-card border rounded-2xl shadow-sm overflow-hidden">
+        <div className="p-4 border-b pb-4 flex items-center gap-3 bg-muted/10">
+          <div className="h-8 w-8 rounded-full flex items-center justify-center">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-foreground">Follow Up History</h3>
+            {/* <p className="text-xs text-muted-foreground mt-0.5
+          <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center border border-blue-200">Track interactions and scheduled events.</p> */}
+          </div>
+          <Badge variant="outline" className="ml-auto text-xs bg-background px-4 py-4">{followUps.length} Follow ups</Badge>
+        </div>
 
         {followUps.length === 0 ? (
-          <p className="text-sm text-muted-foreground italic text-center py-6">No follow-up history yet. Use the form below to log the first one.</p>
+          <p className="text-sm text-muted-foreground italic text-center py-10">No follow-up history yet. Use the form below to log the first one.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  <th className="pb-3 text-left w-10">#</th>
-                  <th className="pb-3 text-left w-36">Staff</th>
-                  <th className="pb-3 text-left w-28">Via</th>
-                  <th className="pb-3 text-left w-40">Date & Time</th>
-                  <th className="pb-3 text-left w-40">Next Follow-Up</th>
-                  <th className="pb-3 text-left w-24">Priority</th>
-                  <th className="pb-3 text-left min-w-[250px]">Notes</th>
-                  <th className="pb-3 text-center w-24">Actions</th>
+              <thead className="bg-muted/30">
+                <tr className="border-b text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <th className="py-3 px-4 text-left w-10">#</th>
+                  <th className="py-3 px-4 text-left w-36">Staff</th>
+                  <th className="py-3 px-4 text-left w-28">Via</th>
+                  <th className="py-3 px-4 text-left w-40">Date & Time</th>
+                  <th className="py-3 px-4 text-left w-40">Next Follow-Up</th>
+                  <th className="py-3 px-4 text-left w-24">Priority</th>
+                  <th className="py-3 px-4 text-left min-w-[280px]">Notes</th>
+                  <th className="py-3 px-4 text-center w-16">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
                 {followUps.map((fu: any, i: number) => (
-                  <tr key={fu.id} className="hover:bg-muted/20 transition-colors">
-                    <td className="py-4 pr-3 text-muted-foreground font-mono text-xs align-middle">{i + 1}</td>
-                    <td className="py-4 pr-4 align-middle">
-                      <div className="flex items-center gap-2">
-                        {/* <div className="h-7 w-7 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-xs font-bold text-blue-800 shrink-0">
-                          {(fu.created_by?.name || "?").charAt(0).toUpperCase()}
-                        </div> */}
-                        <span className="font-medium text-sm whitespace-nowrap">{fu.created_by?.name || "—"}</span>
-                      </div>
+                  <tr key={fu.id} className="hover:bg-muted/10 transition-colors group">
+                    <td className="py-4 px-4 text-muted-foreground font-mono text-xs align-top">{i + 1}</td>
+                    <td className="py-4 px-4 align-top">
+                      <span className="font-semibold text-[13px] text-foreground/90 whitespace-nowrap">{fu.created_by?.name || "—"}</span>
                     </td>
-                    <td className="py-4 pr-4 align-middle">
+                    <td className="py-4 px-4 align-top">
                       {fu.contacted_via ? (
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold capitalize ${CONTACT_TYPE_STYLES[fu.contacted_via] || "bg-gray-100 text-gray-700"}`}>
-                          {CONTACT_TYPE_ICONS[fu.contacted_via]}
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[11px] font-bold capitalize tracking-wide ${CONTACT_TYPE_STYLES[fu.contacted_via] || "bg-gray-100 text-gray-700"}`}>
+                          {/* {CONTACT_TYPE_ICONS[fu.contacted_via]} */}
                           {fu.contacted_via}
                         </span>
                       ) : <span className="text-muted-foreground">—</span>}
                     </td>
-                    <td className="py-4 pr-4 whitespace-nowrap text-sm align-middle">
-                      <p className="font-medium text-foreground">{formatFollowUpDate(fu.follow_up_date)}</p>
-                      {fu.follow_up_time && <p className="text-xs text-muted-foreground mt-0.5">{formatTime12hr(fu.follow_up_time)}</p>}
+                    <td className="py-4 px-4 whitespace-nowrap text-[13px] align-top">
+                      <p className="font-semibold text-foreground/90">{formatFollowUpDate(fu.follow_up_date)}</p>
+                      {fu.follow_up_time && <p className="text-xs text-muted-foreground font-medium mt-0.5">{formatTime12hr(fu.follow_up_time)}</p>}
                     </td>
-                    <td className="py-4 pr-4 whitespace-nowrap text-sm align-middle">
+                    <td className="py-4 px-4 whitespace-nowrap text-[13px] align-top">
                       {fu.next_follow_up_date ? (
                         <div>
-                          <p className="text-[#0052FF] font-medium">{formatFollowUpDate(fu.next_follow_up_date)}</p>
-                          {fu.next_follow_up_time && <p className="text-xs text-muted-foreground mt-0.5">{formatTime12hr(fu.next_follow_up_time)}</p>}
+                          <p className="text-[#0052FF] font-bold">{formatFollowUpDate(fu.next_follow_up_date)}</p>
+                          {fu.next_follow_up_time && <p className="text-xs text-muted-foreground font-medium mt-0.5">{formatTime12hr(fu.next_follow_up_time)}</p>}
                         </div>
                       ) : <span className="text-muted-foreground">—</span>}
                     </td>
-                    <td className="py-4 pr-4 align-middle">
+                    <td className="py-4 px-4 align-top">
                       {fu.priority ? (
-                        <Badge className={`capitalize text-xs border w-full ${PRIORITY_STYLES[fu.priority] || "bg-gray-100 text-gray-700"}`}>{fu.priority}</Badge>
+                        <Badge className={`capitalize text-[11px] font-bold tracking-wide border px-2 py-0.5 ${PRIORITY_STYLES[fu.priority] || "bg-gray-100 text-gray-700"}`}>{fu.priority}</Badge>
                       ) : <span className="text-muted-foreground">—</span>}
                     </td>
-                    <td className="py-4 pr-4 align-middle">
-                      <div className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap bg-muted/20 p-2.5 rounded-lg border border-border/50">
+                    <td className="py-4 px-4 align-top">
+                      <div className="text-[13px] leading-relaxed text-foreground/80 whitespace-pre-wrap max-w-lg">
                         {fu.notes || <span className="text-muted-foreground italic">No notes provided</span>}
                       </div>
                     </td>
-                    <td className="py-4 align-middle">
-                      <div className="flex items-center justify-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-[#0052FF]" onClick={() => openEditFu(fu)}>
-                          <Edit className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => setDeleteFuId(fu.id)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                    <td className="py-4 px-4 align-top text-center">
+                      <Button variant="outline" size="icon" className="h-8 w-8 text-muted-foreground transition-colors hover:text-[#0052FF] hover:bg-blue-50" onClick={() => openEditFu(fu)}>
+                        <Edit className="h-3.5 w-3.5" />
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -851,28 +849,28 @@ export default function LeadViewPage() {
       {/* ── New Follow-Up Form ── */}
       <div className="bg-card border rounded-2xl p-6 shadow-sm">
         <h3 className="text-base font-bold text-foreground border-b pb-3 mb-6 flex items-center gap-2">
-          <Plus className="h-4 w-4 text-muted-foreground" /> Log New Follow-Up
+          <ArrowUpRight className="h-4 w-4 text-muted-foreground" /> Log New Follow Up
         </h3>
         
         <div className="flex flex-col xl:flex-row gap-6">
           {/* Left Side: Inputs */}
           <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-5 h-fit">
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow-Up Date & Time</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow Up Date & Time</label>
               <DateTimePicker 
                 value={getFuDateObj(fuForm.followUpDate, fuForm.followUpTime)}
                 onChange={(date) => handleFuDateTimeChange("followUp", date)}
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Follow-Up Date & Time</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Follow Up Date & Time</label>
               <DateTimePicker 
                 value={getFuDateObj(fuForm.nextFollowUpDate, fuForm.nextFollowUpTime)}
                 onChange={(date) => handleFuDateTimeChange("nextFollowUp", date)}
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contacted Via *</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contacted Via</label>
               <FormSelect name="contactedVia" placeholder="How contacted?" options={CONTACTED_VIA} value={fuForm.contactedVia} onValueChange={v => setFuForm(f => ({ ...f, contactedVia: v || "" }))} />
             </div>
             <div className="space-y-2">
@@ -892,8 +890,8 @@ export default function LeadViewPage() {
               <Textarea value={fuForm.notes} onChange={e => setFuForm(f => ({ ...f, notes: e.target.value }))} placeholder="What was discussed? Any outcome or next steps..." className="bg-muted/30 rounded-xl resize-none text-[14px] p-3.5 flex-1 min-h-[120px]" />
             </div>
             <Button onClick={handleSaveFollowUp} disabled={isSavingFu} className="w-full h-11 bg-[#0052FF] text-white hover:bg-[#0040CC] rounded-xl shadow font-semibold gap-2">
-              {isSavingFu ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              Save Follow-Up
+              {isSavingFu ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpRight className="h-4 w-4" />}
+              Save Follow Up
             </Button>
           </div>
         </div>

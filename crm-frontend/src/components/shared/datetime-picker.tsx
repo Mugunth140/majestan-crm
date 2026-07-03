@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { format, addDays, endOfWeek, nextMonday, addMonths, setHours, setMinutes } from "date-fns";
-import { Calendar as CalendarIcon, Clock, Globe, ChevronUp, ChevronDown } from "lucide-react";
+import { format, addDays, endOfWeek, nextMonday, addMonths} from "date-fns";
+import { Calendar as CalendarIcon, Globe, ChevronUp, ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Input } from "@/components/ui/input";
 
 interface DateTimePickerProps {
   value?: Date;
@@ -136,6 +135,8 @@ export function DateTimePicker({ value, onChange, placeholder = "Pick date & tim
         </Button>
       } />
       <PopoverContent 
+        side="top"
+        sideOffset={8}
         className="w-auto p-0 rounded-2xl shadow-2xl border-border/50 bg-background overflow-hidden animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95 duration-150" 
         align="start"
       >
