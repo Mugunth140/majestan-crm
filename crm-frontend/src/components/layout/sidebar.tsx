@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { 
@@ -10,6 +10,7 @@ import {
   ShieldAlert, 
   Building2, 
   Home, 
+  Astroid,
   Activity, 
   Settings,
   ChevronLeft,
@@ -19,8 +20,13 @@ import Image from "next/image";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Leads", href: "/leads", icon: Users },
-  { name: "Users", href: "/users", icon: ShieldAlert, adminOnly: true },
+  { name: "Leads", href: "/leads", icon: Astroid },
+  { 
+    name: "Users", 
+    icon: Users, 
+    adminOnly: true,
+    href: "/users"
+  },
   { name: "Roles", href: "/roles", icon: ShieldAlert, adminOnly: true },
   { name: "Departments", href: "/departments", icon: Building2 },
   { name: "Properties", href: "/properties", icon: Home },
@@ -39,6 +45,7 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
 
@@ -116,7 +123,22 @@ export function Sidebar() {
                 {!isCollapsed && hasSub && isActive && (
                   <div className="ml-9 mt-1 flex flex-col gap-1 border-l-2 border-muted/50 pl-3">
                     {item.subItems?.map((sub) => {
-                      const isSubActive = pathname === sub.href;
+                      let isSubActive = false;
+                      if (sub.href.includes("?")) {
+                        const paramString = sub.href.split("?")[1];
+                        const urlParams = new URLSearchParams(paramString);
+                        isSubActive = pathname === sub.href.split("?")[0];
+                        urlParams.forEach((val, key) => {
+                          if (searchParams.get(key) !== val) isSubActive = false;
+                        });
+                      } else {
+                        isSubActive = pathname === sub.href;
+                        // Don't highlight the base "All Users" if a specific department filter is active
+                        if (sub.href === "/users" && searchParams.get("dept")) {
+                          isSubActive = false;
+                        }
+                      }
+                                          
                       return (
                         <Link
                           key={sub.name}

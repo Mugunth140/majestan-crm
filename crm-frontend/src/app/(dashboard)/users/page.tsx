@@ -1,20 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
 import { Edit, Trash2, Plus, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
-export default function UsersPage() {
+function UsersList() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const deptFilter = searchParams.get("dept");
+
   const [users, setUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -37,6 +40,10 @@ export default function UsersPage() {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  const displayedUsers = deptFilter 
+    ? users.filter(u => u.department?.name === deptFilter)
+    : users;
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -102,7 +109,9 @@ export default function UsersPage() {
     <div className="flex flex-col space-y-6">
       <div className="flex h-[48px] items-center justify-between pr-[150px]">
         <div>
-          <h1 className="text-[28px] font-bold tracking-tight">Users Management</h1>
+          <h1 className="text-[28px] font-bold tracking-tight">
+            {deptFilter ? `${deptFilter} Users` : "Users Management"}
+          </h1>
           <p className="text-muted-foreground text-sm mt-1 flex items-center gap-2">
             <ShieldAlert className="h-4 w-4" /> Only Administrators can view and manage this section.
           </p>
@@ -115,7 +124,7 @@ export default function UsersPage() {
       </div>
 
       <div className="bg-card border rounded-xl overflow-hidden shadow-sm p-6">
-        {isLoading ? <TableSkeleton /> : <DataTable columns={columns} data={users} />}
+        {isLoading ? <TableSkeleton /> : <DataTable columns={columns} data={displayedUsers} />}
       </div>
 
       <Dialog open={deleteId !== null} onOpenChange={(open) => !open && setDeleteId(null)}>
@@ -131,5 +140,13 @@ export default function UsersPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function UsersPage() {
+  return (
+    <Suspense fallback={<TableSkeleton />}>
+      <UsersList />
+    </Suspense>
   );
 }

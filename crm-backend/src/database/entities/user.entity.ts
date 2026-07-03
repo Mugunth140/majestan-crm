@@ -16,6 +16,30 @@ export class User {
   @Column()
   password_hash: string;
 
+  @Column({ type: 'text', nullable: true })
+  address: string;
+
+  @Column({ nullable: true })
+  phone: string;
+
+  @Column({ nullable: true })
+  whatsapp_no: string;
+
+  @Column({ type: 'date', nullable: true })
+  dob: string;
+
+  @Column({ nullable: true })
+  aadhaar_no: string;
+
+  @Column({ nullable: true })
+  bank_account_no: string;
+
+  @Column({ type: 'date', nullable: true })
+  join_date: string;
+
+  @Column({ nullable: true })
+  qualification: string;
+
   @Column({ name: 'role_id' })
   role_id: number;
 
