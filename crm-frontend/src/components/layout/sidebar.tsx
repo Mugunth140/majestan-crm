@@ -7,33 +7,42 @@ import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, 
   Users, 
-  ShieldAlert, 
-  Building2, 
   Home, 
   Astroid,
   Activity, 
   Settings,
+  Database,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Inbox,
+  Route,
+  Network,
+  Briefcase,
+  Package,
+  LineChart
 } from "lucide-react";
 import Image from "next/image";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Leads", href: "/leads", icon: Astroid },
-  { 
+  { name: "Inbound", href: "/inbound", icon: Inbox },
+  { name: "Lead Routing", href: "/lead-routing", icon: Route },
+  { name: "Agent Network", href: "/agent-network", icon: Network },
+  { name: "Projects", href: "/projects", icon: Briefcase },
+  { name: "Properties", href: "/properties", icon: Home },
+  { name: "Asset Inventory", href: "/asset-inventory", icon: Package },
+  { name: "Target Insights", href: "/insights", icon: LineChart },
+  { name: "Activity Logs", href: "/activity-logs", icon: Activity },
+    { 
     name: "Users", 
     icon: Users, 
     adminOnly: true,
     href: "/users"
   },
-  { name: "Roles", href: "/roles", icon: ShieldAlert, adminOnly: true },
-  { name: "Departments", href: "/departments", icon: Building2 },
-  { name: "Properties", href: "/properties", icon: Home },
-  { name: "Activity Logs", href: "/activity-logs", icon: Activity },
   { 
-    name: "Master Data", 
-    icon: Settings,
+    name: "Master Registry", 
+    icon: Database,
     adminOnly: true,
     subItems: [
       { name: "Lead Status", href: "/master/lead-status" },
