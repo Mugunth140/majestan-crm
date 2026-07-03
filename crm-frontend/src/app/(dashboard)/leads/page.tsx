@@ -5,10 +5,12 @@ import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Plus, FileSpreadsheet, UploadCloud, RefreshCw, Eye } from "lucide-react";
+import { Edit, Trash2, Plus, FileSpreadsheet, UploadCloud, RefreshCw, Eye, Search, Filter, X } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { FormSelect } from "@/components/shared/form-select";
 import { Input } from "@/components/ui/input";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
@@ -46,6 +48,17 @@ export default function LeadsPage() {
   const [pendingImports, setPendingImports] = useState<any[]>([]);
   const [isInserting, setIsInserting] = useState(false);
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filters, setFilters] = useState({
+    dateFrom: "",
+    dateTo: "",
+    category: "",
+    type: "",
+    staff: "",
+    status: "",
+    source: "",
+  });
+
   const [todayViewMode, setTodayViewMode] = useState<"pending" | "completed">("pending");
 
   const tabs = ["All Leads", "Open Pipeline", "Action Required", "Unqualified"];
@@ -69,17 +82,47 @@ export default function LeadsPage() {
   }, [fetchLeads]);
 
   const displayedLeads = () => {
+    let filtered = leads;
+
+    // 1. Search Query
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(l => 
+        (l.id && l.id.toLowerCase().includes(q)) ||
+        (l.name && l.name.toLowerCase().includes(q)) ||
+        (l.mobile && l.mobile.toLowerCase().includes(q)) ||
+        (l.email && l.email.toLowerCase().includes(q))
+      );
+    }
+
+    // 2. Filters
+    if (filters.dateFrom) {
+      const from = new Date(filters.dateFrom);
+      from.setHours(0, 0, 0, 0);
+      filtered = filtered.filter(l => new Date(l.createdAt || l.date) >= from);
+    }
+    if (filters.dateTo) {
+      const to = new Date(filters.dateTo);
+      to.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(l => new Date(l.createdAt || l.date) <= to);
+    }
+    if (filters.category) filtered = filtered.filter(l => l.propertyCategory === filters.category);
+    if (filters.type) filtered = filtered.filter(l => l.propertyType === filters.type);
+    if (filters.staff) filtered = filtered.filter(l => l.staff === filters.staff);
+    if (filters.status) filtered = filtered.filter(l => l.status === filters.status);
+    if (filters.source) filtered = filtered.filter(l => l.source === filters.source);
+
     if (activeTab === "Open Pipeline") {
       // Pending imports haven't been saved to DB yet, so they aren't unqualified
       return pendingImports;
     }
 
     if (activeTab === "Unqualified") {
-      return leads.filter(lead => lead.isUnqualified === true);
+      return filtered.filter(lead => lead.isUnqualified === true);
     }
 
     // For All Leads and Action Required, filter OUT unqualified leads
-    const qualifiedLeads = leads.filter(lead => !lead.isUnqualified);
+    const qualifiedLeads = filtered.filter(lead => !lead.isUnqualified);
 
     if (activeTab === "Action Required") {
       const today = new Date();
@@ -383,6 +426,16 @@ export default function LeadsPage() {
     }
   };
 
+  const uniqueCategories = Array.from(new Set(leads.map(l => l.propertyCategory).filter(c => c && c !== "—")));
+  const uniqueTypes = Array.from(new Set(leads.map(l => l.propertyType).filter(t => t && t !== "—")));
+  const uniqueStaff = Array.from(new Set(leads.map(l => l.staff).filter(s => s && s !== "Unassigned")));
+  const uniqueStatuses = Array.from(new Set(leads.map(l => l.status).filter(Boolean)));
+  const uniqueSources = Array.from(new Set(leads.map(l => l.source).filter(Boolean)));
+
+  const activeFiltersCount = Object.values(filters).filter(v => v !== "").length;
+
+  const clearFilters = () => setFilters({ dateFrom: "", dateTo: "", category: "", type: "", staff: "", status: "", source: "" });
+
   return (
     <div className="flex flex-col space-y-6">
       <div className="flex h-[48px] items-center justify-between pr-[150px]">
@@ -434,8 +487,81 @@ export default function LeadsPage() {
       </div>
 
       <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
-        <div className="flex items-center gap-8 px-6 border-b bg-muted/10 pt-4 overflow-x-auto scrollbar-hide relative">
-          {tabs.map((tab) => (
+        <div className="flex flex-col xl:flex-row xl:items-end justify-between px-6 border-b bg-muted/10 pt-4 gap-4">
+          <div className="flex items-center gap-3 pb-3 xl:pb-4 w-full xl:w-auto">
+            {/* Search Input */}
+            <div className="relative flex-1 xl:w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search ID, Name, Phone, Email..." 
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="pl-9 h-10 bg-background rounded-full border-border/60 shadow-sm text-[13.5px]"
+              />
+            </div>
+            
+            {/* Filters Popover */}
+            <Popover>
+              <PopoverTrigger render={
+                <Button variant="outline" className="h-10 rounded-full bg-background border-border/60 shadow-sm px-4 flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium text-[13.5px]">Filters</span>
+                  {activeFiltersCount > 0 && (
+                    <Badge className="ml-1 bg-[#0052FF] text-white px-1.5 py-0.5 rounded-md text-[10px]">{activeFiltersCount}</Badge>
+                  )}
+                </Button>
+              } />
+              <PopoverContent align="start" className="w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60">
+                <div className="flex items-center justify-between p-4 border-b bg-muted/10">
+                  <h4 className="font-semibold text-foreground text-sm">Filter Leads</h4>
+                  {activeFiltersCount > 0 && (
+                    <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 text-xs text-muted-foreground hover:text-red-600">
+                      Clear All
+                    </Button>
+                  )}
+                </div>
+                <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Created From</label>
+                    <Input type="date" value={filters.dateFrom} onChange={e => setFilters(f => ({...f, dateFrom: e.target.value}))} className="h-9 rounded-lg text-sm" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Created To</label>
+                    <Input type="date" value={filters.dateTo} onChange={e => setFilters(f => ({...f, dateTo: e.target.value}))} className="h-9 rounded-lg text-sm" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Status</label>
+                    <FormSelect name="status" options={uniqueStatuses.map(s => ({label: s, value: s}))} value={filters.status} onValueChange={v => setFilters(f => ({...f, status: v || ""}))} placeholder="All Statuses" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Staff</label>
+                    <FormSelect name="staff" options={uniqueStaff.map(s => ({label: s, value: s}))} value={filters.staff} onValueChange={v => setFilters(f => ({...f, staff: v || ""}))} placeholder="All Staff" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Lead Source</label>
+                    <FormSelect name="source" options={uniqueSources.map(s => ({label: s, value: s}))} value={filters.source} onValueChange={v => setFilters(f => ({...f, source: v || ""}))} placeholder="All Sources" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Property Category</label>
+                    <FormSelect name="category" options={uniqueCategories.map(s => ({label: s, value: s}))} value={filters.category} onValueChange={v => setFilters(f => ({...f, category: v || ""}))} placeholder="All Categories" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Property Type</label>
+                    <FormSelect name="type" options={uniqueTypes.map(s => ({label: s, value: s}))} value={filters.type} onValueChange={v => setFilters(f => ({...f, type: v || ""}))} placeholder="All Types" />
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+            
+            {(searchQuery || activeFiltersCount > 0) && (
+              <Button variant="ghost" size="icon" onClick={() => { setSearchQuery(""); clearFilters(); }} className="h-10 w-10 rounded-full text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors" title="Clear Search & Filters">
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-8 overflow-x-auto scrollbar-hide relative xl:pr-6">
+            {tabs.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -447,6 +573,7 @@ export default function LeadsPage() {
               )}
             </button>
           ))}
+          </div>
         </div>
 
         {activeTab === "Action Required" && (
