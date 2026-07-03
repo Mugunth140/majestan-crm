@@ -62,7 +62,7 @@ export default function LeadsPage() {
   const [todayViewMode, setTodayViewMode] = useState<"pending" | "completed">("pending");
 
   const tabs = ["All Leads", "Open Pipeline", "Action Required", "Unqualified"];
-  const actionFilters = ["Overdue", "Today", "Tomorrow", "All Scheduled"];
+  const actionFilters = ["Overdue", "Yesterday", "Today", "Tomorrow", "All Scheduled"];
 
   const fetchLeads = useCallback(async () => {
     try {
@@ -131,6 +131,9 @@ export default function LeadsPage() {
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
       return qualifiedLeads.filter(lead => {
         const hasNext = !!lead.nextFollowUpDate;
         const fDate = lead.nextFollowUpDate ? new Date(lead.nextFollowUpDate) : null;
@@ -142,6 +145,9 @@ export default function LeadsPage() {
 
         if (actionFilter === "Overdue") {
           return fDate && fDate < today;
+        }
+        if (actionFilter === "Yesterday") {
+          return lDate && lDate.getTime() === yesterday.getTime();
         }
         if (actionFilter === "Today") {
           const isFollowedUpToday = lDate && lDate.getTime() === today.getTime();
@@ -583,6 +589,7 @@ export default function LeadsPage() {
                 const isActive = actionFilter === filter;
                 let activeClass = "bg-primary/10 text-primary border-primary/30";
                 if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
+                else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
                 else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
                 return (
                   <button
