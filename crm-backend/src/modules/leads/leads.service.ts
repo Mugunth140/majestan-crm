@@ -325,6 +325,7 @@ export class LeadsService {
         notes: '',
         nextFollowUpDate: latestNextFollowUp,
         lastFollowedUpDate: lastFollowedUpDate,
+        isUnqualified: lead.is_unqualified || false,
       };
     });
   }

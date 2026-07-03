@@ -48,7 +48,7 @@ export default function LeadsPage() {
 
   const [todayViewMode, setTodayViewMode] = useState<"pending" | "completed">("pending");
 
-  const tabs = ["All Leads", "Open Pipeline", "Action Required"];
+  const tabs = ["All Leads", "Open Pipeline", "Action Required", "Unqualified"];
   const actionFilters = ["Overdue", "Today", "Tomorrow", "All Scheduled"];
 
   const fetchLeads = useCallback(async () => {
@@ -70,8 +70,16 @@ export default function LeadsPage() {
 
   const displayedLeads = () => {
     if (activeTab === "Open Pipeline") {
+      // Pending imports haven't been saved to DB yet, so they aren't unqualified
       return pendingImports;
     }
+
+    if (activeTab === "Unqualified") {
+      return leads.filter(lead => lead.isUnqualified === true);
+    }
+
+    // For All Leads and Action Required, filter OUT unqualified leads
+    const qualifiedLeads = leads.filter(lead => !lead.isUnqualified);
 
     if (activeTab === "Action Required") {
       const today = new Date();
@@ -80,7 +88,7 @@ export default function LeadsPage() {
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
-      return leads.filter(lead => {
+      return qualifiedLeads.filter(lead => {
         const hasNext = !!lead.nextFollowUpDate;
         const fDate = lead.nextFollowUpDate ? new Date(lead.nextFollowUpDate) : null;
         if (fDate) fDate.setHours(0, 0, 0, 0);
@@ -112,8 +120,8 @@ export default function LeadsPage() {
       });
     }
 
-    // Default: All Leads
-    return leads;
+    // Default: All Leads (excluding unqualified)
+    return qualifiedLeads;
   };
 
   const handleDelete = async () => {
@@ -204,10 +212,42 @@ export default function LeadsPage() {
     {
       id: "actions",
       header: "Action",
-      cell: ({ row }) => (
-        row.original.isPendingImport ? (
-          <Badge variant="outline" className="text-xs bg-amber-50 text-amber-600 border-amber-200">Pending</Badge>
-        ) : (
+      cell: ({ row }) => {
+        if (row.original.isPendingImport) {
+          return <Badge variant="outline" className="text-xs bg-amber-50 text-amber-600 border-amber-200">Pending</Badge>;
+        }
+        
+        if (activeTab === "Unqualified") {
+          return (
+            <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs font-medium bg-background hover:bg-muted text-muted-foreground hover:text-foreground"
+                onClick={async () => {
+                  try {
+                    const res = await fetch(`${API_URL}/leads/${row.original.rawId}/status`, {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ is_unqualified: false }),
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                      toast.success("Lead reverted to qualified.");
+                      fetchLeads();
+                    } else toast.error("Failed to revert lead.");
+                  } catch {
+                    toast.error("Failed to revert lead.");
+                  }
+                }}
+              >
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Revert
+              </Button>
+            </div>
+          );
+        }
+
+        return (
           <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
             <Button
               variant="ghost"
@@ -237,8 +277,8 @@ export default function LeadsPage() {
               <Trash2 size={15} />
             </Button>
           </div>
-        )
-      ),
+        );
+      }
     },
   ];
 
