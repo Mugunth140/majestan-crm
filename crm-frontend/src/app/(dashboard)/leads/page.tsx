@@ -453,9 +453,9 @@ export default function LeadsPage() {
           </Button>
 
           <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
-            <DialogTrigger className="inline-flex h-10 rounded-full bg-card px-5 text-[14px] font-medium shadow-sm border border-border/60 hover:bg-muted/50 items-center gap-2">
+            <DialogTrigger className="inline-flex h-12 rounded-full bg-card px-5 text-[14px] font-medium shadow-sm border border-border/60 hover:bg-muted/50 items-center gap-2">
               <FileSpreadsheet size={16} className="text-muted-foreground" />
-              Bulk Import (Excel)
+              Bulk Import
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
@@ -485,7 +485,7 @@ export default function LeadsPage() {
             </DialogContent>
           </Dialog>
 
-          <Link href="/leads/new" className="inline-flex h-10 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
+          <Link href="/leads/new" className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
             <Plus size={18} />
             Add New Lead
           </Link>
