@@ -117,7 +117,7 @@ function UsersList() {
           </p>
         </div>
 
-        <Button onClick={() => router.push("/users/new")} className="bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md h-10 px-5 rounded-full font-semibold gap-2">
+        <Button onClick={() => router.push("/users/new")} className="bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md h-10 p-5 rounded-full font-semibold gap-2">
           <Plus size={16} />
           Add User
         </Button>
