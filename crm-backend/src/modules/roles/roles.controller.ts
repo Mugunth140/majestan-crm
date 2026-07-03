@@ -1,4 +1,3 @@
-
 import { Controller, Get } from '@nestjs/common';
 import { RolesService } from './roles.service';
 
@@ -7,7 +6,8 @@ export class RolesController {
   constructor(private readonly service: RolesService) {}
 
   @Get()
-  findAll() {
-    return { success: true, message: 'Operation successful', data: [] };
+  async findAll() {
+    const data = await this.service.findAll();
+    return { success: true, data };
   }
 }

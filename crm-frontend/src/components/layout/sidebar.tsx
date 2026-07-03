@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, 
@@ -20,13 +20,15 @@ import Image from "next/image";
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Leads", href: "/leads", icon: Users },
-  { name: "Roles", href: "/roles", icon: ShieldAlert },
+  { name: "Users", href: "/users", icon: ShieldAlert, adminOnly: true },
+  { name: "Roles", href: "/roles", icon: ShieldAlert, adminOnly: true },
   { name: "Departments", href: "/departments", icon: Building2 },
   { name: "Properties", href: "/properties", icon: Home },
   { name: "Activity Logs", href: "/activity-logs", icon: Activity },
   { 
     name: "Master Data", 
     icon: Settings,
+    adminOnly: true,
     subItems: [
       { name: "Lead Status", href: "/master/lead-status" },
       { name: "Lead Sources", href: "/master/sources" },
@@ -38,6 +40,21 @@ const navigation = [
 export function Sidebar() {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const userStr = localStorage.getItem("crm_user");
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        setUserRole(user.role);
+      }
+    } catch (err) {
+      console.error("Failed to parse user from local storage");
+    }
+  }, []);
+
+  const isAdmin = userRole === "Admin" || userRole === "Super Admin";
 
   return (
     <aside
@@ -73,6 +90,8 @@ export function Sidebar() {
       <div className="flex-1 overflow-x-hidden overflow-y-auto py-4 scrollbar-hide">
         <nav className="grid items-start px-2 gap-1 text-[15px] font-medium">
           {navigation.map((item) => {
+            if (item.adminOnly && !isAdmin) return null;
+
             const hasSub = item.subItems && item.subItems.length > 0;
             const isActive = item.href ? (pathname === item.href || pathname.startsWith(item.href + "/")) : (hasSub && item.subItems?.some(sub => pathname.startsWith(sub.href)));
 

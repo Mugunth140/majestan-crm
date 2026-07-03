@@ -1,4 +1,3 @@
-
 import { Controller, Get } from '@nestjs/common';
 import { DepartmentsService } from './departments.service';
 
@@ -7,7 +6,8 @@ export class DepartmentsController {
   constructor(private readonly service: DepartmentsService) {}
 
   @Get()
-  findAll() {
-    return { success: true, message: 'Operation successful', data: [] };
+  async findAll() {
+    const data = await this.service.findAll();
+    return { success: true, data };
   }
 }
