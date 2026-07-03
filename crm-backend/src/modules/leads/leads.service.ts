@@ -300,6 +300,13 @@ export class LeadsService {
       
       const latestNextFollowUp = sortedFollowUps[0]?.next_follow_up_date || null;
 
+      // Find the most recent actual follow-up date
+      const sortedActualFollowUps = (lead.follow_ups || [])
+        .filter(f => f.follow_up_date)
+        .sort((a, b) => new Date(b.follow_up_date as string).getTime() - new Date(a.follow_up_date as string).getTime());
+        
+      const lastFollowedUpDate = sortedActualFollowUps[0]?.follow_up_date || null;
+
       return {
         sno: index + 1,
         id: 'L' + String(lead.id).padStart(5, '0'),
@@ -317,6 +324,7 @@ export class LeadsService {
         status: lead.status?.name ?? 'INCOMING',
         notes: '',
         nextFollowUpDate: latestNextFollowUp,
+        lastFollowedUpDate: lastFollowedUpDate,
       };
     });
   }

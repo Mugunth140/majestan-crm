@@ -46,6 +46,8 @@ export default function LeadsPage() {
   const [pendingImports, setPendingImports] = useState<any[]>([]);
   const [isInserting, setIsInserting] = useState(false);
 
+  const [todayViewMode, setTodayViewMode] = useState<"pending" | "completed">("pending");
+
   const tabs = ["All Leads", "Open Pipeline", "Action Required"];
   const actionFilters = ["Overdue", "Today", "Tomorrow", "All Scheduled"];
 
@@ -79,22 +81,32 @@ export default function LeadsPage() {
       tomorrow.setDate(tomorrow.getDate() + 1);
 
       return leads.filter(lead => {
-        if (!lead.nextFollowUpDate) return false;
-        
-        const fDate = new Date(lead.nextFollowUpDate);
-        fDate.setHours(0, 0, 0, 0);
+        const hasNext = !!lead.nextFollowUpDate;
+        const fDate = lead.nextFollowUpDate ? new Date(lead.nextFollowUpDate) : null;
+        if (fDate) fDate.setHours(0, 0, 0, 0);
+
+        const hasLast = !!lead.lastFollowedUpDate;
+        const lDate = lead.lastFollowedUpDate ? new Date(lead.lastFollowedUpDate) : null;
+        if (lDate) lDate.setHours(0, 0, 0, 0);
 
         if (actionFilter === "Overdue") {
-          return fDate < today;
+          return fDate && fDate < today;
         }
         if (actionFilter === "Today") {
-          return fDate.getTime() === today.getTime();
+          const isFollowedUpToday = lDate && lDate.getTime() === today.getTime();
+          
+          if (todayViewMode === "completed") {
+            return isFollowedUpToday;
+          } else {
+            // pending
+            return fDate && fDate.getTime() === today.getTime() && !isFollowedUpToday;
+          }
         }
         if (actionFilter === "Tomorrow") {
-          return fDate.getTime() === tomorrow.getTime();
+          return fDate && fDate.getTime() === tomorrow.getTime();
         }
         if (actionFilter === "All Scheduled") {
-          return fDate > tomorrow;
+          return fDate && fDate > tomorrow;
         }
         return false;
       });
@@ -398,22 +410,53 @@ export default function LeadsPage() {
         </div>
 
         {activeTab === "Action Required" && (
-          <div className="flex items-center gap-2 px-6 pt-5 animate-in slide-in-from-top-2 fade-in duration-200">
-            {actionFilters.map((filter) => {
-              const isActive = actionFilter === filter;
-              let activeClass = "bg-primary/10 text-primary border-primary/30";
-              if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
-              else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
-              return (
-                <button
-                  key={filter}
-                  className={"flex items-center justify-center cursor-pointer px-5 py-2 rounded-full text-[13.5px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
-                  onClick={() => setActionFilter(filter)}
-                >
-                  {filter}
-                </button>
-              );
-            })}
+          <div className="flex items-center gap-2 px-6 pt-5 animate-in slide-in-from-top-2 fade-in duration-200 flex-wrap">
+            <div className="flex items-center gap-2">
+              {actionFilters.map((filter) => {
+                const isActive = actionFilter === filter;
+                let activeClass = "bg-primary/10 text-primary border-primary/30";
+                if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
+                else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
+                return (
+                  <button
+                    key={filter}
+                    className={"flex items-center justify-center cursor-pointer px-5 py-2 rounded-full text-[13.5px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
+                    onClick={() => setActionFilter(filter)}
+                  >
+                    {filter}
+                  </button>
+                );
+              })}
+            </div>
+            
+            {actionFilter === "Today" && (
+              <div className="ml-auto flex items-center bg-muted/40 p-1 rounded-full border border-border/50 relative">
+                {[
+                  { id: "pending", label: "Today Follow Up" },
+                  { id: "completed", label: "Today Followed Up" }
+                ].map((mode) => {
+                  const isSelected = todayViewMode === mode.id;
+                  return (
+                    <button
+                      key={mode.id}
+                      onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
+                      className={`relative px-4 py-1.5 rounded-full text-xs font-semibold transition-colors duration-200 z-10 active:scale-[0.96] ${isSelected ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      {isSelected && (
+                        <motion.div
+                          layoutId="todayToggleBg"
+                          className="absolute inset-0 bg-background shadow-sm rounded-full border border-border/20"
+                          initial={false}
+                          transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                          style={{ zIndex: -1 }}
+                        />
+                      )}
+                      <span className="relative z-10">{mode.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
