@@ -478,20 +478,26 @@ export default function LeadViewPage() {
       {/* Log New Follow-Up */}
       <div className="bg-card border rounded-2xl p-6 shadow-sm">
         <Skeleton className="h-5 w-40 mb-6" />
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
-          {[...Array(7)].map((_, i) => (
-            <div key={i}>
-              <Skeleton className="h-3 w-28 mb-2" />
+        <div className="flex flex-col xl:flex-row gap-6">
+          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-5 h-fit">
+            {[...Array(4)].map((_, i) => (
+              <div key={i}>
+                <Skeleton className="h-3 w-28 mb-2" />
+                <Skeleton className="h-11 w-full rounded-xl" />
+              </div>
+            ))}
+            <div className="md:col-span-2">
+              <Skeleton className="h-3 w-24 mb-2" />
               <Skeleton className="h-11 w-full rounded-xl" />
             </div>
-          ))}
-          <div className="xl:col-span-4">
-            <Skeleton className="h-3 w-24 mb-2" />
-            <Skeleton className="h-24 w-full rounded-xl" />
           </div>
-        </div>
-        <div className="flex justify-end mt-5">
-          <Skeleton className="h-11 w-40 rounded-xl" />
+          <div className="w-full xl:w-[450px] flex flex-col gap-4">
+            <div className="flex-1 flex flex-col">
+              <Skeleton className="h-3 w-20 mb-2" />
+              <Skeleton className="w-full rounded-xl flex-1 min-h-[120px]" />
+            </div>
+            <Skeleton className="h-11 w-full rounded-xl" />
+          </div>
         </div>
       </div>
     </div>
@@ -847,43 +853,49 @@ export default function LeadViewPage() {
         <h3 className="text-base font-bold text-foreground border-b pb-3 mb-6 flex items-center gap-2">
           <Plus className="h-4 w-4 text-muted-foreground" /> Log New Follow-Up
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow-Up Date & Time</label>
-            <DateTimePicker 
-              value={getFuDateObj(fuForm.followUpDate, fuForm.followUpTime)}
-              onChange={(date) => handleFuDateTimeChange("followUp", date)}
-            />
+        
+        <div className="flex flex-col xl:flex-row gap-6">
+          {/* Left Side: Inputs */}
+          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-5 h-fit">
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow-Up Date & Time</label>
+              <DateTimePicker 
+                value={getFuDateObj(fuForm.followUpDate, fuForm.followUpTime)}
+                onChange={(date) => handleFuDateTimeChange("followUp", date)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Follow-Up Date & Time</label>
+              <DateTimePicker 
+                value={getFuDateObj(fuForm.nextFollowUpDate, fuForm.nextFollowUpTime)}
+                onChange={(date) => handleFuDateTimeChange("nextFollowUp", date)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contacted Via *</label>
+              <FormSelect name="contactedVia" placeholder="How contacted?" options={CONTACTED_VIA} value={fuForm.contactedVia} onValueChange={v => setFuForm(f => ({ ...f, contactedVia: v || "" }))} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Priority</label>
+              <FormSelect name="priority" placeholder="Select Priority" options={PRIORITIES} value={fuForm.priority} onValueChange={v => setFuForm(f => ({ ...f, priority: v || "" }))} />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">RNR Status</label>
+              <FormSelect name="rnr" placeholder="Select RNR" options={RNR_OPTIONS} value={fuForm.rnr} onValueChange={v => setFuForm(f => ({ ...f, rnr: v || "" }))} />
+            </div>
           </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Follow-Up Date & Time</label>
-            <DateTimePicker 
-              value={getFuDateObj(fuForm.nextFollowUpDate, fuForm.nextFollowUpTime)}
-              onChange={(date) => handleFuDateTimeChange("nextFollowUp", date)}
-            />
+
+          {/* Right Side: Notes and Submit */}
+          <div className="w-full xl:w-[450px] flex flex-col gap-4">
+            <div className="space-y-2 flex-1 flex flex-col">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Notes</label>
+              <Textarea value={fuForm.notes} onChange={e => setFuForm(f => ({ ...f, notes: e.target.value }))} placeholder="What was discussed? Any outcome or next steps..." className="bg-muted/30 rounded-xl resize-none text-[14px] p-3.5 flex-1 min-h-[120px]" />
+            </div>
+            <Button onClick={handleSaveFollowUp} disabled={isSavingFu} className="w-full h-11 bg-[#0052FF] text-white hover:bg-[#0040CC] rounded-xl shadow font-semibold gap-2">
+              {isSavingFu ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Save Follow-Up
+            </Button>
           </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contacted Via *</label>
-            <FormSelect name="contactedVia" placeholder="How contacted?" options={CONTACTED_VIA} value={fuForm.contactedVia} onValueChange={v => setFuForm(f => ({ ...f, contactedVia: v || "" }))} />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Priority</label>
-            <FormSelect name="priority" placeholder="Select Priority" options={PRIORITIES} value={fuForm.priority} onValueChange={v => setFuForm(f => ({ ...f, priority: v || "" }))} />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">RNR Status</label>
-            <FormSelect name="rnr" placeholder="Select RNR" options={RNR_OPTIONS} value={fuForm.rnr} onValueChange={v => setFuForm(f => ({ ...f, rnr: v || "" }))} />
-          </div>
-          <div className="space-y-2 xl:col-span-3">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Notes</label>
-            <Textarea value={fuForm.notes} onChange={e => setFuForm(f => ({ ...f, notes: e.target.value }))} placeholder="What was discussed? Any outcome or next steps..." className="bg-muted/30 rounded-xl resize-none text-[14px] p-3.5" rows={4} />
-          </div>
-        </div>
-        <div className="flex justify-end mt-5">
-          <Button onClick={handleSaveFollowUp} disabled={isSavingFu} className="h-11 px-8 bg-[#0052FF] text-white hover:bg-[#0040CC] rounded-xl shadow font-semibold gap-2">
-            {isSavingFu ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            Save Follow-Up
-          </Button>
         </div>
       </div>
 
