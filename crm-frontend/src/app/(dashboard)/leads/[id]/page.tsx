@@ -289,19 +289,27 @@ export default function LeadViewPage() {
   const handleSaveFollowUp = async () => {
     if (!fuForm.contactedVia) return toast.error("Please select how you contacted the lead.");
     setIsSavingFu(true);
+    
+    // Auto-record exact current timestamp for the follow-up
+    const now = new Date();
+    const payload = {
+      ...fuForm,
+      followUpDate: format(now, "yyyy-MM-dd"),
+      followUpTime: format(now, "HH:mm")
+    };
+
     try {
       const res = await fetch(`${API_URL}/leads/${id}/follow-ups`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(fuForm),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.success) {
         toast.success("Follow-up logged successfully.");
-        const now = new Date();
         setFuForm({ 
-          followUpDate: now.toISOString().split("T")[0], 
-          followUpTime: now.toTimeString().slice(0, 5), 
+          followUpDate: "", 
+          followUpTime: "", 
           contactedVia: "", nextFollowUpDate: "", nextFollowUpTime: "", priority: "", rnr: "", notes: "" 
         });
         fetchLead(true);
@@ -856,28 +864,21 @@ export default function LeadViewPage() {
           {/* Left Side: Inputs */}
           <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-5 h-fit">
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow Up Date & Time</label>
-              <DateTimePicker 
-                value={getFuDateObj(fuForm.followUpDate, fuForm.followUpTime)}
-                onChange={(date) => handleFuDateTimeChange("followUp", date)}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Follow Up Date & Time</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Follow-Up Date & Time</label>
               <DateTimePicker 
                 value={getFuDateObj(fuForm.nextFollowUpDate, fuForm.nextFollowUpTime)}
                 onChange={(date) => handleFuDateTimeChange("nextFollowUp", date)}
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contacted Via</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contacted Via *</label>
               <FormSelect name="contactedVia" placeholder="How contacted?" options={CONTACTED_VIA} value={fuForm.contactedVia} onValueChange={v => setFuForm(f => ({ ...f, contactedVia: v || "" }))} />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Priority</label>
               <FormSelect name="priority" placeholder="Select Priority" options={PRIORITIES} value={fuForm.priority} onValueChange={v => setFuForm(f => ({ ...f, priority: v || "" }))} />
             </div>
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">RNR Status</label>
               <FormSelect name="rnr" placeholder="Select RNR" options={RNR_OPTIONS} value={fuForm.rnr} onValueChange={v => setFuForm(f => ({ ...f, rnr: v || "" }))} />
             </div>
