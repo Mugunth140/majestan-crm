@@ -4,7 +4,6 @@ import { DataSource, EntityManager } from 'typeorm';
 import { Lead } from '../../database/entities/lead.entity';
 import { LeadFollowUp } from '../../database/entities/lead-follow-up.entity';
 import { LeadInquiry } from '../../database/entities/lead-inquiry.entity';
-import { LeadStatus } from '../../database/entities/lead-status.entity';
 import { ContactLog } from '../../database/entities/contact-log.entity';
 import { User } from '../../database/entities/user.entity';
 
@@ -23,9 +22,8 @@ export class LeadsService {
       where: { id },
       relations: {
         inquiries: true,
-        status: true,
         assigned_staff: true,
-      }
+      },
     });
     if (!lead) throw new NotFoundException('Lead not found');
 
@@ -124,11 +122,7 @@ export class LeadsService {
     if (!existingLead) throw new NotFoundException('Lead not found');
 
     if (body.status_name) {
-      const statusRepo = this.dataSource.getRepository(LeadStatus);
-      const newStatus = await statusRepo.findOne({ where: { name: body.status_name } });
-      if (newStatus) {
-        existingLead.status_id = newStatus.id;
-      }
+      existingLead.status = body.status_name;
     }
 
     if (body.is_unqualified !== undefined) {
@@ -197,7 +191,7 @@ export class LeadsService {
     return this.dataSource.transaction(async (manager: EntityManager) => {
       const existingLead = await manager.getRepository(Lead).findOne({
         where: { mobile_number: body.mobile },
-        relations: { assigned_staff: true, status: true },
+        relations: { assigned_staff: true },
       });
 
       if (existingLead) {
@@ -233,9 +227,6 @@ export class LeadsService {
         };
       }
 
-      const statusRepo = manager.getRepository(LeadStatus);
-      const incomingStatus = await statusRepo.findOne({ where: { name: 'INCOMING' } });
-
       let assignedStaffId: number | undefined;
       if (body.userId) {
         const user = await manager.getRepository(User).findOne({ where: { id: body.userId } });
@@ -251,7 +242,7 @@ export class LeadsService {
         city: body.city || null,
         address: body.address || null,
         lead_source: body.source || null,
-        status_id: incomingStatus ? incomingStatus.id : undefined,
+        status: 'New Lead',
         assigned_staff_id: assignedStaffId,
       });
       const savedLead: Lead = await manager.save(lead);
@@ -288,7 +279,7 @@ export class LeadsService {
   async getLeads(): Promise<any[]> {
     const leadRepo = this.dataSource.getRepository(Lead);
     const leads = await leadRepo.find({
-      relations: { status: true, assigned_staff: true, inquiries: true, follow_ups: true },
+      relations: { assigned_staff: true, inquiries: true, follow_ups: true },
       order: { created_at: 'DESC' },
     });
 
@@ -324,7 +315,7 @@ export class LeadsService {
         propertyCategory: lead.inquiries?.[0]?.property_category || '—',
         staff: lead.assigned_staff?.name ?? 'Unassigned',
         source: lead.lead_source ?? '',
-        status: lead.status?.name ?? 'INCOMING',
+        status: lead.status ?? 'New Lead',
         notes: '',
         nextFollowUpDate: latestNextFollowUp,
         lastFollowedUpDate: lastFollowedUpDate,

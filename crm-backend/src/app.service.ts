@@ -4,7 +4,6 @@ import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Role } from './database/entities/role.entity';
 import { User } from './database/entities/user.entity';
-import { LeadStatus } from './database/entities/lead-status.entity';
 import { LeadSource } from './database/entities/lead-source.entity';
 
 @Injectable()
@@ -16,7 +15,6 @@ export class AppService implements OnModuleInit {
   async onModuleInit() {
     try {
       await this.seedRolesAndAdmin();
-      await this.seedLeadStatuses();
       await this.seedLeadSources();
     } catch (e) {
       this.logger.error('Failed to seed database:', e);
@@ -25,30 +23,6 @@ export class AppService implements OnModuleInit {
 
   getHello(): string {
     return 'Majestan CRM API';
-  }
-
-  private async seedLeadStatuses() {
-    const statusRepo = this.dataSource.getRepository(LeadStatus);
-    const statuses = [
-      { name: 'INCOMING', color: '#9CA3AF' }, 
-      { name: 'REJECT', color: '#F59E0B' }, 
-      { name: 'OPPORTUNITY', color: '#FCD34D' }, 
-      { name: 'SITE VISIT DONE', color: '#93C5FD' }, 
-      { name: 'RSV DONE', color: '#818CF8' }, 
-      { name: 'RSV SCHEDULE', color: '#FDE047' }, 
-      { name: 'PROSPECTIVE', color: '#84CC16' }, 
-      { name: 'DROPPED', color: '#EF4444' }, 
-      { name: 'BOOKED', color: '#059669' }, 
-      { name: 'SV SCHEDULE', color: '#7C3AED' }
-    ];
-
-    for (const status of statuses) {
-      const exists = await statusRepo.findOne({ where: { name: status.name }});
-      if (!exists) {
-        await statusRepo.save(statusRepo.create(status));
-        this.logger.log(`Seeded lead status: ${status.name}`);
-      }
-    }
   }
 
   private async seedLeadSources() {

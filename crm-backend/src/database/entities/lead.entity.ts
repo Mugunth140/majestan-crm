@@ -1,6 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { User } from './user.entity';
-import { LeadStatus } from './lead-status.entity';
 import { LeadInquiry } from './lead-inquiry.entity';
 import { LeadFollowUp } from './lead-follow-up.entity';
 
@@ -30,12 +29,8 @@ export class Lead {
   @Column({ nullable: true })
   lead_source: string;
 
-  @Column({ name: 'status_id', nullable: true })
-  status_id: number;
-
-  @ManyToOne(() => LeadStatus)
-  @JoinColumn({ name: 'status_id' })
-  status: LeadStatus;
+  @Column({ type: 'varchar', default: 'New Lead' })
+  status: string;
 
   @Column({ name: 'assigned_staff_id', nullable: true })
   assigned_staff_id: number;

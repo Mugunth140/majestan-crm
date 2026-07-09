@@ -49,7 +49,6 @@ const navigation = [
     icon: Database,
     adminOnly: true,
     subItems: [
-      { name: "Lead Status", href: "/master/lead-status" },
       { name: "Lead Sources", href: "/master/sources" },
       { name: "Property Types", href: "/master/property-types" }
     ]

@@ -21,7 +21,6 @@ import { Permission } from './database/entities/permission.entity';
 import { RolePermission } from './database/entities/role-permission.entity';
 import { Role } from './database/entities/role.entity';
 import { User } from './database/entities/user.entity';
-import { LeadStatus } from './database/entities/lead-status.entity';
 import { LeadSource } from './database/entities/lead-source.entity';
 import { Lead } from './database/entities/lead.entity';
 import { LeadInquiry } from './database/entities/lead-inquiry.entity';
@@ -46,7 +45,7 @@ import { ContactLog } from './database/entities/contact-log.entity';
         username: configService.get<string>('DB_USERNAME', 'root'),
         password: configService.get<string>('DB_PASSWORD', '8220'),
         database: configService.get<string>('CRM_DB_NAME', 'majestan_crm'),
-        entities: [User, Role, Permission, RolePermission, Department, ActivityLog, LeadStatus, LeadSource, Lead, LeadInquiry, LeadFollowUp, ContactLog],
+        entities: [User, Role, Permission, RolePermission, Department, ActivityLog, LeadSource, Lead, LeadInquiry, LeadFollowUp, ContactLog],
         synchronize: true, // DEV ONLY
       }),
     }),
