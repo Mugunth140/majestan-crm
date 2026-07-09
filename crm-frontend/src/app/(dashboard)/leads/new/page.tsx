@@ -94,6 +94,44 @@ const PROJECTS = [
   { label: "Majestan Grand", value: "majestan_grand" },
 ];
 
+function parseIndianCurrency(input: string): number {
+  if (!input) return 0;
+  const cleanInput = input.toString().toLowerCase().replace(/,/g, '').trim();
+  let multiplier = 1;
+  let numericStr = cleanInput;
+
+  if (cleanInput.endsWith('cr') || cleanInput.endsWith('crore') || cleanInput.endsWith('crores')) {
+    multiplier = 10000000;
+    numericStr = cleanInput.replace(/cr(ore)?s?$/, '');
+  } else if (cleanInput.endsWith('l') || cleanInput.endsWith('lac') || cleanInput.endsWith('lakh') || cleanInput.endsWith('lakhs')) {
+    multiplier = 100000;
+    numericStr = cleanInput.replace(/l(akh)?s?|lacs?$/, '');
+  } else if (cleanInput.endsWith('k') || cleanInput.endsWith('thousand') || cleanInput.endsWith('thousands')) {
+    multiplier = 1000;
+    numericStr = cleanInput.replace(/k|thousands?$/, '');
+  }
+
+  const val = parseFloat(numericStr);
+  return isNaN(val) ? 0 : val * multiplier;
+}
+
+function formatIndianCurrencyWords(num: number): string {
+  if (!num || isNaN(num) || num === 0) return "";
+  
+  const cr = Math.floor(num / 10000000);
+  const lk = Math.floor((num % 10000000) / 100000);
+  const th = Math.floor((num % 100000) / 1000);
+  const rem = Math.floor(num % 1000);
+
+  const parts = [];
+  if (cr > 0) parts.push(`${cr} Crore${cr > 1 ? 's' : ''}`);
+  if (lk > 0) parts.push(`${lk} Lakh${lk > 1 ? 's' : ''}`);
+  if (th > 0) parts.push(`${th} Thousand`);
+  if (rem > 0) parts.push(`${rem}`);
+
+  return "₹ " + parts.join(' ');
+}
+
 function LeadForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -187,6 +225,14 @@ function LeadForm() {
         if (stored) userId = JSON.parse(stored).id;
       } catch {}
 
+      const payloadPreferences = { ...preferences };
+      if (payloadPreferences.minBudget) {
+        payloadPreferences.minBudget = parseIndianCurrency(payloadPreferences.minBudget);
+      }
+      if (payloadPreferences.maxBudget) {
+        payloadPreferences.maxBudget = parseIndianCurrency(payloadPreferences.maxBudget);
+      }
+
       const payload = {
         userId,
         name: formData.get("name") as string,
@@ -198,10 +244,10 @@ function LeadForm() {
         source: sourceValue,
         project: formData.get("project") as string,
         purchaseType: formData.get("purchaseType") as string,
-        propertyType: formData.get("propertyType") as string,
+        propertyType: selectedType || formData.get("propertyType") as string,
         funder: formData.get("funder") as string,
-        propertyCategory: formData.get("propertyCategory") as string,
-        preferences,
+        propertyCategory: selectedCategory || formData.get("propertyCategory") as string,
+        preferences: payloadPreferences,
         followUpDate: followUpDateObj ? format(followUpDateObj, "yyyy-MM-dd") : null,
         followUpTime: followUpDateObj ? format(followUpDateObj, "HH:mm") : null,
         priority: formData.get("priority") as string,
@@ -384,11 +430,21 @@ function LeadForm() {
                 
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Min Budget</label>
-                  <Input type="number" placeholder="Min Budget" value={preferences?.minBudget || ""} onChange={e => setPreferences({...preferences, minBudget: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
+                  <Input type="text" placeholder="e.g. 2.5Cr or 50L" value={preferences?.minBudget || ""} onChange={e => setPreferences({...preferences, minBudget: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
+                  {preferences?.minBudget && parseIndianCurrency(preferences.minBudget) > 0 && (
+                    <p className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 pl-1">
+                      {formatIndianCurrencyWords(parseIndianCurrency(preferences.minBudget))}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Max Budget</label>
-                  <Input type="number" placeholder="Max Budget" value={preferences?.maxBudget || ""} onChange={e => setPreferences({...preferences, maxBudget: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
+                  <Input type="text" placeholder="e.g. 3Cr or 75L" value={preferences?.maxBudget || ""} onChange={e => setPreferences({...preferences, maxBudget: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
+                  {preferences?.maxBudget && parseIndianCurrency(preferences.maxBudget) > 0 && (
+                    <p className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 pl-1">
+                      {formatIndianCurrencyWords(parseIndianCurrency(preferences.maxBudget))}
+                    </p>
+                  )}
                 </div>
 
                 {selectedCategory === "residential" && (
