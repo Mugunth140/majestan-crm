@@ -402,10 +402,7 @@ export default function LeadViewPage() {
           </Button>
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl font-bold tracking-tight text-foreground">{lead.name}</h1>
-            {lead.is_unqualified ?
-              <Badge variant="destructive" className="font-medium px-2.5 py-0.5 shadow-sm border border-red-300">Unqualified</Badge>
-              : <Badge className={`font-medium px-2.5 py-0.5 shadow-sm border ${badgeCls}`}>{statusName}</Badge>
-            }
+            <Badge className={`font-medium px-2.5 py-0.5 shadow-sm border ${badgeCls}`}>{statusName}</Badge>
             <span className="text-sm font-semibold text-muted-foreground ml-2">L{String(lead.id).padStart(5, "0")}</span>
             <span className="text-muted-foreground/40 text-xs">&bull;</span>
             <span className="text-sm text-muted-foreground flex items-center gap-1.5">
@@ -508,7 +505,7 @@ export default function LeadViewPage() {
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Lead Qualification</p>
                 <div className="flex items-center justify-between h-12 px-4 rounded-xl border border-input bg-muted/20">
-                  <span className="text-[14px] font-medium text-foreground/80">Unqualify Lead</span>
+                  <span className="text-[14px] font-medium text-foreground/80">Mark as Unqualified</span>
                   <button
                     role="switch"
                     aria-checked={lead.is_unqualified || false}
@@ -518,11 +515,14 @@ export default function LeadViewPage() {
                         const res = await fetch(`${API_URL}/leads/${id}/status`, {
                           method: "PUT",
                           headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ is_unqualified: newVal }),
+                          body: JSON.stringify({ 
+                            is_unqualified: newVal,
+                            status_name: newVal ? 'Lost' : 'New Lead'
+                          }),
                         });
                         const data = await res.json();
                         if (data.success) {
-                          toast.success(newVal ? "Lead marked as unqualified." : "Lead marked as qualified.");
+                          toast.success(newVal ? "Lead marked as Unqualified (Lost)." : "Lead unmarked as Unqualified.");
                           fetchLead(true);
                         } else toast.error("Failed to update qualification status");
                       } catch {
@@ -714,10 +714,10 @@ export default function LeadViewPage() {
       <Sheet open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
         <SheetContent side="right" className="w-[450px] !max-w-[450px] p-0 flex flex-col border-l">
           <SheetHeader className="p-6 border-b shrink-0">
-            <SheetTitle className="text-lg">Follow Up History {followUps.length > 0 && `(${followUps.length})`}</SheetTitle>
-            <SheetDescription>
+            <SheetTitle className="text-lg">Follow Up Timeline {followUps.length > 0 && `(${followUps.length})`}</SheetTitle>
+            {/* <SheetDescription>
               Timeline of all logged follow-ups and interactions for this lead.
-            </SheetDescription>
+            </SheetDescription> */}
           </SheetHeader>
           <div className="flex-1 overflow-hidden relative">
             <FollowUpPanel

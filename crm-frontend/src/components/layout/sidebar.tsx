@@ -29,15 +29,15 @@ import Image from "next/image";
 const navigation = [
   { name: "Dashboard", href: "/", icon: Astroid },
   { name: "Leads", href: "/leads", icon: TrendingUp },
-  { name: "Inbound", href: "/inbound", icon: Inbox },
   { name: "Lead Routing", href: "/lead-routing", icon: Route },
+  { name: "Inbound", href: "/inbound", icon: Inbox },
   { name: "Agent Network", href: "/agent-network", icon: Network },
   { name: "Projects", href: "/projects", icon: Briefcase },
   { name: "Properties", href: "/properties", icon: Home },
   { name: "Asset Inventory", href: "/asset-inventory", icon: Package },
   { name: "HR Panel", href: "/hr", icon: UserPen },
   { name: "Target Insights", href: "/insights", icon: Target },
-  { name: "Activity Logs", href: "/activity-logs", icon: Activity },
+  { name: "Activity Logs", adminOnly: true, href: "/activity-logs", icon: Activity },
     { 
     name: "Users", 
     icon: Users, 

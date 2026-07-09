@@ -2,13 +2,14 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, CheckCircle2, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { FormSelect } from "@/components/shared/form-select";
+import { DateTimePicker } from "@/components/shared/datetime-picker";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
@@ -21,37 +22,55 @@ const PURCHASE_TYPES = [
   { label: "Buy", value: "buy" },
 ];
 
-const PROPERTY_TYPES = [
-  { label: "Apartment", value: "apartment" },
-  { label: "Villa", value: "villa" },
-  { label: "Showrooms", value: "showrooms" },
-  { label: "Office Space", value: "office_space" },
-  { label: "Ware House", value: "ware_house" },
-  { label: "Industrial Plot", value: "industrial_plot" },
-  { label: "Commercial Sites", value: "commercial_sites" },
-  { label: "Commercial Buildings", value: "commercial_buildings" },
-  { label: "Individual House", value: "individual_house" },
-  { label: "Farm Land", value: "farm_land" },
-];
-
-const PURPOSES = [
-  { label: "New Follow Up", value: "new_follow_up" },
-  { label: "Site Visit", value: "site_visit" },
-  { label: "Office Visit", value: "office_visit" },
-  { label: "Payment Negotiation", value: "payment_negotiation" },
-  { label: "Payment Follow Up", value: "payment_follow_up" },
-  { label: "Booking Confirmation", value: "booking_confirmation" },
-  { label: "Client Reference", value: "client_reference" },
-  { label: "RSV", value: "rsv" },
-  { label: "No Need", value: "no_need" },
-];
-
 const PROPERTY_CATEGORIES = [
   { label: "Residential", value: "residential" },
   { label: "Commercial", value: "commercial" },
   { label: "Industrial", value: "industrial" },
   { label: "Agricultural", value: "agricultural" },
+  { label: "Institutional", value: "institutional" },
 ];
+
+const PROPERTY_TYPES_MAP: Record<string, { label: string; value: string }[]> = {
+  residential: [
+    { label: "Apartment", value: "apartment" },
+    { label: "Villa", value: "villa" },
+    { label: "Independent House", value: "independent_house" },
+    { label: "Plot", value: "plot" },
+    { label: "Farm House", value: "farm_house" },
+    { label: "Builder Floor", value: "builder_floor" },
+  ],
+  commercial: [
+    { label: "Office", value: "office" },
+    { label: "Shop", value: "shop" },
+    { label: "Showroom", value: "showroom" },
+    { label: "Commercial Building", value: "commercial_building" },
+    { label: "Warehouse", value: "warehouse" },
+    { label: "Hotel", value: "hotel" },
+    { label: "Restaurant", value: "restaurant" },
+    { label: "Commercial Land", value: "commercial_land" },
+  ],
+  industrial: [
+    { label: "Factory", value: "factory" },
+    { label: "Industrial Shed", value: "industrial_shed" },
+    { label: "Industrial Land", value: "industrial_land" },
+    { label: "Warehouse", value: "warehouse" },
+    { label: "Manufacturing Unit", value: "manufacturing_unit" },
+  ],
+  agricultural: [
+    { label: "Agricultural Land", value: "agricultural_land" },
+    { label: "Farm Land", value: "farm_land" },
+    { label: "Coconut Farm", value: "coconut_farm" },
+    { label: "Plantation", value: "plantation" },
+    { label: "Orchard", value: "orchard" },
+  ],
+  institutional: [
+    { label: "School", value: "school" },
+    { label: "College", value: "college" },
+    { label: "Hospital", value: "hospital" },
+    { label: "Clinic", value: "clinic" },
+    { label: "Training Centre", value: "training_centre" },
+  ],
+};
 
 const FUNDERS = [
   { label: "Self Funded", value: "self" },
@@ -65,11 +84,7 @@ const PRIORITIES = [
   { label: "Urgent", value: "urgent" },
 ];
 
-const RNR_OPTIONS = [
-  { label: "RNR 1", value: "rnr1" },
-  { label: "RNR 2", value: "rnr2" },
-  { label: "RNR 3", value: "rnr3" },
-];
+
 
 const PROJECTS = [
   { label: "Majestan Prestige", value: "majestan_prestige" },
@@ -92,8 +107,12 @@ function LeadForm() {
   const [isLoadingLead, setIsLoadingLead] = useState(!!editId);
 
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedType, setSelectedType] = useState<string | null>(null);
   const [otherSourceText, setOtherSourceText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [followUpDateObj, setFollowUpDateObj] = useState<Date | undefined>(undefined);
 
   useEffect(() => {
     const fetchMasterData = async () => {
@@ -126,6 +145,10 @@ function LeadForm() {
           if (result.success) {
             setLeadData(result.data);
             setSelectedSource(result.data.lead_source);
+            if (result.data.inquiries?.[0]) {
+              setSelectedCategory(result.data.inquiries[0].property_category || null);
+              setSelectedType(result.data.inquiries[0].property_type || null);
+            }
           } else {
             toast.error("Lead not found");
             router.push("/leads");
@@ -176,11 +199,9 @@ function LeadForm() {
         propertyType: formData.get("propertyType") as string,
         funder: formData.get("funder") as string,
         propertyCategory: formData.get("propertyCategory") as string,
-        followUpDate: formData.get("followUpDate") as string,
-        followUpTime: formData.get("followUpTime") as string,
-        purpose: formData.get("purpose") as string,
+        followUpDate: followUpDateObj ? format(followUpDateObj, "yyyy-MM-dd") : null,
+        followUpTime: followUpDateObj ? format(followUpDateObj, "HH:mm") : null,
         priority: formData.get("priority") as string,
-        rnr: formData.get("rnr") as string,
         notes: formData.get("notes") as string,
       };
 
@@ -318,12 +339,32 @@ function LeadForm() {
               <FormSelect name="funder" defaultValue={leadData?.inquiries?.[0]?.funder || null} placeholder="Select Funder" options={FUNDERS} required />
             </div>
             <div className="space-y-2 lg:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Property Type</label>
-              <FormSelect name="propertyType" defaultValue={leadData?.inquiries?.[0]?.property_type || null} placeholder="Select Property Type" options={PROPERTY_TYPES} required />
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Property Category</label>
+              <FormSelect 
+                name="propertyCategory" 
+                defaultValue={leadData?.inquiries?.[0]?.property_category || null} 
+                value={selectedCategory}
+                onValueChange={(val) => {
+                  setSelectedCategory(val);
+                  setSelectedType(null);
+                }}
+                placeholder="Select Property Category" 
+                options={PROPERTY_CATEGORIES} 
+                required 
+              />
             </div>
             <div className="space-y-2 lg:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Property Category</label>
-              <FormSelect name="propertyCategory" defaultValue={leadData?.inquiries?.[0]?.property_category || null} placeholder="Select Property Category" options={PROPERTY_CATEGORIES} required />
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Property Type</label>
+              <FormSelect 
+                name="propertyType" 
+                defaultValue={leadData?.inquiries?.[0]?.property_type || null} 
+                value={selectedType}
+                onValueChange={setSelectedType}
+                placeholder={selectedCategory ? "Select Property Type" : "Select Category First"} 
+                options={selectedCategory ? PROPERTY_TYPES_MAP[selectedCategory] || [] : []} 
+                disabled={!selectedCategory}
+                required 
+              />
             </div>
           </div>
         </div>
@@ -332,32 +373,20 @@ function LeadForm() {
           <div className="bg-card border rounded-2xl p-8 shadow-sm">
             <div className="flex items-center justify-between border-b pb-4 mb-6">
               <h3 className="text-lg font-bold text-foreground">New Follow Up</h3>
-              <div className="flex items-center gap-3 bg-muted/40 px-4 py-2 rounded-full border border-border/50 transition-colors hover:bg-muted/60">
-                <label htmlFor="unqualified" className="text-sm font-semibold text-muted-foreground cursor-pointer select-none">Mark as Unqualified</label>
-                <Switch id="unqualified" name="unqualified" />
-              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow Up Date</label>
-                <Input name="followUpDate" type="date" className="h-12 rounded-xl bg-muted/30 text-[15px]" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow Up Time</label>
-                <Input name="followUpTime" type="time" className="h-12 rounded-xl bg-muted/30 text-[15px]" />
-              </div>
               <div className="space-y-2 lg:col-span-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Purpose</label>
-                <FormSelect name="purpose" placeholder="Select Purpose" options={PURPOSES} />
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Follow-Up</label>
+                <DateTimePicker
+                  value={followUpDateObj}
+                  onChange={(d) => setFollowUpDateObj(d)}
+                  placeholder="Pick date & time"
+                />
               </div>
               <div className="space-y-2 lg:col-span-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Priority Level</label>
                 <FormSelect name="priority" placeholder="Select Priority" options={PRIORITIES} />
-              </div>
-              <div className="space-y-2 lg:col-span-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">RNR Status</label>
-                <FormSelect name="rnr" placeholder="Select RNR Status" options={RNR_OPTIONS} />
               </div>
               <div className="space-y-2 md:col-span-2 lg:col-span-4">
                 <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow Up Notes</label>
