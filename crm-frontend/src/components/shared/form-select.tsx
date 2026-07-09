@@ -12,7 +12,7 @@ interface FormSelectProps {
   className?: string;
   value?: string | null;
   defaultValue?: string | null;
-  onValueChange?: (value: string | null) => void;
+  onValueChange?: (value: any) => void;
   disabled?: boolean;
 }
 
@@ -34,8 +34,13 @@ export function FormSelect({
     [options]
   );
 
+  const isControlled = value !== undefined;
+  const selectProps = isControlled 
+    ? { value: value === null ? "" : value }
+    : { defaultValue: defaultValue === null ? undefined : defaultValue };
+
   return (
-    <Select name={name} required={required} value={value} defaultValue={defaultValue} onValueChange={onValueChange} disabled={disabled}>
+    <Select name={name} required={required} onValueChange={onValueChange} disabled={disabled} {...selectProps}>
       <SelectTrigger
         className={cn(
           "w-full h-12! rounded-xl bg-muted/30 border-border/60 focus:ring-2 focus:ring-[#0052FF]/20 focus:border-[#0052FF] transition-all text-[15px]",
@@ -43,7 +48,7 @@ export function FormSelect({
         )}
       >
         <SelectValue placeholder={placeholder}>
-          {(val: string | null) => (val ? (labelMap[val] ?? val) : placeholder)}
+          {(val: string | null) => (val && val !== "" ? (labelMap[val] ?? val) : placeholder)}
         </SelectValue>
       </SelectTrigger>
       <SelectContent className="max-h-75" alignItemWithTrigger={false} side="bottom" align="start">

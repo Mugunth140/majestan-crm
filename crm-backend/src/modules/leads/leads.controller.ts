@@ -40,6 +40,12 @@ export class LeadsController {
     return { success: true, data };
   }
 
+  @Get(':id/auto-match')
+  async autoMatchProperties(@Param('id') id: string) {
+    const data = await this.leadsService.autoMatchProperties(Number(id));
+    return { success: true, data };
+  }
+
   @Put(':id')
   async updateLead(@Param('id') id: string, @Body() body: any) {
     const data = await this.leadsService.updateLead(Number(id), body);

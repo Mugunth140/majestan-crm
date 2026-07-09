@@ -15,7 +15,10 @@ export interface CreateLeadResult {
 
 @Injectable()
 export class LeadsService {
-  constructor(@InjectDataSource() private dataSource: DataSource) {}
+  constructor(
+    @InjectDataSource() private dataSource: DataSource,
+    @InjectDataSource('siteConnection') private siteDataSource: DataSource,
+  ) {}
 
   async getLeadById(id: number) {
     const lead = await this.dataSource.getRepository(Lead).findOne({
@@ -161,6 +164,7 @@ export class LeadsService {
         inquiry.property_type = body.propertyType || null;
         inquiry.property_category = body.propertyCategory || null;
         inquiry.funder = body.funder || null;
+        inquiry.preferences = body.preferences || null;
         await manager.save(LeadInquiry, inquiry);
       }
 
@@ -203,6 +207,7 @@ export class LeadsService {
             property_type: body.propertyType || null,
             property_category: body.propertyCategory || null,
             funder: body.funder || null,
+            preferences: body.preferences || null,
           });
           await manager.save(inquiry);
         }
@@ -255,6 +260,7 @@ export class LeadsService {
           property_type: body.propertyType || null,
           property_category: body.propertyCategory || null,
           funder: body.funder || null,
+          preferences: body.preferences || null,
         });
         await manager.save(inquiry);
       }
@@ -322,5 +328,64 @@ export class LeadsService {
         isUnqualified: lead.is_unqualified || false,
       };
     });
+  }
+
+  async autoMatchProperties(leadId: number) {
+    const lead = await this.dataSource.getRepository(Lead).findOne({
+      where: { id: leadId },
+      relations: { inquiries: true },
+    });
+    if (!lead || !lead.inquiries?.length) throw new NotFoundException('Lead or inquiry not found');
+
+    const inquiry = lead.inquiries[0];
+    const prefs = inquiry.preferences;
+    if (!prefs || Object.keys(prefs).length === 0) {
+      throw new ConflictException('Please define customer preferences (like budget or area) to auto-match properties.');
+    }
+
+    let query = `
+      SELECT p.id, p.title, p.price, p.property_type, p.status, p.slug, p.city, p.listing_type, 
+             pd.bedrooms, pd.bathrooms, pd.area_sqft, pd.furnished
+      FROM properties p
+      LEFT JOIN property_details pd ON p.id = pd.property_id
+      WHERE p.status = 'available'
+    `;
+    const params: any[] = [];
+
+    // Basic map for property type if there is a match in enum
+    // property_type enum: 'apartment','villa','plot','commercial','coworking','farmland','industrial','other','individual_portion'
+    if (inquiry.property_type) {
+      let mappedType = inquiry.property_type.toLowerCase();
+      const validTypes = ['apartment', 'villa', 'plot', 'commercial', 'coworking', 'farmland', 'industrial', 'other', 'individual_portion'];
+      if (validTypes.includes(mappedType)) {
+        query += ` AND p.property_type = ?`;
+        params.push(mappedType);
+      }
+    }
+
+    if (prefs.minBudget) {
+      query += ` AND p.price >= ?`;
+      params.push(Number(prefs.minBudget));
+    }
+    if (prefs.maxBudget) {
+      query += ` AND p.price <= ?`;
+      params.push(Number(prefs.maxBudget));
+    }
+    if (prefs.bhk) {
+      query += ` AND pd.bedrooms = ?`;
+      params.push(Number(prefs.bhk));
+    }
+    if (prefs.minArea) {
+      query += ` AND pd.area_sqft >= ?`;
+      params.push(Number(prefs.minArea));
+    }
+    if (prefs.maxArea) {
+      query += ` AND pd.area_sqft <= ?`;
+      params.push(Number(prefs.maxArea));
+    }
+
+    query += ` ORDER BY p.created_at DESC LIMIT 20`;
+
+    return this.siteDataSource.query(query, params);
   }
 }

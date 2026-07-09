@@ -28,6 +28,9 @@ export class LeadInquiry {
   @Column({ nullable: true })
   funder: string;
 
+  @Column({ type: 'json', nullable: true })
+  preferences: any;
+
   @CreateDateColumn()
   created_at: Date;
 }

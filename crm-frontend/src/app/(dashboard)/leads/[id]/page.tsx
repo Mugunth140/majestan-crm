@@ -273,6 +273,27 @@ export default function LeadViewPage() {
   // Modals / Sliders
   const [contactModal, setContactModal] = useState<{ open: boolean; type: string; to: string }>({ open: false, type: "", to: "" });
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isAutoMatchOpen, setIsAutoMatchOpen] = useState(false);
+  const [autoMatchResults, setAutoMatchResults] = useState<any[]>([]);
+  const [isMatching, setIsMatching] = useState(false);
+
+  const fetchAutoMatch = async () => {
+    setIsMatching(true);
+    try {
+      const res = await fetch(`${API_URL}/leads/${id}/auto-match`);
+      const data = await res.json();
+      if (data.success) {
+        setAutoMatchResults(data.data);
+        setIsAutoMatchOpen(true);
+      } else {
+        toast.error(data.message || "Failed to auto-match properties");
+      }
+    } catch {
+      toast.error("Failed to auto-match properties");
+    } finally {
+      setIsMatching(false);
+    }
+  };
 
   // Keyboard shortcut for history slider
   useEffect(() => {
@@ -705,6 +726,28 @@ export default function LeadViewPage() {
                 ))}
               </div>
             </div>
+            {/* Customer Preferences */}
+            <div className="bg-card border rounded-2xl p-6 shadow-sm">
+              <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center justify-between">
+                <span className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground" /> Preferences</span>
+                <Button size="sm" onClick={() => fetchAutoMatch()} disabled={isMatching} className="h-8 bg-[#0052FF] hover:bg-[#0040CC] text-white rounded-lg px-4 shadow-sm">
+                  {isMatching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Auto Match"}
+                </Button>
+              </h3>
+              
+              {(!inquiry?.preferences || Object.keys(inquiry.preferences).length === 0) ? (
+                <p className="text-sm text-muted-foreground italic text-center py-4">No preferences defined yet.</p>
+              ) : (
+                <div className="space-y-3 text-sm">
+                  {Object.entries(inquiry.preferences).map(([key, val]) => (
+                    <div key={key} className="flex justify-between items-center py-1.5 border-b border-border/30 last:border-0">
+                      <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
+                      <span className="font-medium text-[14px]">{String(val)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -725,6 +768,40 @@ export default function LeadViewPage() {
               followUps={followUps}
               onRefresh={() => fetchLead(true)}
             />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* ── Auto Match Slider (Sheet) ── */}
+      <Sheet open={isAutoMatchOpen} onOpenChange={setIsAutoMatchOpen}>
+        <SheetContent side="right" className="w-[450px] !max-w-[450px] p-0 flex flex-col border-l">
+          <SheetHeader className="p-6 border-b shrink-0 bg-blue-50 dark:bg-blue-900/20">
+            <SheetTitle className="text-lg text-[#0052FF] dark:text-blue-400">Auto Match Results</SheetTitle>
+            <SheetDescription>
+              Properties matching the customer preferences.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {autoMatchResults.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-10">No matching properties found.</p>
+            ) : (
+              autoMatchResults.map((prop) => (
+                <div key={prop.id} className="border rounded-xl p-4 shadow-sm bg-card hover:border-blue-200 dark:hover:border-blue-800 transition-colors">
+                  <h4 className="font-bold text-[15px] mb-1">{prop.title}</h4>
+                  <div className="flex gap-2 mb-3">
+                    <Badge variant="secondary" className="text-[10px] uppercase bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">{prop.property_type}</Badge>
+                    <Badge variant="outline" className="text-[10px]">{prop.listing_type}</Badge>
+                    <Badge variant="outline" className="text-[10px]">{prop.status}</Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                    <div><span className="font-semibold text-foreground">Price:</span> ₹{Number(prop.price).toLocaleString()}</div>
+                    {prop.bedrooms && <div><span className="font-semibold text-foreground">BHK:</span> {prop.bedrooms}</div>}
+                    {prop.area_sqft && <div><span className="font-semibold text-foreground">Area:</span> {prop.area_sqft} sqft</div>}
+                    {prop.city && <div><span className="font-semibold text-foreground">City:</span> {prop.city}</div>}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </SheetContent>
       </Sheet>

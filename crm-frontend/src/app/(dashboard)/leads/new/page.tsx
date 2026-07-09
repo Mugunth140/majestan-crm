@@ -109,6 +109,7 @@ function LeadForm() {
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [preferences, setPreferences] = useState<any>({});
   const [otherSourceText, setOtherSourceText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -148,6 +149,7 @@ function LeadForm() {
             if (result.data.inquiries?.[0]) {
               setSelectedCategory(result.data.inquiries[0].property_category || null);
               setSelectedType(result.data.inquiries[0].property_type || null);
+              setPreferences(result.data.inquiries[0].preferences || {});
             }
           } else {
             toast.error("Lead not found");
@@ -199,6 +201,7 @@ function LeadForm() {
         propertyType: formData.get("propertyType") as string,
         funder: formData.get("funder") as string,
         propertyCategory: formData.get("propertyCategory") as string,
+        preferences,
         followUpDate: followUpDateObj ? format(followUpDateObj, "yyyy-MM-dd") : null,
         followUpTime: followUpDateObj ? format(followUpDateObj, "HH:mm") : null,
         priority: formData.get("priority") as string,
@@ -368,6 +371,55 @@ function LeadForm() {
             </div>
           </div>
         </div>
+
+          <div className="bg-card border rounded-2xl p-8 shadow-sm">
+            <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Customer Preferences</h3>
+            
+            {!selectedCategory ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Please select a Property Category above to define customer preferences.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Min Budget</label>
+                  <Input type="number" placeholder="Min Budget" value={preferences?.minBudget || ""} onChange={e => setPreferences({...preferences, minBudget: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Max Budget</label>
+                  <Input type="number" placeholder="Max Budget" value={preferences?.maxBudget || ""} onChange={e => setPreferences({...preferences, maxBudget: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
+                </div>
+
+                {selectedCategory === "residential" && (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">BHK</label>
+                      <FormSelect name="_bhk" placeholder="Select BHK" options={[{label: "1", value: "1"}, {label: "2", value: "2"}, {label: "3", value: "3"}, {label: "4+", value: "4"}]} value={preferences?.bhk || null} onValueChange={v => setPreferences({...preferences, bhk: v})} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Furnishing</label>
+                      <FormSelect name="_furnishing" placeholder="Select" options={[{label: "Furnished", value: "1"}, {label: "Unfurnished", value: "0"}]} value={preferences?.furnished || null} onValueChange={v => setPreferences({...preferences, furnished: v})} />
+                    </div>
+                  </>
+                )}
+
+                {['commercial', 'industrial', 'agricultural', 'institutional'].includes(selectedCategory) && (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Min Area</label>
+                      <Input type="number" placeholder="Min Area" value={preferences?.minArea || ""} onChange={e => setPreferences({...preferences, minArea: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Max Area</label>
+                      <Input type="number" placeholder="Max Area" value={preferences?.maxArea || ""} onChange={e => setPreferences({...preferences, maxArea: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
+                    </div>
+                  </>
+                )}
+
+              </div>
+            )}
+          </div>
 
         {!editId && (
           <div className="bg-card border rounded-2xl p-8 shadow-sm">
