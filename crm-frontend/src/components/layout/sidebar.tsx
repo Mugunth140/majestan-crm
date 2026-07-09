@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { useSidebar } from "./sidebar-context";
 import { 
   Users, 
   Home, 
@@ -58,7 +59,7 @@ const navigation = [
 export function Sidebar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const { isCollapsed, setIsCollapsed } = useSidebar();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
 
