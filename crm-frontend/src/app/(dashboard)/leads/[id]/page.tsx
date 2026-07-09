@@ -364,6 +364,17 @@ export default function LeadViewPage() {
   const followUps: any[] = lead.follow_ups || [];
   const contactLogs: any[] = lead.contact_logs || [];
 
+  // RNR Calculation
+  const existingRnrs = followUps
+    .map(fu => fu.rnr)
+    .filter(rnr => rnr && typeof rnr === 'string' && rnr.startsWith("rnr"))
+    .map(rnr => parseInt(rnr.replace("rnr", ""), 10))
+    .filter(n => !isNaN(n));
+  const highestRnr = existingRnrs.length > 0 ? Math.max(...existingRnrs) : 0;
+  const nextRnrNumber = highestRnr + 1;
+  const nextRnrValue = `rnr${nextRnrNumber}`;
+  const isRnrMaxed = highestRnr >= 5;
+
   return (
     <div className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
 
@@ -549,9 +560,27 @@ export default function LeadViewPage() {
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Priority</label>
                   <FormSelect name="priority" placeholder="Select..." options={PRIORITIES} value={fuForm.priority} onValueChange={v => setFuForm(f => ({ ...f, priority: v || "" }))} />
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 flex flex-col justify-end">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">RNR Status</label>
-                  <FormSelect name="rnr" placeholder="Select..." options={RNR_OPTIONS} value={fuForm.rnr} onValueChange={v => setFuForm(f => ({ ...f, rnr: v || "" }))} />
+                  <Button
+                    type="button"
+                    variant={fuForm.rnr === nextRnrValue ? "default" : "outline"}
+                    className={cn(
+                      "w-full h-12 rounded-xl transition-all font-semibold",
+                      fuForm.rnr === nextRnrValue 
+                        ? "bg-orange-500 hover:bg-orange-600 text-white border-orange-500" 
+                        : "border-border/60 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 text-foreground/80"
+                    )}
+                    disabled={isRnrMaxed}
+                    onClick={() => {
+                      setFuForm(f => ({
+                        ...f,
+                        rnr: f.rnr === nextRnrValue ? "" : nextRnrValue
+                      }));
+                    }}
+                  >
+                    {isRnrMaxed ? "Max RNR (5) Reached" : (fuForm.rnr === nextRnrValue ? `RNR ${nextRnrNumber} Applied` : `Apply RNR ${nextRnrNumber}`)}
+                  </Button>
                 </div>
               </div>
             </div>
