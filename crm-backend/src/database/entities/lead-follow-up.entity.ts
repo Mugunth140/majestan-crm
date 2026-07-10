@@ -1,4 +1,5 @@
 // fallow-ignore-file circular-dependencies
+import type { Relation } from "typeorm";
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { Lead } from './lead.entity';
 import { User } from './user.entity';
@@ -13,7 +14,7 @@ export class LeadFollowUp {
 
   @ManyToOne(() => Lead, lead => lead.follow_ups, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'lead_id' })
-  lead: Lead;
+  lead: Relation<Lead>;
 
   // When the follow-up actually happened
   @Column({ type: 'date', nullable: true })

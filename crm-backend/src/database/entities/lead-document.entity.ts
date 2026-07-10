@@ -1,4 +1,5 @@
 // fallow-ignore-file circular-dependencies
+import type { Relation } from "typeorm";
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { Lead } from './lead.entity';
 
@@ -12,7 +13,7 @@ export class LeadDocument {
 
   @ManyToOne(() => Lead, lead => lead.documents, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'lead_id' })
-  lead: Lead;
+  lead: Relation<Lead>;
 
   @Column({ length: 255 })
   file_name: string;

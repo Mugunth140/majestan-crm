@@ -1,4 +1,5 @@
 // fallow-ignore-file circular-dependencies
+import type { Relation } from "typeorm";
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { Agent } from './agent.entity';
 import { User } from './user.entity';
@@ -13,7 +14,7 @@ export class AgentFollowUp {
 
   @ManyToOne(() => Agent, agent => agent.follow_ups, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'agent_id' })
-  agent: Agent;
+  agent: Relation<Agent>;
 
   @Column({ type: 'date', nullable: true })
   follow_up_date: string | null;

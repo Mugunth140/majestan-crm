@@ -51,7 +51,7 @@ import { AgentContactLog } from './database/entities/agent-contact-log.entity';
         password: configService.get<string>('DB_PASSWORD', '8220'),
         database: configService.get<string>('CRM_DB_NAME', 'majestan_crm'),
         entities: [User, Role, Permission, RolePermission, Department, ActivityLog, LeadSource, Lead, LeadInquiry, LeadFollowUp, LeadDocument, ContactLog, Agent, AgentFollowUp, AgentContactLog],
-        synchronize: true, // DEV ONLY
+        synchronize: false, // Migrations are used instead
       }),
     }),
 
