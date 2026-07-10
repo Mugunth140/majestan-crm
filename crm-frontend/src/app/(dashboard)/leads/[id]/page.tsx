@@ -13,8 +13,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { FormSelect } from "@/components/shared/form-select";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
-import { ContactModal } from "@/components/shared/contact-modal";
-import { FollowUpPanel } from "@/components/shared/follow-up-panel";
+import dynamic from "next/dynamic";
+
+const FollowUpPanel = dynamic(() => import("@/components/shared/follow-up-panel").then(mod => mod.FollowUpPanel), { ssr: false });
+const ContactModal = dynamic(() => import("@/components/shared/contact-modal").then(mod => mod.ContactModal), { ssr: false });
+const LeadAttachments = dynamic(() => import("@/components/shared/lead-attachments").then(mod => mod.LeadAttachments), { ssr: false });
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft, Loader2, User, Phone, MapPin, Building2,
@@ -178,7 +181,7 @@ function PageSkeleton() {
 }
 
 // ── Main Page ────────────────────────────────────────────────────────────────
-import { LeadAttachments } from "@/components/shared/lead-attachments";
+
 
 export default function LeadViewPage() {
   const params = useParams();

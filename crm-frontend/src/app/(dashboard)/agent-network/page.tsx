@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/tables/data-table";
@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
+import { useDebounce } from "@/hooks/use-debounce";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -43,6 +44,7 @@ export default function AgentsPage() {
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [filters, setFilters] = useState({
     partnerType: "",
     status: "",
@@ -98,11 +100,11 @@ export default function AgentsPage() {
     }
   };
 
-  const displayedAgents = () => {
+  const displayedAgents = useMemo(() => {
     let filtered = agents;
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+    if (debouncedSearchQuery.trim()) {
+      const q = debouncedSearchQuery.toLowerCase();
       filtered = filtered.filter(a => 
         a.name.toLowerCase().includes(q) ||
         String(a.mobile).includes(q) ||
@@ -167,7 +169,7 @@ export default function AgentsPage() {
     }
 
     return filtered;
-  };
+  }, [agents, debouncedSearchQuery, filters, activeTab, actionFilter, todayViewMode]);
 
   const columns: ColumnDef<any>[] = [
     {
@@ -422,7 +424,7 @@ export default function AgentsPage() {
         )}
 
         <div className="p-6">
-          {isLoading ? <TableSkeleton columns={6} rows={5} /> : <DataTable columns={columns} data={displayedAgents()} showToolbar={true} />}
+          {isLoading ? <TableSkeleton columns={6} rows={5} /> : <DataTable columns={columns} data={displayedAgents} showToolbar={true} />}
         </div>
       </div>
 

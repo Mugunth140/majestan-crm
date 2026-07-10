@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
+import { useDebounce } from "@/hooks/use-debounce";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
@@ -54,6 +55,7 @@ export default function LeadsPage() {
   const [isInserting, setIsInserting] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [filters, setFilters] = useState({
     dateFrom: "",
     dateTo: "",
@@ -86,12 +88,12 @@ export default function LeadsPage() {
     fetchLeads();
   }, [fetchLeads]);
 
-  const displayedLeads = () => {
+  const displayedLeads = useMemo(() => {
     let filtered = leads;
 
     // 1. Search Query
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+    if (debouncedSearchQuery.trim()) {
+      const q = debouncedSearchQuery.toLowerCase();
       filtered = filtered.filter(l => 
         (l.id && l.id.toLowerCase().includes(q)) ||
         (l.name && l.name.toLowerCase().includes(q)) ||
@@ -180,7 +182,7 @@ export default function LeadsPage() {
 
     // Default: All Leads (excluding unqualified)
     return qualifiedLeads;
-  };
+  }, [leads, debouncedSearchQuery, filters, activeTab, actionFilter, todayViewMode, pendingImports]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -668,7 +670,7 @@ export default function LeadsPage() {
               </Button>
             </div>
           ) : (
-            isLoading ? <TableSkeleton /> : <DataTable columns={columns} data={displayedLeads()} showToolbar={true} />
+            isLoading ? <TableSkeleton /> : <DataTable columns={columns} data={displayedLeads} showToolbar={true} />
           )}
         </div>
       </div>
