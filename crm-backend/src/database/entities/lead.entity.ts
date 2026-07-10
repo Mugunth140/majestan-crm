@@ -1,5 +1,5 @@
 // fallow-ignore-file circular-dependencies
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany, Index } from 'typeorm';
 import { User } from './user.entity';
 import { LeadInquiry } from './lead-inquiry.entity';
 import { LeadFollowUp } from './lead-follow-up.entity';
@@ -11,12 +11,14 @@ export class Lead {
   id: number;
 
   @Column()
+  @Index()
   name: string;
 
   @Column({ unique: true })
   mobile_number: string;
 
   @Column({ nullable: true })
+  @Index()
   email: string;
 
   @Column({ nullable: true })
@@ -32,9 +34,11 @@ export class Lead {
   lead_source: string;
 
   @Column({ type: 'varchar', default: 'New Lead' })
+  @Index()
   status: string;
 
   @Column({ name: 'assigned_staff_id', nullable: true })
+  @Index()
   assigned_staff_id: number;
 
   @ManyToOne(() => User)
@@ -54,6 +58,7 @@ export class Lead {
   documents: LeadDocument[];
 
   @CreateDateColumn()
+  @Index()
   created_at: Date;
 
   @UpdateDateColumn()

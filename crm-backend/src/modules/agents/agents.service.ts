@@ -17,38 +17,49 @@ export class AgentsService {
   constructor(@InjectDataSource() private dataSource: DataSource) {}
 
   async getAgents(): Promise<any[]> {
-    const agentRepo = this.dataSource.getRepository(Agent);
-    const agents = await agentRepo.find({
-      relations: { assigned_staff: true, follow_ups: true },
-      order: { created_at: 'DESC' },
-    });
+    const rawAgents = await this.dataSource.query(`
+      SELECT 
+        a.id as rawId, 
+        a.name, 
+        a.company_name, 
+        a.mobile_number as mobile, 
+        a.email, 
+        a.city, 
+        a.partner_type as partnerType, 
+        a.status, 
+        a.created_at as createdAt,
+        s.name as staff,
+        latest_f.next_follow_up_date as nextFollowUpDate,
+        latest_actual_f.follow_up_date as lastFollowedUpDate
+      FROM agents a
+      LEFT JOIN users s ON a.assigned_staff_id = s.id
+      LEFT JOIN (
+        SELECT agent_id, next_follow_up_date,
+               ROW_NUMBER() OVER(PARTITION BY agent_id ORDER BY created_at DESC) as rn
+        FROM agent_follow_ups
+      ) latest_f ON latest_f.agent_id = a.id AND latest_f.rn = 1
+      LEFT JOIN (
+        SELECT agent_id, follow_up_date,
+               ROW_NUMBER() OVER(PARTITION BY agent_id ORDER BY follow_up_date DESC) as rn
+        FROM agent_follow_ups
+        WHERE follow_up_date IS NOT NULL
+      ) latest_actual_f ON latest_actual_f.agent_id = a.id AND latest_actual_f.rn = 1
+      ORDER BY a.created_at DESC
+    `);
 
-    return agents.map((agent: Agent) => {
-      const allFollowUps = (agent.follow_ups || [])
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      
-      const latestNextFollowUp = allFollowUps[0]?.next_follow_up_date || null;
-
-      const sortedActualFollowUps = (agent.follow_ups || [])
-        .filter(f => f.follow_up_date)
-        .sort((a, b) => new Date(b.follow_up_date as string).getTime() - new Date(a.follow_up_date as string).getTime());
-        
-      const lastFollowedUpDate = sortedActualFollowUps[0]?.follow_up_date || null;
-
-      return {
-        id: agent.id,
-        created_at: agent.created_at,
-        name: agent.name,
-        email: agent.email || '',
-        mobile: agent.mobile_number,
-        company_name: agent.company_name || '—',
-        partner_type: agent.partner_type || '—',
-        staff: agent.assigned_staff?.name ?? 'Unassigned',
-        status: agent.status ?? 'New',
-        nextFollowUpDate: latestNextFollowUp,
-        lastFollowedUpDate: lastFollowedUpDate,
-      };
-    });
+    return rawAgents.map((row: any) => ({
+      id: row.rawId,
+      created_at: row.createdAt,
+      name: row.name,
+      email: row.email || '',
+      mobile: row.mobile,
+      company_name: row.company_name || '—',
+      partner_type: row.partnerType || '—',
+      staff: row.staff ?? 'Unassigned',
+      status: row.status ?? 'New',
+      nextFollowUpDate: row.nextFollowUpDate || null,
+      lastFollowedUpDate: row.lastFollowedUpDate || null,
+    }));
   }
 
   async getAgentById(id: number) {

@@ -1,5 +1,5 @@
 // fallow-ignore-file circular-dependencies
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany, Index } from 'typeorm';
 import { User } from './user.entity';
 import { AgentFollowUp } from './agent-follow-up.entity';
 import { AgentContactLog } from './agent-contact-log.entity';
@@ -10,9 +10,11 @@ export class Agent {
   id: number;
 
   @Column()
+  @Index()
   name: string;
 
   @Column({ nullable: true })
+  @Index()
   company_name: string;
 
   @Column({ unique: true })
@@ -22,6 +24,7 @@ export class Agent {
   whatsapp_number: string;
 
   @Column({ nullable: true })
+  @Index()
   email: string;
 
   @Column({ nullable: true })
@@ -31,6 +34,7 @@ export class Agent {
   state: string;
 
   @Column({ nullable: true })
+  @Index()
   partner_type: string;
 
   @Column({ nullable: true })
@@ -49,9 +53,11 @@ export class Agent {
   remarks: string;
 
   @Column({ type: 'varchar', default: 'New' })
+  @Index()
   status: string;
 
   @Column({ name: 'assigned_staff_id', nullable: true })
+  @Index()
   assigned_staff_id: number;
 
   @ManyToOne(() => User)
@@ -65,6 +71,7 @@ export class Agent {
   contact_logs: AgentContactLog[];
 
   @CreateDateColumn()
+  @Index()
   created_at: Date;
 
   @UpdateDateColumn()

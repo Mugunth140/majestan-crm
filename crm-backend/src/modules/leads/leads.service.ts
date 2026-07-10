@@ -311,49 +311,61 @@ export class LeadsService {
   }
 
   async getLeads(): Promise<any[]> {
-    const leadRepo = this.dataSource.getRepository(Lead);
-    const leads = await leadRepo.find({
-      relations: { assigned_staff: true, inquiries: true, follow_ups: true },
-      order: { created_at: 'DESC' },
-    });
+    const rawLeads = await this.dataSource.query(`
+      SELECT 
+        l.id as rawId, 
+        l.name, 
+        l.mobile_number as mobile, 
+        l.email, 
+        l.status, 
+        l.lead_source as source, 
+        l.is_unqualified as isUnqualified, 
+        l.created_at as createdAt,
+        s.name as staff,
+        i.property_type as propertyType, 
+        i.property_category as propertyCategory,
+        latest_f.next_follow_up_date as nextFollowUpDate,
+        latest_actual_f.follow_up_date as lastFollowedUpDate
+      FROM leads l
+      LEFT JOIN users s ON l.assigned_staff_id = s.id
+      LEFT JOIN lead_inquiries i ON i.lead_id = l.id
+      LEFT JOIN (
+        SELECT lead_id, next_follow_up_date,
+               ROW_NUMBER() OVER(PARTITION BY lead_id ORDER BY created_at DESC) as rn
+        FROM lead_follow_ups
+      ) latest_f ON latest_f.lead_id = l.id AND latest_f.rn = 1
+      LEFT JOIN (
+        SELECT lead_id, follow_up_date,
+               ROW_NUMBER() OVER(PARTITION BY lead_id ORDER BY follow_up_date DESC) as rn
+        FROM lead_follow_ups
+        WHERE follow_up_date IS NOT NULL
+      ) latest_actual_f ON latest_actual_f.lead_id = l.id AND latest_actual_f.rn = 1
+      ORDER BY l.created_at DESC
+    `);
 
-    return leads.map((lead: Lead, index: number) => {
-      const allFollowUps = (lead.follow_ups || [])
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      
-      const latestNextFollowUp = allFollowUps[0]?.next_follow_up_date || null;
-
-      // Find the most recent actual follow-up date
-      const sortedActualFollowUps = (lead.follow_ups || [])
-        .filter(f => f.follow_up_date)
-        .sort((a, b) => new Date(b.follow_up_date as string).getTime() - new Date(a.follow_up_date as string).getTime());
-        
-      const lastFollowedUpDate = sortedActualFollowUps[0]?.follow_up_date || null;
-
-      return {
-        sno: index + 1,
-        id: 'L' + String(lead.id).padStart(5, '0'),
-        rawId: lead.id,
-        createdAt: lead.created_at,
-        date: new Date(lead.created_at).toLocaleDateString('en-GB', {
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-        }),
-        name: lead.name,
-        email: lead.email || '',
-        mobile: lead.mobile_number,
-        propertyType: lead.inquiries?.[0]?.property_type || '—',
-        propertyCategory: lead.inquiries?.[0]?.property_category || '—',
-        staff: lead.assigned_staff?.name ?? 'Unassigned',
-        source: lead.lead_source ?? '',
-        status: lead.status ?? 'New Lead',
-        notes: '',
-        nextFollowUpDate: latestNextFollowUp,
-        lastFollowedUpDate: lastFollowedUpDate,
-        isUnqualified: lead.is_unqualified || false,
-      };
-    });
+    return rawLeads.map((row: any, index: number) => ({
+      sno: index + 1,
+      id: 'L' + String(row.rawId).padStart(5, '0'),
+      rawId: row.rawId,
+      createdAt: row.createdAt,
+      date: new Date(row.createdAt).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      }),
+      name: row.name,
+      email: row.email || '',
+      mobile: row.mobile,
+      propertyType: row.propertyType || '—',
+      propertyCategory: row.propertyCategory || '—',
+      staff: row.staff ?? 'Unassigned',
+      source: row.source ?? '',
+      status: row.status ?? 'New Lead',
+      notes: '',
+      nextFollowUpDate: row.nextFollowUpDate || null,
+      lastFollowedUpDate: row.lastFollowedUpDate || null,
+      isUnqualified: Boolean(row.isUnqualified),
+    }));
   }
 
   async autoMatchProperties(leadId: number) {
