@@ -18,19 +18,24 @@ export interface CreateLeadResult {
 
 @Injectable()
 export class LeadsService {
-  private s3Client: S3Client;
+  private _s3Client: S3Client | null = null;
 
   constructor(
     @InjectDataSource() private dataSource: DataSource,
     @InjectDataSource('siteConnection') private siteDataSource: DataSource,
-  ) {
-    this.s3Client = new S3Client({
-      accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
-      endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-      bucket: process.env.R2_BUCKET_NAME || '',
-      region: 'auto',
-    });
+  ) {}
+
+  private get s3Client(): S3Client {
+    if (!this._s3Client) {
+      this._s3Client = new S3Client({
+        accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
+        endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+        bucket: process.env.R2_BUCKET_NAME || '',
+        region: 'auto',
+      });
+    }
+    return this._s3Client;
   }
 
   async getLeadById(id: number) {
