@@ -319,12 +319,23 @@ export default function LeadViewPage() {
   const contactLogs: any[] = lead.contact_logs || [];
 
   // RNR Calculation
-  const existingRnrs = followUps
-    .map(fu => fu.rnr)
-    .filter(rnr => rnr && typeof rnr === 'string' && rnr.startsWith("rnr"))
-    .map(rnr => parseInt(rnr.replace("rnr", ""), 10))
-    .filter(n => !isNaN(n));
-  const highestRnr = existingRnrs.length > 0 ? Math.max(...existingRnrs) : 0;
+  let highestRnr = 0;
+  if (followUps.length > 0) {
+    // Sort follow-ups by date descending locally to ensure we check the most recent one
+    const sortedFollowUps = [...followUps].sort((a, b) => {
+      const dateA = new Date(`${a.follow_up_date}T${a.follow_up_time || '00:00:00'}`).getTime();
+      const dateB = new Date(`${b.follow_up_date}T${b.follow_up_time || '00:00:00'}`).getTime();
+      return dateB - dateA;
+    });
+    
+    const latestFu = sortedFollowUps[0];
+    if (latestFu.rnr && typeof latestFu.rnr === 'string' && latestFu.rnr.startsWith("rnr")) {
+      const num = parseInt(latestFu.rnr.replace("rnr", ""), 10);
+      if (!isNaN(num)) {
+        highestRnr = num;
+      }
+    }
+  }
   const nextRnrNumber = highestRnr + 1;
   const nextRnrValue = `rnr${nextRnrNumber}`;
   const isRnrMaxed = highestRnr >= 5;
@@ -532,9 +543,11 @@ export default function LeadViewPage() {
                     )}
                     disabled={isRnrMaxed}
                     onClick={() => {
+                      const isApplying = fuForm.rnr !== nextRnrValue;
                       setFuForm(f => ({
                         ...f,
-                        rnr: f.rnr === nextRnrValue ? "" : nextRnrValue
+                        rnr: isApplying ? nextRnrValue : "",
+                        notes: isApplying ? `RNR ${nextRnrNumber} for this lead` : (f.notes === `RNR ${nextRnrNumber} for this lead` ? "" : f.notes)
                       }));
                     }}
                   >
@@ -551,7 +564,8 @@ export default function LeadViewPage() {
                   value={fuForm.notes}
                   onChange={e => setFuForm(f => ({ ...f, notes: e.target.value }))}
                   placeholder="What was discussed?..."
-                  className="bg-muted/20 rounded-xl resize-none text-sm flex-1 min-h-[100px]"
+                  disabled={!!fuForm.rnr}
+                  className={cn("bg-muted/20 rounded-xl resize-none text-sm flex-1 min-h-[100px]", fuForm.rnr ? "opacity-70 cursor-not-allowed bg-muted" : "")}
                 />
               </div>
               <Button
