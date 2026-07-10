@@ -30,6 +30,36 @@ export function DateTimePicker({ value, onChange, placeholder = "Pick date & tim
   const minute = internalDate ? internalDate.getMinutes() : 0;
   const ampm = hour24 >= 12 ? "PM" : "AM";
 
+  const [hourInput, setHourInput] = React.useState<string>(hour12.toString());
+  const [minuteInput, setMinuteInput] = React.useState<string>(minute.toString().padStart(2, '0'));
+
+  React.useEffect(() => {
+    setHourInput(hour12.toString());
+    setMinuteInput(minute.toString().padStart(2, '0'));
+  }, [hour12, minute]);
+
+  const commitHour = () => {
+    let h = parseInt(hourInput, 10);
+    if (isNaN(h)) {
+      setHourInput(hour12.toString());
+      return;
+    }
+    if (h < 1) h = 1;
+    if (h > 12) h = 12;
+    setTime(h, minute, ampm);
+  };
+
+  const commitMinute = () => {
+    let m = parseInt(minuteInput, 10);
+    if (isNaN(m)) {
+      setMinuteInput(minute.toString().padStart(2, '0'));
+      return;
+    }
+    if (m < 0) m = 0;
+    if (m > 59) m = 59;
+    setTime(hour12, m, ampm);
+  };
+
   // Sync internal state when popover opens
   React.useEffect(() => {
     if (isOpen) {
@@ -81,12 +111,12 @@ export function DateTimePicker({ value, onChange, placeholder = "Pick date & tim
   };
 
   const QUICK_TIMES = [
-    { label: "9:00 AM", h: 9, m: 0 },
-    { label: "10:00 AM", h: 10, m: 0 },
-    { label: "11:00 AM", h: 11, m: 0 },
-    { label: "12:00 PM", h: 12, m: 0 },
-    { label: "2:00 PM", h: 14, m: 0 },
-    { label: "4:00 PM", h: 16, m: 0 },
+    { label: "9:30 AM", h: 9, m: 30 },
+    { label: "11:30 AM", h: 11, m: 30 },
+    { label: "1:45 PM", h: 13, m: 45 },
+    { label: "3:30 PM", h: 15, m: 30 },
+    { label: "4:45 PM", h: 16, m: 45 },
+    { label: "6:30 PM", h: 18, m: 30 },
   ];
 
   const SHORTCUTS = [
@@ -108,11 +138,13 @@ export function DateTimePicker({ value, onChange, placeholder = "Pick date & tim
     setTime(newH12, minute, ampm);
   };
   const incMin = () => {
-    const newMin = minute === 59 ? 0 : minute + 1;
+    let newMin = minute + 5;
+    if (newMin >= 60) newMin = newMin - 60;
     setTime(hour12, newMin, ampm);
   };
   const decMin = () => {
-    const newMin = minute === 0 ? 59 : minute - 1;
+    let newMin = minute - 5;
+    if (newMin < 0) newMin = 60 + newMin;
     setTime(hour12, newMin, ampm);
   };
   const toggleAmPm = () => {
@@ -191,9 +223,14 @@ export function DateTimePicker({ value, onChange, placeholder = "Pick date & tim
                       <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" onClick={incHour}>
                         <ChevronUp className="h-5 w-5" />
                       </Button>
-                      <div className="w-11 h-11 flex items-center justify-center bg-background rounded-xl text-lg font-bold border border-border/50 shadow-sm">
-                        {hour12.toString().padStart(2, '0')}
-                      </div>
+                      <input
+                        type="text"
+                        value={hourInput}
+                        onChange={(e) => setHourInput(e.target.value)}
+                        onBlur={commitHour}
+                        onKeyDown={(e) => e.key === "Enter" && commitHour()}
+                        className="w-11 h-11 text-center bg-background rounded-xl text-lg font-bold border border-border/50 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                      />
                       <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" onClick={decHour}>
                         <ChevronDown className="h-5 w-5" />
                       </Button>
@@ -206,9 +243,14 @@ export function DateTimePicker({ value, onChange, placeholder = "Pick date & tim
                       <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" onClick={incMin}>
                         <ChevronUp className="h-5 w-5" />
                       </Button>
-                      <div className="w-11 h-11 flex items-center justify-center bg-background rounded-xl text-lg font-bold border border-border/50 shadow-sm">
-                        {minute.toString().padStart(2, '0')}
-                      </div>
+                      <input
+                        type="text"
+                        value={minuteInput}
+                        onChange={(e) => setMinuteInput(e.target.value)}
+                        onBlur={commitMinute}
+                        onKeyDown={(e) => e.key === "Enter" && commitMinute()}
+                        className="w-11 h-11 text-center bg-background rounded-xl text-lg font-bold border border-border/50 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                      />
                       <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground" onClick={decMin}>
                         <ChevronDown className="h-5 w-5" />
                       </Button>
