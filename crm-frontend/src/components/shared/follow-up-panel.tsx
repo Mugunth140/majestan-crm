@@ -56,13 +56,14 @@ function formatFollowUpDate(dateStr: string) {
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface FollowUpPanelProps {
-  leadId: number | string;
+  entityId: number | string;
+  entityType: 'leads' | 'agents';
   followUps: any[];
   onRefresh: () => void;
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
-export function FollowUpPanel({ leadId, followUps, onRefresh }: FollowUpPanelProps) {
+export function FollowUpPanel({ entityId, entityType, followUps, onRefresh }: FollowUpPanelProps) {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
@@ -124,7 +125,7 @@ export function FollowUpPanel({ leadId, followUps, onRefresh }: FollowUpPanelPro
     if (!editFu) return;
     setIsSavingEdit(true);
     try {
-      const res = await fetch(`${API_URL}/leads/${leadId}/follow-ups/${editFu.id}`, {
+      const res = await fetch(`${API_URL}/${entityType}/${entityId}/follow-ups/${editFu.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editFuForm),

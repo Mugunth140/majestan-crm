@@ -70,7 +70,7 @@ export function Sidebar() {
         setUserRole(user.role);
       }
     } catch (err) {
-      console.error("Failed to parse user from local storage");
+      console.error("FailLocationed to parse user from local storage");
     }
   }, []);
 

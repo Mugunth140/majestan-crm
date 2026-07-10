@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { FormSelect } from "@/components/shared/form-select";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
+import { ContactModal } from "@/components/shared/contact-modal";
 import { FollowUpPanel } from "@/components/shared/follow-up-panel";
 import { cn } from "@/lib/utils";
 import {
@@ -81,91 +82,6 @@ function formatTimestamp(ts: string) {
   const d = new Date(ts);
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) +
     " at " + d.toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true });
-}
-
-// ── Contact Modal ────────────────────────────────────────────────────────────
-function ContactModal({
-  open, type, to, leadId, onClose, onSent,
-}: { open: boolean; type: string; to: string; leadId: number; onClose: () => void; onSent: () => void }) {
-  const [subject, setSubject] = useState("");
-  const [message, setMessage] = useState("");
-  const [isSending, setIsSending] = useState(false);
-
-  const handleSend = async () => {
-    setIsSending(true);
-    try {
-      await fetch(`${API_URL}/leads/${leadId}/contact-log`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contact_type: type, subject, message }),
-      });
-      toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} logged successfully. API integration coming soon.`);
-      setSubject("");
-      setMessage("");
-      onSent();
-      onClose();
-    } catch {
-      toast.error("Failed to log contact.");
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  const titles: Record<string, string> = {
-    email: `Send Email to ${to}`,
-    sms: `Send SMS to ${to}`,
-    whatsapp: `Send WhatsApp to ${to}`,
-    call: `Log Call with ${to}`,
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            <div className={`h-10 w-10 rounded-xl flex items-center justify-center border ${CONTACT_TYPE_STYLES[type] || ""}`}>
-              {CONTACT_TYPE_ICONS[type]}
-            </div>
-            <div>
-              <DialogTitle className="text-lg">{titles[type]}</DialogTitle>
-              <DialogDescription className="text-sm">This will be logged as a contact attempt.</DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
-
-        <div className="space-y-4 py-2">
-          {(type === "email" || type === "sms") && (
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Subject</label>
-              <Input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Subject line..." className="h-11 rounded-xl bg-muted/30" />
-            </div>
-          )}
-          {type === "call" ? (
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Call Notes</label>
-              <Textarea value={message} onChange={e => setMessage(e.target.value)} placeholder="What was discussed on this call?" className="rounded-xl bg-muted/30 resize-none" rows={5} />
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Message</label>
-              <Textarea value={message} onChange={e => setMessage(e.target.value)} placeholder={`Write your ${type} message here...`} className="rounded-xl bg-muted/30 resize-none" rows={6} />
-            </div>
-          )}
-          <p className="text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
-            API integration coming soon. This will be logged as a timestamp in the contact history.
-          </p>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSend} disabled={isSending} className="bg-[#0052FF] text-white hover:bg-[#0040CC] gap-2">
-            {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            {type === "call" ? "Log Call" : `Send ${type.charAt(0).toUpperCase() + type.slice(1)}`}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
 }
 
 // ── Loading Skeleton ─────────────────────────────────────────────────────────
@@ -764,7 +680,8 @@ export default function LeadViewPage() {
           </SheetHeader>
           <div className="flex-1 overflow-hidden relative">
             <FollowUpPanel
-              leadId={Number(id)}
+              entityId={Number(id)}
+              entityType="leads"
               followUps={followUps}
               onRefresh={() => fetchLead(true)}
             />
@@ -811,7 +728,8 @@ export default function LeadViewPage() {
         open={contactModal.open}
         type={contactModal.type}
         to={contactModal.to}
-        leadId={Number(id)}
+        entityId={Number(id)}
+        entityType="leads"
         onClose={() => setContactModal({ open: false, type: "", to: "" })}
         onSent={() => fetchLead(true)}
       />
