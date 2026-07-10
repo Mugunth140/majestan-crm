@@ -1,0 +1,3 @@
+#!/bin/sh
+cd crm-backend
+bunx lint-staged
