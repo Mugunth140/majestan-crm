@@ -64,6 +64,14 @@ const CONTACTED_VIA = [
   { label: "Email", value: "email" },
 ];
 
+const RNR_OPTIONS = [
+  { label: "RNR 1", value: "rnr1" },
+  { label: "RNR 2", value: "rnr2" },
+  { label: "RNR 3", value: "rnr3" },
+  { label: "RNR 4", value: "rnr4" },
+  { label: "RNR 5", value: "rnr5" },
+];
+
 function formatTimestamp(ts: string) {
   const d = new Date(ts);
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) +
@@ -125,6 +133,7 @@ export default function AgentViewPage() {
     nextFollowUpDate: "",
     nextFollowUpTime: "",
     priority: "",
+    rnr: "",
     notes: "",
   });
   const [isSavingFu, setIsSavingFu] = useState(false);
@@ -190,7 +199,7 @@ export default function AgentViewPage() {
       const data = await res.json();
       if (data.success) {
         toast.success("Follow-up logged successfully.");
-        setFuForm({ contactedVia: "", nextFollowUpDate: "", nextFollowUpTime: "", priority: "", notes: "" });
+        setFuForm({ contactedVia: "", nextFollowUpDate: "", nextFollowUpTime: "", priority: "", rnr: "", notes: "" });
         fetchAgent(true);
       } else toast.error(data.message || "Failed to save follow-up");
     } catch { toast.error("Failed to save follow-up"); }
@@ -206,9 +215,30 @@ export default function AgentViewPage() {
   if (!agent) return null;
 
   const statusName = agent.status || "New";
-  const badgeCls = STATUS_STYLES[statusName] ?? "bg-gray-100 text-gray-800 border-gray-200";
+  const badgeCls = STATUS_STYLES[statusName] ?? "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300";
   const followUps: any[] = agent.follow_ups || [];
   const contactLogs: any[] = agent.contact_logs || [];
+
+  // RNR Calculation
+  let highestRnr = 0;
+  if (followUps.length > 0) {
+    const sortedFollowUps = [...followUps].sort((a, b) => {
+      const dateA = new Date(`${a.follow_up_date}T${a.follow_up_time || '00:00:00'}`).getTime();
+      const dateB = new Date(`${b.follow_up_date}T${b.follow_up_time || '00:00:00'}`).getTime();
+      return dateB - dateA;
+    });
+    
+    const latestFu = sortedFollowUps[0];
+    if (latestFu.rnr && typeof latestFu.rnr === 'string' && latestFu.rnr.startsWith("rnr")) {
+      const num = parseInt(latestFu.rnr.replace("rnr", ""), 10);
+      if (!isNaN(num)) {
+        highestRnr = num;
+      }
+    }
+  }
+  const nextRnrNumber = highestRnr + 1;
+  const nextRnrValue = `rnr${nextRnrNumber}`;
+  const isRnrMaxed = highestRnr >= 5;
 
   return (
     <div className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -363,6 +393,30 @@ export default function AgentViewPage() {
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Priority</label>
                   <FormSelect name="priority" placeholder="Select..." options={PRIORITIES} value={fuForm.priority} onValueChange={v => setFuForm(f => ({ ...f, priority: v || "" }))} />
                 </div>
+                <div className="space-y-1.5 flex flex-col justify-end">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">RNR Status</label>
+                  <Button
+                    type="button"
+                    variant={fuForm.rnr === nextRnrValue ? "default" : "outline"}
+                    className={cn(
+                      "w-full h-12 rounded-xl transition-all font-semibold",
+                      fuForm.rnr === nextRnrValue 
+                        ? "bg-orange-500 hover:bg-orange-600 text-white border-orange-500" 
+                        : "border-border/60 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 text-foreground/80"
+                    )}
+                    disabled={isRnrMaxed}
+                    onClick={() => {
+                      const isApplying = fuForm.rnr !== nextRnrValue;
+                      setFuForm(f => ({
+                        ...f,
+                        rnr: isApplying ? nextRnrValue : "",
+                        notes: isApplying ? `RNR ${nextRnrNumber} for this agent` : (f.notes === `RNR ${nextRnrNumber} for this agent` ? "" : f.notes)
+                      }));
+                    }}
+                  >
+                    {isRnrMaxed ? "Max RNR (5) Reached" : (fuForm.rnr === nextRnrValue ? `RNR ${nextRnrNumber} Applied` : `Apply RNR ${nextRnrNumber}`)}
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -373,7 +427,8 @@ export default function AgentViewPage() {
                   value={fuForm.notes}
                   onChange={e => setFuForm(f => ({ ...f, notes: e.target.value }))}
                   placeholder="What was discussed?..."
-                  className="bg-muted/20 rounded-xl resize-none text-sm flex-1 min-h-[100px]"
+                  disabled={!!fuForm.rnr}
+                  className={cn("bg-muted/20 rounded-xl resize-none text-sm flex-1 min-h-[100px]", fuForm.rnr ? "opacity-70 cursor-not-allowed bg-muted" : "")}
                 />
               </div>
               <Button
