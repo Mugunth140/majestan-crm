@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -17,14 +16,19 @@ import {
 import { FormSelect } from "@/components/shared/form-select";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
 import {
-  Edit,
   Loader2,
-  User,
-  ArrowUpRight,
+  CalendarClock,
   MessageSquare,
+  Phone,
+  MessageCircle,
+  Mail,
+  Smartphone,
+  User,
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+
+// ── Lookup maps ───────────────────────────────────────────────────────────────
 
 const PRIORITIES = [
   { label: "Low", value: "low" },
@@ -33,7 +37,7 @@ const PRIORITIES = [
   { label: "Urgent", value: "urgent" },
 ];
 
-const CONTACTED_VIA = [
+const CONTACTED_VIA_OPTIONS = [
   { label: "Call", value: "call" },
   { label: "WhatsApp", value: "whatsapp" },
   { label: "SMS", value: "sms" },
@@ -48,21 +52,39 @@ const RNR_OPTIONS = [
   { label: "RNR 5", value: "rnr5" },
 ];
 
+const CONTACTED_VIA_STYLES: Record<string, { label: string; className: string; icon: React.ElementType }> = {
+  call:     { label: "Call",     className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",       icon: Phone },
+  whatsapp: { label: "WhatsApp", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400", icon: MessageCircle },
+  sms:      { label: "SMS",      className: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400",               icon: Smartphone },
+  email:    { label: "Email",    className: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",   icon: Mail },
+};
+
+const PRIORITY_STYLES: Record<string, string> = {
+  low:    "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
+  medium: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  high:   "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  urgent: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function formatFollowUpDate(dateStr: string) {
-  if (!dateStr) return "\u2014";
+  if (!dateStr) return "—";
   const d = new Date(dateStr);
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
+
 interface FollowUpPanelProps {
   entityId: number | string;
-  entityType: 'leads' | 'agents';
+  entityType: "leads" | "agents";
   followUps: any[];
   onRefresh: () => void;
 }
 
-// ── Component ────────────────────────────────────────────────────────────────
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export function FollowUpPanel({ entityId, entityType, followUps, onRefresh }: FollowUpPanelProps) {
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -73,17 +95,16 @@ export function FollowUpPanel({ entityId, entityType, followUps, onRefresh }: Fo
         const user = JSON.parse(userStr);
         setIsAdmin(user.role === "Admin" || user.role === "Super Admin");
       }
-    } catch (err) {
-      console.error("Failed to parse user from local storage");
+    } catch {
+      /* ignore */
     }
   }, []);
 
-  // Edit follow-up state
+  // Edit state (admin only, kept for data integrity — triggered via "next follow-up" strip)
   const [editFu, setEditFu] = useState<any>(null);
   const [editFuForm, setEditFuForm] = useState<any>({});
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
-  // ── Date helpers ───────────────────────────────────────────────────────────
   const getFuDateObj = (d: string, t: string) => {
     if (!d) return undefined;
     const date = new Date(d);
@@ -106,7 +127,6 @@ export function FollowUpPanel({ entityId, entityType, followUps, onRefresh }: Fo
     }));
   };
 
-  // ── Edit follow-up ────────────────────────────────────────────────────────
   const openEdit = (fu: any) => {
     setEditFu(fu);
     setEditFuForm({
@@ -136,114 +156,151 @@ export function FollowUpPanel({ entityId, entityType, followUps, onRefresh }: Fo
         setEditFu(null);
         onRefresh();
       } else toast.error("Failed to update follow-up");
-    } catch { toast.error("Failed to update follow-up"); }
-    finally { setIsSavingEdit(false); }
+    } catch {
+      toast.error("Failed to update follow-up");
+    } finally {
+      setIsSavingEdit(false);
+    }
   };
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Render ───────────────────────────────────────────────────────────────────
+
   return (
     <>
-      <div className="flex flex-col h-full bg-transparent">
+      <div className="flex flex-col h-full">
 
         {/* ── Timeline ── */}
-        <div className="flex-1 overflow-y-auto min-h-0 pt-4 px-2 pb-10">
+        <div className="flex-1 overflow-y-auto min-h-0 py-6 px-5 pb-12">
           {followUps.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 px-4">
-              <div className="h-12 w-12 rounded-full bg-muted/40 flex items-center justify-center mb-3">
-                <MessageSquare className="h-5 w-5 text-muted-foreground/50" />
+            <div className="flex flex-col items-center justify-center py-20 px-4">
+              <div className="h-14 w-14 rounded-full bg-muted/40 flex items-center justify-center mb-4">
+                <MessageSquare className="h-6 w-6 text-muted-foreground/40" />
               </div>
               <p className="text-sm font-medium text-muted-foreground text-center">No follow-ups recorded yet</p>
+              <p className="text-xs text-muted-foreground/60 text-center mt-1">Log a follow-up to get started</p>
             </div>
           ) : (
-            <div className="space-y-6">
-              {followUps.map((fu: any) => {
-                const timestamp = getFuDateObj(fu.follow_up_date, fu.follow_up_time || "00:00");
-                const relativeTime = timestamp ? formatDistanceToNow(timestamp, { addSuffix: true }) : "";
-                const absoluteTime = timestamp ? format(timestamp, "MMM d, yyyy \u00B7 h:mma") : formatFollowUpDate(fu.follow_up_date);
+            <div className="relative">
+              {/* Vertical connector line */}
+              <div
+                className="absolute left-[15px] top-[18px] bottom-8 w-[2px] bg-gradient-to-b from-[#0052FF]/60 via-[#0052FF]/20 to-transparent"
+                aria-hidden
+              />
 
-                return (
-                  <div key={fu.id} className="relative group">
-                    {/* Header (Timestamp & Edit Button) */}
-                    <div className="mb-2 flex items-center justify-between pr-1">
-                      <div className="flex items-center gap-1.5 text-[13px] text-muted-foreground pl-1">
-                        <span className="font-medium text-foreground/70">{absoluteTime}</span>
-                        <span className="text-muted-foreground/40">|</span>
-                        <span>{relativeTime}</span>
+              <div className="space-y-8">
+                {followUps.map((fu: any, idx: number) => {
+                  const timestamp = getFuDateObj(fu.follow_up_date, fu.follow_up_time || "00:00");
+                  const relativeTime = timestamp ? formatDistanceToNow(timestamp, { addSuffix: true }) : "";
+                  const absoluteDate = timestamp
+                    ? format(timestamp, "d MMM yyyy")
+                    : formatFollowUpDate(fu.follow_up_date);
+                  const absoluteTime = timestamp ? format(timestamp, "h:mm a") : "";
+
+                  const viaStyle = fu.contacted_via ? CONTACTED_VIA_STYLES[fu.contacted_via] : null;
+                  const ViaIcon = viaStyle?.icon;
+                  const isLast = idx === followUps.length - 1;
+
+                  return (
+                    <div key={fu.id} className="relative flex gap-4">
+
+                      {/* ── Left gutter: dot ── */}
+                      <div className="flex flex-col items-center shrink-0" style={{ width: 32 }}>
+                        {/* Dot */}
+                        <div
+                          className={`mt-[14px] h-[10px] w-[10px] rounded-full border-2 border-[#0052FF] shrink-0 z-10 ${
+                            idx === 0 ? "bg-[#0052FF]" : "bg-white dark:bg-background"
+                          }`}
+                        />
                       </div>
-                      {isAdmin && (
-                        <button
-                          onClick={() => openEdit(fu)}
-                          className="hidden opacity-0 group-hover:opacity-100 transition-opacity h-7 w-7 rounded-lg items-center justify-center text-muted-foreground hover:text-[#0052FF] hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
 
-                    {/* Card */}
-                    <div className="rounded-xl border bg-card p-4 shadow-sm group-hover:border-blue-200 dark:group-hover:border-blue-900/50 transition-colors">
-                      <div className="space-y-3">
-                        {/* Header row: User and Badges */}
-                        <div className="flex items-center justify-between gap-4 flex-wrap">
-                          <div className="flex items-center gap-2">
-                            <div className="h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-700 dark:text-blue-400">
-                              <User className="h-3.5 w-3.5" />
+                      {/* ── Right: date label + card ── */}
+                      <div className="flex-1 min-w-0 pb-2">
+
+                        {/* Date / time label */}
+                        <div className="flex items-baseline gap-2 mb-2.5">
+                          <span className="text-[13px] font-bold text-foreground/85">{absoluteDate}</span>
+                          {absoluteTime && (
+                            <span className="text-[12px] text-muted-foreground">{absoluteTime}</span>
+                          )}
+                          <span className="text-[11px] text-muted-foreground/60 ml-auto">{relativeTime}</span>
+                        </div>
+
+                        {/* Card */}
+                        <div className="rounded-xl border bg-card shadow-sm overflow-hidden transition-shadow hover:shadow-md">
+
+                          {/* ── Card header: staff + method badge ── */}
+                          <div className="flex items-center justify-between gap-3 px-4 pt-3.5 pb-3 border-b border-border/40">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="h-7 w-7 shrink-0 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-[#0052FF] dark:text-blue-400">
+                                <User className="h-3.5 w-3.5" />
+                              </div>
+                              <span className="text-[13px] font-semibold text-foreground truncate">
+                                {fu.created_by?.name || "Staff"}
+                              </span>
                             </div>
-                            <span className="text-[14px] font-bold">{fu.created_by?.name || "Staff"}</span>
+
+                            {/* Badges */}
+                            <div className="flex items-center gap-1.5 flex-wrap justify-end shrink-0">
+                              {viaStyle && ViaIcon && (
+                                <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${viaStyle.className}`}>
+                                  <ViaIcon className="h-3 w-3" />
+                                  {viaStyle.label}
+                                </span>
+                              )}
+                              {fu.priority && (
+                                <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full capitalize ${PRIORITY_STYLES[fu.priority] ?? "bg-muted/60 text-foreground/80"}`}>
+                                  {fu.priority}
+                                </span>
+                              )}
+                              {fu.rnr && (
+                                <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full uppercase bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                                  {fu.rnr}
+                                </span>
+                              )}
+                            </div>
                           </div>
 
-                          {/* Attributes */}
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {fu.contacted_via && (
-                              <Badge variant="secondary" className="bg-muted/60 hover:bg-muted/80 text-foreground/80 font-semibold px-2.5 py-0.5 capitalize rounded-md">
-                                {fu.contacted_via}
-                              </Badge>
-                            )}
-                            {fu.priority && (
-                              <Badge variant="secondary" className="bg-muted/60 hover:bg-muted/80 text-foreground/80 font-semibold px-2.5 py-0.5 capitalize rounded-md">
-                                {fu.priority}
-                              </Badge>
-                            )}
-                            {fu.rnr && (
-                              <Badge variant="secondary" className="bg-muted/60 hover:bg-muted/80 text-foreground/80 font-semibold px-2.5 py-0.5 uppercase rounded-md">
-                                {fu.rnr}
-                              </Badge>
+                          {/* ── Notes ── */}
+                          <div className="px-4 py-4">
+                            {fu.notes ? (
+                              <p className="text-[14px] text-foreground/85 leading-[1.65] whitespace-pre-wrap">
+                                {fu.notes}
+                              </p>
+                            ) : (
+                              <p className="text-[13px] text-muted-foreground/50 italic">No notes provided</p>
                             )}
                           </div>
-                        </div>
 
-                        {/* Summary */}
-                        <div>
-                          <p className="text-[14px] text-foreground/90 font-medium leading-relaxed whitespace-pre-wrap">
-                            {fu.notes || <span className="text-muted-foreground/60 italic">No notes provided</span>}
-                          </p>
+                          {/* ── Next follow-up footer ── */}
+                          {fu.next_follow_up_date && (
+                            <div
+                              className={`flex items-center gap-2.5 px-4 py-3 border-t border-blue-100 dark:border-blue-900/30 bg-blue-50/70 dark:bg-blue-900/10 ${
+                                isAdmin ? "cursor-pointer hover:bg-blue-100/80 dark:hover:bg-blue-900/20" : ""
+                              } transition-colors`}
+                              onClick={() => isAdmin && openEdit(fu)}
+                            >
+                              <CalendarClock className="h-3.5 w-3.5 text-[#0052FF] dark:text-blue-400 shrink-0" />
+                              <span className="text-[12px] font-semibold text-[#0052FF] dark:text-blue-400">
+                                Next follow-up
+                              </span>
+                              <span className="text-[12px] text-[#0052FF]/70 dark:text-blue-400/70">
+                                {formatFollowUpDate(fu.next_follow_up_date)}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
-
-                      {/* Next Follow Up Button / Indicator */}
-                      {fu.next_follow_up_date && (
-                        <div className="mt-5 border-t pt-4">
-                          <Button 
-                            variant="outline" 
-                            className={`w-full justify-center h-10 font-semibold bg-muted/20 border-border/60 text-foreground/80 ${isAdmin ? 'hover:bg-muted/50 cursor-pointer' : 'cursor-default hover:bg-muted/20'}`}
-                            onClick={() => isAdmin && openEdit(fu)}
-                          >
-                            Next follow-up on {formatFollowUpDate(fu.next_follow_up_date)}
-                            {isAdmin && <ArrowUpRight className="ml-2 h-4 w-4 text-muted-foreground" />}
-                          </Button>
-                        </div>
-                      )}
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* ── Edit Follow-Up Dialog ── */}
-      <Dialog open={!!editFu} onOpenChange={open => !open && setEditFu(null)}>
+      {/* ── Edit Follow-Up Dialog (admin only, triggered from next follow-up strip) ── */}
+      <Dialog open={!!editFu} onOpenChange={(open) => !open && setEditFu(null)}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Edit Follow-Up</DialogTitle>
@@ -251,14 +308,14 @@ export function FollowUpPanel({ entityId, entityType, followUps, onRefresh }: Fo
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 py-4">
             <div className="space-y-1.5 col-span-2 sm:col-span-1">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow-Up Date & Time</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow-Up Date &amp; Time</label>
               <DateTimePicker
                 value={getFuDateObj(editFuForm.followUpDate, editFuForm.followUpTime)}
                 onChange={(date) => handleEditDateTimeChange("followUp", date)}
               />
             </div>
             <div className="space-y-1.5 col-span-2 sm:col-span-1">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Follow-Up Date & Time</label>
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Follow-Up Date &amp; Time</label>
               <DateTimePicker
                 value={getFuDateObj(editFuForm.nextFollowUpDate, editFuForm.nextFollowUpTime)}
                 onChange={(date) => handleEditDateTimeChange("nextFollowUp", date)}
@@ -266,19 +323,42 @@ export function FollowUpPanel({ entityId, entityType, followUps, onRefresh }: Fo
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contacted Via</label>
-              <FormSelect name="editContactedVia" placeholder="How contacted?" options={CONTACTED_VIA} value={editFuForm.contactedVia} onValueChange={v => setEditFuForm((f: any) => ({ ...f, contactedVia: v || "" }))} />
+              <FormSelect
+                name="editContactedVia"
+                placeholder="How contacted?"
+                options={CONTACTED_VIA_OPTIONS}
+                value={editFuForm.contactedVia}
+                onValueChange={(v) => setEditFuForm((f: any) => ({ ...f, contactedVia: v || "" }))}
+              />
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Priority</label>
-              <FormSelect name="editPriority" placeholder="Priority" options={PRIORITIES} value={editFuForm.priority} onValueChange={v => setEditFuForm((f: any) => ({ ...f, priority: v || "" }))} />
+              <FormSelect
+                name="editPriority"
+                placeholder="Priority"
+                options={PRIORITIES}
+                value={editFuForm.priority}
+                onValueChange={(v) => setEditFuForm((f: any) => ({ ...f, priority: v || "" }))}
+              />
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">RNR Status</label>
-              <FormSelect name="editRnr" placeholder="RNR" options={RNR_OPTIONS} value={editFuForm.rnr} onValueChange={v => setEditFuForm((f: any) => ({ ...f, rnr: v || "" }))} />
+              <FormSelect
+                name="editRnr"
+                placeholder="RNR"
+                options={RNR_OPTIONS}
+                value={editFuForm.rnr}
+                onValueChange={(v) => setEditFuForm((f: any) => ({ ...f, rnr: v || "" }))}
+              />
             </div>
             <div className="col-span-2 space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Notes</label>
-              <Textarea value={editFuForm.notes} onChange={e => setEditFuForm((f: any) => ({ ...f, notes: e.target.value }))} className="bg-muted/30 rounded-xl resize-none" rows={3} />
+              <Textarea
+                value={editFuForm.notes}
+                onChange={(e) => setEditFuForm((f: any) => ({ ...f, notes: e.target.value }))}
+                className="bg-muted/30 rounded-xl resize-none"
+                rows={3}
+              />
             </div>
           </div>
           <DialogFooter>

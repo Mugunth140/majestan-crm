@@ -630,11 +630,11 @@ export default function LeadViewPage() {
               </h3>
               <div className="space-y-3 text-sm">
                 {[
-                  { label: "Project", value: inquiry?.project_list?.replace(/_/g, " ") },
                   { label: "Purchase Type", value: inquiry?.purchase_type?.replace(/_/g, " ") },
-                  { label: "Property Type", value: inquiry?.property_type?.replace(/_/g, " ") },
                   { label: "Category", value: inquiry?.property_category?.replace(/_/g, " ") },
-                  { label: "Funder", value: inquiry?.funder?.replace(/_/g, " ") },
+                  { label: "Property Type", value: inquiry?.property_type?.replace(/_/g, " ") },
+                  { label: "Funding", value: inquiry?.funder?.replace(/_/g, " ") },
+                  { label: "Project", value: inquiry?.project_list?.replace(/_/g, " ") },
                 ].map(f => (
                   <div key={f.label} className="flex justify-between items-center py-1.5 border-b border-border/30 last:border-0">
                     <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{f.label}</span>

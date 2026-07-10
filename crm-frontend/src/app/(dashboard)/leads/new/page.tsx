@@ -376,16 +376,8 @@ function LeadForm() {
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Requirement Information</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="space-y-2 lg:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Project List</label>
-              <FormSelect name="project" defaultValue={leadData?.inquiries?.[0]?.project_list || null} placeholder="Select Project" options={PROJECTS} />
-            </div>
-            <div className="space-y-2 lg:col-span-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Purchase / Service Type</label>
               <FormSelect name="purchaseType" defaultValue={leadData?.inquiries?.[0]?.purchase_type || null} placeholder="Select Purchase Type" options={PURCHASE_TYPES} required />
-            </div>
-            <div className="space-y-2 lg:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Funder</label>
-              <FormSelect name="funder" defaultValue={leadData?.inquiries?.[0]?.funder || null} placeholder="Select Funder" options={FUNDERS} required />
             </div>
             <div className="space-y-2 lg:col-span-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Property Category</label>
@@ -414,6 +406,14 @@ function LeadForm() {
                 disabled={!selectedCategory}
                 required 
               />
+            </div>
+            <div className="space-y-2 lg:col-span-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Funding</label>
+              <FormSelect name="funder" defaultValue={leadData?.inquiries?.[0]?.funder || null} placeholder="Select Funding" options={FUNDERS} required />
+            </div>
+            <div className="space-y-2 lg:col-span-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Project List</label>
+              <FormSelect name="project" defaultValue={leadData?.inquiries?.[0]?.project_list || null} placeholder="Select Project" options={PROJECTS} />
             </div>
           </div>
         </div>
