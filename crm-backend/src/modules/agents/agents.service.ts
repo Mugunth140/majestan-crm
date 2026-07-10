@@ -24,11 +24,10 @@ export class AgentsService {
     });
 
     return agents.map((agent: Agent) => {
-      const sortedFollowUps = (agent.follow_ups || [])
-        .filter(f => f.next_follow_up_date)
+      const allFollowUps = (agent.follow_ups || [])
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       
-      const latestNextFollowUp = sortedFollowUps[0]?.next_follow_up_date || null;
+      const latestNextFollowUp = allFollowUps[0]?.next_follow_up_date || null;
 
       const sortedActualFollowUps = (agent.follow_ups || [])
         .filter(f => f.follow_up_date)

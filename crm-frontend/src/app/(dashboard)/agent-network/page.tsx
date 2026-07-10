@@ -11,11 +11,10 @@ import { toast } from "sonner";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FormSelect } from "@/components/shared/form-select";
-import { Edit, Trash2, Plus, FileSpreadsheet, UploadCloud, RefreshCw, Search, Eye, Filter, X } from "lucide-react";
-import * as XLSX from "xlsx";
+import { Trash2, Plus, RefreshCw, Search, Eye, Filter } from "lucide-react";
 import { motion } from "framer-motion";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
@@ -34,17 +33,13 @@ const STATUS_STYLES: Record<string, string> = {
 export default function AgentsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("All Agents");
+  const [actionFilter, setActionFilter] = useState("Today");
   const [agents, setAgents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
-  // Bulk Import State
-  const [isImportOpen, setIsImportOpen] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState(0);
-  const [pendingImports, setPendingImports] = useState<any[]>([]);
-  const [isInserting, setIsInserting] = useState(false);
+  const [todayViewMode, setTodayViewMode] = useState<"pending" | "completed">("pending");
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -53,7 +48,8 @@ export default function AgentsPage() {
     status: "",
   });
 
-  const tabs = ["All Agents", "Open Pipeline"];
+  const tabs = ["All Agents", "Action Required"];
+  const actionFilters = ["Overdue", "Yesterday", "Today", "Tomorrow", "All Scheduled"];
 
   useEffect(() => {
     try {
@@ -71,7 +67,6 @@ export default function AgentsPage() {
       const res = await fetch(API_URL + "/agents");
       const data = await res.json();
       if (data.success) {
-        // Assign sequential sno
         setAgents(data.data.map((a: any, i: number) => ({ ...a, sno: i + 1 })));
       }
     } catch {
@@ -104,8 +99,6 @@ export default function AgentsPage() {
   };
 
   const displayedAgents = () => {
-    if (activeTab === "Open Pipeline") return pendingImports;
-
     let filtered = agents;
 
     if (searchQuery.trim()) {
@@ -123,6 +116,54 @@ export default function AgentsPage() {
     }
     if (filters.status) {
       filtered = filtered.filter(a => a.status === filters.status);
+    }
+
+    if (activeTab === "Action Required") {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      return filtered.filter(agent => {
+        const parseLocal = (dStr: string) => {
+          if (!dStr) return null;
+          const parts = dStr.split("T")[0].split("-");
+          if (parts.length !== 3) return null;
+          const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+          d.setHours(0, 0, 0, 0);
+          return d;
+        };
+
+        const fDate = parseLocal(agent.nextFollowUpDate);
+        const lDate = parseLocal(agent.lastFollowedUpDate);
+
+        if (actionFilter === "Overdue") {
+          return fDate && fDate < today;
+        }
+        if (actionFilter === "Yesterday") {
+          return lDate && lDate.getTime() === yesterday.getTime();
+        }
+        if (actionFilter === "Today") {
+          const isFollowedUpToday = lDate && lDate.getTime() === today.getTime();
+          
+          if (todayViewMode === "completed") {
+            return isFollowedUpToday;
+          } else {
+            return fDate && fDate.getTime() === today.getTime();
+          }
+        }
+        if (actionFilter === "Tomorrow") {
+          return fDate && fDate.getTime() === tomorrow.getTime();
+        }
+        if (actionFilter === "All Scheduled") {
+          return fDate && fDate > tomorrow;
+        }
+        return false;
+      });
     }
 
     return filtered;
@@ -159,8 +200,8 @@ export default function AgentsPage() {
       accessorKey: "id",
       header: "ID",
       cell: ({ row }) => (
-        <Link href={`/agent-network/${row.original.id || row.original.rawId}`} className="text-[#0052FF] hover:underline font-medium">
-          A{String(row.original.id || row.original.rawId).padStart(5, "0")}
+        <Link href={`/agent-network/${row.original.id}`} className="text-[#0052FF] hover:underline font-medium">
+          A{String(row.original.id).padStart(5, "0")}
         </Link>
       ),
     },
@@ -203,137 +244,32 @@ export default function AgentsPage() {
     {
       id: "actions",
       header: "Action",
-      cell: ({ row }) => {
-        if (row.original.isPendingImport) {
-          return <Badge variant="outline" className="text-xs bg-amber-50 text-amber-600 border-amber-200">Pending</Badge>;
-        }
-
-        return (
-          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-[#0052FF] hover:bg-blue-50 dark:hover:bg-blue-950"
+            title="View Agent"
+            onClick={() => router.push(`/agent-network/${row.original.id}`)}
+          >
+            <Eye size={15} />
+          </Button>
+          {isAdmin && (
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-[#0052FF] hover:bg-blue-50 dark:hover:bg-blue-950"
-              title="View Agent"
-              onClick={() => router.push(`/agent-network/${row.original.id}`)}
+              className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+              title="Delete Agent"
+              onClick={() => setDeleteId(row.original.id)}
             >
-              <Eye size={15} />
+              <Trash2 size={15} />
             </Button>
-            {isAdmin && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-                title="Delete Agent"
-                onClick={() => setDeleteId(row.original.id)}
-              >
-                <Trash2 size={15} />
-              </Button>
-            )}
-          </div>
-        );
-      }
+          )}
+        </div>
+      )
     }
   ];
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    setIsImporting(true);
-    setImportProgress(0);
-    
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: "binary" });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws) as any[];
-        
-        if (data.length > 0) {
-          const total = data.length;
-          let processed = 0;
-          const chunkSize = Math.max(10, Math.floor(total / 20));
-          const formattedData: any[] = [];
-          
-          const processChunk = () => {
-             const nextChunk = Math.min(processed + chunkSize, total);
-             
-             for (let i = processed; i < nextChunk; i++) {
-                const row = data[i];
-                formattedData.push({
-                    rawId: `import-${i}`,
-                    sno: i + 1,
-                    name: row.Name || row.name || "",
-                    mobile: row.Mobile || row.mobile || "",
-                    email: row.Email || row.email || "",
-                    company_name: row.Company || row.company || row.company_name || "",
-                    partner_type: row["Partner Type"] || row.partner_type || "individual_broker",
-                    status: "New",
-                    isPendingImport: true,
-                    rawData: row
-                });
-             }
-             
-             processed = nextChunk;
-             setImportProgress(Math.floor((processed / total) * 100));
-             
-             if (processed < total) {
-                 setTimeout(processChunk, 20);
-             } else {
-                 setPendingImports(formattedData);
-                 setIsImporting(false);
-                 setIsImportOpen(false);
-                 setActiveTab("Open Pipeline");
-                 toast.success(`${formattedData.length} agents parsed. Please review and insert.`);
-             }
-          };
-          processChunk();
-        } else {
-          toast.error("The uploaded Excel file appears to be empty.");
-          setIsImporting(false);
-        }
-      } catch {
-        toast.error("Failed to parse Excel file.");
-        setIsImporting(false);
-      }
-    };
-    reader.readAsBinaryString(file);
-  };
-
-  const handleBulkInsert = async () => {
-    try {
-      setIsInserting(true);
-      const payload = pendingImports.map(p => ({
-         name: p.name,
-         mobile: String(p.mobile),
-         email: p.email,
-         company_name: p.company_name,
-         partner_type: p.partner_type,
-      }));
-      
-      const res = await fetch(API_URL + "/agents/bulk", {
-         method: "POST",
-         headers: { "Content-Type": "application/json" },
-         body: JSON.stringify({ agents: payload })
-      });
-      const data = await res.json();
-      if (data.success) {
-         toast.success(`Successfully inserted ${data.count} agents.`);
-         setPendingImports([]);
-         fetchAgents();
-         setActiveTab("All Agents");
-      } else {
-         toast.error(data.message || "Bulk insert failed");
-      }
-    } catch(err) {
-      toast.error("An error occurred during bulk insert.");
-    } finally {
-      setIsInserting(false);
-    }
-  };
 
   const uniquePartnerTypes = Array.from(new Set(agents.map(a => a.partner_type).filter(c => c && c !== "—")));
   const uniqueStatuses = Array.from(new Set(agents.map(a => a.status).filter(Boolean)));
@@ -349,39 +285,6 @@ export default function AgentsPage() {
           <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={fetchAgents} title="Refresh">
             <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
           </Button>
-
-          <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
-            <DialogTrigger className="inline-flex h-12 rounded-full bg-card px-5 text-[14px] font-medium shadow-sm border border-border/60 hover:bg-muted/50 items-center gap-2">
-              <FileSpreadsheet size={16} className="text-muted-foreground" />
-              Bulk Import
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Import Agents</DialogTitle>
-                <DialogDescription>Upload your Excel file to bulk import agents.</DialogDescription>
-              </DialogHeader>
-              <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-xl bg-muted/30">
-                {isImporting ? (
-                  <div className="w-full space-y-4">
-                    <div className="flex items-center justify-between text-sm font-medium">
-                      <span>Parsing Excel Data...</span>
-                      <span>{importProgress}%</span>
-                    </div>
-                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-[#0052FF] transition-all duration-300" style={{ width: `${importProgress}%` }} />
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <UploadCloud className="h-10 w-10 text-muted-foreground mb-4" />
-                    <p className="text-sm font-medium text-foreground mb-1">Click to upload or drag and drop</p>
-                    <p className="text-xs text-muted-foreground mb-4">.xlsx, .xls, or .csv files</p>
-                    <Input type="file" accept=".xlsx, .xls, .csv" className="max-w-[250px] cursor-pointer" onChange={handleFileUpload} />
-                  </>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
 
           <Link href="/agent-network/new" className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
             <Plus size={18} />
@@ -405,9 +308,9 @@ export default function AgentsPage() {
             
             <Popover>
               <PopoverTrigger render={
-                <Button variant="outline" className="h-10 rounded-full bg-background border-border/60 shadow-sm gap-2">
+                <Button variant="outline" className="h-10 rounded-full bg-background border-border/60 shadow-sm gap-2 px-4 flex items-center">
                   <Filter size={14} className="text-muted-foreground" />
-                  Filters
+                  <span className="font-medium text-[13.5px]">Filters</span>
                   {activeFiltersCount > 0 && (
                     <Badge className="ml-1 h-5 w-5 rounded-full p-0 flex items-center justify-center bg-[#0052FF]">
                       {activeFiltersCount}
@@ -459,11 +362,6 @@ export default function AgentsPage() {
               >
                 <span className={activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground"}>
                   {tab}
-                  {tab === "Open Pipeline" && pendingImports.length > 0 && (
-                    <Badge className="ml-2 bg-amber-500 text-white border-transparent">
-                      {pendingImports.length}
-                    </Badge>
-                  )}
                 </span>
                 {activeTab === tab && (
                   <motion.div layoutId="agent-tab-indicator" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full" />
@@ -473,35 +371,58 @@ export default function AgentsPage() {
           </div>
         </div>
 
-        <div className="p-6">
-          {pendingImports.length > 0 && activeTab === "Open Pipeline" && (
-             <div className="mb-6 p-5 bg-blue-50/50 border border-blue-200 rounded-xl flex items-center justify-between shadow-sm">
-                <div>
-                   <h3 className="text-blue-900 font-bold text-[15px]">Review Pending Imports</h3>
-                   <p className="text-blue-700/80 text-sm mt-0.5">Please review the <strong>{pendingImports.length}</strong> imported agents below. They have not been saved yet.</p>
-                </div>
-                <div className="flex items-center gap-3">
-                   <Button variant="outline" className="border-blue-200 text-blue-800 hover:bg-blue-100" onClick={() => setPendingImports([])}>Cancel Import</Button>
-                   <Button onClick={handleBulkInsert} disabled={isInserting} className="bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md px-6">
-                     {isInserting ? "Inserting Agents..." : "Confirm & Insert All"}
-                   </Button>
-                </div>
-             </div>
-          )}
-          {activeTab === "Open Pipeline" && pendingImports.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-border rounded-xl bg-muted/10">
-              <div className="h-16 w-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-4 shadow-sm border border-blue-100">
-                <FileSpreadsheet className="h-8 w-8" />
-              </div>
-              <h3 className="text-xl font-bold text-foreground mb-2">No Imported Agents</h3>
-              <p className="text-muted-foreground max-w-sm mb-6">You haven't imported any agents yet. Use the bulk import feature to add an Excel file.</p>
-              <Button onClick={() => setIsImportOpen(true)} className="bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md px-6">
-                <UploadCloud className="h-4 w-4 mr-2" /> Bulk Import
-              </Button>
+        {activeTab === "Action Required" && (
+          <div className="flex items-center gap-2 px-6 pt-5 min-h-[60px] animate-in slide-in-from-top-2 fade-in duration-200 flex-wrap">
+            <div className="flex items-center gap-2">
+              {actionFilters.map((filter) => {
+                const isActive = actionFilter === filter;
+                let activeClass = "bg-primary/10 text-primary border-primary/30";
+                if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
+                else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
+                else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
+                return (
+                  <button
+                    key={filter}
+                    className={"h-10 flex items-center justify-center cursor-pointer px-5 rounded-full text-[13.5px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
+                    onClick={() => setActionFilter(filter)}
+                  >
+                    {filter}
+                  </button>
+                );
+              })}
             </div>
-          ) : (
-            isLoading ? <TableSkeleton columns={6} rows={5} /> : <DataTable columns={columns} data={displayedAgents()} showToolbar={true} />
-          )}
+            
+            <div className={`ml-auto flex items-center h-10 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+              {[
+                { id: "pending", label: "Follow Up" },
+                { id: "completed", label: "Followed Up" }
+              ].map((mode) => {
+                const isSelected = todayViewMode === mode.id;
+                return (
+                  <button
+                    key={mode.id}
+                    onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
+                    className={`relative h-full flex items-center px-4 rounded-full text-[13px] font-bold transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    {isSelected && (
+                      <motion.div
+                        layoutId="agentTodayToggleBg"
+                        className="absolute inset-0 bg-[#0052FF] shadow-md rounded-full"
+                        initial={false}
+                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                        style={{ zIndex: -1 }}
+                      />
+                    )}
+                    <span className="relative z-10">{mode.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div className="p-6">
+          {isLoading ? <TableSkeleton columns={6} rows={5} /> : <DataTable columns={columns} data={displayedAgents()} showToolbar={true} />}
         </div>
       </div>
 

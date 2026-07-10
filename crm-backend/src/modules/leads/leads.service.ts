@@ -290,12 +290,10 @@ export class LeadsService {
     });
 
     return leads.map((lead: Lead, index: number) => {
-      // Find the most recent follow-up that has a next_follow_up_date scheduled
-      const sortedFollowUps = (lead.follow_ups || [])
-        .filter(f => f.next_follow_up_date)
+      const allFollowUps = (lead.follow_ups || [])
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       
-      const latestNextFollowUp = sortedFollowUps[0]?.next_follow_up_date || null;
+      const latestNextFollowUp = allFollowUps[0]?.next_follow_up_date || null;
 
       // Find the most recent actual follow-up date
       const sortedActualFollowUps = (lead.follow_ups || [])

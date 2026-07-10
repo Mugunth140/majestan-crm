@@ -139,13 +139,17 @@ export default function LeadsPage() {
       yesterday.setDate(yesterday.getDate() - 1);
 
       return qualifiedLeads.filter(lead => {
-        const hasNext = !!lead.nextFollowUpDate;
-        const fDate = lead.nextFollowUpDate ? new Date(lead.nextFollowUpDate) : null;
-        if (fDate) fDate.setHours(0, 0, 0, 0);
+        const parseLocal = (dStr: string) => {
+          if (!dStr) return null;
+          const parts = dStr.split("T")[0].split("-");
+          if (parts.length !== 3) return null;
+          const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+          d.setHours(0, 0, 0, 0);
+          return d;
+        };
 
-        const hasLast = !!lead.lastFollowedUpDate;
-        const lDate = lead.lastFollowedUpDate ? new Date(lead.lastFollowedUpDate) : null;
-        if (lDate) lDate.setHours(0, 0, 0, 0);
+        const fDate = parseLocal(lead.nextFollowUpDate);
+        const lDate = parseLocal(lead.lastFollowedUpDate);
 
         if (actionFilter === "Overdue") {
           return fDate && fDate < today;
@@ -160,7 +164,7 @@ export default function LeadsPage() {
             return isFollowedUpToday;
           } else {
             // pending
-            return fDate && fDate.getTime() === today.getTime() && !isFollowedUpToday;
+            return fDate && fDate.getTime() === today.getTime();
           }
         }
         if (actionFilter === "Tomorrow") {
