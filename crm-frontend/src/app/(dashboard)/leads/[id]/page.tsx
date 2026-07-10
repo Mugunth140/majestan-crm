@@ -217,7 +217,12 @@ export default function LeadViewPage() {
   // Keyboard shortcut for history slider
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.altKey && e.key.toLowerCase() === 'h') {
+      // Trigger on 'a' or 'A', but ignore if typing in an input/textarea
+      if (
+        e.key.toLowerCase() === 'a' && 
+        document.activeElement?.tagName !== 'INPUT' && 
+        document.activeElement?.tagName !== 'TEXTAREA'
+      ) {
         e.preventDefault();
         setIsHistoryOpen(prev => !prev);
       }
@@ -497,7 +502,7 @@ export default function LeadViewPage() {
                     <History className="mr-2 h-4 w-4" /> View Follow-up History
                   </span>
                   <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border border-blue-200 dark:border-blue-800 bg-background/50 px-1.5 font-mono text-[10px] font-medium text-blue-700 dark:text-blue-400 opacity-100">
-                    Alt H
+                    A
                   </kbd>
                 </Button>
               </div>

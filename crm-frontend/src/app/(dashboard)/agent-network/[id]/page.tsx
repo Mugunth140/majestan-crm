@@ -105,7 +105,11 @@ export default function AgentViewPage() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.altKey && e.key.toLowerCase() === 'h') {
+      if (
+        e.key.toLowerCase() === 'a' && 
+        document.activeElement?.tagName !== 'INPUT' && 
+        document.activeElement?.tagName !== 'TEXTAREA'
+      ) {
         e.preventDefault();
         setIsHistoryOpen(prev => !prev);
       }
@@ -322,7 +326,7 @@ export default function AgentViewPage() {
                     <History className="mr-2 h-4 w-4" /> Follow-up History
                   </span>
                   <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border border-blue-200 dark:border-blue-800 bg-background/50 px-1.5 font-mono text-[10px] font-medium text-blue-700 dark:text-blue-400 opacity-100">
-                    Alt H
+                    A
                   </kbd>
                 </Button>
               </div>
