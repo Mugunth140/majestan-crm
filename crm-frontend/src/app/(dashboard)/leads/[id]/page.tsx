@@ -178,6 +178,8 @@ function PageSkeleton() {
 }
 
 // ── Main Page ────────────────────────────────────────────────────────────────
+import { LeadAttachments } from "@/components/shared/lead-attachments";
+
 export default function LeadViewPage() {
   const params = useParams();
   const router = useRouter();
@@ -680,6 +682,15 @@ export default function LeadViewPage() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* ── Row 4: Attachments ── */}
+        <div className="grid grid-cols-1">
+          <LeadAttachments
+            leadId={id as string}
+            documents={lead?.documents || []}
+            onRefresh={() => fetchLead(true)}
+          />
         </div>
 
       </div>

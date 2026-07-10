@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { User } from './user.entity';
 import { LeadInquiry } from './lead-inquiry.entity';
 import { LeadFollowUp } from './lead-follow-up.entity';
+import { LeadDocument } from './lead-document.entity';
 
 @Entity('leads')
 export class Lead {
@@ -47,6 +48,9 @@ export class Lead {
 
   @OneToMany(() => LeadFollowUp, followUp => followUp.lead)
   follow_ups: LeadFollowUp[];
+
+  @OneToMany(() => LeadDocument, doc => doc.lead)
+  documents: LeadDocument[];
 
   @CreateDateColumn()
   created_at: Date;

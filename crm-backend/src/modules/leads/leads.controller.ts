@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Post, Put, Delete, Param } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, Delete, Param, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { LeadsService } from './leads.service';
 
 @Controller('api/v1/leads')
@@ -88,6 +89,22 @@ export class LeadsController {
     @Param('followUpId') followUpId: string,
   ) {
     const data = await this.leadsService.deleteFollowUp(Number(id), Number(followUpId));
+    return { success: true, data };
+  }
+
+  @Post(':id/documents')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadDocument(@Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+    const data = await this.leadsService.uploadDocument(Number(id), file);
+    return { success: true, data };
+  }
+
+  @Delete(':id/documents/:docId')
+  async deleteDocument(@Param('id') id: string, @Param('docId') docId: string) {
+    const data = await this.leadsService.deleteDocument(Number(id), Number(docId));
     return { success: true, data };
   }
 }

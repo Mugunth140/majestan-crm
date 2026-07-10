@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import { Lead } from '../../database/entities/lead.entity';
@@ -6,6 +6,9 @@ import { LeadFollowUp } from '../../database/entities/lead-follow-up.entity';
 import { LeadInquiry } from '../../database/entities/lead-inquiry.entity';
 import { ContactLog } from '../../database/entities/contact-log.entity';
 import { User } from '../../database/entities/user.entity';
+import { LeadDocument } from '../../database/entities/lead-document.entity';
+import { S3Client } from 'bun';
+import { extname } from 'path';
 
 export interface CreateLeadResult {
   lead: Lead;
@@ -15,10 +18,20 @@ export interface CreateLeadResult {
 
 @Injectable()
 export class LeadsService {
+  private s3Client: S3Client;
+
   constructor(
     @InjectDataSource() private dataSource: DataSource,
     @InjectDataSource('siteConnection') private siteDataSource: DataSource,
-  ) {}
+  ) {
+    this.s3Client = new S3Client({
+      accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
+      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
+      endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      bucket: process.env.R2_BUCKET_NAME || '',
+      region: 'auto',
+    });
+  }
 
   async getLeadById(id: number) {
     const lead = await this.dataSource.getRepository(Lead).findOne({
@@ -26,6 +39,7 @@ export class LeadsService {
       relations: {
         inquiries: true,
         assigned_staff: true,
+        documents: true,
       },
     });
     if (!lead) throw new NotFoundException('Lead not found');
@@ -112,6 +126,15 @@ export class LeadsService {
   // ── Existing methods ──────────────────────────────────────────────────────
   async deleteLead(id: number) {
     return this.dataSource.transaction(async (manager) => {
+      const docs = await manager.getRepository(LeadDocument).find({ where: { lead_id: id } });
+      for (const doc of docs) {
+        try {
+          await this.s3Client.delete(doc.file_key);
+        } catch (e) {
+          console.error(`Failed to delete document from R2 for lead ${id}: ${e}`);
+        }
+      }
+      await manager.getRepository(LeadDocument).delete({ lead_id: id });
       await manager.getRepository(LeadInquiry).delete({ lead_id: id });
       await manager.getRepository(LeadFollowUp).delete({ lead_id: id });
       await manager.getRepository(ContactLog).delete({ lead_id: id });
@@ -385,5 +408,55 @@ export class LeadsService {
     query += ` ORDER BY p.created_at DESC LIMIT 20`;
 
     return this.siteDataSource.query(query, params);
+  }
+
+  async uploadDocument(leadId: number, file: Express.Multer.File) {
+    const lead = await this.dataSource.getRepository(Lead).findOne({ where: { id: leadId }, relations: { documents: true } });
+    if (!lead) throw new NotFoundException('Lead not found');
+    if (lead.documents.length >= 2) {
+      throw new BadRequestException('Maximum 2 documents allowed per lead');
+    }
+    
+    // Check file size (10MB limit)
+    if (file.size > 10 * 1024 * 1024) {
+      throw new BadRequestException('File size exceeds 10MB limit');
+    }
+
+    const has1 = lead.documents.some(d => d.file_name.includes('_attachment1'));
+    const attachmentNum = has1 ? 2 : 1;
+    const leadDisplayId = `L${String(leadId).padStart(5, '0')}`;
+    const fileExt = extname(file.originalname);
+    const fileName = `${leadDisplayId}_attachment${attachmentNum}${fileExt}`;
+    const fileKey = `leads/${leadDisplayId}/attachments/${fileName}`;
+
+    await this.s3Client.write(fileKey, file.buffer, {
+      type: file.mimetype,
+    });
+
+    const fileUrl = `${process.env.R2_PUBLIC_URL}/${fileKey}`;
+
+    const repo = this.dataSource.getRepository(LeadDocument);
+    const doc = repo.create({
+      lead_id: leadId,
+      file_name: fileName,
+      file_url: fileUrl,
+      file_key: fileKey,
+    });
+    return repo.save(doc);
+  }
+
+  async deleteDocument(leadId: number, docId: number) {
+    const repo = this.dataSource.getRepository(LeadDocument);
+    const doc = await repo.findOne({ where: { id: docId, lead_id: leadId } });
+    if (!doc) throw new NotFoundException('Document not found');
+
+    try {
+      await this.s3Client.delete(doc.file_key);
+    } catch (e) {
+      console.error(`Failed to delete document from R2: ${e}`);
+    }
+
+    await repo.remove(doc);
+    return { id: docId };
   }
 }
