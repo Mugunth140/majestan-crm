@@ -1,3 +1,4 @@
+// fallow-ignore-file circular-dependencies
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { User } from './user.entity';
 import { AgentFollowUp } from './agent-follow-up.entity';

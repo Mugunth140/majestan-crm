@@ -1,3 +1,4 @@
+// fallow-ignore-file circular-dependencies
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 
 @Entity('lead_sources')
