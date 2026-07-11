@@ -33,6 +33,8 @@ import { Agent } from './database/entities/agent.entity';
 import { AgentFollowUp } from './database/entities/agent-follow-up.entity';
 import { AgentContactLog } from './database/entities/agent-contact-log.entity';
 import { Inbound } from './database/entities/inbound.entity';
+import { InboundFollowUp } from './database/entities/inbound-follow-up.entity';
+import { InboundContactLog } from './database/entities/inbound-contact-log.entity';
 
 @Module({
   imports: [
@@ -52,7 +54,7 @@ import { Inbound } from './database/entities/inbound.entity';
         username: configService.get<string>('DB_USERNAME', 'root'),
         password: configService.get<string>('DB_PASSWORD', '8220'),
         database: configService.get<string>('CRM_DB_NAME', 'majestan_crm'),
-        entities: [User, Role, Permission, RolePermission, Department, ActivityLog, LeadSource, Lead, LeadInquiry, LeadFollowUp, LeadDocument, ContactLog, Agent, AgentFollowUp, AgentContactLog, Inbound],
+        entities: [User, Role, Permission, RolePermission, Department, ActivityLog, LeadSource, Lead, LeadInquiry, LeadFollowUp, LeadDocument, ContactLog, Agent, AgentFollowUp, AgentContactLog, Inbound, InboundFollowUp, InboundContactLog],
         synchronize: false, // Migrations are used instead
       }),
     }),

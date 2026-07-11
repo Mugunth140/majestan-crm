@@ -46,7 +46,7 @@ export default function InboundPage() {
     status: "",
   });
 
-  const tabs = ["All Inbound", "Open Pipeline", "Action Required", "Closed"];
+  const tabs = ["All Inbound", "Action Required", "Closed"];
 
   const fetchInbounds = useCallback(async () => {
     try {
@@ -99,12 +99,8 @@ export default function InboundPage() {
     if (filters.type) filtered = filtered.filter(l => (l.property_type || l.propertyType) === filters.type);
     if (filters.status) filtered = filtered.filter(l => l.status === filters.status);
 
-    if (activeTab === "Open Pipeline") {
-      return filtered.filter(l => l.status === "Pending" || l.status === "Verification Pending");
-    }
-
     if (activeTab === "Action Required") {
-      return filtered.filter(l => l.status === "Hold" || l.status === "Revisit");
+      return filtered.filter(l => ["New Inbound", "Hold", "Revisit", "Verification Pending", "Pending"].includes(l.status));
     }
 
     if (activeTab === "Closed") {
@@ -183,7 +179,11 @@ export default function InboundPage() {
       enableSorting: false,
       enableHiding: false,
     },
-    { accessorKey: "sno", header: "#" },
+    { 
+      id: "sno", 
+      header: "#",
+      cell: ({ row }) => <span>{row.index + 1}</span>
+    },
     {
       accessorKey: "propertyId",
       header: "Property ID",

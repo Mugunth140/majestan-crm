@@ -6,12 +6,23 @@ import {
   UpdateDateColumn,
   BeforeInsert,
   BeforeUpdate,
+  OneToMany,
 } from 'typeorm';
+
+import { InboundFollowUp } from './inbound-follow-up.entity';
+import { InboundContactLog } from './inbound-contact-log.entity';
 
 @Entity('inbounds')
 export class Inbound {
   @PrimaryGeneratedColumn()
   id: number;
+
+  @OneToMany(() => InboundFollowUp, followUp => followUp.inbound)
+  follow_ups: InboundFollowUp[];
+
+  @OneToMany(() => InboundContactLog, log => log.inbound)
+  contact_logs: InboundContactLog[];
+
 
   @Column({ type: 'varchar', unique: true, nullable: true }) // Set nullable to true since we generate it after insert
   property_id: string;

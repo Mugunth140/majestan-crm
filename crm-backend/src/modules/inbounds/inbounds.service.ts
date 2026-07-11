@@ -2,6 +2,8 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Inbound } from '../../database/entities/inbound.entity';
+import { InboundFollowUp } from '../../database/entities/inbound-follow-up.entity';
+import { InboundContactLog } from '../../database/entities/inbound-contact-log.entity';
 import { S3Client } from 'bun';
 import { extname } from 'path';
 
@@ -12,6 +14,10 @@ export class InboundsService {
   constructor(
     @InjectRepository(Inbound)
     private inboundsRepository: Repository<Inbound>,
+    @InjectRepository(InboundFollowUp)
+    private followUpsRepository: Repository<InboundFollowUp>,
+    @InjectRepository(InboundContactLog)
+    private contactLogsRepository: Repository<InboundContactLog>,
   ) {}
 
   private get s3Client(): S3Client {
@@ -69,7 +75,23 @@ export class InboundsService {
   }
 
   async findOne(id: number): Promise<Inbound> {
-    const inbound = await this.inboundsRepository.findOne({ where: { id } });
+    const inbound = await this.inboundsRepository.findOne({
+      where: { id },
+      relations: {
+        follow_ups: true,
+        contact_logs: {
+          sent_by: true
+        }
+      },
+      order: {
+        follow_ups: {
+          created_at: 'DESC'
+        },
+        contact_logs: {
+          created_at: 'DESC'
+        }
+      }
+    });
     if (!inbound) {
       throw new NotFoundException(`Inbound with ID ${id} not found`);
     }
@@ -83,6 +105,56 @@ export class InboundsService {
     Object.assign(inbound, updateInboundDto);
     
     return this.inboundsRepository.save(inbound);
+  }
+
+  
+  async addContactLog(inboundId: number, payload: Partial<InboundContactLog>, userId: number): Promise<InboundContactLog> {
+    const inbound = await this.findOne(inboundId);
+    
+    const contactLog = this.contactLogsRepository.create({
+      ...payload,
+      inbound_id: inboundId,
+      sent_by_id: userId,
+    });
+    
+    return this.contactLogsRepository.save(contactLog);
+  }
+
+  async addFollowUp(inboundId: number, payload: Partial<InboundFollowUp>, userId: number): Promise<InboundFollowUp> {
+    const inbound = await this.findOne(inboundId);
+    
+    const followUp = this.followUpsRepository.create({
+      ...payload,
+      inbound_id: inboundId,
+      created_by_id: userId,
+    });
+    
+    return this.followUpsRepository.save(followUp);
+  }
+
+  async updateFollowUp(inboundId: number, followUpId: number, payload: Partial<InboundFollowUp>): Promise<InboundFollowUp> {
+    const followUp = await this.followUpsRepository.findOne({
+      where: { id: followUpId, inbound_id: inboundId }
+    });
+    
+    if (!followUp) {
+      throw new NotFoundException(`Follow-up with ID ${followUpId} not found`);
+    }
+    
+    Object.assign(followUp, payload);
+    return this.followUpsRepository.save(followUp);
+  }
+
+  async deleteFollowUp(inboundId: number, followUpId: number): Promise<void> {
+    const followUp = await this.followUpsRepository.findOne({
+      where: { id: followUpId, inbound_id: inboundId }
+    });
+    
+    if (!followUp) {
+      throw new NotFoundException(`Follow-up with ID ${followUpId} not found`);
+    }
+    
+    await this.followUpsRepository.remove(followUp);
   }
 
   async remove(id: number): Promise<void> {

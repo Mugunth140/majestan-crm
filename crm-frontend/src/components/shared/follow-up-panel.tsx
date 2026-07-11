@@ -78,7 +78,7 @@ function formatFollowUpDate(dateStr: string) {
 
 interface FollowUpPanelProps {
   entityId: number | string;
-  entityType: "leads" | "agents";
+  entityType: "leads" | "agents" | "inbounds";
   followUps: any[];
   onRefresh: () => void;
 }

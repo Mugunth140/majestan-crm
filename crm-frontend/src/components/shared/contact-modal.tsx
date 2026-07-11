@@ -27,7 +27,7 @@ interface ContactModalProps {
   type: string;
   to: string;
   entityId: number;
-  entityType: 'leads' | 'agents';
+  entityType: 'leads' | 'agents' | 'inbounds';
   onClose: () => void;
   onSent: () => void;
 }
