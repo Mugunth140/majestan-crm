@@ -11,6 +11,7 @@ import { ArrowLeft, CheckCircle2, Loader2, Save, UploadCloud } from "lucide-reac
 import { toast } from "sonner";
 import { FormSelect } from "@/components/shared/form-select";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
+import { TimePicker } from "@/components/shared/time-picker";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
@@ -133,6 +134,8 @@ function InboundForm() {
   const [brokeragePaidBy, setBrokeragePaidBy] = useState<string[]>([]);
   const [brokerageType, setBrokerageType] = useState<string | null>(null);
 
+  const [preferredContactTime, setPreferredContactTime] = useState<string | undefined>(undefined);
+
   // Checkbox States
   const [panAvailable, setPanAvailable] = useState(false);
   const [gstApplicable, setGstApplicable] = useState(false);
@@ -183,6 +186,10 @@ function InboundForm() {
                }
             }
             setBrokerageType(data.brokerage_type || null);
+            
+            if (data.preferred_contact_time) {
+               setPreferredContactTime(data.preferred_contact_time);
+            }
 
             setPanAvailable(!!data.pan_available);
             setGstApplicable(!!data.gst_applicable);
@@ -238,6 +245,7 @@ function InboundForm() {
       payload.brokerage_accepted = brokerageAccepted;
       payload.brokerage_paid_by = brokeragePaidBy;
       payload.brokerage_type = brokerageType;
+      payload.preferred_contact_time = preferredContactTime || null;
 
       payload.pan_available = panAvailable;
       payload.gst_applicable = gstApplicable;
@@ -426,6 +434,15 @@ function InboundForm() {
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Alternate Contact</label>
               <Input name="alternate_contact" defaultValue={inboundData?.alternate_contact || ""} placeholder="Alternate Number" className="h-12 rounded-xl bg-muted/30" />
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Preferred Contact Time</label>
+              <TimePicker
+                value={preferredContactTime}
+                onChange={setPreferredContactTime}
+                placeholder="Pick time"
+              />
             </div>
             <div className="space-y-2 lg:col-span-3">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Address</label>
