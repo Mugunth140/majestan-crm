@@ -15,6 +15,7 @@ import { HealthModule } from './modules/health/health.module';
 import { MasterModule } from './modules/master/master.module';
 import { LeadsModule } from './modules/leads/leads.module';
 import { AgentsModule } from './modules/agents/agents.module';
+import { InboundsModule } from './modules/inbounds/inbounds.module';
 
 import { ActivityLog } from './database/entities/activity-log.entity';
 import { Department } from './database/entities/department.entity';
@@ -31,6 +32,7 @@ import { ContactLog } from './database/entities/contact-log.entity';
 import { Agent } from './database/entities/agent.entity';
 import { AgentFollowUp } from './database/entities/agent-follow-up.entity';
 import { AgentContactLog } from './database/entities/agent-contact-log.entity';
+import { Inbound } from './database/entities/inbound.entity';
 
 @Module({
   imports: [
@@ -50,7 +52,7 @@ import { AgentContactLog } from './database/entities/agent-contact-log.entity';
         username: configService.get<string>('DB_USERNAME', 'root'),
         password: configService.get<string>('DB_PASSWORD', '8220'),
         database: configService.get<string>('CRM_DB_NAME', 'majestan_crm'),
-        entities: [User, Role, Permission, RolePermission, Department, ActivityLog, LeadSource, Lead, LeadInquiry, LeadFollowUp, LeadDocument, ContactLog, Agent, AgentFollowUp, AgentContactLog],
+        entities: [User, Role, Permission, RolePermission, Department, ActivityLog, LeadSource, Lead, LeadInquiry, LeadFollowUp, LeadDocument, ContactLog, Agent, AgentFollowUp, AgentContactLog, Inbound],
         synchronize: false, // Migrations are used instead
       }),
     }),
@@ -83,6 +85,7 @@ import { AgentContactLog } from './database/entities/agent-contact-log.entity';
     MasterModule,
     LeadsModule,
     AgentsModule,
+    InboundsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
