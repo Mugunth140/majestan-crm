@@ -23,12 +23,12 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1
 const STATUS_STYLES: Record<string, string> = {
   "New Inbound": "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300",
   "Contacting Owner": "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400",
-  "Pending Inspection": "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400",
-  "Verifying Details": "bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400",
-  "Action Required": "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400",
+  "Terms not Accepted": "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400",
   "On Hold": "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400",
+  "Pending Verification": "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
   "Approved": "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400",
   "Rejected": "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400",
+  "Closed": "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
 };
 
 export default function InboundPage() {
@@ -102,11 +102,11 @@ export default function InboundPage() {
     if (filters.status) filtered = filtered.filter(l => l.status === filters.status);
 
     if (activeTab === "Action Required") {
-      return filtered.filter(l => ["New Inbound", "Contacting Owner", "Pending Inspection", "Verifying Details", "Action Required"].includes(l.status));
+      return filtered.filter(l => ["New Inbound", "Contacting Owner", "Pending Verification"].includes(l.status));
     }
 
     if (activeTab === "Closed") {
-      return filtered.filter(l => ["Approved", "Rejected", "On Hold"].includes(l.status));
+      return filtered.filter(l => ["Terms not Accepted", "On Hold", "Approved", "Rejected", "Closed"].includes(l.status));
     }
 
     // Default: All Inbound

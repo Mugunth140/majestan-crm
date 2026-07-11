@@ -74,12 +74,12 @@ const PURPOSES = [
 const STATUSES = [
   { label: "New Inbound", value: "New Inbound" },
   { label: "Contacting Owner", value: "Contacting Owner" },
-  { label: "Pending Inspection", value: "Pending Inspection" },
-  { label: "Verifying Details", value: "Verifying Details" },
-  { label: "Action Required", value: "Action Required" },
+  { label: "Terms not Accepted", value: "Terms not Accepted" },
   { label: "On Hold", value: "On Hold" },
+  { label: "Pending Verification", value: "Pending Verification" },
   { label: "Approved", value: "Approved" },
   { label: "Rejected", value: "Rejected" },
+  { label: "Closed", value: "Closed" },
 ];
 
 const PRIMARY_CONTACTS = [

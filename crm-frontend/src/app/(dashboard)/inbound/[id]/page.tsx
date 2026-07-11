@@ -30,23 +30,23 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1
 const STATUS_OPTIONS = [
   "New Inbound",
   "Contacting Owner",
-  "Pending Inspection",
-  "Verifying Details",
-  "Action Required",
+  "Terms not Accepted",
   "On Hold",
+  "Pending Verification",
   "Approved",
-  "Rejected"
+  "Rejected",
+  "Closed"
 ];
 
 const STATUS_STYLES: Record<string, string> = {
   "New Inbound": "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300",
   "Contacting Owner": "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400",
-  "Pending Inspection": "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400",
-  "Verifying Details": "bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400",
-  "Action Required": "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400",
+  "Terms not Accepted": "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400",
   "On Hold": "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400",
+  "Pending Verification": "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
   "Approved": "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400",
   "Rejected": "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400",
+  "Closed": "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
 };
 
 const CONTACT_TYPE_STYLES: Record<string, string> = {
@@ -480,16 +480,32 @@ export default function InboundViewPage() {
                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Current Status</p>
                      {isUpdatingStatus && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
                   </div>
-                  <FormSelect 
-                    name="inboundStatus" 
-                    options={STATUS_OPTIONS.map(s => ({label: s, value: s}))}
-                    value={selectedStatus}
-                    onValueChange={(v) => {
-                      setSelectedStatus(v || "");
-                      handleDirectStatusUpdate(v || "");
-                    }}
-                    placeholder="Select Status"
-                  />
+                  <div className="flex gap-2">
+      
+                     <div className="flex-1">
+                       <FormSelect 
+                         name="inboundStatus" 
+                         options={STATUS_OPTIONS.map(s => ({label: s, value: s}))}
+                         value={selectedStatus}
+                         onValueChange={(v) => {
+                           setSelectedStatus(v || "");
+                           handleDirectStatusUpdate(v || "");
+                         }}
+                         placeholder="Select Status"
+                       />
+                     </div>
+                       <Button 
+                        variant="outline" 
+                        onClick={() => {
+                          setSelectedStatus("Closed");
+                          handleDirectStatusUpdate("Closed");
+                        }}
+                        disabled={isUpdatingStatus || selectedStatus === "Closed"}
+                        className="border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700 h-11 px-6 rounded-xl font-bold transition-all"
+                     >
+                        Close
+                     </Button>
+                  </div>
                </div>
 
                {inbound.assigned_to && (
