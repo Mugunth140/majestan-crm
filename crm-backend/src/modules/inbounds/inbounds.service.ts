@@ -41,15 +41,36 @@ export class InboundsService {
     }
 
     const fileExt = extname(file.originalname);
-    const fileName = `image_${Date.now()}${fileExt}`;
-    const fileKey = `inbounds/${inbound.property_id}/${fileName}`;
+    const tempFileKey = `inbounds/${inbound.property_id}/temp_${Date.now()}${fileExt}`;
 
-    await this.s3Client.write(fileKey, file.buffer, {
+    await this.s3Client.write(tempFileKey, file.buffer, {
       type: file.mimetype,
     });
 
-    const fileUrl = `${process.env.R2_PUBLIC_URL}/${fileKey}`;
-    inbound.image_url = fileUrl;
+    const tempFileUrl = `${process.env.R2_PUBLIC_URL}/${tempFileKey}`;
+
+    // Process image via Imgproxy (WebP + Watermark)
+    try {
+      const imgproxyUrl = `http://imgproxy:8080/insecure/watermark:1:ce:0:0:0.3/format:webp/plain/${tempFileUrl}`;
+      const response = await fetch(imgproxyUrl);
+      
+      if (!response.ok) {
+        throw new Error(`Imgproxy failed with status ${response.status}`);
+      }
+      
+      const processedBuffer = await response.arrayBuffer();
+      const finalFileKey = `inbounds/${inbound.property_id}/image_${Date.now()}.webp`;
+      
+      await this.s3Client.write(finalFileKey, Buffer.from(processedBuffer), { type: 'image/webp' });
+      
+      // Cleanup temp file
+      this.s3Client.delete(tempFileKey).catch(() => {});
+
+      inbound.image_url = `${process.env.R2_PUBLIC_URL}/${finalFileKey}`;
+    } catch (e) {
+      console.error('Imgproxy processing failed, using original:', e);
+      inbound.image_url = tempFileUrl;
+    }
     
     return this.inboundsRepository.save(inbound);
   }
@@ -70,8 +91,37 @@ export class InboundsService {
     return savedInbound;
   }
 
-  async findAll(): Promise<Inbound[]> {
-    return this.inboundsRepository.find();
+  async findAll(): Promise<any[]> {
+    const inbounds = await this.inboundsRepository.find({
+      relations: { follow_ups: true },
+      order: { created_at: 'DESC' }
+    });
+
+    return inbounds.map(inbound => {
+      let nextFollowUpDate = null;
+      let lastFollowedUpDate = null;
+      
+      if (inbound.follow_ups && inbound.follow_ups.length > 0) {
+        // Find latest scheduled follow-up
+        const scheduledFus = [...inbound.follow_ups].sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        nextFollowUpDate = scheduledFus.length > 0 ? scheduledFus[0].next_follow_up_date : null;
+
+        // Find latest actual follow up (where follow_up_date is set)
+        const actualFus = [...inbound.follow_ups]
+          .filter(f => f.follow_up_date)
+          .sort((a, b) => new Date(b.follow_up_date!).getTime() - new Date(a.follow_up_date!).getTime());
+        
+        lastFollowedUpDate = actualFus.length > 0 ? actualFus[0].follow_up_date : null;
+      }
+
+      return {
+        ...inbound,
+        nextFollowUpDate,
+        lastFollowedUpDate
+      };
+    });
   }
 
   async findOne(id: number): Promise<Inbound> {

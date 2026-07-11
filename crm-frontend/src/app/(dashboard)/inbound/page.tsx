@@ -10,6 +10,7 @@ import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { FormSelect } from "@/components/shared/form-select";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -34,6 +35,7 @@ const STATUS_STYLES: Record<string, string> = {
 export default function InboundPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("All Inbound");
+  const [actionFilter, setActionFilter] = useState("Today");
   const [inbounds, setInbounds] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -48,7 +50,10 @@ export default function InboundPage() {
     status: "",
   });
 
+  const [todayViewMode, setTodayViewMode] = useState<"pending" | "completed">("pending");
+
   const tabs = ["All Inbound", "Action Required", "Closed"];
+  const actionFilters = ["Overdue", "Yesterday", "Today", "Tomorrow", "All Scheduled"];
 
   const fetchInbounds = useCallback(async () => {
     try {
@@ -101,16 +106,65 @@ export default function InboundPage() {
     if (filters.type) filtered = filtered.filter(l => (l.property_type || l.propertyType) === filters.type);
     if (filters.status) filtered = filtered.filter(l => l.status === filters.status);
 
+    const closedStatuses = ["Terms not Accepted", "On Hold", "Approved", "Rejected", "Closed"];
+
     if (activeTab === "Action Required") {
-      return filtered.filter(l => ["New Inbound", "Contacting Owner", "Pending Verification"].includes(l.status));
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      const actionStatuses = ["New Inbound", "Contacting Owner", "Pending Verification"];
+
+      return filtered.filter(l => {
+        const parseLocal = (dStr: string) => {
+          if (!dStr) return null;
+          const parts = dStr.split("T")[0].split("-");
+          if (parts.length !== 3) return null;
+          const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+          d.setHours(0, 0, 0, 0);
+          return d;
+        };
+
+        const fDate = parseLocal(l.nextFollowUpDate);
+        const lDate = parseLocal(l.lastFollowedUpDate);
+
+        let matchesTimeFilter = false;
+
+        if (actionFilter === "Overdue") {
+          matchesTimeFilter = !!(fDate && fDate < today);
+        } else if (actionFilter === "Yesterday") {
+          matchesTimeFilter = !!(lDate && lDate.getTime() === yesterday.getTime());
+        } else if (actionFilter === "Today") {
+          const isFollowedUpToday = !!(lDate && lDate.getTime() === today.getTime());
+          
+          if (todayViewMode === "completed") {
+            matchesTimeFilter = isFollowedUpToday;
+          } else {
+            // pending
+            matchesTimeFilter = !!(fDate && fDate.getTime() === today.getTime());
+          }
+        } else if (actionFilter === "Tomorrow") {
+          matchesTimeFilter = !!(fDate && fDate.getTime() === tomorrow.getTime());
+        } else if (actionFilter === "All Scheduled") {
+          matchesTimeFilter = !!(fDate && fDate > tomorrow);
+        }
+
+        // Action required if it matches the time filter, OR if it's in a critical status and has NO future follow-ups scheduled
+        return matchesTimeFilter || (actionStatuses.includes(l.status) && !fDate);
+      });
     }
 
     if (activeTab === "Closed") {
-      return filtered.filter(l => ["Terms not Accepted", "On Hold", "Approved", "Rejected", "Closed"].includes(l.status));
+      return filtered.filter(l => closedStatuses.includes(l.status));
     }
 
-    // Default: All Inbound
-    return filtered;
+    // Default: All Inbound (Active Pipeline)
+    return filtered.filter(l => !closedStatuses.includes(l.status));
   }, [inbounds, debouncedSearchQuery, filters, activeTab]);
 
   const handleDelete = async () => {
@@ -130,30 +184,6 @@ export default function InboundPage() {
     }
   };
 
-  const renderQualityScore = (score: number) => {
-    let label = "Needs Improvement";
-    let cls = "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400";
-    
-    if (score > 90) {
-      label = "Premium";
-      cls = "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400";
-    } else if (score > 75) {
-      label = "Featured";
-      cls = "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400";
-    } else if (score > 60) {
-      label = "Standard";
-      cls = "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400";
-    }
-
-    return (
-      <div className="flex items-center gap-2">
-        <Badge className={`font-medium shadow-sm border whitespace-nowrap ${cls}`}>
-          {label}
-        </Badge>
-        <span className="text-xs font-semibold text-muted-foreground">{score}%</span>
-      </div>
-    );
-  };
 
   const columns: ColumnDef<any>[] = [
     {
@@ -188,7 +218,7 @@ export default function InboundPage() {
     },
     {
       accessorKey: "propertyId",
-      header: "Property ID",
+      header: "Id",
       cell: ({ row }) => (
         <Link href={`/inbound/${row.original.rawId || row.original.id}`} className="text-[#0052FF] hover:underline font-medium">
           {row.getValue("propertyId") || row.original.property_id || "N/A"}
@@ -204,26 +234,42 @@ export default function InboundPage() {
       }
     },
     { 
-      accessorKey: "propertyCategory", 
-      header: "Category",
-      cell: ({ row }) => (
-        <span className="capitalize">{(row.original.property_category || row.original.propertyCategory)?.replace(/_/g, ' ') || "-"}</span>
-      ),
-    },
-    {
-      accessorKey: "propertyType",
-      header: "Property Type",
-      cell: ({ row }) => (
-        <span className="capitalize">{(row.original.property_type || row.original.propertyType)?.replace(/_/g, ' ') || "-"}</span>
-      ),
-    },
-    {
-      accessorKey: "qualityScore",
-      header: "Quality Score",
+      id: "categoryType", 
+      header: "Category - Type",
       cell: ({ row }) => {
-        const score = row.original.qualityScore || row.original.quality_score || 0;
-        return renderQualityScore(Number(score));
-      }
+        const cat = (row.original.property_category || row.original.propertyCategory || "");
+        const type = (row.original.property_type || row.original.propertyType || "").replace(/_/g, ' ');
+        if (!cat && !type) return <span>-</span>;
+        return <span className="capitalize">{cat} - {type}</span>;
+      },
+    },
+    {
+      id: "mobile",
+      header: "Mobile Number",
+      cell: ({ row }) => <span>{row.original.mobile_number || row.original.owner_mobile || "-"}</span>,
+    },
+    {
+      id: "address",
+      header: "Address",
+      cell: ({ row }) => {
+        const addr = row.original.address || row.original.location || "";
+        if (!addr) return <span>-</span>;
+        
+        return (
+          <TooltipProvider delay={150}>
+            <Tooltip>
+              <TooltipTrigger render={
+                <div className="max-w-[200px] w-full truncate text-sm text-left cursor-default py-1">
+                  {addr}
+                </div>
+              } />
+              <TooltipContent side="top" className="max-w-[300px] text-sm break-words whitespace-normal p-3 border-border/50 shadow-xl bg-background text-foreground relative z-50">
+                {addr}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
+      },
     },
     {
       accessorKey: "status",
@@ -380,6 +426,56 @@ export default function InboundPage() {
           ))}
           </div>
         </div>
+
+        {activeTab === "Action Required" && (
+          <div className="flex items-center gap-2 px-6 pt-5 min-h-[60px] animate-in slide-in-from-top-2 fade-in duration-200 flex-wrap">
+            <div className="flex items-center gap-2">
+              {actionFilters.map((filter) => {
+                const isActive = actionFilter === filter;
+                let activeClass = "bg-primary/10 text-primary border-primary/30";
+                if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
+                else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
+                else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
+                return (
+                  <button
+                    key={filter}
+                    className={"h-10 flex items-center justify-center cursor-pointer px-5 rounded-full text-[13.5px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
+                    onClick={() => setActionFilter(filter)}
+                  >
+                    {filter}
+                  </button>
+                );
+              })}
+            </div>
+            
+            <div className={`ml-auto flex items-center h-10 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+              {[
+                { id: "pending", label: "Follow Up" },
+                { id: "completed", label: "Followed Up" }
+              ].map((mode) => {
+                const isSelected = todayViewMode === mode.id;
+                return (
+                  <button
+                    key={mode.id}
+                    onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
+                    className={`relative h-full flex items-center px-4 rounded-full text-[13px] font-bold transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    {isSelected && (
+                      <motion.div
+                        layoutId="todayToggleBg"
+                        className="absolute inset-0 bg-[#0052FF] shadow-md rounded-full"
+                        initial={false}
+                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                        style={{ zIndex: -1 }}
+                      />
+                    )}
+                    <span className="relative z-10">{mode.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="p-6">
           {isLoading ? <TableSkeleton /> : <DataTable columns={columns} data={displayedInbounds} showToolbar={true} />}

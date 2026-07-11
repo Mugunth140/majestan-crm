@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import {
   ArrowLeft, Loader2, User, Phone, MapPin, Building2,
   Briefcase, Mail, MessageSquare, Plus, ArrowUpRight,
-  Clock, Send, RefreshCw, History, Edit, Shield, CheckCircle
+  Clock, Send, RefreshCw, History, Edit, Shield, CheckCircle, Image as ImageIcon
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
@@ -196,6 +196,7 @@ export default function InboundViewPage() {
   // Modals / Sliders
   const [contactModal, setContactModal] = useState<{ open: boolean; type: string; to: string }>({ open: false, type: "", to: "" });
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 
   // Keyboard shortcut for history slider
   useEffect(() => {
@@ -458,42 +459,50 @@ export default function InboundViewPage() {
                 <p className="text-[14px] font-medium text-foreground">{inbound.purpose || "\u2014"}</p>
               </div>
               <div className="col-span-2 lg:col-span-3">
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Full Address / Location</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Full Address / Location</p>
+                  {inbound.image_url && (
+                    <Button variant="outline" size="sm" className="h-8 text-xs flex items-center gap-1.5 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800" onClick={() => setIsImageModalOpen(true)}>
+                      <ImageIcon className="h-3.5 w-3.5" /> View Inbound Image
+                    </Button>
+                  )}
+                </div>
                 <p className="text-[14px] font-medium text-foreground/80">{inbound.address || inbound.location || "\u2014"}</p>
               </div>
             </div>
           </div>
 
-          <div className="col-span-1 bg-card border rounded-2xl p-6 shadow-sm h-full flex flex-col">
-            <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-              <Shield className="h-4 w-4 text-muted-foreground" /> Actions & Score
-            </h3>
-            
-            <div className="mb-6">
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Quality Score</p>
-              {renderQualityScore(Number(inbound.quality_score || inbound.qualityScore || 0))}
-            </div>
-            
-            <div className="flex-1 flex flex-col gap-4">
-               <div>
-                  <div className="flex items-center justify-between mb-2">
-                     <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Current Status</p>
-                     {isUpdatingStatus && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-                  </div>
-                  <div className="flex gap-2">
-      
-                     <div className="flex-1">
-                       <FormSelect 
-                         name="inboundStatus" 
-                         options={STATUS_OPTIONS.map(s => ({label: s, value: s}))}
-                         value={selectedStatus}
-                         onValueChange={(v) => {
-                           setSelectedStatus(v || "");
-                           handleDirectStatusUpdate(v || "");
-                         }}
-                         placeholder="Select Status"
-                       />
-                     </div>
+          <div className="col-span-1 flex flex-col gap-6">
+            <div className="bg-card border rounded-2xl p-6 shadow-sm flex flex-col">
+              <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
+                <Shield className="h-4 w-4 text-muted-foreground" /> Actions & Score
+              </h3>
+              
+              <div className="mb-6">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Quality Score</p>
+                {renderQualityScore(Number(inbound.quality_score || inbound.qualityScore || 0))}
+              </div>
+              
+              <div className="flex-1 flex flex-col gap-4">
+                 <div>
+                    <div className="flex items-center justify-between mb-2">
+                       <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Current Status</p>
+                       {isUpdatingStatus && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                    </div>
+                    <div className="flex gap-2">
+        
+                       <div className="flex-1">
+                         <FormSelect 
+                           name="inboundStatus" 
+                           options={STATUS_OPTIONS.map(s => ({label: s, value: s}))}
+                           value={selectedStatus}
+                           onValueChange={(v) => {
+                             setSelectedStatus(v || "");
+                             handleDirectStatusUpdate(v || "");
+                           }}
+                           placeholder="Select Status"
+                         />
+                       </div>
                        <Button 
                         variant="outline" 
                         onClick={() => {
@@ -505,31 +514,34 @@ export default function InboundViewPage() {
                      >
                         Close
                      </Button>
-                  </div>
-               </div>
-
-               {inbound.assigned_to && (
-                 <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 mt-2">Assigned To</p>
-                    <p className="text-[14px] font-medium">{inbound.assigned_to.name || "Staff Member"}</p>
+                    </div>
                  </div>
-               )}
-               
-               {/* Trigger the Right Slider */}
-               <div className="mt-auto pt-2">
-                 <Button 
-                   onClick={() => setIsHistoryOpen(true)} 
-                   className="w-full h-12 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 font-semibold shadow-sm border border-blue-200 dark:border-blue-800 rounded-xl flex items-center justify-between px-4"
-                 >
-                   <span className="flex items-center">
-                     <History className="mr-2 h-4 w-4" /> View Follow-up History
-                   </span>
-                   <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border border-blue-200 dark:border-blue-800 bg-background/50 px-1.5 font-mono text-[10px] font-medium text-blue-700 dark:text-blue-400 opacity-100">
-                     A
-                   </kbd>
-                 </Button>
-               </div>
+
+                 {inbound.assigned_to && (
+                   <div>
+                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 mt-2">Assigned To</p>
+                      <p className="text-[14px] font-medium">{inbound.assigned_to.name || "Staff Member"}</p>
+                   </div>
+                 )}
+                 
+                 {/* Trigger the Right Slider */}
+                 <div className="mt-auto pt-2">
+                   <Button 
+                     onClick={() => setIsHistoryOpen(true)} 
+                     className="w-full h-12 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 font-semibold shadow-sm border border-blue-200 dark:border-blue-800 rounded-xl flex items-center justify-between px-4"
+                   >
+                     <span className="flex items-center">
+                       <History className="mr-2 h-4 w-4" /> View Follow-up History
+                     </span>
+                     <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border border-blue-200 dark:border-blue-800 bg-background/50 px-1.5 font-mono text-[10px] font-medium text-blue-700 dark:text-blue-400 opacity-100">
+                       A
+                     </kbd>
+                   </Button>
+                 </div>
+              </div>
             </div>
+
+
           </div>
         </div>
 
@@ -754,7 +766,13 @@ export default function InboundViewPage() {
         onSent={() => fetchInbound(true)}
       />
 
-
+      <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
+        <DialogContent className="max-w-[95vw] w-full h-[95vh] p-0 overflow-hidden bg-black/95 border-none shadow-2xl">
+          <div className="relative flex items-center justify-center w-full h-full p-4">
+            <img src={inbound?.image_url} alt="Inbound Full View" className="w-full h-full object-contain" />
+          </div>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );
