@@ -71,10 +71,14 @@ const PURPOSES = [
 ];
 
 const STATUSES = [
-  { label: "Available", value: "Available" },
-  { label: "Hold", value: "Hold" },
-  { label: "Sold", value: "Sold" },
-  { label: "Rented", value: "Rented" },
+  { label: "New Inbound", value: "New Inbound" },
+  { label: "Contacting Owner", value: "Contacting Owner" },
+  { label: "Pending Inspection", value: "Pending Inspection" },
+  { label: "Verifying Details", value: "Verifying Details" },
+  { label: "Action Required", value: "Action Required" },
+  { label: "On Hold", value: "On Hold" },
+  { label: "Approved", value: "Approved" },
+  { label: "Rejected", value: "Rejected" },
 ];
 
 const PRIMARY_CONTACTS = [

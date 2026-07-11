@@ -28,21 +28,25 @@ import {
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
 const STATUS_OPTIONS = [
-  "Hold", "Verification Pending", "Verified", "Approved for Inventory",
-  "Pending", "Revisit", "Reject", "Close", "Sold", "Rented"
+  "New Inbound",
+  "Contacting Owner",
+  "Pending Inspection",
+  "Verifying Details",
+  "Action Required",
+  "On Hold",
+  "Approved",
+  "Rejected"
 ];
 
 const STATUS_STYLES: Record<string, string> = {
-  "Hold": "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300",
-  "Verification Pending": "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
-  "Verified": "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400",
-  "Approved for Inventory": "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400",
-  "Pending": "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400",
-  "Revisit": "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400",
-  "Reject": "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400",
-  "Close": "bg-slate-200 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-300",
-  "Sold": "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
-  "Rented": "bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/30 dark:text-teal-400",
+  "New Inbound": "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300",
+  "Contacting Owner": "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400",
+  "Pending Inspection": "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400",
+  "Verifying Details": "bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400",
+  "Action Required": "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400",
+  "On Hold": "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400",
+  "Approved": "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400",
+  "Rejected": "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400",
 };
 
 const CONTACT_TYPE_STYLES: Record<string, string> = {
@@ -244,20 +248,19 @@ export default function InboundViewPage() {
 
   useEffect(() => { fetchInbound(); }, [fetchInbound]);
 
-  const handleStatusUpdate = async () => {
-    if (!selectedStatus) return;
+  const handleDirectStatusUpdate = async (newStatus: string) => {
+    if (!newStatus || newStatus === inbound.status) return;
     setIsUpdatingStatus(true);
     try {
-      const res = await fetch(`${API_URL}/inbounds/${id}/status`, {
-        method: "PUT",
+      const res = await fetch(`${API_URL}/inbounds/${id}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: selectedStatus }),
+        body: JSON.stringify({ status: newStatus }),
       });
       const data = await res.json();
-      if (data.success) {
-        toast.success("Status updated successfully.");
+      if (res.ok) {
+        toast.success("Status updated to " + newStatus);
         fetchInbound(true);
-        setStatusModalOpen(false);
       } else {
         toast.error(data.message || "Failed to update status");
       }
@@ -319,24 +322,35 @@ export default function InboundViewPage() {
 
   const renderQualityScore = (score: number) => {
     let label = "Needs Improvement";
-    let cls = "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400";
+    let bgCls = "bg-red-500";
+    let textCls = "text-red-700 dark:text-red-400";
     
-    if (score > 90) {
+    if (score >= 90) {
       label = "Premium";
-      cls = "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400";
-    } else if (score > 75) {
+      bgCls = "bg-green-500";
+      textCls = "text-green-700 dark:text-green-400";
+    } else if (score >= 75) {
       label = "Featured";
-      cls = "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400";
-    } else if (score > 60) {
+      bgCls = "bg-blue-500";
+      textCls = "text-blue-700 dark:text-blue-400";
+    } else if (score >= 60) {
       label = "Standard";
-      cls = "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400";
+      bgCls = "bg-yellow-500";
+      textCls = "text-yellow-700 dark:text-yellow-400";
     }
 
     return (
-      <div className="flex items-center gap-3">
-        <Badge className={`font-bold px-3 py-1 shadow-sm border whitespace-nowrap text-[13px] ${cls}`}>
-          {label} ({score}%)
-        </Badge>
+      <div className="flex flex-col gap-2.5">
+        <div className="flex items-center justify-between">
+          <span className={`text-[15px] font-bold ${textCls}`}>{label}</span>
+          <span className="text-sm font-bold text-foreground">{score}/100</span>
+        </div>
+        <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden border border-border/50 shadow-inner">
+          <div 
+            className={`h-full ${bgCls} transition-all duration-1000 ease-out`} 
+            style={{ width: `${score}%` }} 
+          />
+        </div>
       </div>
     );
   };
@@ -462,16 +476,20 @@ export default function InboundViewPage() {
             
             <div className="flex-1 flex flex-col gap-4">
                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Current Status</p>
-                  <div className="flex items-center justify-between p-3 border rounded-xl bg-muted/20">
-                     <div className="flex items-center gap-2">
-                        <div className={`w-2.5 h-2.5 rounded-full ${statusName === "Reject" ? "bg-red-500" : statusName.includes("Verif") ? "bg-amber-500" : statusName === "Approved for Inventory" ? "bg-emerald-500" : "bg-blue-500"}`} />
-                        <span className="text-sm font-semibold">{statusName}</span>
-                     </div>
-                     <Button variant="outline" size="sm" className="h-8 text-xs font-medium" onClick={() => setStatusModalOpen(true)}>
-                        Change
-                     </Button>
+                  <div className="flex items-center justify-between mb-2">
+                     <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Current Status</p>
+                     {isUpdatingStatus && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
                   </div>
+                  <FormSelect 
+                    name="inboundStatus" 
+                    options={STATUS_OPTIONS.map(s => ({label: s, value: s}))}
+                    value={selectedStatus}
+                    onValueChange={(v) => {
+                      setSelectedStatus(v || "");
+                      handleDirectStatusUpdate(v || "");
+                    }}
+                    placeholder="Select Status"
+                  />
                </div>
 
                {inbound.assigned_to && (
@@ -720,48 +738,7 @@ export default function InboundViewPage() {
         onSent={() => fetchInbound(true)}
       />
 
-      {/* ── Status Change Modal ── */}
-      <Dialog open={statusModalOpen} onOpenChange={setStatusModalOpen}>
-        <DialogContent className="sm:max-w-[400px] p-0 overflow-hidden border-border/60">
-          <DialogHeader className="p-6 pb-4 bg-muted/10 border-b">
-            <DialogTitle className="text-lg">Update Status</DialogTitle>
-            <DialogDescription>
-              Change the progression status of this inbound property.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="p-6 space-y-4">
-            <div className="space-y-2">
-               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">New Status</label>
-               <FormSelect 
-                 name="inboundStatus" 
-                 options={STATUS_OPTIONS.map(s => ({label: s, value: s}))}
-                 value={selectedStatus}
-                 onValueChange={(v) => setSelectedStatus(v || "")}
-                 placeholder="Select Status"
-               />
-            </div>
-            
-            {selectedStatus && (
-               <div className="p-3 bg-muted/30 rounded-lg flex items-center gap-3 mt-2 border">
-                  <Badge className={`font-medium shadow-sm border ${STATUS_STYLES[selectedStatus] ?? STATUS_STYLES["Hold"]}`}>
-                     {selectedStatus}
-                  </Badge>
-               </div>
-            )}
-          </div>
-          <DialogFooter className="p-4 bg-muted/10 border-t">
-            <Button variant="outline" onClick={() => setStatusModalOpen(false)}>Cancel</Button>
-            <Button 
-               onClick={handleStatusUpdate} 
-               disabled={isUpdatingStatus || !selectedStatus || selectedStatus === inbound.status}
-               className="bg-[#0052FF] hover:bg-[#0040CC] text-white flex items-center gap-2"
-            >
-              {isUpdatingStatus ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
-              Save Changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
 
     </div>
   );
