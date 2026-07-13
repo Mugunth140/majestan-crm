@@ -106,7 +106,7 @@ export default function InboundPage() {
     if (filters.type) filtered = filtered.filter(l => (l.property_type || l.propertyType) === filters.type);
     if (filters.status) filtered = filtered.filter(l => l.status === filters.status);
 
-    const closedStatuses = ["Terms not Accepted", "On Hold", "Approved", "Rejected", "Closed"];
+    const closedStatuses = ["Closed"];
 
     if (activeTab === "Action Required") {
       const today = new Date();
