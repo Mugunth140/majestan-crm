@@ -254,6 +254,10 @@ function InboundForm() {
       payload.is_prime_location = isPrimeLocation;
       payload.documents_collected = documentsCollected;
 
+      if (payload.percentage === "") payload.percentage = null;
+      if (payload.fixed_amount === "") payload.fixed_amount = null;
+      if (payload.rental_brokerage === "") payload.rental_brokerage = null;
+
       const method = editId ? "PATCH" : "POST";
       const endpoint = API_URL + (editId ? "/inbounds/" + editId : "/inbounds");
 
