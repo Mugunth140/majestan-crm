@@ -43,38 +43,42 @@ export class InboundsController {
 
 
   @Post(':id/follow-ups')
-  addFollowUp(
+  async addFollowUp(
     @Param('id') id: string,
     @Body() payload: Partial<InboundFollowUp>,
   ) {
     // We default created_by_id to 1 here as in leads (if leads even uses it).
-    return this.inboundsService.addFollowUp(+id, payload, 1);
+    const data = await this.inboundsService.addFollowUp(+id, payload, 1);
+    return { success: true, data };
   }
 
   @Post(':id/contact-log')
-  addContactLog(
+  async addContactLog(
     @Param('id') id: string,
     @Body() payload: Partial<InboundContactLog>,
   ) {
     // Defaulting sent_by_id to 1 as dummy userId for now
-    return this.inboundsService.addContactLog(+id, payload, 1);
+    const data = await this.inboundsService.addContactLog(+id, payload, 1);
+    return { success: true, data };
   }
 
   @Patch(':id/follow-ups/:followUpId')
-  updateFollowUp(
+  async updateFollowUp(
     @Param('id') id: string,
     @Param('followUpId') followUpId: string,
     @Body() payload: Partial<InboundFollowUp>,
   ) {
-    return this.inboundsService.updateFollowUp(+id, +followUpId, payload);
+    const data = await this.inboundsService.updateFollowUp(+id, +followUpId, payload);
+    return { success: true, data };
   }
 
   @Delete(':id/follow-ups/:followUpId')
-  deleteFollowUp(
+  async deleteFollowUp(
     @Param('id') id: string,
     @Param('followUpId') followUpId: string,
   ) {
-    return this.inboundsService.deleteFollowUp(+id, +followUpId);
+    const data = await this.inboundsService.deleteFollowUp(+id, +followUpId);
+    return { success: true, data };
   }
 
   @Delete(':id')

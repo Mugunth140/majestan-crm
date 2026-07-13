@@ -24,6 +24,7 @@ import {
   Mail,
   Smartphone,
   User,
+  Trash2,
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
@@ -163,6 +164,22 @@ export function FollowUpPanel({ entityId, entityType, followUps, onRefresh }: Fo
     }
   };
 
+  const handleDeleteFu = async (fuId: number) => {
+    if (!confirm("Are you sure you want to delete this follow-up?")) return;
+    try {
+      const res = await fetch(`${API_URL}/${entityType}/${entityId}/follow-ups/${fuId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Follow-up deleted.");
+        onRefresh();
+      } else toast.error(data.message || "Failed to delete follow-up");
+    } catch {
+      toast.error("Failed to delete follow-up");
+    }
+  };
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -256,6 +273,20 @@ export function FollowUpPanel({ entityId, entityType, followUps, onRefresh }: Fo
                                 <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full uppercase bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                                   {fu.rnr}
                                 </span>
+                              )}
+                              {isAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 ml-1 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteFu(fu.id);
+                                  }}
+                                  title="Delete Follow-up"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
                               )}
                             </div>
                           </div>

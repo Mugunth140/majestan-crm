@@ -170,19 +170,27 @@ export class InboundsService {
     return this.contactLogsRepository.save(contactLog);
   }
 
-  async addFollowUp(inboundId: number, payload: Partial<InboundFollowUp>, userId: number): Promise<InboundFollowUp> {
+  async addFollowUp(inboundId: number, body: any, userId: number): Promise<InboundFollowUp> {
     const inbound = await this.findOne(inboundId);
     
     const followUp = this.followUpsRepository.create({
-      ...payload,
       inbound_id: inboundId,
       created_by_id: userId,
+      follow_up_date: body.followUpDate || null,
+      follow_up_time: body.followUpTime || null,
+      contacted_via: body.contactedVia || null,
+      next_follow_up_date: body.nextFollowUpDate || null,
+      next_follow_up_time: body.nextFollowUpTime || null,
+      purpose: body.purpose || null,
+      priority: body.priority || null,
+      rnr: body.rnr || null,
+      notes: body.notes || null,
     });
     
     return this.followUpsRepository.save(followUp);
   }
 
-  async updateFollowUp(inboundId: number, followUpId: number, payload: Partial<InboundFollowUp>): Promise<InboundFollowUp> {
+  async updateFollowUp(inboundId: number, followUpId: number, body: any): Promise<InboundFollowUp> {
     const followUp = await this.followUpsRepository.findOne({
       where: { id: followUpId, inbound_id: inboundId }
     });
@@ -191,7 +199,16 @@ export class InboundsService {
       throw new NotFoundException(`Follow-up with ID ${followUpId} not found`);
     }
     
-    Object.assign(followUp, payload);
+    if (body.followUpDate !== undefined) followUp.follow_up_date = body.followUpDate;
+    if (body.followUpTime !== undefined) followUp.follow_up_time = body.followUpTime;
+    if (body.contactedVia !== undefined) followUp.contacted_via = body.contactedVia;
+    if (body.nextFollowUpDate !== undefined) followUp.next_follow_up_date = body.nextFollowUpDate;
+    if (body.nextFollowUpTime !== undefined) followUp.next_follow_up_time = body.nextFollowUpTime;
+    if (body.purpose !== undefined) followUp.purpose = body.purpose;
+    if (body.priority !== undefined) followUp.priority = body.priority;
+    if (body.rnr !== undefined) followUp.rnr = body.rnr;
+    if (body.notes !== undefined) followUp.notes = body.notes;
+
     return this.followUpsRepository.save(followUp);
   }
 
