@@ -129,8 +129,8 @@ export class Inbound {
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
   fixed_amount: number;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
-  rental_brokerage: number;
+  @Column({ type: 'varchar', nullable: true })
+  rental_brokerage: string;
 
   @Column({ type: 'text', nullable: true })
   brokerage_remarks: string;

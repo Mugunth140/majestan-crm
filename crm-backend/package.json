@@ -22,7 +22,7 @@
   "lint-staged": {
     "src/database/entities/*.entity.ts": [
       "bash -c 'DB_HOST=127.0.0.1 bunx typeorm-ts-node-commonjs migration:generate -d src/database/data-source.ts src/database/migrations/AutoSync || true'",
-      "git add src/database/migrations/* || true"
+      "bash -c 'git add src/database/migrations || true'"
     ]
   },
   "dependencies": {
