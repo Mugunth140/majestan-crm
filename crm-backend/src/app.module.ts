@@ -36,7 +36,7 @@ import { AgentContactLog } from './database/entities/agent-contact-log.entity';
 import { Inbound } from './database/entities/inbound.entity';
 import { InboundFollowUp } from './database/entities/inbound-follow-up.entity';
 import { InboundContactLog } from './database/entities/inbound-contact-log.entity';
-import { HrCandidate } from './modules/hr/entities/hr-candidate.entity';
+import { HrCandidate } from './database/entities/hr-candidate.entity';
 
 @Module({
   imports: [

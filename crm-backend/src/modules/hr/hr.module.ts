@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { HrCandidate } from './entities/hr-candidate.entity';
+import { HrCandidate } from '../../database/entities/hr-candidate.entity';
 import { HrController } from './hr.controller';
 import { HrService } from './hr.service';
 

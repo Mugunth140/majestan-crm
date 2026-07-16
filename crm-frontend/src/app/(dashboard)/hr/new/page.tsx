@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -32,9 +32,13 @@ const SOURCES = [
   { label: "Other", value: "Other" }
 ];
 
-export default function NewCandidate() {
+function HrCandidateForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("edit");
+  
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(!!editId);
   
   const [formData, setFormData] = useState({
     name: "", mobile: "", whatsapp: "", email: "", city: "", state: "",
@@ -46,33 +50,57 @@ export default function NewCandidate() {
 
   const [resumeFile, setResumeFile] = useState<File | null>(null);
 
+  useEffect(() => {
+    if (editId) {
+      fetch(`${API_URL}/hr/${editId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data) {
+            setFormData({
+              name: data.name || "", mobile: data.mobile || "", whatsapp: data.whatsapp || "", email: data.email || "", city: data.city || "", state: data.state || "",
+              department: data.department || "", position: data.position || "", experience: data.experience || "", currentSalary: data.currentSalary || "", expectedSalary: data.expectedSalary || "", noticePeriod: data.noticePeriod || "",
+              recruitmentSource: data.recruitmentSource || "",
+              interviewDate: data.interviewDate || "", interviewer: data.interviewer || "", interviewRound: data.interviewRound || "", interviewFeedback: data.interviewFeedback || "",
+              status: data.status || "New Application"
+            });
+          }
+        })
+        .catch(() => toast.error("Failed to load candidate details"))
+        .finally(() => setIsLoading(false));
+    }
+  }, [editId]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     
     try {
-      // Create Candidate
-      const res = await fetch(`${API_URL}/hr`, {
-        method: "POST", 
+      const url = editId ? `${API_URL}/hr/${editId}` : `${API_URL}/hr`;
+      const method = editId ? "PATCH" : "POST";
+
+      const res = await fetch(url, {
+        method, 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)
       });
       const data = await res.json();
       
+      const candidateId = editId || data.id;
+
       // Upload Resume if selected
-      if (resumeFile && data.id) {
+      if (resumeFile && candidateId) {
         const fileData = new FormData();
         fileData.append("file", resumeFile);
-        await fetch(`${API_URL}/hr/${data.id}/upload/resume`, {
+        await fetch(`${API_URL}/hr/${candidateId}/upload/resume`, {
           method: "POST",
           body: fileData
         });
       }
 
-      toast.success("Candidate added successfully!");
+      toast.success(`Candidate ${editId ? 'updated' : 'added'} successfully!`);
       router.push("/hr");
     } catch (err) {
-      toast.error("Failed to add candidate");
+      toast.error(`Failed to ${editId ? 'update' : 'add'} candidate`);
     } finally {
       setIsSaving(false);
     }
@@ -82,17 +110,25 @@ export default function NewCandidate() {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex h-[60vh] w-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-[#0052FF]" />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center justify-between pr-[150px] min-h-[48px]">
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" onClick={() => router.push("/hr")}>
+          <Button type="button" variant="outline" size="icon" className="h-10 w-10 rounded-full" onClick={() => router.push("/hr")}>
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Add New Candidate</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{editId ? "Edit Candidate" : "Add New Candidate"}</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Enter the details for the new HR applicant.
+              {editId ? "Update the details for this candidate." : "Enter the details for the new HR applicant."}
             </p>
           </div>
         </div>
@@ -172,7 +208,7 @@ export default function NewCandidate() {
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Interview Date</label>
-              <Input name="interviewDate" type="date" value={formData.interviewDate} onChange={handleChange} className="h-12 rounded-xl bg-muted/30" />
+              <Input name="interviewDate" type="date" value={formData.interviewDate ? formData.interviewDate.split('T')[0] : ""} onChange={handleChange} className="h-12 rounded-xl bg-muted/30" />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Interviewer Name</label>
@@ -190,26 +226,36 @@ export default function NewCandidate() {
         </div>
 
         {/* Document Section */}
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Documents</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Candidate Resume (PDF/Doc)</label>
-              <Input type="file" onChange={(e) => setResumeFile(e.target.files?.[0] || null)} className="h-12 rounded-xl bg-muted/30 pt-2.5 cursor-pointer" accept=".pdf,.doc,.docx" />
+        {!editId && (
+          <div className="bg-card border rounded-2xl p-8 shadow-sm">
+            <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Documents</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Candidate Resume (PDF/Doc)</label>
+                <Input type="file" onChange={(e) => setResumeFile(e.target.files?.[0] || null)} className="h-12 rounded-xl bg-muted/30 pt-2.5 cursor-pointer" accept=".pdf,.doc,.docx" />
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         <div className="flex justify-end gap-4 pt-4 pb-20">
           <Button type="button" variant="outline" className="h-12 px-8 rounded-xl font-semibold border-border/60 hover:bg-muted" onClick={() => router.push("/hr")}>
             Cancel
           </Button>
           <Button type="submit" disabled={isSaving} className="h-12 px-8 rounded-xl font-semibold bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md hover:shadow-lg transition-all active:scale-95">
-            {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Save className="h-5 w-5 mr-2" /> Save Candidate</>}
+            {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Save className="h-5 w-5 mr-2" /> {editId ? "Update Candidate" : "Save Candidate"}</>}
           </Button>
         </div>
 
       </form>
     </div>
+  );
+}
+
+export default function NewCandidatePage() {
+  return (
+    <Suspense fallback={<div className="flex h-[60vh] w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#0052FF]" /></div>}>
+      <HrCandidateForm />
+    </Suspense>
   );
 }

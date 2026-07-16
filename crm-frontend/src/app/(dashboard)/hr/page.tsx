@@ -26,11 +26,39 @@ export default function HrPage() {
   const [candidates, setCandidates] = useState([]);
   
   useEffect(() => {
-    fetch(`${API_URL}/hr`).then(res => res.json()).then(setCandidates);
+    fetch(`${API_URL}/hr`)
+      .then(res => res.json())
+      .then(data => {
+        const mapped = data.map((c: any, i: number) => ({
+          ...c,
+          sno: i + 1,
+          formattedId: "HRC" + String(c.id).padStart(4, "0")
+        }));
+        setCandidates(mapped);
+      });
   }, []);
 
   const columns = [
-    { accessorKey: "name", header: "Name" },
+    { accessorKey: "sno", header: "#" },
+    {
+      accessorKey: "formattedId",
+      header: "Id",
+      cell: ({ row }: any) => (
+        <Link href={`/hr/${row.original.id}`} className="text-[#0052FF] hover:underline font-medium">
+          {row.getValue("formattedId")}
+        </Link>
+      ),
+    },
+    { accessorKey: "name", header: "Name",
+      cell: ({ row }: any) => (
+        <div className="flex items-center gap-2">
+          <div className="h-7 w-7 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center font-bold text-xs text-blue-900 dark:text-blue-300 shrink-0">
+            {row.original.name?.charAt(0).toUpperCase()}
+          </div>
+          <span className="font-medium text-foreground">{row.original.name}</span>
+        </div>
+      )
+    },
     { accessorKey: "position", header: "Position" },
     { accessorKey: "department", header: "Department" },
     { accessorKey: "mobile", header: "Mobile" },

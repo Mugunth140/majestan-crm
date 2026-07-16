@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { HrService } from './hr.service';
-import { HrCandidate } from './entities/hr-candidate.entity';
+import { HrCandidate } from '../../database/entities/hr-candidate.entity';
 
 @Controller('api/v1/hr')
 export class HrController {
