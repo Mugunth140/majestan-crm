@@ -1,10 +1,26 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException, Put } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { HrService } from './hr.service';
 import { HrCandidate } from '../../database/entities/hr-candidate.entity';
 
 @Controller('api/v1/hr')
 export class HrController {
+  @Post(':id/follow-ups')
+  async addFollowUp(@Param('id') id: string, @Body() data: any) {
+    await this.hrService.addFollowUp(+id, data);
+    return { success: true };
+  }
+
+  @Put(':id/follow-ups/:fuId')
+  async updateFollowUp(@Param('id') id: string, @Param('fuId') fuId: string, @Body() data: any) {
+    return this.hrService.updateFollowUp(+id, +fuId, data);
+  }
+
+  @Delete(':id/follow-ups/:fuId')
+  async deleteFollowUp(@Param('id') id: string, @Param('fuId') fuId: string) {
+    return this.hrService.deleteFollowUp(+id, +fuId);
+  }
+
   constructor(private readonly hrService: HrService) {}
 
   @Get() findAll() { return this.hrService.findAll(); }

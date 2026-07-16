@@ -1,4 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+// fallow-ignore-file circular-dependencies
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { HrFollowUp } from './hr-follow-up.entity';
 
 export enum HrCandidateStatus {
   NEW_APPLICATION = 'New Application',
@@ -51,6 +53,9 @@ export class HrCandidate {
   @Column({ nullable: true }) educationCertUrl: string;
   @Column({ nullable: true }) experienceCertUrl: string;
   @Column({ nullable: true }) photoUrl: string;
+
+  // follow_ups mapped manually
+  
 
   @CreateDateColumn() createdAt: Date;
   @UpdateDateColumn() updatedAt: Date;
