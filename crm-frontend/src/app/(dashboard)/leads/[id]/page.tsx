@@ -431,6 +431,20 @@ export default function LeadViewPage() {
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Address</p>
                 <p className="text-[14px] font-medium text-foreground/80">{lead.address || "\u2014"}</p>
               </div>
+              
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Commission</p>
+                <p className="text-[14px] font-medium text-foreground">{lead.commission ? `${lead.commission}%` : "\u2014"}</p>
+              </div>
+              
+              {lead.is_referral ? (
+                <div className="col-span-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Referred By</p>
+                  <p className="text-[14px] font-medium text-foreground/80">
+                    {lead.referred_by_name || "Unknown"} {lead.referred_by_contact ? `(${lead.referred_by_contact})` : ""}
+                  </p>
+                </div>
+              ) : null}
             </div>
           </div>
 

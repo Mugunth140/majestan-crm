@@ -58,6 +58,18 @@ export class Lead {
   @OneToMany(() => LeadDocument, doc => doc.lead)
   documents: LeadDocument[];
 
+  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
+  commission: number;
+
+  @Column({ type: 'boolean', default: false })
+  is_referral: boolean;
+
+  @Column({ type: 'varchar', nullable: true })
+  referred_by_name: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  referred_by_contact: string;
+
   @CreateDateColumn()
   @Index()
   created_at: Date;

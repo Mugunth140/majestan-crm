@@ -181,6 +181,10 @@ export class LeadsService {
       existingLead.city = body.city || null;
       existingLead.address = body.address || null;
       existingLead.lead_source = body.source || null;
+      existingLead.commission = body.commission !== undefined ? body.commission : existingLead.commission;
+      if (body.isReferral !== undefined) existingLead.is_referral = body.isReferral;
+      if (body.referredByName !== undefined) existingLead.referred_by_name = body.referredByName;
+      if (body.referredByContact !== undefined) existingLead.referred_by_contact = body.referredByContact;
       await manager.save(Lead, existingLead);
 
       if (body.purchaseType || body.propertyType || body.funder || body.project || body.propertyCategory) {
@@ -277,6 +281,10 @@ export class LeadsService {
         lead_source: body.source || null,
         status: 'New Lead',
         assigned_staff_id: assignedStaffId,
+        commission: body.commission || null,
+        is_referral: body.isReferral || false,
+        referred_by_name: body.referredByName || null,
+        referred_by_contact: body.referredByContact || null,
       });
       const savedLead: Lead = await manager.save(lead);
 
