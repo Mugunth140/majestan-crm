@@ -13,7 +13,32 @@ export class HrService {
     private fuRepo: Repository<HrFollowUp>,
   ) {}
 
-  findAll() { return this.repo.find({ order: { createdAt: 'DESC' } }); }
+  async findAll() { 
+    const candidates = await this.repo.find({ order: { createdAt: 'DESC' } });
+    const allFollowUps = await this.fuRepo.find({ order: { created_at: 'DESC' } });
+
+    return candidates.map(candidate => {
+      const followUps = allFollowUps.filter(f => f.hr_candidate_id === candidate.id);
+      let nextFollowUpDate = null;
+      let lastFollowedUpDate = null;
+
+      if (followUps.length > 0) {
+        nextFollowUpDate = followUps[0].next_follow_up_date || null;
+        
+        const actualFus = followUps
+          .filter(f => f.follow_up_date)
+          .sort((a, b) => new Date(b.follow_up_date!).getTime() - new Date(a.follow_up_date!).getTime());
+        
+        lastFollowedUpDate = actualFus.length > 0 ? actualFus[0].follow_up_date : null;
+      }
+
+      return {
+        ...candidate,
+        nextFollowUpDate,
+        lastFollowedUpDate
+      };
+    });
+  }
   async findOne(id: number) {
     const candidate = await this.repo.findOne({ where: { id } });
     if (candidate) {

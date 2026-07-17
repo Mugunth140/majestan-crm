@@ -15,6 +15,68 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 const FollowUpPanel = dynamic(() => import("@/components/shared/follow-up-panel").then(mod => mod.FollowUpPanel), { ssr: false });
 
+import { Skeleton } from "@/components/ui/skeleton";
+
+function PageSkeleton() {
+  return (
+    <div className="animate-in fade-in duration-500 h-full flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-9 w-9 rounded-full shrink-0" />
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-6 w-24 rounded-md" />
+              <Skeleton className="h-5 w-20" />
+            </div>
+            <Skeleton className="h-4 w-40" />
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-9 w-9 rounded-full" />
+          <Skeleton className="h-10 w-28 rounded-lg" />
+        </div>
+      </div>
+
+      <div className="flex-1 space-y-6 overflow-y-auto min-h-0 pb-6 pr-2">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="col-span-2 flex flex-col gap-6">
+             <div className="bg-card border rounded-2xl p-6 shadow-sm">
+                <Skeleton className="h-5 w-48 mb-6" />
+                <div className="grid grid-cols-3 gap-y-6 gap-x-6">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i}>
+                      <Skeleton className="h-3 w-20 mb-2" />
+                      <Skeleton className="h-4 w-32" />
+                    </div>
+                  ))}
+                </div>
+             </div>
+             <div className="bg-card border rounded-2xl p-6 shadow-sm">
+                <Skeleton className="h-5 w-40 mb-6" />
+                <Skeleton className="h-40 w-full rounded-xl" />
+             </div>
+          </div>
+          <div className="col-span-1 flex flex-col gap-6">
+             <div className="bg-card border rounded-2xl p-6 shadow-sm">
+                <Skeleton className="h-5 w-32 mb-6" />
+                <div className="space-y-6">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i}>
+                      <Skeleton className="h-3 w-24 mb-2" />
+                      <Skeleton className="h-11 w-full rounded-xl" />
+                    </div>
+                  ))}
+                </div>
+             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -132,7 +194,7 @@ export default function HrDetail() {
     }
   };
 
-  if (!candidate) return <div className="p-8 text-muted-foreground">Loading candidate details...</div>;
+  if (!candidate) return <PageSkeleton />;
 
   const badgeCls = STATUS_STYLES[selectedStatus || candidate.status] ?? "bg-gray-100 text-gray-800 border-gray-200";
   const formattedId = "HRC" + String(candidate.id).padStart(4, "0");
