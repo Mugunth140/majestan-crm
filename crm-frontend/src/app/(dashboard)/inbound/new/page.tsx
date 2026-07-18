@@ -241,6 +241,8 @@ function InboundForm() {
       payload.property_category = selectedCategory;
       payload.property_type = selectedType;
       payload.purpose = selectedPurpose;
+      payload.special_purpose = formData.get("special_purpose") || null;
+      payload.brokerage_days = formData.get("brokerage_days") ? parseInt(formData.get("brokerage_days") as string, 10) : null;
       payload.primary_contact = primaryContact;
       payload.brokerage_accepted = brokerageAccepted;
       payload.brokerage_paid_by = brokeragePaidBy;
@@ -256,7 +258,6 @@ function InboundForm() {
 
       if (payload.percentage === "") payload.percentage = null;
       if (payload.fixed_amount === "") payload.fixed_amount = null;
-      if (payload.rental_brokerage === "") payload.rental_brokerage = null;
 
       const method = editId ? "PATCH" : "POST";
       const endpoint = API_URL + (editId ? "/inbounds/" + editId : "/inbounds");
@@ -379,6 +380,11 @@ function InboundForm() {
                 options={PURPOSES} 
                 required 
               />
+            </div>
+            
+            <div className="space-y-2 lg:col-span-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Special Purpose (Optional)</label>
+              <Input name="special_purpose" defaultValue={inboundData?.special_purpose || ""} placeholder="e.g. Renting for Grocery shop" className="h-12 rounded-xl bg-muted/30" />
             </div>
 
             <div className="space-y-2">
@@ -594,8 +600,8 @@ function InboundForm() {
 
                 {showRentalBrokerage && (
                    <div className="space-y-2">
-                     <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Rental Brokerage</label>
-                     <Input name="rental_brokerage" defaultValue={inboundData?.rental_brokerage || ""} placeholder="e.g. 1 Month Rent" className="h-12 rounded-xl bg-muted/30" />
+                     <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Brokerage Days</label>
+                     <Input type="number" name="brokerage_days" defaultValue={inboundData?.brokerage_days || ""} placeholder="e.g. 15" className="h-12 rounded-xl bg-muted/30" />
                    </div>
                 )}
 

@@ -37,6 +37,9 @@ export class Inbound {
   purpose: string;
 
   @Column({ type: 'varchar', nullable: true })
+  special_purpose: string;
+
+  @Column({ type: 'varchar', nullable: true })
   property_title: string;
 
   @Column({ type: 'varchar', nullable: true })
@@ -131,6 +134,9 @@ export class Inbound {
 
   @Column({ type: 'varchar', nullable: true })
   rental_brokerage: string;
+
+  @Column({ type: 'int', nullable: true })
+  brokerage_days: number;
 
   @Column({ type: 'text', nullable: true })
   brokerage_remarks: string;
