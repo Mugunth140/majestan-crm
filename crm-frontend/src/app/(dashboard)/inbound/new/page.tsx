@@ -110,6 +110,11 @@ const BROKERAGE_TYPES = [
   { label: "Fixed", value: "Fixed" },
 ];
 
+const FLOOR_APPLICABLE_TYPES = [
+  "apartment", "builder_floor", "office", "shop", "showroom", "commercial_building", 
+  "hotel", "restaurant", "school", "college", "hospital", "clinic", "training_centre"
+];
+
 function InboundForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -242,8 +247,13 @@ function InboundForm() {
       payload.property_type = selectedType;
       payload.purpose = selectedPurpose;
       payload.special_purpose = formData.get("special_purpose") || null;
+      payload.budget_details = formData.get("budget_details") || null;
+      payload.floor_number = formData.get("floor_number") || null;
       payload.brokerage_days = formData.get("brokerage_days") ? parseInt(formData.get("brokerage_days") as string, 10) : null;
       payload.primary_contact = primaryContact;
+      payload.security_name = formData.get("security_name") || null;
+      payload.broker_name = formData.get("broker_name") || null;
+      payload.broker_mobile = formData.get("broker_mobile") || null;
       payload.brokerage_accepted = brokerageAccepted;
       payload.brokerage_paid_by = brokeragePaidBy;
       payload.brokerage_type = brokerageType;
@@ -386,6 +396,18 @@ function InboundForm() {
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Special Purpose (Optional)</label>
               <Input name="special_purpose" defaultValue={inboundData?.special_purpose || ""} placeholder="e.g. Renting for Grocery shop" className="h-12 rounded-xl bg-muted/30" />
             </div>
+            
+            <div className="space-y-2 lg:col-span-3">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Budget Details (Optional)</label>
+              <Input name="budget_details" defaultValue={inboundData?.budget_details || ""} placeholder="e.g. Max budget is 50,000 / month" className="h-12 rounded-xl bg-muted/30" />
+            </div>
+
+            {selectedType && FLOOR_APPLICABLE_TYPES.includes(selectedType) && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Floor Number</label>
+                <Input name="floor_number" defaultValue={inboundData?.floor_number || ""} placeholder="e.g. Ground, 1st, Multiple" className="h-12 rounded-xl bg-muted/30" />
+              </div>
+            )}
 
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Status</label>
@@ -517,10 +539,29 @@ function InboundForm() {
             )}
 
             {primaryContact === "Security" && (
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Security Contact</label>
-                <Input name="security_contact" defaultValue={inboundData?.security_contact || ""} placeholder="Contact Info" required className="h-12 rounded-xl bg-muted/30" />
-              </div>
+              <>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Security Name</label>
+                  <Input name="security_name" defaultValue={inboundData?.security_name || ""} placeholder="Name" required className="h-12 rounded-xl bg-muted/30" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Security Contact</label>
+                  <Input name="security_contact" defaultValue={inboundData?.security_contact || ""} placeholder="Contact Info" required className="h-12 rounded-xl bg-muted/30" />
+                </div>
+              </>
+            )}
+
+            {primaryContact === "Broker" && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Broker Name</label>
+                  <Input name="broker_name" defaultValue={inboundData?.broker_name || ""} placeholder="Name" required className="h-12 rounded-xl bg-muted/30" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Broker Mobile</label>
+                  <Input name="broker_mobile" defaultValue={inboundData?.broker_mobile || ""} placeholder="Mobile" required className="h-12 rounded-xl bg-muted/30" />
+                </div>
+              </>
             )}
 
             <div className="space-y-2">

@@ -39,6 +39,12 @@ export class Inbound {
   @Column({ type: 'varchar', nullable: true })
   special_purpose: string;
 
+  @Column({ type: 'text', nullable: true })
+  budget_details: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  floor_number: string;
+
   @Column({ type: 'varchar', nullable: true })
   property_title: string;
 
@@ -108,7 +114,16 @@ export class Inbound {
   caretaker_mobile: string;
 
   @Column({ type: 'varchar', nullable: true })
+  security_name: string;
+
+  @Column({ type: 'varchar', nullable: true })
   security_contact: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  broker_name: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  broker_mobile: string;
 
   @Column({ type: 'varchar', nullable: true })
   key_available_with: string;

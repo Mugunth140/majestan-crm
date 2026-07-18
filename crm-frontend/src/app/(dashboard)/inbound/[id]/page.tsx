@@ -462,6 +462,16 @@ export default function InboundViewPage() {
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Special Purpose</p>
                 <p className="text-[14px] font-medium text-foreground">{inbound.special_purpose || "\u2014"}</p>
               </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Budget Details</p>
+                <p className="text-[14px] font-medium text-foreground">{inbound.budget_details || "\u2014"}</p>
+              </div>
+              {inbound.floor_number && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Floor Number</p>
+                  <p className="text-[14px] font-medium text-foreground">{inbound.floor_number}</p>
+                </div>
+              )}
               <div className="col-span-2 lg:col-span-3">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Full Address / Location</p>
