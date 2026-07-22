@@ -1,9 +1,9 @@
-FROM oven/bun:1.3-alpine as base
+FROM oven/bun:1.3-slim AS base
 WORKDIR /app
 
 FROM base AS builder
 COPY package.json bun.lock ./
-RUN bun install
+RUN bun install --no-cache
 COPY . .
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
