@@ -43,6 +43,9 @@ export class LeadFollowUp {
   @Column({ type: 'varchar', nullable: true })
   rnr: string | null;
 
+  @Column({ type: 'varchar', nullable: true })
+  outcome: string | null; // 'RNR' | 'Contacted' | 'Callback' | 'Not Interested' | etc.
+
   @Column({ type: 'text', nullable: true })
   notes: string | null;
 

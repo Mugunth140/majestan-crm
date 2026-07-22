@@ -18,6 +18,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
+import { AssignLeadModal } from "@/components/shared/assign-lead-modal";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
@@ -72,6 +73,35 @@ export default function LeadsPage() {
 
   const [todayViewMode, setTodayViewMode] = useState<"pending" | "completed">("pending");
 
+  // Role-based state
+  const [role, setRole] = useState<string>("");
+  const [userDept, setUserDept] = useState<string>("");
+  const [userId, setUserId] = useState<number | null>(null);
+  const [deptFilter, setDeptFilter] = useState<"telecalling" | "sales">("telecalling");
+
+  // Assign lead modal state
+  const [assignLeadId, setAssignLeadId] = useState<number | null>(null);
+  const [isAssigning, setIsAssigning] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
+        const roleName = user?.role?.name || "";
+        const deptName = (user?.department?.name || "").toLowerCase();
+        setRole(roleName);
+        setUserDept(deptName);
+        setUserId(user?.id || null);
+        // Staff see only their dept
+        if (roleName === "Staff") {
+          setDeptFilter(deptName === "sales" ? "sales" : "telecalling");
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
+
   const tabs = ["All Leads", "Open Pipeline", "Action Required", "Unqualified"];
   const actionFilters = ["Overdue", "Yesterday", "Today", "Tomorrow", "All Scheduled"];
 
@@ -94,6 +124,23 @@ export default function LeadsPage() {
 
   const displayedLeads = useMemo(() => {
     let filtered = leads;
+
+    // Role-based filtering
+    if (role === "Staff") {
+      // Staff only see their own assigned leads (no unassigned)
+      filtered = filtered.filter((l) => {
+        const staffId = l.assigned_staff?.id ?? l.assignedStaffId;
+        return staffId && staffId === userId;
+      });
+    }
+
+    // Department filter for TeamLead / Manager / Admin
+    if (role !== "Staff") {
+      filtered = filtered.filter((l) => {
+        const dept = (l.department?.name || l.departmentName || "").toLowerCase();
+        return !dept || dept === deptFilter;
+      });
+    }
 
     // 1. Search Query
     if (debouncedSearchQuery.trim()) {
@@ -186,7 +233,7 @@ export default function LeadsPage() {
 
     // Default: All Leads (excluding unqualified)
     return qualifiedLeads;
-  }, [leads, debouncedSearchQuery, filters, activeTab, actionFilter, todayViewMode, pendingImports]);
+  }, [leads, debouncedSearchQuery, filters, activeTab, actionFilter, todayViewMode, pendingImports, role, userId, deptFilter]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -202,6 +249,30 @@ export default function LeadsPage() {
       toast.error("Failed to delete lead");
     } finally {
       setDeleteId(null);
+    }
+  };
+
+  const handleAssignLead = async (toUserId: number) => {
+    if (!assignLeadId) return;
+    setIsAssigning(true);
+    try {
+      const res = await fetch(`${API_URL}/lead-routing/assign/${assignLeadId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to_user_id: toUserId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Lead assigned successfully");
+        fetchLeads();
+      } else {
+        toast.error(data.message || "Failed to assign lead");
+      }
+    } catch {
+      toast.error("Failed to assign lead");
+    } finally {
+      setIsAssigning(false);
+      setAssignLeadId(null);
     }
   };
 
@@ -262,7 +333,40 @@ export default function LeadsPage() {
         <span className="capitalize">{row.original.propertyType?.replace(/_/g, ' ')}</span>
       ),
     },
-    { accessorKey: "staff", header: "Staff" },
+    {
+      id: "assigned",
+      header: "Assigned",
+      cell: ({ row }) => {
+        const assignedStaff = row.original.assigned_staff || row.original.assignedStaff;
+        if (assignedStaff && assignedStaff.name) {
+          return (
+            <div className="flex items-center justify-center gap-1.5">
+              <div className="h-5 w-5 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center font-bold text-[10px] text-blue-900 dark:text-blue-300 shrink-0">
+                {assignedStaff.name.charAt(0).toUpperCase()}
+              </div>
+              <span className="text-sm font-medium">{assignedStaff.name}</span>
+            </div>
+          );
+        }
+        // Unassigned
+        if (role === "Staff") {
+          return <span className="text-muted-foreground text-xs">Unassigned</span>;
+        }
+        // TeamLead / Manager / Admin — show Assign Lead button
+        return (
+          <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs px-3 rounded-full border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+              onClick={() => setAssignLeadId(row.original.rawId)}
+            >
+              Assign Lead
+            </Button>
+          </div>
+        );
+      },
+    },
     { accessorKey: "source", header: "Lead Source" },
     {
       accessorKey: "status",
@@ -331,15 +435,17 @@ export default function LeadsPage() {
             >
               <Edit size={15} />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-              title="Delete"
-              onClick={() => setDeleteId(row.original.rawId)}
-            >
-              <Trash2 size={15} />
-            </Button>
+            {role === "Admin" && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                title="Delete"
+                onClick={() => setDeleteId(row.original.rawId)}
+              >
+                <Trash2 size={15} />
+              </Button>
+            )}
           </div>
         );
       }
@@ -440,7 +546,7 @@ export default function LeadsPage() {
       } else {
          toast.error(data.message || "Bulk insert failed");
       }
-    } catch(err) {
+    } catch {
       toast.error("An error occurred during bulk insert.");
     } finally {
       setIsInserting(false);
@@ -456,6 +562,16 @@ export default function LeadsPage() {
   const activeFiltersCount = Object.values(filters).filter(v => v !== "").length;
 
   const clearFilters = () => setFilters({ dateFrom: "", dateTo: "", category: "", type: "", staff: "", status: "", source: "" });
+
+  const deptPipelines: { label: string; value: "telecalling" | "sales" }[] = [
+    { label: "Telecalling Pipeline", value: "telecalling" },
+    { label: "Sales Pipeline", value: "sales" },
+  ];
+
+  // Staff only see their own dept tab
+  const visiblePipelines = role === "Staff"
+    ? deptPipelines.filter((d) => d.value === (userDept === "sales" ? "sales" : "telecalling"))
+    : deptPipelines;
 
   return (
     <div className="flex flex-col space-y-6">
@@ -506,6 +622,26 @@ export default function LeadsPage() {
           </Link>
         </div>
       </div>
+
+      {/* Department Pipeline Toggle */}
+      {visiblePipelines.length > 1 && (
+        <div className="flex items-center gap-2">
+          {visiblePipelines.map((d) => (
+            <button
+              key={d.value}
+              onClick={() => setDeptFilter(d.value)}
+              className={[
+                "h-10 px-5 rounded-full text-[13.5px] font-medium transition-all duration-200 border",
+                deptFilter === d.value
+                  ? "bg-[#0052FF] text-white border-[#0052FF] shadow-md"
+                  : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground",
+              ].join(" ")}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
         <div className="flex flex-col xl:flex-row xl:items-end justify-between px-6 border-b bg-muted/10 pt-4 gap-4">
@@ -668,7 +804,7 @@ export default function LeadsPage() {
                 <FileSpreadsheet className="h-8 w-8" />
               </div>
               <h3 className="text-xl font-bold text-foreground mb-2">No Imported Leads</h3>
-              <p className="text-muted-foreground max-w-sm mb-6">You haven't imported any leads yet. Use the bulk import feature to add an Excel file.</p>
+              <p className="text-muted-foreground max-w-sm mb-6">You haven&apos;t imported any leads yet. Use the bulk import feature to add an Excel file.</p>
               <Button onClick={() => setIsImportOpen(true)} className="bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md px-6">
                 <UploadCloud className="h-4 w-4 mr-2" /> Bulk Import
               </Button>
@@ -679,6 +815,7 @@ export default function LeadsPage() {
         </div>
       </div>
 
+      {/* Delete Confirmation Dialog */}
       <Dialog open={deleteId !== null} onOpenChange={(open) => !open && setDeleteId(null)}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -693,6 +830,16 @@ export default function LeadsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Assign Lead Modal */}
+      <AssignLeadModal
+        open={assignLeadId !== null}
+        onClose={() => setAssignLeadId(null)}
+        onConfirm={handleAssignLead}
+        leadId={assignLeadId ?? undefined}
+        department={deptFilter}
+        isLoading={isAssigning}
+      />
     </div>
   );
 }

@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import {
   ArrowLeft, Loader2, User, Phone, MapPin, Building2,
   Briefcase, Mail, MessageSquare, Plus, ArrowUpRight,
-  Clock, Send, RefreshCw, History,
+  Clock, Send, RefreshCw, History, TrendingUp,
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
@@ -203,6 +203,26 @@ export default function LeadViewPage() {
   const [autoMatchResults, setAutoMatchResults] = useState<any[]>([]);
   const [isMatching, setIsMatching] = useState(false);
 
+  // Convert Lead state
+  const [role, setRole] = useState<string>("");
+  const [userDept, setUserDept] = useState<string>("");
+  const [isConvertOpen, setIsConvertOpen] = useState(false);
+  const [convertTo, setConvertTo] = useState<"inbound" | "agent" | "">("");
+  const [convertFeedback, setConvertFeedback] = useState("");
+  const [isConverting, setIsConverting] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
+        setRole(user?.role?.name || "");
+        setUserDept((user?.department?.name || "").toLowerCase());
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
+
   const fetchAutoMatch = async () => {
     setIsMatching(true);
     try {
@@ -218,6 +238,31 @@ export default function LeadViewPage() {
       toast.error("Failed to auto-match properties");
     } finally {
       setIsMatching(false);
+    }
+  };
+
+  const handleConvertLead = async () => {
+    if (!convertTo) return toast.error("Please select a conversion type.");
+    if (!convertFeedback.trim()) return toast.error("Please enter feedback.");
+    setIsConverting(true);
+    try {
+      const res = await fetch(`${API_URL}/lead-routing/convert/${id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ convert_to: convertTo, feedback: convertFeedback }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Lead converted successfully.");
+        setIsConvertOpen(false);
+        router.push("/leads");
+      } else {
+        toast.error(data.message || "Failed to convert lead");
+      }
+    } catch {
+      toast.error("Failed to convert lead");
+    } finally {
+      setIsConverting(false);
     }
   };
 
@@ -377,6 +422,15 @@ export default function LeadViewPage() {
           <Button variant="outline" size="icon" className="h-9 w-9 rounded-full" onClick={() => fetchLead(true)} title="Refresh">
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
           </Button>
+          {role === "Staff" && userDept === "telecalling" && !lead.is_converted && (
+            <Button
+              onClick={() => { setConvertTo(""); setConvertFeedback(""); setIsConvertOpen(true); }}
+              className="rounded-full px-6 py-5 bg-emerald-600 text-white hover:bg-emerald-700 shadow-md gap-2"
+            >
+              <TrendingUp className="h-4 w-4" />
+              Convert Lead
+            </Button>
+          )}
           <Button onClick={() => router.push(`/leads/new?edit=${lead.id}`)} className="rounded-full px-8 py-5 bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md">
             Edit Lead
           </Button>
@@ -785,6 +839,64 @@ export default function LeadViewPage() {
         onClose={() => setContactModal({ open: false, type: "", to: "" })}
         onSent={() => fetchLead(true)}
       />
+
+      {/* ── Convert Lead Dialog ── */}
+      <Dialog open={isConvertOpen} onOpenChange={(o) => !o && setIsConvertOpen(false)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Convert Lead</DialogTitle>
+            <DialogDescription>
+              Select the conversion type and provide feedback to convert this lead.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Conversion Type</label>
+              <div className="flex gap-3">
+                {([
+                  { label: "Inbound", value: "inbound" as const },
+                  { label: "Agent Network", value: "agent" as const },
+                ]).map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setConvertTo(opt.value)}
+                    className={[
+                      "flex-1 h-11 rounded-xl border text-sm font-semibold transition-all",
+                      convertTo === opt.value
+                        ? "bg-emerald-600 text-white border-emerald-600"
+                        : "border-border hover:border-emerald-300 text-foreground",
+                    ].join(" ")}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Feedback *</label>
+              <Textarea
+                value={convertFeedback}
+                onChange={(e) => setConvertFeedback(e.target.value)}
+                placeholder="Enter conversion feedback..."
+                className="h-28 rounded-xl bg-muted/30 resize-none"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsConvertOpen(false)} disabled={isConverting}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConvertLead}
+              disabled={isConverting || !convertTo || !convertFeedback.trim()}
+              className="bg-emerald-600 text-white hover:bg-emerald-700"
+            >
+              {isConverting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Confirm Conversion
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

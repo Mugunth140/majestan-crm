@@ -70,6 +70,22 @@ export class Lead {
   @Column({ type: 'varchar', nullable: true })
   referred_by_contact: string;
 
+  @Column({ type: 'varchar', default: 'telecalling' })
+  @Index()
+  department: string; // 'telecalling' | 'sales'
+
+  @Column({ type: 'int', default: 0 })
+  rnr_consecutive_count: number;
+
+  @Column({ type: 'varchar', nullable: true })
+  converted_to: string | null; // 'inbound' | 'agent' | null
+
+  @Column({ type: 'datetime', nullable: true })
+  converted_at: Date | null;
+
+  @Column({ type: 'int', nullable: true })
+  converted_from_lead_id: number | null; // used on inbound/agent side
+
   @CreateDateColumn()
   @Index()
   created_at: Date;

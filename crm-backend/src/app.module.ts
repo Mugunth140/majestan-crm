@@ -18,6 +18,8 @@ import { AgentsModule } from './modules/agents/agents.module';
 import { InboundsModule } from './modules/inbounds/inbounds.module';
 import { HrModule } from './modules/hr/hr.module';
 import { AssetsModule } from './modules/assets/assets.module';
+import { LeadRoutingModule } from './modules/lead-routing/lead-routing.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 import { ActivityLog } from './database/entities/activity-log.entity';
 import { Department } from './database/entities/department.entity';
@@ -44,6 +46,8 @@ import { AssetLocation } from './database/entities/asset-location.entity';
 import { AssetFinancials } from './database/entities/asset-financials.entity';
 import { AssetFeature } from './database/entities/asset-feature.entity';
 import { AssetDocument } from './database/entities/asset-document.entity';
+import { RoutingHistory } from './database/entities/routing-history.entity';
+import { Notification } from './database/entities/notification.entity';
 
 @Module({
   imports: [
@@ -63,7 +67,7 @@ import { AssetDocument } from './database/entities/asset-document.entity';
         username: configService.get<string>('DB_USERNAME', 'root'),
         password: configService.get<string>('DB_PASSWORD', '8220'),
         database: configService.get<string>('CRM_DB_NAME', 'majestan_crm'),
-        entities: [User, Role, Permission, RolePermission, Department, ActivityLog, LeadSource, Lead, LeadInquiry, LeadFollowUp, LeadDocument, ContactLog, Agent, AgentFollowUp, AgentContactLog, Inbound, InboundFollowUp, InboundContactLog, HrCandidate, HrFollowUp, Asset, AssetLocation, AssetFinancials, AssetFeature, AssetDocument],
+        entities: [User, Role, Permission, RolePermission, Department, ActivityLog, LeadSource, Lead, LeadInquiry, LeadFollowUp, LeadDocument, ContactLog, Agent, AgentFollowUp, AgentContactLog, Inbound, InboundFollowUp, InboundContactLog, HrCandidate, HrFollowUp, Asset, AssetLocation, AssetFinancials, AssetFeature, AssetDocument, RoutingHistory, Notification],
         synchronize: false, // Migrations are used instead
       }),
     }),
@@ -99,6 +103,8 @@ import { AssetDocument } from './database/entities/asset-document.entity';
     InboundsModule,
     HrModule,
     AssetsModule,
+    LeadRoutingModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
