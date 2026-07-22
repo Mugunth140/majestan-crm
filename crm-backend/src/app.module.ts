@@ -17,6 +17,7 @@ import { LeadsModule } from './modules/leads/leads.module';
 import { AgentsModule } from './modules/agents/agents.module';
 import { InboundsModule } from './modules/inbounds/inbounds.module';
 import { HrModule } from './modules/hr/hr.module';
+import { AssetsModule } from './modules/assets/assets.module';
 
 import { ActivityLog } from './database/entities/activity-log.entity';
 import { Department } from './database/entities/department.entity';
@@ -38,6 +39,11 @@ import { InboundFollowUp } from './database/entities/inbound-follow-up.entity';
 import { InboundContactLog } from './database/entities/inbound-contact-log.entity';
 import { HrCandidate } from './database/entities/hr-candidate.entity';
 import { HrFollowUp } from './database/entities/hr-follow-up.entity';
+import { Asset } from './database/entities/asset.entity';
+import { AssetLocation } from './database/entities/asset-location.entity';
+import { AssetFinancials } from './database/entities/asset-financials.entity';
+import { AssetFeature } from './database/entities/asset-feature.entity';
+import { AssetDocument } from './database/entities/asset-document.entity';
 
 @Module({
   imports: [
@@ -57,7 +63,7 @@ import { HrFollowUp } from './database/entities/hr-follow-up.entity';
         username: configService.get<string>('DB_USERNAME', 'root'),
         password: configService.get<string>('DB_PASSWORD', '8220'),
         database: configService.get<string>('CRM_DB_NAME', 'majestan_crm'),
-        entities: [User, Role, Permission, RolePermission, Department, ActivityLog, LeadSource, Lead, LeadInquiry, LeadFollowUp, LeadDocument, ContactLog, Agent, AgentFollowUp, AgentContactLog, Inbound, InboundFollowUp, InboundContactLog, HrCandidate, HrFollowUp],
+        entities: [User, Role, Permission, RolePermission, Department, ActivityLog, LeadSource, Lead, LeadInquiry, LeadFollowUp, LeadDocument, ContactLog, Agent, AgentFollowUp, AgentContactLog, Inbound, InboundFollowUp, InboundContactLog, HrCandidate, HrFollowUp, Asset, AssetLocation, AssetFinancials, AssetFeature, AssetDocument],
         synchronize: false, // Migrations are used instead
       }),
     }),
@@ -92,6 +98,7 @@ import { HrFollowUp } from './database/entities/hr-follow-up.entity';
     AgentsModule,
     InboundsModule,
     HrModule,
+    AssetsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
