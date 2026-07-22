@@ -98,6 +98,14 @@ function UserFormContent() {
       return;
     }
 
+    const roleIdNum = parseInt(formData.role_id);
+    const requiresDept = roleIdNum === 3 || roleIdNum === 4; // Team Lead or Staff
+    
+    if (requiresDept && !formData.department_id) {
+      toast.error("Department is mandatory for Team Lead and Staff roles");
+      return;
+    }
+
     if (!editId && !formData.password) {
       toast.error("Password is required for new users");
       return;
@@ -110,8 +118,8 @@ function UserFormContent() {
       
       const payload: Record<string, any> = {
         ...formData,
-        role_id: parseInt(formData.role_id),
-        department_id: formData.department_id ? parseInt(formData.department_id) : null,
+        role_id: roleIdNum,
+        department_id: requiresDept && formData.department_id ? parseInt(formData.department_id) : null,
         dob: formData.dob || null,
         join_date: formData.join_date || null,
         phone: formData.phone || null,
@@ -210,19 +218,31 @@ function UserFormContent() {
                 name="role" 
                 options={roles.map(r => ({ label: r.name, value: r.id.toString() }))}
                 value={formData.role_id}
-                onValueChange={v => setFormData({...formData, role_id: v || ""})}
+                onValueChange={v => {
+                  const newRole = v || "";
+                  const roleNum = parseInt(newRole);
+                  const isCrossDept = roleNum === 1 || roleNum === 2; // Admin or Manager
+                  setFormData({
+                    ...formData, 
+                    role_id: newRole,
+                    department_id: isCrossDept ? "" : formData.department_id 
+                  });
+                }}
                 placeholder="Select Role"
               />
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Department</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                Department {(formData.role_id === "3" || formData.role_id === "4") && "*"}
+              </label>
               <FormSelect 
                 name="department" 
                 options={departments.map(d => ({ label: d.name, value: d.id.toString() }))}
                 value={formData.department_id}
                 onValueChange={v => setFormData({...formData, department_id: v || ""})}
-                placeholder="Select Department"
+                placeholder={(formData.role_id === "1" || formData.role_id === "2") ? "Not Applicable" : "Select Department"}
+                disabled={formData.role_id === "1" || formData.role_id === "2"}
               />
             </div>
             

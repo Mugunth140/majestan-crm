@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../../database/entities/user.entity';
@@ -10,6 +10,18 @@ export class UsersService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
   ) {}
+
+  private validateRoleDepartment(roleId: number, departmentId: number | null): number | null {
+    // 1 = Admin, 2 = Manager, 3 = Team Lead, 4 = Staff
+    if (roleId === 1 || roleId === 2) {
+      // Admin and Manager should not be tied to a specific department
+      return null;
+    }
+    if ((roleId === 3 || roleId === 4) && !departmentId) {
+      throw new BadRequestException('Department is mandatory for Staff and Team Lead roles');
+    }
+    return departmentId;
+  }
 
   async findAll() {
     return this.userRepository.find({
@@ -31,13 +43,15 @@ export class UsersService {
     const existing = await this.userRepository.findOne({ where: { email: body.email } });
     if (existing) throw new ConflictException('Email already exists');
 
+    const validDepartmentId = this.validateRoleDepartment(body.role_id, body.department_id || null);
+
     const hashedPassword = await bcrypt.hash(body.password, 10);
     const user = this.userRepository.create({
       name: body.name,
       email: body.email,
       password_hash: hashedPassword,
       role_id: body.role_id,
-      department_id: body.department_id || null,
+      department_id: validDepartmentId as any,
       address: body.address || null,
       phone: body.phone || null,
       whatsapp_no: body.whatsapp_no || null,
@@ -63,10 +77,24 @@ export class UsersService {
       user.password_hash = await bcrypt.hash(body.password, 10);
     }
 
+    const newRoleId = body.role_id ?? user.role_id;
+    const newDeptId = body.department_id !== undefined ? (body.department_id || null) : user.department_id;
+    
+    const validDepartmentId = this.validateRoleDepartment(newRoleId, newDeptId);
+
     user.name = body.name ?? user.name;
     user.email = body.email ?? user.email;
-    user.role_id = body.role_id ?? user.role_id;
-    user.department_id = body.department_id !== undefined ? (body.department_id || null) : user.department_id;
+    
+    // TypeORM relation fix: When updating a loaded entity with relations, 
+    // update the relation object directly so it doesn't overwrite the scalar ID during save.
+    if (body.role_id !== undefined) {
+      user.role_id = body.role_id;
+      user.role = { id: body.role_id } as any;
+    }
+    
+    user.department_id = validDepartmentId as any;
+    user.department = validDepartmentId ? { id: validDepartmentId } as any : null;
+    
     user.address = body.address !== undefined ? (body.address || null) : user.address;
     user.phone = body.phone !== undefined ? (body.phone || null) : user.phone;
     user.whatsapp_no = body.whatsapp_no !== undefined ? (body.whatsapp_no || null) : user.whatsapp_no;
