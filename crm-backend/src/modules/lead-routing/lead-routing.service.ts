@@ -118,7 +118,7 @@ export class LeadRoutingService {
   }
 
   // ── Assign ─────────────────────────────────────────────────────────────────
-  async assignLead(leadId: number, toUserId: number, actionedById: number, feedback?: string) {
+  async assignLead(leadId: number, toUserId: number, actionedById: number | null, feedback?: string) {
     const leadRepo = this.dataSource.getRepository(Lead);
     const lead = await leadRepo.findOne({ where: { id: leadId } });
     if (!lead) throw new NotFoundException('Lead not found');

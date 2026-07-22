@@ -178,7 +178,15 @@ export default function LeadRoutingPage() {
   const handleClaim = async (leadId: number) => {
     setClaimingId(leadId);
     try {
-      const res = await fetch(`${API_URL}/lead-routing/claim/${leadId}`, { method: "POST" });
+      let currentUserId = 0;
+      const stored = localStorage.getItem("crm_user");
+      if (stored) currentUserId = JSON.parse(stored).id;
+
+      const res = await fetch(`${API_URL}/lead-routing/claim/${leadId}`, { 
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actioned_by_id: currentUserId || null })
+      });
       const data = await res.json();
       if (data.success) {
         toast.success("Lead claimed successfully");
@@ -197,10 +205,16 @@ export default function LeadRoutingPage() {
     if (!assignLeadId) return;
     setIsAssigning(true);
     try {
+      let currentUserId = 0;
+      try {
+        const stored = localStorage.getItem("crm_user");
+        if (stored) currentUserId = JSON.parse(stored).id;
+      } catch {}
+
       const res = await fetch(`${API_URL}/lead-routing/assign/${assignLeadId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to_user_id: toUserId }),
+        body: JSON.stringify({ to_user_id: toUserId, actioned_by_id: currentUserId || null }),
       });
       const data = await res.json();
       if (data.success) {

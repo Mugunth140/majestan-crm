@@ -256,10 +256,16 @@ export default function LeadsPage() {
     if (!assignLeadId) return;
     setIsAssigning(true);
     try {
+      let currentUserId = 0;
+      try {
+        const stored = localStorage.getItem("crm_user");
+        if (stored) currentUserId = JSON.parse(stored).id;
+      } catch {}
+
       const res = await fetch(`${API_URL}/lead-routing/assign/${assignLeadId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to_user_id: toUserId }),
+        body: JSON.stringify({ to_user_id: toUserId, actioned_by_id: currentUserId || null }),
       });
       const data = await res.json();
       if (data.success) {
@@ -337,14 +343,14 @@ export default function LeadsPage() {
       id: "assigned",
       header: "Assigned",
       cell: ({ row }) => {
-        const assignedStaff = row.original.assigned_staff || row.original.assignedStaff;
-        if (assignedStaff && assignedStaff.name) {
+        const assignedStaff = row.original.staff;
+        if (assignedStaff && assignedStaff !== "Unassigned") {
           return (
             <div className="flex items-center justify-center gap-1.5">
               <div className="h-5 w-5 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center font-bold text-[10px] text-blue-900 dark:text-blue-300 shrink-0">
-                {assignedStaff.name.charAt(0).toUpperCase()}
+                {assignedStaff.charAt(0).toUpperCase()}
               </div>
-              <span className="text-sm font-medium">{assignedStaff.name}</span>
+              <span className="text-sm font-medium">{assignedStaff}</span>
             </div>
           );
         }

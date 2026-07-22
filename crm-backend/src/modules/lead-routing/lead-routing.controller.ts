@@ -55,10 +55,13 @@ export class LeadRoutingController {
 
   // ── POST /claim/:leadId ────────────────────────────────────────────────────
   @Post('claim/:leadId')
-  async claimLead(@Param('leadId') leadId: string, @Req() req: any) {
+  async claimLead(@Param('leadId') leadId: string, @Body() body: any, @Req() req: any) {
     // TODO: add auth guard
     const user = req.user;
-    const requestingUserId: number = user?.sub ?? user?.id ?? 0;
+    const requestingUserId: number = body?.actioned_by_id || user?.sub || user?.id || 0;
+    if (!requestingUserId) {
+      throw new Error('User ID is required to claim a lead');
+    }
     const data = await this.leadRoutingService.claimLead(Number(leadId), requestingUserId);
     return { success: true, data };
   }
@@ -67,12 +70,12 @@ export class LeadRoutingController {
   @Post('assign/:leadId')
   async assignLead(
     @Param('leadId') leadId: string,
-    @Body() body: AssignLeadDto,
+    @Body() body: AssignLeadDto & { actioned_by_id?: number },
     @Req() req: any,
   ) {
     // TODO: add auth guard
     const user = req.user;
-    const actionedById: number = user?.sub ?? user?.id ?? 0;
+    const actionedById: number | null = body.actioned_by_id || user?.sub || user?.id || null;
     const data = await this.leadRoutingService.assignLead(
       Number(leadId),
       body.to_user_id,
