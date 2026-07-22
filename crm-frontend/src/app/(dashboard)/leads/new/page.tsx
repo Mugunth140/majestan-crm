@@ -626,10 +626,10 @@ function LeadForm() {
                   setIsAssignModalOpen(false);
                   if (pendingFormData) executeSubmission(pendingFormData, currentUser?.id);
                 }} 
-                className="h-14 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 justify-start px-5 font-semibold text-[15px]"
+                className="h-14 bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 justify-start px-5 font-semibold text-[15px]"
                 variant="outline"
               >
-                <User className="mr-3 h-5 w-5 text-blue-600" />
+                <User className="mr-3 h-5 w-5 text-primary" />
                 Assign to Myself
               </Button>
               <Button 
@@ -637,11 +637,11 @@ function LeadForm() {
                   setIsAssignModalOpen(false);
                   if (pendingFormData) executeSubmission(pendingFormData, null);
                 }} 
-                className="h-14 bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200 justify-start px-5 font-semibold text-[15px]"
+                className="h-14 justify-start px-5 font-semibold text-[15px]"
                 variant="outline"
               >
-                <div className="mr-3 h-5 w-5 flex items-center justify-center rounded bg-slate-200/50">
-                  <span className="text-[10px] uppercase font-bold text-slate-700">RQ</span>
+                <div className="mr-3 h-5 w-5 flex items-center justify-center rounded bg-muted">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">RQ</span>
                 </div>
                 Add to Routing Queue (Unassigned)
               </Button>
@@ -671,7 +671,7 @@ function LeadForm() {
                   setIsAssignModalOpen(false);
                   if (pendingFormData) executeSubmission(pendingFormData, null);
                 }} 
-                className="w-full h-12 bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200 font-semibold text-[14px]"
+                className="w-full h-12 font-semibold text-[14px]"
                 variant="outline"
               >
                 Add to Routing Queue (Unassigned)
