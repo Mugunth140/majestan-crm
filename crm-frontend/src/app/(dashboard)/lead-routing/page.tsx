@@ -125,8 +125,8 @@ export default function LeadRoutingPage() {
       const res = await fetch(`${API_URL}/lead-routing/queue?${params}`);
       const data = await res.json();
       if (data.success) {
-        setQueue(data.data || []);
-        setQueueTotal(data.total || data.data?.length || 0);
+        setQueue(data.data?.items || data.data || []);
+        setQueueTotal(data.data?.total || data.total || 0);
       } else {
         toast.error("Failed to load routing queue");
       }
@@ -150,8 +150,8 @@ export default function LeadRoutingPage() {
       const res = await fetch(`${API_URL}/lead-routing/history?${params}`);
       const data = await res.json();
       if (data.success) {
-        setHistory(data.data || []);
-        setHistoryTotal(data.total || data.data?.length || 0);
+        setHistory(data.data?.items || data.data || []);
+        setHistoryTotal(data.data?.total || data.total || 0);
       } else {
         toast.error("Failed to load routing history");
       }
