@@ -428,37 +428,35 @@ export default function LeadRoutingPage() {
 
       {/* Main Tabs */}
       <div className="bg-card border rounded-2xl shadow-sm overflow-hidden">
-        <div className="flex items-center gap-8 px-6 border-b bg-muted/10 pt-4">
-          {(["queue", "history"] as MainTab[]).map((tab) => {
-            const labels = { queue: "Routing Queue", history: "Routing History" };
-            return (
-              <button
-                key={tab}
-                onClick={() => setMainTab(tab)}
-                className={[
-                  "relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out",
-                  mainTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground",
-                ].join(" ")}
-              >
-                {labels[tab]}
-                {mainTab === tab && (
-                  <motion.div
-                    layoutId="routingTabUnderline"
-                    className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full"
-                    initial={false}
-                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                  />
-                )}
-              </button>
-            );
-          })}
-        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-6 border-b bg-muted/10 pt-4 gap-4">
+          <div className="flex items-center gap-8">
+            {(["queue", "history"] as MainTab[]).map((tab) => {
+              const labels = { queue: "Routing Queue", history: "Routing History" };
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setMainTab(tab)}
+                  className={[
+                    "relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out",
+                    mainTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground",
+                  ].join(" ")}
+                >
+                  {labels[tab]}
+                  {mainTab === tab && (
+                    <motion.div
+                      layoutId="routingTabUnderline"
+                      className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full"
+                      initial={false}
+                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
 
-        {/* Queue Tab */}
-        {mainTab === "queue" && (
-          <div className="p-6 space-y-4">
-            {/* Department sub-tabs */}
-            <div className="flex items-center gap-2">
+          {mainTab === "queue" && visibleDeptTabs.length > 1 && (
+            <div className="flex items-center gap-2 pb-3 sm:pb-4">
               {visibleDeptTabs.map((d) => (
                 <button
                   key={d.value}
@@ -466,15 +464,20 @@ export default function LeadRoutingPage() {
                   className={[
                     "h-9 px-4 rounded-full text-[13px] font-medium border transition-all duration-200",
                     deptTab === d.value
-                      ? "bg-[#0052FF] text-white border-[#0052FF]"
-                      : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground",
+                      ? "bg-[#0052FF] text-white border-[#0052FF] shadow-sm"
+                      : "bg-background text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground",
                   ].join(" ")}
                 >
                   {d.label}
                 </button>
               ))}
             </div>
+          )}
+        </div>
 
+        {/* Queue Tab */}
+        {mainTab === "queue" && (
+          <div className="p-6 space-y-4">
             {queueLoading ? (
               <TableSkeleton />
             ) : (

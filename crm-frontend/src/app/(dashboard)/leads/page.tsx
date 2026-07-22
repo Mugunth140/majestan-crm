@@ -629,51 +629,67 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      {/* Department Pipeline Toggle */}
-      {visiblePipelines.length > 1 && (
-        <div className="flex items-center gap-2">
-          {visiblePipelines.map((d) => (
-            <button
-              key={d.value}
-              onClick={() => setDeptFilter(d.value)}
-              className={[
-                "h-10 px-5 rounded-full text-[13.5px] font-medium transition-all duration-200 border",
-                deptFilter === d.value
-                  ? "bg-[#0052FF] text-white border-[#0052FF] shadow-md"
-                  : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground",
-              ].join(" ")}
-            >
-              {d.label}
-            </button>
-          ))}
-        </div>
-      )}
-
       <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
-        <div className="flex flex-col xl:flex-row xl:items-end justify-between px-6 border-b bg-muted/10 pt-4 gap-4">
-          <div className="flex items-center gap-3 pb-3 xl:pb-4 w-full xl:w-auto">
-            {/* Search Input */}
-            <div className="relative flex-1 xl:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Search ID, Name, Phone, Email..." 
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="pl-9 h-10 bg-background rounded-full border-border/60 shadow-sm text-[13.5px]"
-              />
+        
+        {/* Tabs & Pipeline Toggles Row */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-6 border-b bg-muted/10 pt-4 gap-4">
+          <div className="flex items-center gap-8 overflow-x-auto scrollbar-hide relative">
+            {tabs.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={"relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " + (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")}
+              >
+                {tab}
+                {activeTab === tab && (
+                  <motion.div layoutId="activeTabUnderline" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full" initial={false} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {visiblePipelines.length > 1 && (
+            <div className="flex items-center gap-2 pb-3 sm:pb-4 shrink-0">
+              {visiblePipelines.map((d) => (
+                <button
+                  key={d.value}
+                  onClick={() => setDeptFilter(d.value)}
+                  className={[
+                    "h-9 px-4 rounded-full text-[13px] font-medium transition-all duration-200 border",
+                    deptFilter === d.value
+                      ? "bg-[#0052FF] text-white border-[#0052FF] shadow-sm"
+                      : "bg-background text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground",
+                  ].join(" ")}
+                >
+                  {d.label}
+                </button>
+              ))}
             </div>
-            
-            {/* Filters Popover */}
-            <Popover>
-              <PopoverTrigger render={
-                <Button variant="outline" className="h-10 rounded-full bg-background border-border/60 shadow-sm px-4 flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium text-[13.5px]">Filters</span>
-                  {activeFiltersCount > 0 && (
-                    <Badge className="ml-1 bg-[#0052FF] text-white px-1.5 py-0.5 rounded-md text-[10px]">{activeFiltersCount}</Badge>
-                  )}
-                </Button>
-              } />
+          )}
+        </div>
+
+        {/* Search & Filters Row */}
+        <div className="flex flex-wrap items-center gap-3 px-6 py-4 border-b bg-background">
+          <div className="relative flex-1 min-w-[240px] max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search ID, Name, Phone, Email..." 
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-9 h-10 bg-muted/30 rounded-xl border-border/60 text-[13.5px]"
+            />
+          </div>
+          
+          <Popover>
+            <PopoverTrigger render={
+              <Button variant="outline" className="h-10 rounded-xl bg-muted/30 border-border/60 px-4 flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium text-[13.5px]">Filters</span>
+                {activeFiltersCount > 0 && (
+                  <Badge className="ml-1 bg-[#0052FF] text-white px-1.5 py-0.5 rounded-md text-[10px]">{activeFiltersCount}</Badge>
+                )}
+              </Button>
+            } />
               <PopoverContent align="start" className="w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60">
                 <div className="flex items-center justify-between p-4 border-b bg-muted/10">
                   <h4 className="font-semibold text-foreground text-sm">Filter Leads</h4>
@@ -721,22 +737,6 @@ export default function LeadsPage() {
                 <X className="h-4 w-4" />
               </Button>
             )}
-          </div>
-
-          <div className="flex items-center gap-8 overflow-x-auto scrollbar-hide relative xl:pr-6">
-            {tabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={"relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " + (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")}
-            >
-              {tab}
-              {activeTab === tab && (
-                <motion.div layoutId="activeTabUnderline" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full" initial={false} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
-              )}
-            </button>
-          ))}
-          </div>
         </div>
 
         {activeTab === "Action Required" && (
