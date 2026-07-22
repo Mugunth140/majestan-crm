@@ -349,10 +349,16 @@ export default function LeadsPage() {
           );
         }
         // Unassigned
-        if (role === "Staff") {
-          return <span className="text-muted-foreground text-xs">Unassigned</span>;
+        if (role === "Admin" || role === "Staff") {
+          return (
+            <div className="flex items-center justify-center">
+              <Badge variant="outline" className="bg-muted/40 text-muted-foreground border-border/60">
+                Unassigned
+              </Badge>
+            </div>
+          );
         }
-        // TeamLead / Manager / Admin — show Assign Lead button
+        // TeamLead / Manager — show Assign Lead button
         return (
           <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
             <Button

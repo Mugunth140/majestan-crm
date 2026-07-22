@@ -381,13 +381,15 @@ export class LeadRoutingService {
 
   // ── Staff List ─────────────────────────────────────────────────────────────
   async getStaffList(department: string) {
-    // Find users in the given department (matched by department name)
+    // Find users in the given department (matched loosely, e.g., 'telecalling' matches 'Telecalling Department')
+    const searchTerm = department.toLowerCase().replace(' department', '').trim();
+    
     const users = await this.dataSource
       .getRepository(User)
       .createQueryBuilder('u')
       .leftJoinAndSelect('u.role', 'role')
       .leftJoinAndSelect('u.department', 'dept')
-      .where('dept.name = :department', { department })
+      .where('LOWER(dept.name) LIKE :searchTerm', { searchTerm: `%${searchTerm}%` })
       .andWhere('u.is_active = 1')
       .getMany();
 
