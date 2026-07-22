@@ -45,10 +45,11 @@ interface HistoryEntry {
 
 const EVENT_TYPE_OPTIONS = [
   { label: "All Events", value: "" },
-  { label: "Assigned", value: "assigned" },
-  { label: "Claimed", value: "claimed" },
-  { label: "Released", value: "released" },
-  { label: "Converted", value: "converted" },
+  { label: "Assigned", value: "Assigned" },
+  { label: "Claimed", value: "Claimed" },
+  { label: "Auto-transferred", value: "Auto-transferred" },
+  { label: "Auto-unassigned", value: "Auto-unassigned" },
+  { label: "Converted", value: "Converted" },
 ];
 
 function formatDate(d?: string) {
