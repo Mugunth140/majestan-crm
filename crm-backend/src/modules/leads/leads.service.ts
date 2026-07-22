@@ -336,7 +336,11 @@ export class LeadsService {
         latest_actual_f.follow_up_date as lastFollowedUpDate
       FROM leads l
       LEFT JOIN users s ON l.assigned_staff_id = s.id
-      LEFT JOIN lead_inquiries i ON i.lead_id = l.id
+      LEFT JOIN (
+        SELECT lead_id, property_type, property_category,
+               ROW_NUMBER() OVER(PARTITION BY lead_id ORDER BY id DESC) as rn
+        FROM lead_inquiries
+      ) i ON i.lead_id = l.id AND i.rn = 1
       LEFT JOIN (
         SELECT lead_id, next_follow_up_date,
                ROW_NUMBER() OVER(PARTITION BY lead_id ORDER BY created_at DESC) as rn
@@ -348,6 +352,7 @@ export class LeadsService {
         FROM lead_follow_ups
         WHERE follow_up_date IS NOT NULL
       ) latest_actual_f ON latest_actual_f.lead_id = l.id AND latest_actual_f.rn = 1
+      WHERE l.assigned_staff_id IS NOT NULL
       ORDER BY l.created_at DESC
     `);
 

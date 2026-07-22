@@ -371,7 +371,6 @@ export default function LeadViewPage() {
   if (isLoading) return <PageSkeleton />;
   if (!lead) return null;
 
-  const inquiry = lead.inquiries?.[0];
   const statusName = lead.status || "New Lead";
   const badgeCls = STATUS_STYLES[statusName] ?? "bg-gray-100 text-gray-800 border-gray-200";
   const followUps: any[] = lead.follow_ups || [];
@@ -719,46 +718,63 @@ export default function LeadViewPage() {
               </div>
             </div>
 
-            {/* Requirement */}
-            <div className="bg-card border rounded-2xl p-6 shadow-sm">
-              <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-muted-foreground" /> Requirement
-              </h3>
-              <div className="space-y-3 text-sm">
-                {[
-                  { label: "Purchase Type", value: inquiry?.purchase_type?.replace(/_/g, " ") },
-                  { label: "Category", value: inquiry?.property_category?.replace(/_/g, " ") },
-                  { label: "Property Type", value: inquiry?.property_type?.replace(/_/g, " ") },
-                  { label: "Funding", value: inquiry?.funder?.replace(/_/g, " ") },
-                  { label: "Project", value: inquiry?.project_list?.replace(/_/g, " ") },
-                ].map(f => (
-                  <div key={f.label} className="flex justify-between items-center py-1.5 border-b border-border/30 last:border-0">
-                    <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{f.label}</span>
-                    <span className="font-medium capitalize text-[14px]">{f.value || "\u2014"}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            {/* Customer Preferences */}
-            <div className="bg-card border rounded-2xl p-6 shadow-sm">
-              <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center justify-between">
-                <span className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground" /> Preferences</span>
-                <Button size="sm" onClick={() => fetchAutoMatch()} disabled={isMatching} className="h-8 bg-[#0052FF] hover:bg-[#0040CC] text-white rounded-lg px-4 shadow-sm">
-                  {isMatching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Auto Match"}
-                </Button>
-              </h3>
-              
-              {(!inquiry?.preferences || Object.keys(inquiry.preferences).length === 0) ? (
-                <p className="text-sm text-muted-foreground italic text-center py-4">No preferences defined yet.</p>
-              ) : (
-                <div className="space-y-3 text-sm">
-                  {Object.entries(inquiry.preferences).map(([key, val]) => (
-                    <div key={key} className="flex justify-between items-center py-1.5 border-b border-border/30 last:border-0">
-                      <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                      <span className="font-medium text-[14px]">{String(val)}</span>
-                    </div>
-                  ))}
+            {/* Requirements & Preferences */}
+            <div className="space-y-6">
+              {(!lead.inquiries || lead.inquiries.length === 0) ? (
+                <div className="bg-card border rounded-2xl p-6 shadow-sm">
+                  <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-muted-foreground" /> Requirement
+                  </h3>
+                  <p className="text-sm text-muted-foreground italic text-center py-4">No requirements defined yet.</p>
                 </div>
+              ) : (
+                lead.inquiries.map((inq: any, idx: number) => (
+                  <div key={inq.id || idx} className="space-y-6">
+                    <div className="bg-card border rounded-2xl p-6 shadow-sm">
+                      <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-muted-foreground" /> Requirement {lead.inquiries.length > 1 ? `#${idx + 1}` : ""}
+                      </h3>
+                      <div className="space-y-3 text-sm">
+                        {[
+                          { label: "Purchase Type", value: inq?.purchase_type?.replace(/_/g, " ") },
+                          { label: "Category", value: inq?.property_category?.replace(/_/g, " ") },
+                          { label: "Property Type", value: inq?.property_type?.replace(/_/g, " ") },
+                          { label: "Funding", value: inq?.funder?.replace(/_/g, " ") },
+                          { label: "Project", value: inq?.project_list?.replace(/_/g, " ") },
+                        ].map(f => (
+                          <div key={f.label} className="flex justify-between items-center py-1.5 border-b border-border/30 last:border-0">
+                            <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{f.label}</span>
+                            <span className="font-medium capitalize text-[14px]">{f.value || "\u2014"}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="bg-card border rounded-2xl p-6 shadow-sm">
+                      <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center justify-between">
+                        <span className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground" /> Preferences {lead.inquiries.length > 1 ? `#${idx + 1}` : ""}</span>
+                        {idx === 0 && (
+                          <Button size="sm" onClick={() => fetchAutoMatch()} disabled={isMatching} className="h-8 bg-[#0052FF] hover:bg-[#0040CC] text-white rounded-lg px-4 shadow-sm">
+                            {isMatching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Auto Match"}
+                          </Button>
+                        )}
+                      </h3>
+                      
+                      {(!inq?.preferences || Object.keys(inq.preferences).length === 0) ? (
+                        <p className="text-sm text-muted-foreground italic text-center py-4">No preferences defined yet.</p>
+                      ) : (
+                        <div className="space-y-3 text-sm">
+                          {Object.entries(inq.preferences).map(([key, val]) => (
+                            <div key={key} className="flex justify-between items-center py-1.5 border-b border-border/30 last:border-0">
+                              <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
+                              <span className="font-medium text-[14px]">{String(val)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           </div>

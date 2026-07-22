@@ -381,17 +381,19 @@ export class LeadRoutingService {
 
   // ── Staff List ─────────────────────────────────────────────────────────────
   async getStaffList(department: string) {
-    // Find users in the given department (matched loosely, e.g., 'telecalling' matches 'Telecalling Department')
-    const searchTerm = department.toLowerCase().replace(' department', '').trim();
-    
-    const users = await this.dataSource
+    const qb = this.dataSource
       .getRepository(User)
       .createQueryBuilder('u')
       .leftJoinAndSelect('u.role', 'role')
       .leftJoinAndSelect('u.department', 'dept')
-      .where('LOWER(dept.name) LIKE :searchTerm', { searchTerm: `%${searchTerm}%` })
-      .andWhere('u.is_active = 1')
-      .getMany();
+      .where('u.is_active = 1');
+
+    if (department && department.toLowerCase() !== 'all') {
+      const searchTerm = department.toLowerCase().replace(' department', '').trim();
+      qb.andWhere('LOWER(dept.name) LIKE :searchTerm', { searchTerm: `%${searchTerm}%` });
+    }
+
+    const users = await qb.getMany();
 
     // For each user, count their current assigned leads
     const enriched = await Promise.all(

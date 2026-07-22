@@ -48,7 +48,7 @@ export class LeadRoutingController {
 
   // ── GET /staff-list ────────────────────────────────────────────────────────
   @Get('staff-list')
-  async getStaffList(@Query('department') department: string = 'telecalling') {
+  async getStaffList(@Query('department') department: string = 'all') {
     const data = await this.leadRoutingService.getStaffList(department);
     return { success: true, data };
   }

@@ -6,7 +6,8 @@ import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, CheckCircle2, Loader2, Save } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, Save, User } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { FormSelect } from "@/components/shared/form-select";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
@@ -154,6 +155,25 @@ function LeadForm() {
   
   const [followUpDateObj, setFollowUpDateObj] = useState<Date | undefined>(undefined);
 
+  // User state for routing modal
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  
+  // Modal state
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [assigneeId, setAssigneeId] = useState<number | null>(null);
+  const [staffList, setStaffList] = useState<any[]>([]);
+  const [isFetchingStaff, setIsFetchingStaff] = useState(false);
+  const [pendingFormData, setPendingFormData] = useState<FormData | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("crm_user");
+        if (stored) setCurrentUser(JSON.parse(stored));
+      } catch {}
+    }
+  }, []);
+
   useEffect(() => {
     const fetchMasterData = async () => {
       try {
@@ -205,10 +225,41 @@ function LeadForm() {
 
   const handleAddSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    
+    // If we're creating a NEW lead, intercept submission to show Assignment Modal
+    if (!editId) {
+      setPendingFormData(new FormData(e.currentTarget));
+      setIsAssignModalOpen(true);
+      
+      // If user is Admin/TL, fetch staff list for the dropdown
+      if (currentUser?.role?.name !== "Staff") {
+        setIsFetchingStaff(true);
+        try {
+          // If Admin/Manager, pass 'all', else pass TL's department
+          const isCrossDept = currentUser?.role?.name === "Admin" || currentUser?.role?.name === "Manager";
+          const deptQuery = isCrossDept ? "all" : (currentUser?.department?.name || "");
+          const res = await fetch(`${API_URL}/lead-routing/staff-list?department=${encodeURIComponent(deptQuery.toLowerCase())}`);
+          const data = await res.json();
+          if (data.success) {
+            setStaffList(data.data);
+          }
+        } catch {
+          toast.error("Failed to load staff list");
+        } finally {
+          setIsFetchingStaff(false);
+        }
+      }
+      return;
+    }
+    
+    // If editing, proceed directly
+    await executeSubmission(new FormData(e.currentTarget), undefined);
+  };
+
+  const executeSubmission = async (formData: FormData, finalAssigneeId?: number | null) => {
     setIsSubmitting(true);
 
     try {
-      const formData = new FormData(e.currentTarget);
       let sourceValue = formData.get("source") as string;
 
       if (sourceValue === "others" && otherSourceText.trim()) {
@@ -221,11 +272,14 @@ function LeadForm() {
         if (result.success) sourceValue = result.data.value;
       }
 
-      let userId: number | undefined;
-      try {
-        const stored = localStorage.getItem("crm_user");
-        if (stored) userId = JSON.parse(stored).id;
-      } catch {}
+      // Determine the assigned user based on modal choice or edit state
+      let assignedUserId = finalAssigneeId;
+      if (editId) {
+         // Keep existing logic for edit - typically we don't change assignment on edit unless specified
+         // But payload currently sends current user. If editing, we shouldn't send userId at all actually,
+         // but let's preserve the existing behavior for editId:
+         assignedUserId = undefined; 
+      }
 
       const payloadPreferences = { ...preferences };
       if (payloadPreferences.minBudget) {
@@ -236,7 +290,7 @@ function LeadForm() {
       }
 
       const payload = {
-        userId,
+        userId: assignedUserId,
         name: formData.get("name") as string,
         mobile: formData.get("mobile") as string,
         email: formData.get("email") as string,
@@ -284,7 +338,11 @@ function LeadForm() {
         toast.success(editId ? "Lead updated successfully!" : "Lead created successfully!");
       }
 
-      router.push("/leads");
+      if (assignedUserId === null && !editId) {
+        router.push("/lead-routing");
+      } else {
+        router.push("/leads");
+      }
     } catch (err: any) {
       toast.error(err.message || "Failed to save lead.");
     } finally {
@@ -550,6 +608,96 @@ function LeadForm() {
           </Button>
         </div>
       </form>
+
+      {/* Assignment Modal for New Leads */}
+      <Dialog open={isAssignModalOpen} onOpenChange={setIsAssignModalOpen}>
+        <DialogContent className="sm:max-w-md p-6 rounded-2xl">
+          <DialogHeader className="mb-2">
+            <DialogTitle className="text-xl font-bold">Assign this Lead</DialogTitle>
+            <DialogDescription className="text-muted-foreground pt-1">
+              Where should this new lead be routed?
+            </DialogDescription>
+          </DialogHeader>
+
+          {currentUser?.role?.name === "Staff" ? (
+            <div className="flex flex-col gap-3 py-4">
+              <Button 
+                onClick={() => {
+                  setIsAssignModalOpen(false);
+                  if (pendingFormData) executeSubmission(pendingFormData, currentUser?.id);
+                }} 
+                className="h-14 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 justify-start px-5 font-semibold text-[15px]"
+                variant="outline"
+              >
+                <User className="mr-3 h-5 w-5 text-blue-600" />
+                Assign to Myself
+              </Button>
+              <Button 
+                onClick={() => {
+                  setIsAssignModalOpen(false);
+                  if (pendingFormData) executeSubmission(pendingFormData, null);
+                }} 
+                className="h-14 bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200 justify-start px-5 font-semibold text-[15px]"
+                variant="outline"
+              >
+                <div className="mr-3 h-5 w-5 flex items-center justify-center rounded bg-slate-200/50">
+                  <span className="text-[10px] uppercase font-bold text-slate-700">RQ</span>
+                </div>
+                Add to Routing Queue (Unassigned)
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Select Staff Member</label>
+                <FormSelect 
+                  name="assignee"
+                  options={staffList.map(s => ({ label: `${s.name} (${s.department?.name || 'No Dept'})`, value: s.id.toString() }))}
+                  value={assigneeId ? assigneeId.toString() : ""}
+                  onValueChange={(v) => setAssigneeId(v ? parseInt(v) : null)}
+                  placeholder={isFetchingStaff ? "Loading staff..." : "Select to assign directly..."}
+                  disabled={isFetchingStaff}
+                />
+              </div>
+
+              <div className="relative flex items-center py-2">
+                <div className="flex-grow border-t border-muted" />
+                <span className="flex-shrink-0 mx-4 text-muted-foreground text-xs uppercase font-bold">OR</span>
+                <div className="flex-grow border-t border-muted" />
+              </div>
+
+              <Button 
+                onClick={() => {
+                  setIsAssignModalOpen(false);
+                  if (pendingFormData) executeSubmission(pendingFormData, null);
+                }} 
+                className="w-full h-12 bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200 font-semibold text-[14px]"
+                variant="outline"
+              >
+                Add to Routing Queue (Unassigned)
+              </Button>
+            </div>
+          )}
+
+          <DialogFooter className="mt-2 pt-4 border-t sm:justify-between">
+            <Button variant="ghost" className="rounded-xl" onClick={() => setIsAssignModalOpen(false)}>
+              Back to Form
+            </Button>
+            {currentUser?.role?.name !== "Staff" && (
+              <Button 
+                disabled={!assigneeId}
+                onClick={() => {
+                  setIsAssignModalOpen(false);
+                  if (pendingFormData) executeSubmission(pendingFormData, assigneeId);
+                }}
+                className="rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC]"
+              >
+                Assign & Create
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
