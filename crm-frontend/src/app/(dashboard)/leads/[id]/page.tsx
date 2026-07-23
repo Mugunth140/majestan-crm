@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import {
   ArrowLeft, Loader2, User, Phone, MapPin, Building2,
   Briefcase, Mail, MessageSquare, Plus, ArrowUpRight,
-  Clock, Send, RefreshCw, History, TrendingUp,
+  Clock, Send, RefreshCw, History, TrendingUp, SlidersHorizontal, Sparkles,
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
@@ -717,67 +717,81 @@ export default function LeadViewPage() {
                 <p className="text-[15px] font-semibold">{lead.assigned_staff?.name || "Unassigned"}</p>
               </div>
             </div>
+          </div>
+        </div>
 
-            {/* Requirements & Preferences */}
-            <div className="space-y-6">
-              {(!lead.inquiries || lead.inquiries.length === 0) ? (
-                <div className="bg-card border rounded-2xl p-6 shadow-sm">
-                  <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-                    <Building2 className="h-4 w-4 text-muted-foreground" /> Requirement
+        {/* ── Row 3.5: Requirements & Preferences ── */}
+        <div className="space-y-6 mt-6">
+          {(!lead.inquiries || lead.inquiries.length === 0) ? (
+            <div className="bg-card border rounded-2xl p-6 shadow-sm">
+              <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-muted-foreground" /> Requirement
+              </h3>
+              <p className="text-sm text-muted-foreground italic text-center py-4">No requirements defined yet.</p>
+            </div>
+          ) : (
+            lead.inquiries.map((inq: any, idx: number) => (
+              <div key={inq.id || idx} className="bg-card border rounded-2xl p-6 shadow-sm">
+                
+                {/* Unified Card Header */}
+                <div className="flex items-center justify-between border-b pb-3 mb-5">
+                  <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-muted-foreground" /> Requirement {lead.inquiries.length > 1 ? `#${idx + 1}` : ""}
                   </h3>
-                  <p className="text-sm text-muted-foreground italic text-center py-4">No requirements defined yet.</p>
+                  {idx === 0 && (
+                    <Button size="sm" onClick={() => fetchAutoMatch()} disabled={isMatching} className="h-8 bg-[#0052FF] hover:bg-[#0040CC] text-white rounded-lg px-4 shadow-sm">
+                      {isMatching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Auto Match"}
+                    </Button>
+                  )}
                 </div>
-              ) : (
-                lead.inquiries.map((inq: any, idx: number) => (
-                  <div key={inq.id || idx} className="space-y-6">
-                    <div className="bg-card border rounded-2xl p-6 shadow-sm">
-                      <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-muted-foreground" /> Requirement {lead.inquiries.length > 1 ? `#${idx + 1}` : ""}
-                      </h3>
+
+                {/* Unified Card Body (Grid) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  
+                  {/* Left Column: Core Details */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                      <Briefcase className="h-4 w-4 text-muted-foreground" /> Core Details
+                    </h4>
+                    <div className="space-y-3 text-sm">
+                      {[
+                        { label: "Purchase Type", value: inq?.purchase_type?.replace(/_/g, " ") },
+                        { label: "Category", value: inq?.property_category?.replace(/_/g, " ") },
+                        { label: "Property Type", value: inq?.property_type?.replace(/_/g, " ") },
+                        { label: "Funding", value: inq?.funder?.replace(/_/g, " ") },
+                        { label: "Project", value: inq?.project_list?.replace(/_/g, " ") },
+                      ].map(f => (
+                        <div key={f.label} className="flex justify-between items-center py-1.5 border-b border-border/30 last:border-0">
+                          <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{f.label}</span>
+                          <span className="font-medium capitalize text-[14px]">{f.value || "\u2014"}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Right Column: Preferences */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" /> Preferences
+                    </h4>
+                    {(!inq?.preferences || Object.keys(inq.preferences).length === 0) ? (
+                      <p className="text-sm text-muted-foreground italic text-center py-4">No preferences defined yet.</p>
+                    ) : (
                       <div className="space-y-3 text-sm">
-                        {[
-                          { label: "Purchase Type", value: inq?.purchase_type?.replace(/_/g, " ") },
-                          { label: "Category", value: inq?.property_category?.replace(/_/g, " ") },
-                          { label: "Property Type", value: inq?.property_type?.replace(/_/g, " ") },
-                          { label: "Funding", value: inq?.funder?.replace(/_/g, " ") },
-                          { label: "Project", value: inq?.project_list?.replace(/_/g, " ") },
-                        ].map(f => (
-                          <div key={f.label} className="flex justify-between items-center py-1.5 border-b border-border/30 last:border-0">
-                            <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{f.label}</span>
-                            <span className="font-medium capitalize text-[14px]">{f.value || "\u2014"}</span>
+                        {Object.entries(inq.preferences).map(([key, val]) => (
+                          <div key={key} className="flex justify-between items-center py-1.5 border-b border-border/30 last:border-0">
+                            <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
+                            <span className="font-medium text-[14px]">{String(val)}</span>
                           </div>
                         ))}
                       </div>
-                    </div>
-                    
-                    <div className="bg-card border rounded-2xl p-6 shadow-sm">
-                      <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center justify-between">
-                        <span className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground" /> Preferences {lead.inquiries.length > 1 ? `#${idx + 1}` : ""}</span>
-                        {idx === 0 && (
-                          <Button size="sm" onClick={() => fetchAutoMatch()} disabled={isMatching} className="h-8 bg-[#0052FF] hover:bg-[#0040CC] text-white rounded-lg px-4 shadow-sm">
-                            {isMatching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Auto Match"}
-                          </Button>
-                        )}
-                      </h3>
-                      
-                      {(!inq?.preferences || Object.keys(inq.preferences).length === 0) ? (
-                        <p className="text-sm text-muted-foreground italic text-center py-4">No preferences defined yet.</p>
-                      ) : (
-                        <div className="space-y-3 text-sm">
-                          {Object.entries(inq.preferences).map(([key, val]) => (
-                            <div key={key} className="flex justify-between items-center py-1.5 border-b border-border/30 last:border-0">
-                              <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                              <span className="font-medium text-[14px]">{String(val)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
-                ))
-              )}
-            </div>
-          </div>
+                  
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         {/* ── Row 4: Attachments ── */}
