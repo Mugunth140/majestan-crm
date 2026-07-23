@@ -322,6 +322,7 @@ export class LeadsService {
     const rawLeads = await this.dataSource.query(`
       SELECT 
         l.id as rawId, 
+        l.assigned_staff_id as assignedStaffId,
         l.name, 
         l.mobile_number as mobile, 
         l.email, 
@@ -372,6 +373,7 @@ export class LeadsService {
       propertyType: row.propertyType || '—',
       propertyCategory: row.propertyCategory || '—',
       staff: row.staff ?? 'Unassigned',
+      assignedStaffId: row.assignedStaffId,
       source: row.source ?? '',
       status: row.status ?? 'New Lead',
       notes: '',

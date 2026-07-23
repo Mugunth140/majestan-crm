@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
@@ -35,7 +36,7 @@ interface QueueLead {
 interface HistoryEntry {
   id: number;
   created_at: string;
-  lead?: { name: string };
+  lead?: { id: number; name: string };
   event_type?: string;
   from_staff?: { name: string };
   to_staff?: { name: string };
@@ -65,6 +66,7 @@ function formatDateTime(d?: string) {
 }
 
 export default function LeadRoutingPage() {
+  const router = useRouter();
   const [role, setRole] = useState<string>("");
   const [userDept, setUserDept] = useState<string>("");
 
@@ -101,8 +103,8 @@ export default function LeadRoutingPage() {
     if (typeof window !== "undefined") {
       try {
         const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
-        const roleName = user?.role?.name || "";
-        const deptName = (user?.department?.name || "").toLowerCase();
+        const roleName = user?.role?.name || user?.role || "";
+        const deptName = (user?.department?.name || user?.department || "").toLowerCase();
         setRole(roleName);
         setUserDept(deptName);
         if (roleName === "Staff") {
@@ -248,12 +250,15 @@ export default function LeadRoutingPage() {
     }
   };
 
-  const queueColumns: ColumnDef<QueueLead>[] = [
+  const queueColumns = useMemo<ColumnDef<QueueLead>[]>(() => [
     {
       accessorKey: "display_id",
       header: "Lead ID",
       cell: ({ row }) => (
-        <span className="font-mono text-[13px] text-[#0052FF] font-medium">
+        <span 
+          onClick={() => router.push(`/leads/${row.original.id}`)}
+          className="font-mono text-[13px] text-[#0052FF] font-medium cursor-pointer hover:underline"
+        >
           {row.original.display_id || `L${String(row.original.id).padStart(5, "0")}`}
         </span>
       ),
@@ -354,9 +359,9 @@ export default function LeadRoutingPage() {
         </div>
       ),
     },
-  ];
+  ], [role, claimingId, deletingId, router]);
 
-  const historyColumns: ColumnDef<HistoryEntry>[] = [
+  const historyColumns = useMemo<ColumnDef<HistoryEntry>[]>(() => [
     {
       accessorKey: "created_at",
       header: "Date",
@@ -365,7 +370,19 @@ export default function LeadRoutingPage() {
     {
       id: "lead_name",
       header: "Lead Name",
-      cell: ({ row }) => <span className="font-medium">{row.original.lead?.name || "—"}</span>,
+      cell: ({ row }) => {
+        if (row.original.lead?.id) {
+          return (
+            <span 
+              onClick={() => router.push(`/leads/${row.original.lead!.id}`)}
+              className="font-medium text-[#0052FF] cursor-pointer hover:underline"
+            >
+              {row.original.lead?.name || "—"}
+            </span>
+          );
+        }
+        return <span className="font-medium">{row.original.lead?.name || "—"}</span>;
+      },
     },
     {
       accessorKey: "event_type",
@@ -410,7 +427,7 @@ export default function LeadRoutingPage() {
         </span>
       ),
     },
-  ];
+  ], [router]);
 
   const deptTabs: { label: string; value: DeptTab }[] = [
     { label: "Telecalling Queue", value: "telecalling" },

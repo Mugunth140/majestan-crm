@@ -206,6 +206,7 @@ export default function LeadViewPage() {
   // Convert Lead state
   const [role, setRole] = useState<string>("");
   const [userDept, setUserDept] = useState<string>("");
+  const [currentUserId, setCurrentUserId] = useState<number>(0);
   const [isConvertOpen, setIsConvertOpen] = useState(false);
   const [convertTo, setConvertTo] = useState<"inbound" | "agent" | "">("");
   const [convertFeedback, setConvertFeedback] = useState("");
@@ -215,8 +216,9 @@ export default function LeadViewPage() {
     if (typeof window !== "undefined") {
       try {
         const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
-        setRole(user?.role?.name || "");
-        setUserDept((user?.department?.name || "").toLowerCase());
+        setRole(user?.role?.name || user?.role || "");
+        setUserDept((user?.department?.name || user?.department || "").toLowerCase());
+        setCurrentUserId(user?.id || 0);
       } catch {
         // ignore
       }
@@ -398,6 +400,8 @@ export default function LeadViewPage() {
   const nextRnrValue = `rnr${nextRnrNumber}`;
   const isRnrMaxed = highestRnr >= 5;
 
+  const canEdit = role === "Admin" || (lead?.assigned_staff?.id === currentUserId);
+
   return (
     <div className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
 
@@ -421,18 +425,22 @@ export default function LeadViewPage() {
           <Button variant="outline" size="icon" className="h-9 w-9 rounded-full" onClick={() => fetchLead(true)} title="Refresh">
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
           </Button>
-          {role === "Staff" && userDept === "telecalling" && !lead.is_converted && (
-            <Button
-              onClick={() => { setConvertTo(""); setConvertFeedback(""); setIsConvertOpen(true); }}
-              className="rounded-full px-6 py-5 bg-emerald-600 text-white hover:bg-emerald-700 shadow-md gap-2"
-            >
-              <TrendingUp className="h-4 w-4" />
-              Convert Lead
-            </Button>
+          {canEdit && (
+            <>
+              {role === "Staff" && userDept === "telecalling" && !lead.is_converted && (
+                <Button
+                  onClick={() => { setConvertTo(""); setConvertFeedback(""); setIsConvertOpen(true); }}
+                  className="rounded-full px-6 py-5 bg-emerald-600 text-white hover:bg-emerald-700 shadow-md gap-2"
+                >
+                  <TrendingUp className="h-4 w-4" />
+                  Convert Lead
+                </Button>
+              )}
+              <Button onClick={() => router.push(`/leads/new?edit=${lead.id}`)} className="rounded-full px-8 py-5 bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md">
+                Edit Lead
+              </Button>
+            </>
           )}
-          <Button onClick={() => router.push(`/leads/new?edit=${lead.id}`)} className="rounded-full px-8 py-5 bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md">
-            Edit Lead
-          </Button>
         </div>
       </div>
 
@@ -449,23 +457,23 @@ export default function LeadViewPage() {
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Mobile</p>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <button onClick={() => openContact("call", lead.mobile_number)} className="flex items-center gap-1.5 text-[14px] font-medium text-foreground hover:text-[#0052FF] transition-colors group">
+                  <button disabled={!canEdit} onClick={() => openContact("call", lead.mobile_number)} className="flex items-center gap-1.5 text-[14px] font-medium text-foreground hover:text-[#0052FF] disabled:hover:text-foreground transition-colors group">
                     <Phone className="h-3.5 w-3.5 text-muted-foreground group-hover:text-[#0052FF]" /> {lead.mobile_number || "\u2014"}
                   </button>
                   {lead.mobile_number && (
-                    <button onClick={() => openContact("sms", lead.mobile_number)} className="text-[11px] px-2 py-0.5 rounded-full border bg-green-50 text-green-700 border-green-200 hover:bg-green-100 transition-colors">SMS</button>
+                    <button disabled={!canEdit} onClick={() => openContact("sms", lead.mobile_number)} className="text-[11px] px-2 py-0.5 rounded-full border bg-green-50 text-green-700 border-green-200 hover:bg-green-100 disabled:opacity-50 transition-colors">SMS</button>
                   )}
                 </div>
               </div>
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">WhatsApp</p>
-                <button disabled={!lead.whatsapp_number} onClick={() => openContact("whatsapp", lead.whatsapp_number)} className="flex items-center gap-1.5 text-[14px] font-medium text-foreground hover:text-emerald-600 transition-colors group disabled:opacity-40 disabled:cursor-default">
+                <button disabled={!canEdit || !lead.whatsapp_number} onClick={() => openContact("whatsapp", lead.whatsapp_number)} className="flex items-center gap-1.5 text-[14px] font-medium text-foreground hover:text-emerald-600 transition-colors group disabled:opacity-40 disabled:hover:text-foreground disabled:cursor-default">
                   <Phone className="h-3.5 w-3.5 text-emerald-600" /> {lead.whatsapp_number || "\u2014"}
                 </button>
               </div>
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Email</p>
-                <button disabled={!lead.email} onClick={() => openContact("email", lead.email)} className="flex items-center gap-1.5 text-[14px] font-medium text-foreground hover:text-[#0052FF] transition-colors group disabled:opacity-40 disabled:cursor-default">
+                <button disabled={!canEdit || !lead.email} onClick={() => openContact("email", lead.email)} className="flex items-center gap-1.5 text-[14px] font-medium text-foreground hover:text-[#0052FF] transition-colors group disabled:opacity-40 disabled:hover:text-foreground disabled:cursor-default">
                   <Mail className="h-3.5 w-3.5 text-muted-foreground group-hover:text-[#0052FF]" />
                   <span className="truncate max-w-[160px]">{lead.email || "\u2014"}</span>
                 </button>
@@ -506,40 +514,42 @@ export default function LeadViewPage() {
               <RefreshCw className="h-4 w-4 text-muted-foreground" /> Quick Actions
             </h3>
             <div className="flex flex-col gap-6 flex-1">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Lead Status</p>
-                <FormSelect
-                  name="quickLeadStatus"
-                  placeholder="Select Status"
-                  options={Object.keys(STATUS_STYLES).map(k => ({ label: k, value: k }))}
-                  value={lead.status || ""}
-                  onValueChange={async (v) => {
-                    if (!v) return;
-                    try {
-                      const res = await fetch(`${API_URL}/leads/${id}/status`, {
-                        method: "PUT",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ status_name: v }),
-                      });
-                      const data = await res.json();
-                      if (data.success) {
-                        toast.success("Lead status updated.");
-                        fetchLead(true);
-                      } else toast.error("Failed to update status");
-                    } catch {
-                      toast.error("Failed to update status");
-                    }
-                  }}
-                />
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Lead Qualification</p>
-                <div className="flex items-center justify-between h-12 px-4 rounded-xl border border-input bg-muted/20">
-                  <span className="text-[14px] font-medium text-foreground/80">Mark as Unqualified</span>
-                  <button
-                    role="switch"
-                    aria-checked={lead.is_unqualified || false}
-                    onClick={async () => {
+              {canEdit && (
+                <>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Lead Status</p>
+                    <FormSelect
+                      name="quickLeadStatus"
+                      placeholder="Select Status"
+                      options={Object.keys(STATUS_STYLES).map(k => ({ label: k, value: k }))}
+                      value={lead.status || ""}
+                      onValueChange={async (v) => {
+                        if (!v) return;
+                        try {
+                          const res = await fetch(`${API_URL}/leads/${id}/status`, {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ status_name: v }),
+                          });
+                          const data = await res.json();
+                          if (data.success) {
+                            toast.success("Lead status updated.");
+                            fetchLead(true);
+                          } else toast.error("Failed to update status");
+                        } catch {
+                          toast.error("Failed to update status");
+                        }
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Lead Qualification</p>
+                    <div className="flex items-center justify-between h-12 px-4 rounded-xl border border-input bg-muted/20">
+                      <span className="text-[14px] font-medium text-foreground/80">Mark as Unqualified</span>
+                      <button
+                        role="switch"
+                        aria-checked={lead.is_unqualified || false}
+                        onClick={async () => {
                       const newVal = !lead.is_unqualified;
                       try {
                         const res = await fetch(`${API_URL}/leads/${id}/status`, {
@@ -565,6 +575,8 @@ export default function LeadViewPage() {
                   </button>
                 </div>
               </div>
+              </>
+              )}
               
               {/* Trigger the Right Slider */}
               <div className="mt-auto pt-2">
@@ -585,9 +597,10 @@ export default function LeadViewPage() {
         </div>
 
         {/* ── Row 2: Log New Follow Up Form ── */}
-        <div className="bg-card border rounded-2xl p-6 shadow-sm">
-          <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-            <Plus className="h-4 w-4 text-[#0052FF]" /> Log New Follow Up
+        {canEdit && (
+          <div className="bg-card border rounded-2xl p-6 shadow-sm">
+            <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
+              <Plus className="h-4 w-4 text-[#0052FF]" /> Log New Follow Up
           </h3>
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -660,6 +673,7 @@ export default function LeadViewPage() {
             </div>
           </div>
         </div>
+        )}
 
         {/* ── Row 3: Contact Log (2/3) + Assignment/Requirement (1/3) ── */}
         <div className="grid grid-cols-3 gap-6">
@@ -738,7 +752,7 @@ export default function LeadViewPage() {
                   <h3 className="text-base font-bold text-foreground flex items-center gap-2">
                     <Building2 className="h-4 w-4 text-muted-foreground" /> Requirement {lead.inquiries.length > 1 ? `#${idx + 1}` : ""}
                   </h3>
-                  {idx === 0 && (
+                  {canEdit && idx === 0 && (
                     <Button size="sm" onClick={() => fetchAutoMatch()} disabled={isMatching} className="h-8 bg-[#0052FF] hover:bg-[#0040CC] text-white rounded-lg px-4 shadow-sm">
                       {isMatching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Auto Match"}
                     </Button>

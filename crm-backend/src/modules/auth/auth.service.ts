@@ -16,7 +16,7 @@ export class AuthService {
   async login(email: string, pass: string) {
     const user = await this.userRepository.findOne({ 
       where: { email },
-      relations: { role: true } 
+      relations: { role: true, department: true } 
     });
 
     if (!user) {
@@ -47,7 +47,8 @@ export class AuthService {
           id: user.id,
           name: user.name,
           email: user.email,
-          role: user.role?.name
+          role: user.role?.name,
+          department: user.department?.name
         }
       }
     };

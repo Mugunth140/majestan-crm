@@ -87,8 +87,8 @@ export default function LeadsPage() {
     if (typeof window !== "undefined") {
       try {
         const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
-        const roleName = user?.role?.name || "";
-        const deptName = (user?.department?.name || "").toLowerCase();
+        const roleName = user?.role?.name || user?.role || "";
+        const deptName = (user?.department?.name || user?.department || "").toLowerCase();
         setRole(roleName);
         setUserDept(deptName);
         setUserId(user?.id || null);
