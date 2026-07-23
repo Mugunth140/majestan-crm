@@ -89,12 +89,12 @@ export class LeadRoutingController {
   @Post('site-visit-complete/:leadId')
   async siteVisitComplete(
     @Param('leadId') leadId: string,
-    @Body() body: TransferFeedbackDto,
+    @Body() body: TransferFeedbackDto & { actioned_by_id?: number },
     @Req() req: any,
   ) {
     // TODO: add auth guard
     const user = req.user;
-    const requestingUserId: number = user?.sub ?? user?.id ?? 0;
+    const requestingUserId: number = body.actioned_by_id || user?.sub || user?.id || 0;
     await this.leadRoutingService.siteVisitComplete(
       Number(leadId),
       requestingUserId,

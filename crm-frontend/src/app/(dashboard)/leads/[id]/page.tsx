@@ -534,6 +534,25 @@ export default function LeadViewPage() {
                           const data = await res.json();
                           if (data.success) {
                             toast.success("Lead status updated.");
+                            
+                            // Auto-route to Sales if telecalling staff marks it as Site Visit Completed
+                            if (v === "Site Visit Completed" && lead.department === "telecalling") {
+                              const routeRes = await fetch(`${API_URL}/lead-routing/site-visit-complete/${id}`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ 
+                                  feedback: "Auto-transferred to Sales upon Site Visit completion",
+                                  actioned_by_id: currentUserId 
+                                })
+                              });
+                              if (routeRes.ok) {
+                                toast.success("Lead transferred to Sales Queue.");
+                              } else {
+                                const errorData = await routeRes.json();
+                                toast.error(errorData.message || "Failed to route to sales queue");
+                              }
+                            }
+                            
                             fetchLead(true);
                           } else toast.error("Failed to update status");
                         } catch {
