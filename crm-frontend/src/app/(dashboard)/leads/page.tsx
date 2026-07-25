@@ -40,9 +40,7 @@ const STATUS_STYLES: Record<string, string> = {
   "Agreement":            "bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/30 dark:text-teal-400",
   "Closed Won":           "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
   "Not Interested":       "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400",
-  "Dropped 1":            "bg-red-50 text-red-600 border-red-200 dark:bg-red-950/40 dark:text-red-300",
-  "Dropped 2":            "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300",
-  "Dropped 3":            "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/40 dark:text-red-400",
+  "Dropped":              "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/40 dark:text-red-400",
   "Lost":                 "bg-red-200 text-red-900 border-red-300 dark:bg-red-900/50 dark:text-red-300",
   "Future Follow-up":     "bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-800 dark:text-slate-300",
 };

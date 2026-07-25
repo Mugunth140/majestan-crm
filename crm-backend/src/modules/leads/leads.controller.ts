@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Put, Delete, Param, UseInterceptors, UploadedFile, BadRequestException, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, Delete, Param, Query, UseInterceptors, UploadedFile, BadRequestException, UseGuards } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { LeadsService } from './leads.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -7,6 +7,18 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 @UseGuards(JwtAuthGuard)
 export class LeadsController {
   constructor(private readonly leadsService: LeadsService) {}
+
+  @Get('cities')
+  async getCities() {
+    const data = await this.leadsService.getCities();
+    return { success: true, data };
+  }
+
+  @Get('sublocations')
+  async getSublocations(@Query('city_id') cityId: string) {
+    const data = await this.leadsService.getSublocations(Number(cityId));
+    return { success: true, data };
+  }
 
   @Get()
   async getLeads() {

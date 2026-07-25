@@ -33,6 +33,22 @@ export class LeadInquiry {
   @Column({ type: 'json', nullable: true })
   preferences: any;
 
+  // Buyer Qualification fields
+  @Column({ type: 'int', unsigned: true, nullable: true })
+  city_id: number | null;
+
+  @Column({ type: 'json', nullable: true })
+  sub_locations: string[] | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  purchase_timeline: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  qualification_purpose: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  decision_maker: string | null;
+
   @CreateDateColumn()
   created_at: Date;
 }

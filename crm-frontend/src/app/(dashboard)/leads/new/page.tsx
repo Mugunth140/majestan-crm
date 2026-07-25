@@ -25,6 +25,21 @@ const PURCHASE_TYPES = [
   { label: "Buy", value: "buy" },
 ];
 
+const PURCHASE_TIMELINES = [
+  { label: "Immediate (0-3 months)", value: "immediate" },
+  { label: "Short Term (3-6 months)", value: "short_term" },
+  { label: "Medium Term (6-12 months)", value: "medium_term" },
+  { label: "Long Term (1-2 years)", value: "long_term" },
+  { label: "Just Exploring", value: "exploring" },
+];
+
+const QUALIFICATION_PURPOSES = [
+  { label: "Self Use", value: "self_use" },
+  { label: "Investment", value: "investment" },
+  { label: "Rental Income", value: "rental_income" },
+  { label: "Business Use", value: "business_use" },
+];
+
 const PROPERTY_CATEGORIES = [
   { label: "Residential", value: "residential" },
   { label: "Commercial", value: "commercial" },
@@ -138,9 +153,13 @@ function LeadForm() {
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
 
-  const [cities, setCities] = useState<{ label: string; value: string }[]>([]);
+  const [cities, setCities] = useState<{ id: number; city_name: string }[]>([]);
   const [sources, setSources] = useState<{ label: string; value: string }[]>([]);
   const [isFetchingData, setIsFetchingData] = useState(true);
+  
+  const [subLocations, setSubLocations] = useState<{ id: number; locality_name: string }[]>([]);
+  const [selectedCityId, setSelectedCityId] = useState<number | null>(null);
+  const [selectedSubLocations, setSelectedSubLocations] = useState<string[]>([]);
   
   const [leadData, setLeadData] = useState<any>(null);
   const [isLoadingLead, setIsLoadingLead] = useState(!!editId);
@@ -179,8 +198,8 @@ function LeadForm() {
       try {
         setIsFetchingData(true);
         const [cityRes, sourceRes] = await Promise.all([
-          fetch(API_URL + "/master/cities"),
-          fetch(API_URL + "/master/lead-sources"),
+          apiFetch(API_URL + "/leads/cities"),
+          apiFetch(API_URL + "/master/lead-sources"),
         ]);
         const cityData = await cityRes.json();
         const sourceData = await sourceRes.json();
@@ -198,6 +217,19 @@ function LeadForm() {
   }, []);
 
   useEffect(() => {
+    if (selectedCityId) {
+      apiFetch(API_URL + "/leads/sublocations?city_id=" + selectedCityId)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) setSubLocations(data.data);
+        })
+        .catch(() => toast.error("Failed to load sub-locations."));
+    } else {
+      setSubLocations([]);
+    }
+  }, [selectedCityId]);
+
+  useEffect(() => {
     if (editId) {
       fetch(API_URL + "/leads/" + editId)
         .then((res) => res.json())
@@ -207,9 +239,12 @@ function LeadForm() {
             setIsReferral(!!result.data.is_referral);
             setSelectedSource(result.data.lead_source);
             if (result.data.inquiries?.[0]) {
-              setSelectedCategory(result.data.inquiries[0].property_category || null);
-              setSelectedType(result.data.inquiries[0].property_type || null);
-              setPreferences(result.data.inquiries[0].preferences || {});
+              const inq = result.data.inquiries[0];
+              setSelectedCategory(inq.property_category || null);
+              setSelectedType(inq.property_type || null);
+              setPreferences(inq.preferences || {});
+              if (inq.city_id) setSelectedCityId(inq.city_id);
+              if (inq.sub_locations) setSelectedSubLocations(inq.sub_locations);
             }
           } else {
             toast.error("Lead not found");
@@ -225,6 +260,15 @@ function LeadForm() {
 
   const handleAddSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    if (followUpDateObj) {
+      const diffTime = Math.abs(followUpDateObj.getTime() - new Date().getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      if (diffDays > 45) {
+        toast.error("Follow-up date cannot be more than 45 days in the future.");
+        return;
+      }
+    }
     
     // If we're creating a NEW lead, intercept submission to show Assignment Modal
     if (!editId) {
@@ -304,6 +348,11 @@ function LeadForm() {
         funder: formData.get("funder") as string,
         propertyCategory: selectedCategory || formData.get("propertyCategory") as string,
         preferences: payloadPreferences,
+        cityId: selectedCityId,
+        subLocations: selectedSubLocations.length > 0 ? selectedSubLocations : null,
+        purchaseTimeline: formData.get("purchaseTimeline") as string,
+        qualificationPurpose: formData.get("qualificationPurpose") as string,
+        decisionMaker: formData.get("decisionMaker") as string,
         followUpDate: followUpDateObj ? format(followUpDateObj, "yyyy-MM-dd") : null,
         followUpTime: followUpDateObj ? format(followUpDateObj, "HH:mm") : null,
         priority: formData.get("priority") as string,
@@ -405,7 +454,15 @@ function LeadForm() {
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">City</label>
-              {isFetchingData ? skeletonField : <FormSelect name="city" defaultValue={leadData?.city || null} placeholder="Select City" options={cities} required />}
+              {isFetchingData ? skeletonField : (
+                <FormSelect 
+                  name="city" 
+                  defaultValue={leadData?.city || null} 
+                  placeholder="Select City" 
+                  options={cities.map(c => ({ label: c.city_name, value: c.city_name }))} 
+                  required 
+                />
+              )}
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Lead Source</label>
@@ -512,7 +569,93 @@ function LeadForm() {
           </div>
         </div>
 
-          <div className="bg-card border rounded-2xl p-8 shadow-sm">
+        <div className="bg-card border rounded-2xl p-8 shadow-sm">
+          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Buyer Qualification</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="space-y-2 lg:col-span-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Target City</label>
+              {isFetchingData ? skeletonField : (
+                <FormSelect
+                  name="cityId"
+                  placeholder="Select City"
+                  options={cities.map((c) => ({ label: c.city_name, value: c.id.toString() }))}
+                  value={selectedCityId?.toString() || ""}
+                  onValueChange={(val) => {
+                    setSelectedCityId(val ? Number(val) : null);
+                    setSelectedSubLocations([]);
+                  }}
+                />
+              )}
+            </div>
+
+            <div className="space-y-2 lg:col-span-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Sub Locations (Multiple)</label>
+              <div className="flex flex-wrap gap-2 p-3 min-h-[48px] rounded-xl bg-muted/30 border border-border/60 max-h-[150px] overflow-y-auto">
+                {!selectedCityId ? (
+                  <span className="text-sm text-muted-foreground">Select a city first...</span>
+                ) : subLocations.length === 0 ? (
+                  <span className="text-sm text-muted-foreground">No sub-locations found.</span>
+                ) : (
+                  subLocations.map((sub) => {
+                    const isSelected = selectedSubLocations.includes(sub.locality_name);
+                    return (
+                      <button
+                        type="button"
+                        key={sub.id}
+                        onClick={() => {
+                          if (isSelected) {
+                            setSelectedSubLocations(selectedSubLocations.filter(loc => loc !== sub.locality_name));
+                          } else {
+                            setSelectedSubLocations([...selectedSubLocations, sub.locality_name]);
+                          }
+                        }}
+                        className={`px-3 py-1 text-[13px] rounded-full border transition-colors ${
+                          isSelected 
+                            ? "bg-[#0052FF] text-white border-[#0052FF] shadow-sm" 
+                            : "bg-background text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground"
+                        }`}
+                      >
+                        {sub.locality_name}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2 lg:col-span-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Purchase Timeline</label>
+              <FormSelect
+                name="purchaseTimeline"
+                defaultValue={leadData?.inquiries?.[0]?.purchase_timeline || null}
+                placeholder="Select Timeline"
+                options={PURCHASE_TIMELINES}
+              />
+            </div>
+
+            <div className="space-y-2 lg:col-span-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Qualification Purpose</label>
+              <FormSelect
+                name="qualificationPurpose"
+                defaultValue={leadData?.inquiries?.[0]?.qualification_purpose || null}
+                placeholder="Select Purpose"
+                options={QUALIFICATION_PURPOSES}
+              />
+            </div>
+
+            <div className="space-y-2 lg:col-span-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Decision Maker</label>
+              <Input
+                name="decisionMaker"
+                defaultValue={leadData?.inquiries?.[0]?.decision_maker || ""}
+                placeholder="e.g. Self, Spouse, Father"
+                className="h-12 rounded-xl bg-muted/30"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-card border rounded-2xl p-8 shadow-sm">
             <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Customer Preferences</h3>
             
             {!selectedCategory ? (
@@ -549,7 +692,15 @@ function LeadForm() {
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Furnishing</label>
-                      <FormSelect name="_furnishing" placeholder="Select" options={[{label: "Furnished", value: "1"}, {label: "Unfurnished", value: "0"}]} value={preferences?.furnished || null} onValueChange={v => setPreferences({...preferences, furnished: v})} />
+                      <FormSelect name="_furnishing" placeholder="Select" options={[{label: "Furnished", value: "1"}, {label: "Semi Furnished", value: "2"}, {label: "Unfurnished", value: "0"}]} value={preferences?.furnished || null} onValueChange={v => setPreferences({...preferences, furnished: v})} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Floor Number</label>
+                      <Input type="text" placeholder="e.g. Ground, 1st, High" value={preferences?.floorNumber || ""} onChange={e => setPreferences({...preferences, floorNumber: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Facing</label>
+                      <FormSelect name="_facing" placeholder="Select Facing" options={[{label: "North", value: "north"}, {label: "East", value: "east"}, {label: "South", value: "south"}, {label: "West", value: "west"}, {label: "North-East", value: "north_east"}]} value={preferences?.facing || null} onValueChange={v => setPreferences({...preferences, facing: v})} />
                     </div>
                   </>
                 )}

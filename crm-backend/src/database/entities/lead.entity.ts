@@ -86,6 +86,9 @@ export class Lead {
   @Column({ type: 'int', nullable: true })
   converted_from_lead_id: number | null; // used on inbound/agent side
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  drop_reason: string | null;
+
   @CreateDateColumn()
   @Index()
   created_at: Date;

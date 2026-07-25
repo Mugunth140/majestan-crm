@@ -45,9 +45,7 @@ const STATUS_STYLES: Record<string, string> = {
   "Agreement":            "bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/30 dark:text-teal-400",
   "Closed Won":           "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
   "Not Interested":       "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400",
-  "Dropped 1":            "bg-red-50 text-red-600 border-red-200 dark:bg-red-950/40 dark:text-red-300",
-  "Dropped 2":            "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300",
-  "Dropped 3":            "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/40 dark:text-red-400",
+  "Dropped":              "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/40 dark:text-red-400",
   "Lost":                 "bg-red-200 text-red-900 border-red-300 dark:bg-red-900/50 dark:text-red-300",
   "Future Follow-up":     "bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-800 dark:text-slate-300",
 };
@@ -213,6 +211,11 @@ export default function LeadViewPage() {
   const [convertFeedback, setConvertFeedback] = useState("");
   const [isConverting, setIsConverting] = useState(false);
 
+  // Dropped Reason Modal
+  const [isDroppedOpen, setIsDroppedOpen] = useState(false);
+  const [dropReason, setDropReason] = useState("");
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
@@ -342,6 +345,19 @@ export default function LeadViewPage() {
 
   const handleSaveFollowUp = async () => {
     if (!fuForm.contactedVia) return toast.error("Please select how you contacted the lead.");
+    
+    if (fuForm.nextFollowUpDate) {
+      const followUpDateObj = getFuDateObj(fuForm.nextFollowUpDate, fuForm.nextFollowUpTime);
+      if (followUpDateObj) {
+        const diffTime = Math.abs(followUpDateObj.getTime() - new Date().getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        if (diffDays > 45) {
+          toast.error("Follow-up date cannot be more than 45 days in the future.");
+          return;
+        }
+      }
+    }
+
     setIsSavingFu(true);
     const now = new Date();
     const payload = {
@@ -414,6 +430,11 @@ export default function LeadViewPage() {
           </Button>
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl font-bold tracking-tight text-foreground">{lead.name}</h1>
+            {(lead.inquiries && lead.inquiries.length > 1) && (
+              <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200">
+                Repeat ({lead.inquiries.length - 1})
+              </Badge>
+            )}
             <Badge className={`font-medium px-2.5 py-0.5 shadow-sm border ${badgeCls}`}>{statusName}</Badge>
             <span className="text-sm font-semibold text-muted-foreground ml-2">L{String(lead.id).padStart(5, "0")}</span>
             <span className="text-muted-foreground/40 text-xs">&bull;</span>
@@ -526,6 +547,10 @@ export default function LeadViewPage() {
                       value={lead.status || ""}
                       onValueChange={async (v) => {
                         if (!v) return;
+                        if (v === "Dropped") {
+                          setIsDroppedOpen(true);
+                          return;
+                        }
                         try {
                           const res = await apiFetch(`${API_URL}/leads/${id}/status`, {
                             method: "PUT",
@@ -794,10 +819,14 @@ export default function LeadViewPage() {
                         { label: "Property Type", value: inq?.property_type?.replace(/_/g, " ") },
                         { label: "Funding", value: inq?.funder?.replace(/_/g, " ") },
                         { label: "Project", value: inq?.project_list?.replace(/_/g, " ") },
+                        { label: "Timeline", value: inq?.purchase_timeline?.replace(/_/g, " ") },
+                        { label: "Purpose", value: inq?.qualification_purpose?.replace(/_/g, " ") },
+                        { label: "Decision Maker", value: inq?.decision_maker },
+                        { label: "Sub Locations", value: inq?.sub_locations?.join(", ") },
                       ].map(f => (
                         <div key={f.label} className="flex justify-between items-center py-1.5 border-b border-border/30 last:border-0">
                           <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{f.label}</span>
-                          <span className="font-medium capitalize text-[14px]">{f.value || "\u2014"}</span>
+                          <span className="font-medium capitalize text-[14px] text-right ml-4">{f.value || "\u2014"}</span>
                         </div>
                       ))}
                     </div>
@@ -892,6 +921,63 @@ export default function LeadViewPage() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* ── Dropped Reason Dialog ── */}
+      <Dialog open={isDroppedOpen} onOpenChange={(o) => !o && setIsDroppedOpen(false)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Lead Dropped Reason</DialogTitle>
+            <DialogDescription>
+              Please provide the reason for dropping this lead.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Reason *</label>
+              <Textarea
+                value={dropReason}
+                onChange={(e) => setDropReason(e.target.value)}
+                placeholder="Enter drop reason..."
+                className="h-28 rounded-xl bg-muted/30 resize-none"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDroppedOpen(false)} disabled={isUpdatingStatus}>
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!dropReason.trim()) return toast.error("Please enter a drop reason.");
+                setIsUpdatingStatus(true);
+                try {
+                  const res = await apiFetch(`${API_URL}/leads/${id}/status`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ status_name: "Dropped", drop_reason: dropReason }),
+                  });
+                  const data = await res.json();
+                  if (data.success) {
+                    toast.success("Lead marked as Dropped.");
+                    setIsDroppedOpen(false);
+                    setDropReason("");
+                    fetchLead(true);
+                  } else toast.error("Failed to update status");
+                } catch {
+                  toast.error("Failed to update status");
+                } finally {
+                  setIsUpdatingStatus(false);
+                }
+              }}
+              disabled={isUpdatingStatus || !dropReason.trim()}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {isUpdatingStatus ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Confirm Dropped
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Contact Modal ── */}
       <ContactModal

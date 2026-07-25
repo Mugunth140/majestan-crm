@@ -180,7 +180,7 @@ export class LeadsService {
     });
   }
 
-  async updateLeadStatus(id: number, body: { status_name?: string; is_unqualified?: boolean }) {
+  async updateLeadStatus(id: number, body: { status_name?: string; is_unqualified?: boolean; drop_reason?: string }) {
     const leadRepo = this.dataSource.getRepository(Lead);
     const existingLead = await leadRepo.findOne({ where: { id } });
     if (!existingLead) throw new NotFoundException('Lead not found');
@@ -191,6 +191,10 @@ export class LeadsService {
 
     if (body.is_unqualified !== undefined) {
       existingLead.is_unqualified = body.is_unqualified;
+    }
+
+    if (body.drop_reason !== undefined) {
+      existingLead.drop_reason = body.drop_reason || null;
     }
 
     return leadRepo.save(existingLead);
@@ -230,6 +234,11 @@ export class LeadsService {
         inquiry.property_category = body.propertyCategory || null;
         inquiry.funder = body.funder || null;
         inquiry.preferences = body.preferences || null;
+        if (body.cityId !== undefined) inquiry.city_id = body.cityId || null;
+        if (body.subLocations !== undefined) inquiry.sub_locations = body.subLocations || null;
+        if (body.purchaseTimeline !== undefined) inquiry.purchase_timeline = body.purchaseTimeline || null;
+        if (body.qualificationPurpose !== undefined) inquiry.qualification_purpose = body.qualificationPurpose || null;
+        if (body.decisionMaker !== undefined) inquiry.decision_maker = body.decisionMaker || null;
         await manager.save(LeadInquiry, inquiry);
       }
 
@@ -273,6 +282,11 @@ export class LeadsService {
             property_category: body.propertyCategory || null,
             funder: body.funder || null,
             preferences: body.preferences || null,
+            city_id: body.cityId || null,
+            sub_locations: body.subLocations || null,
+            purchase_timeline: body.purchaseTimeline || null,
+            qualification_purpose: body.qualificationPurpose || null,
+            decision_maker: body.decisionMaker || null,
           });
           await manager.save(inquiry);
         }
@@ -330,6 +344,11 @@ export class LeadsService {
           property_category: body.propertyCategory || null,
           funder: body.funder || null,
           preferences: body.preferences || null,
+          city_id: body.cityId || null,
+          sub_locations: body.subLocations || null,
+          purchase_timeline: body.purchaseTimeline || null,
+          qualification_purpose: body.qualificationPurpose || null,
+          decision_maker: body.decisionMaker || null,
         });
         await manager.save(inquiry);
       }
@@ -416,6 +435,19 @@ export class LeadsService {
       lastFollowedUpDate: row.lastFollowedUpDate || null,
       isUnqualified: Boolean(row.isUnqualified),
     }));
+  }
+
+  async getCities(): Promise<{ id: number; city_name: string }[]> {
+    return this.siteDataSource.query(
+      `SELECT id, city_name FROM cities WHERE is_active = 1 ORDER BY city_name ASC`
+    );
+  }
+
+  async getSublocations(cityId: number): Promise<{ id: number; locality_name: string }[]> {
+    return this.siteDataSource.query(
+      `SELECT id, locality_name FROM sublocations WHERE city_id = ? AND is_active = 1 ORDER BY locality_name ASC`,
+      [cityId]
+    );
   }
 
   async autoMatchProperties(leadId: number) {
