@@ -3,7 +3,9 @@ name: Deploy CRM Stack
 on:
   push:
     branches: [ "master" ]
-
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 env:
   REGISTRY: ghcr.io
   FRONTEND_IMAGE_NAME: mugunth140/crm-frontend
