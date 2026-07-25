@@ -26,11 +26,11 @@ const PURCHASE_TYPES = [
 ];
 
 const PURCHASE_TIMELINES = [
-  { label: "Immediate (0-3 months)", value: "immediate" },
-  { label: "Short Term (3-6 months)", value: "short_term" },
-  { label: "Medium Term (6-12 months)", value: "medium_term" },
-  { label: "Long Term (1-2 years)", value: "long_term" },
-  { label: "Just Exploring", value: "exploring" },
+  { label: "Immediate", value: "immediate" },
+  { label: "Within 30 Days", value: "within_30_days" },
+  { label: "3 Months", value: "3_months" },
+  { label: "6 Months", value: "6_months" },
+  { label: "Just Enquiry", value: "just_enquiry" },
 ];
 
 const QUALIFICATION_PURPOSES = [

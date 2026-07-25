@@ -86,6 +86,14 @@ const RNR_OPTIONS = [
   { label: "RNR 5", value: "rnr5" },
 ];
 
+const PREDEFINED_DROP_REASONS = [
+  "Location mismatch",
+  "Funding issue",
+  "Vaastu complaint",
+  "Facing issue",
+  "Floor mismatched"
+];
+
 function formatTimestamp(ts: string) {
   const d = new Date(ts);
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) +
@@ -932,13 +940,29 @@ export default function LeadViewPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-1.5">
+            <div className="space-y-3">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Reason *</label>
+              <div className="flex flex-wrap gap-2">
+                {PREDEFINED_DROP_REASONS.map(reason => (
+                  <button
+                    type="button"
+                    key={reason}
+                    onClick={() => setDropReason(reason)}
+                    className={`px-3 py-1.5 text-[13px] rounded-full border transition-colors ${
+                      dropReason === reason
+                        ? "bg-red-50 text-red-600 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900"
+                        : "bg-muted/30 text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    {reason}
+                  </button>
+                ))}
+              </div>
               <Textarea
                 value={dropReason}
                 onChange={(e) => setDropReason(e.target.value)}
-                placeholder="Enter drop reason..."
-                className="h-28 rounded-xl bg-muted/30 resize-none"
+                placeholder="Or type a custom reason..."
+                className="h-24 rounded-xl bg-muted/30 resize-none mt-2"
               />
             </div>
           </div>
