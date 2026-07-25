@@ -457,7 +457,7 @@ export default function LeadViewPage() {
           </Button>
           {canEdit && (
             <>
-              {(role === "Admin" || role === "Manager" || (role === "Staff" && userDept === "telecalling")) && !lead.is_converted && (
+              {(role === "Admin" || role === "Manager" || ((role === "Staff" || role === "Team Lead") && userDept === "telecalling")) && !lead.is_converted && (
                 <Button
                   onClick={() => { setConvertTo(""); setConvertFeedback(""); setIsConvertOpen(true); }}
                   className="rounded-full px-6 py-5 bg-emerald-600 text-white hover:bg-emerald-700 shadow-md gap-2"
