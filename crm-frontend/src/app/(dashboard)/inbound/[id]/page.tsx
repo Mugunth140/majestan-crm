@@ -768,7 +768,7 @@ export default function InboundViewPage() {
                   <span className="font-medium text-[14px]">{inbound.key_available_with || "\u2014"}</span>
                 </div>
 
-                {inbound.key_available_with && inbound.key_available_with !== "Owner" && inbound.key_available_with !== "Primary Contact" && (
+                {inbound.key_available_with && inbound.key_available_with !== "Owner" && inbound.key_available_with !== inbound.primary_contact && (
                   <>
                     <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
                       <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Key Name</span>
@@ -806,14 +806,13 @@ export default function InboundViewPage() {
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
                   <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Brokerage</span>
-                  <span className="font-medium text-[14px]">{inbound.percentage ? `${inbound.percentage}%` : (inbound.fixed_amount ? `₹${inbound.fixed_amount}` : "\u2014")}</span>
+                  <span className="font-medium text-[14px]">
+                    {inbound.brokerage_type === 'Days' 
+                      ? (inbound.brokerage_days ? `${inbound.brokerage_days} Days` : "\u2014") 
+                      : (inbound.percentage ? `${inbound.percentage}%` : (inbound.fixed_amount ? `₹${inbound.fixed_amount}` : "\u2014"))
+                    }
+                  </span>
                 </div>
-                {(inbound.purpose === 'Rent' || inbound.purpose === 'Lease') && (
-                  <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
-                    <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Brokerage Days</span>
-                    <span className="font-medium text-[14px]">{inbound.brokerage_days ? `${inbound.brokerage_days} Days` : "\u2014"}</span>
-                  </div>
-                )}
                 <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
                   <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Remarks</span>
                   <span className="font-medium text-[14px] truncate max-w-[200px]" title={inbound.brokerage_remarks || ""}>{inbound.brokerage_remarks || "\u2014"}</span>

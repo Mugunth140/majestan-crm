@@ -94,7 +94,6 @@ const PRIMARY_CONTACTS = [
 
 const KEY_AVAILABLE_WITH = [
   { label: "Owner", value: "Owner" },
-  { label: "Primary Contact", value: "Primary Contact" },
   { label: "Manager", value: "Manager" },
   { label: "Security", value: "Security" },
   { label: "Tenant", value: "Tenant" },
@@ -111,6 +110,7 @@ const BROKERAGE_PAID_BY_OPTIONS = ["Owner", "Buyer", "Tenant"];
 const BROKERAGE_TYPES = [
   { label: "Percentage", value: "Percentage" },
   { label: "Fixed", value: "Fixed" },
+  { label: "Days", value: "Days" },
 ];
 
 const FLOOR_APPLICABLE_TYPES = [
@@ -608,7 +608,7 @@ function InboundForm() {
               />
             </div>
 
-            {keyAvailableWith && keyAvailableWith !== "Owner" && keyAvailableWith !== "Primary Contact" && (
+            {keyAvailableWith && keyAvailableWith !== "Owner" && keyAvailableWith !== primaryContact && (
               <>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Key Contact Name</label>
@@ -691,7 +691,7 @@ function InboundForm() {
                    </div>
                 )}
 
-                {showRentalBrokerage && (
+                {brokerageType === "Days" && (
                    <div className="space-y-2">
                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Brokerage Days</label>
                      <Input type="number" name="brokerage_days" defaultValue={inboundData?.brokerage_days || ""} placeholder="e.g. 15" className="h-12 rounded-xl bg-muted/30" />
