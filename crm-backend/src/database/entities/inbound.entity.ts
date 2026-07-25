@@ -42,6 +42,16 @@ export class Inbound {
   @Column({ type: 'text', nullable: true })
   budget_details: string;
 
+  // Rent Details
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  total_rent: number;
+
+  @Column({ type: 'varchar', nullable: true })
+  advance: string;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  rent_per_sqft: number;
+
   @Column({ type: 'varchar', nullable: true })
   floor_number: string;
 
@@ -100,6 +110,18 @@ export class Inbound {
   // Contact Info
   @Column({ type: 'varchar', nullable: true })
   primary_contact: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  primary_contact_name: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  primary_contact_number: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  key_contact_name: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  key_contact_number: string;
 
   @Column({ type: 'varchar', nullable: true })
   building_manager_name: string;

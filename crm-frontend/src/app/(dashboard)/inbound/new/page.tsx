@@ -94,6 +94,7 @@ const PRIMARY_CONTACTS = [
 
 const KEY_AVAILABLE_WITH = [
   { label: "Owner", value: "Owner" },
+  { label: "Primary Contact", value: "Primary Contact" },
   { label: "Manager", value: "Manager" },
   { label: "Security", value: "Security" },
   { label: "Tenant", value: "Tenant" },
@@ -134,7 +135,9 @@ function InboundForm() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedPurpose, setSelectedPurpose] = useState<string | null>(null);
+  const [selectedSpecialPurposes, setSelectedSpecialPurposes] = useState<string[]>([]);
   const [primaryContact, setPrimaryContact] = useState<string | null>(null);
+  const [keyAvailableWith, setKeyAvailableWith] = useState<string | null>(null);
   
   // Brokerage States
   const [brokerageAccepted, setBrokerageAccepted] = useState<string | null>(null);
@@ -181,7 +184,12 @@ function InboundForm() {
             setSelectedCategory(data.property_category || null);
             setSelectedType(data.property_type || null);
             setSelectedPurpose(data.purpose || null);
+            
+            const specialPurposes = data.special_purpose ? data.special_purpose.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
+            setSelectedSpecialPurposes(specialPurposes);
+
             setPrimaryContact(data.primary_contact || null);
+            setKeyAvailableWith(data.key_available_with || null);
             
             setBrokerageAccepted(data.brokerage_accepted || null);
             if (data.brokerage_paid_by) {
@@ -248,14 +256,19 @@ function InboundForm() {
       payload.property_category = selectedCategory;
       payload.property_type = selectedType;
       payload.purpose = selectedPurpose;
-      payload.special_purpose = formData.get("special_purpose") || null;
-      payload.budget_details = formData.get("budget_details") || null;
+      payload.special_purpose = selectedSpecialPurposes.length > 0 ? selectedSpecialPurposes.join(", ") : null;
+      
+      payload.advance = formData.get("advance") || null;
+
+      if (selectedPurpose === "Rent") {
+        payload.total_rent = formData.get("total_rent") ? parseFloat(formData.get("total_rent") as string) : null;
+        payload.rent_per_sqft = formData.get("rent_per_sqft") ? parseFloat(formData.get("rent_per_sqft") as string) : null;
+      }
+
       payload.floor_number = formData.get("floor_number") || null;
       payload.brokerage_days = formData.get("brokerage_days") ? parseInt(formData.get("brokerage_days") as string, 10) : null;
       payload.primary_contact = primaryContact;
-      payload.security_name = formData.get("security_name") || null;
-      payload.broker_name = formData.get("broker_name") || null;
-      payload.broker_mobile = formData.get("broker_mobile") || null;
+      payload.key_available_with = keyAvailableWith;
       payload.brokerage_accepted = brokerageAccepted;
       payload.brokerage_paid_by = brokeragePaidBy;
       payload.brokerage_type = brokerageType;
@@ -394,15 +407,71 @@ function InboundForm() {
               />
             </div>
             
-            <div className="space-y-2 lg:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Special Purpose (Optional)</label>
-              <Input name="special_purpose" defaultValue={inboundData?.special_purpose || ""} placeholder="e.g. Renting for Grocery shop" className="h-12 rounded-xl bg-muted/30" />
-            </div>
-            
             <div className="space-y-2 lg:col-span-3">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Budget Details (Optional)</label>
-              <Input name="budget_details" defaultValue={inboundData?.budget_details || ""} placeholder="e.g. Max budget is 50,000 / month" className="h-12 rounded-xl bg-muted/30" />
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">Special Purpose (Optional)</label>
+              <div className="flex flex-wrap gap-2.5 pt-1">
+                {["Salon", "Spa", "Restaurant", "Gym"].map((sp) => {
+                  const isSelected = selectedSpecialPurposes.includes(sp);
+                  return (
+                    <button
+                      type="button"
+                      key={sp}
+                      onClick={() => {
+                        if (isSelected) {
+                          setSelectedSpecialPurposes(selectedSpecialPurposes.filter((s) => s !== sp));
+                        } else {
+                          setSelectedSpecialPurposes([...selectedSpecialPurposes, sp]);
+                        }
+                      }}
+                      className={`px-4 py-2 text-[13px] font-medium rounded-xl border transition-all ${
+                        isSelected
+                          ? "bg-[#0052FF] text-white border-[#0052FF] shadow-sm shadow-blue-500/20"
+                          : "bg-muted/40 text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground"
+                      }`}
+                    >
+                      {sp}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
+            {selectedPurpose === "Rent" && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Total Rent</label>
+                <Input type="number" name="total_rent" defaultValue={inboundData?.total_rent || ""} placeholder="e.g. 15000" className="h-12 rounded-xl bg-muted/30" />
+              </div>
+            )}
+            
+            {(selectedPurpose === "Rent" || selectedPurpose === "Sale" || selectedPurpose === "Lease" || selectedPurpose) && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Advance {selectedPurpose === "Rent" ? "(Months)" : ""}</label>
+                {selectedPurpose === "Rent" ? (
+                  <FormSelect
+                    name="advance"
+                    placeholder="Select Advance"
+                    defaultValue={inboundData?.advance || null}
+                    options={[
+                      { label: "1 Month", value: "1" },
+                      { label: "2 Months", value: "2" },
+                      { label: "3 Months", value: "3" },
+                      { label: "4 Months", value: "4" },
+                      { label: "5 Months", value: "5" },
+                      { label: "6 Months", value: "6" },
+                    ]}
+                  />
+                ) : (
+                  <Input type="text" name="advance" defaultValue={inboundData?.advance || ""} placeholder={selectedPurpose === "Sale" ? "e.g. 5 Lakhs" : "e.g. 1 Lakh"} className="h-12 rounded-xl bg-muted/30" />
+                )}
+              </div>
+            )}
+
+            {selectedPurpose === "Rent" && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Rent per Sq Ft</label>
+                <Input type="number" step="0.01" name="rent_per_sqft" defaultValue={inboundData?.rent_per_sqft || ""} placeholder="e.g. 25.5" className="h-12 rounded-xl bg-muted/30" />
+              </div>
+            )}
 
             {selectedType && FLOOR_APPLICABLE_TYPES.includes(selectedType) && (
               <div className="space-y-2">
@@ -514,64 +583,45 @@ function InboundForm() {
               />
             </div>
 
-            {primaryContact === "Building Manager" && (
+            {primaryContact && primaryContact !== "Owner" && (
               <>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Manager Name</label>
-                  <Input name="building_manager_name" defaultValue={inboundData?.building_manager_name || ""} placeholder="Name" required className="h-12 rounded-xl bg-muted/30" />
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contact Name</label>
+                  <Input name="primary_contact_name" defaultValue={inboundData?.primary_contact_name || ""} placeholder="Name" className="h-12 rounded-xl bg-muted/30" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Manager Mobile</label>
-                  <Input name="manager_mobile" defaultValue={inboundData?.manager_mobile || ""} placeholder="Mobile" required className="h-12 rounded-xl bg-muted/30" />
-                </div>
-              </>
-            )}
-
-            {primaryContact === "Caretaker" && (
-              <>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Caretaker Name</label>
-                  <Input name="caretaker_name" defaultValue={inboundData?.caretaker_name || ""} placeholder="Name" required className="h-12 rounded-xl bg-muted/30" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Caretaker Mobile</label>
-                  <Input name="caretaker_mobile" defaultValue={inboundData?.caretaker_mobile || ""} placeholder="Mobile" required className="h-12 rounded-xl bg-muted/30" />
-                </div>
-              </>
-            )}
-
-            {primaryContact === "Security" && (
-              <>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Security Name</label>
-                  <Input name="security_name" defaultValue={inboundData?.security_name || ""} placeholder="Name" required className="h-12 rounded-xl bg-muted/30" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Security Contact</label>
-                  <Input name="security_contact" defaultValue={inboundData?.security_contact || ""} placeholder="Contact Info" required className="h-12 rounded-xl bg-muted/30" />
-                </div>
-              </>
-            )}
-
-            {primaryContact === "Broker" && (
-              <>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Broker Name</label>
-                  <Input name="broker_name" defaultValue={inboundData?.broker_name || ""} placeholder="Name" required className="h-12 rounded-xl bg-muted/30" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Broker Mobile</label>
-                  <Input name="broker_mobile" defaultValue={inboundData?.broker_mobile || ""} placeholder="Mobile" required className="h-12 rounded-xl bg-muted/30" />
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contact Number</label>
+                  <Input name="primary_contact_number" defaultValue={inboundData?.primary_contact_number || ""} placeholder="Mobile Number" className="h-12 rounded-xl bg-muted/30" />
                 </div>
               </>
             )}
 
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Key Available With</label>
-              <FormSelect name="key_available_with" defaultValue={inboundData?.key_available_with || null} placeholder="Select" options={KEY_AVAILABLE_WITH} required />
+              <FormSelect 
+                name="_key_available_with" 
+                value={keyAvailableWith}
+                onValueChange={setKeyAvailableWith}
+                placeholder="Select" 
+                options={KEY_AVAILABLE_WITH} 
+                required 
+              />
             </div>
+
+            {keyAvailableWith && keyAvailableWith !== "Owner" && keyAvailableWith !== "Primary Contact" && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Key Contact Name</label>
+                  <Input name="key_contact_name" defaultValue={inboundData?.key_contact_name || ""} placeholder="Name" className="h-12 rounded-xl bg-muted/30" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Key Contact Number</label>
+                  <Input name="key_contact_number" defaultValue={inboundData?.key_contact_number || ""} placeholder="Mobile Number" className="h-12 rounded-xl bg-muted/30" />
+                </div>
+              </>
+            )}
             
-            <div className="flex items-center space-x-2 lg:col-span-2 pt-6">
+            <div className="flex items-center space-x-2 lg:col-span-3 pt-6 border-t mt-4 border-border/50">
               <Checkbox id="priorAppointment" checked={priorAppointmentRequired} onCheckedChange={(c) => setPriorAppointmentRequired(!!c)} />
               <label htmlFor="priorAppointment" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                 Prior Appointment Required

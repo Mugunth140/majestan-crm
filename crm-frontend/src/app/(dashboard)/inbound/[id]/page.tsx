@@ -464,10 +464,24 @@ export default function InboundViewPage() {
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Special Purpose</p>
                 <p className="text-[14px] font-medium text-foreground">{inbound.special_purpose || "\u2014"}</p>
               </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Budget Details</p>
-                <p className="text-[14px] font-medium text-foreground">{inbound.budget_details || "\u2014"}</p>
-              </div>
+              {inbound.purpose === "Rent" && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Total Rent</p>
+                  <p className="text-[14px] font-medium text-foreground">{inbound.total_rent ? `₹${Number(inbound.total_rent).toLocaleString()}` : "\u2014"}</p>
+                </div>
+              )}
+              {inbound.advance && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Advance {inbound.purpose === "Rent" ? "(Months)" : ""}</p>
+                  <p className="text-[14px] font-medium text-foreground">{inbound.advance} {inbound.purpose === "Rent" ? "Months" : ""}</p>
+                </div>
+              )}
+              {inbound.purpose === "Rent" && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Rent per Sq Ft</p>
+                  <p className="text-[14px] font-medium text-foreground">{inbound.rent_per_sqft ? `₹${inbound.rent_per_sqft}` : "\u2014"}</p>
+                </div>
+              )}
               {inbound.floor_number && (
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Floor Number</p>
@@ -723,6 +737,57 @@ export default function InboundViewPage() {
                     )}
                   </div>
                 </div>
+
+                <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
+                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Primary Contact Role</span>
+                  <span className="font-medium text-[14px]">{inbound.primary_contact || "\u2014"}</span>
+                </div>
+
+                {inbound.primary_contact && inbound.primary_contact !== "Owner" && (
+                  <>
+                    <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
+                      <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Primary Name</span>
+                      <span className="font-medium text-[14px]">{inbound.primary_contact_name || "\u2014"}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
+                      <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Primary Number</span>
+                      <div className="flex items-center gap-3">
+                        <span className="font-medium text-[14px]">{inbound.primary_contact_number || "\u2014"}</span>
+                        {inbound.primary_contact_number && (
+                          <Button variant="outline" size="icon" className="h-7 w-7 rounded-full bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700" onClick={() => openContact("call", inbound.primary_contact_number)}>
+                            <Phone className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
+                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Key Available With</span>
+                  <span className="font-medium text-[14px]">{inbound.key_available_with || "\u2014"}</span>
+                </div>
+
+                {inbound.key_available_with && inbound.key_available_with !== "Owner" && inbound.key_available_with !== "Primary Contact" && (
+                  <>
+                    <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
+                      <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Key Name</span>
+                      <span className="font-medium text-[14px]">{inbound.key_contact_name || "\u2014"}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
+                      <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Key Number</span>
+                      <div className="flex items-center gap-3">
+                        <span className="font-medium text-[14px]">{inbound.key_contact_number || "\u2014"}</span>
+                        {inbound.key_contact_number && (
+                          <Button variant="outline" size="icon" className="h-7 w-7 rounded-full bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700" onClick={() => openContact("call", inbound.key_contact_number)}>
+                            <Phone className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+
              </div>
             </div>
 
