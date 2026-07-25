@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-fetch";
+
 import { useEffect, useState, Suspense } from "react";
 import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
@@ -25,7 +27,7 @@ function UsersList() {
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
-      const res = await fetch(API_URL + "/users");
+      const res = await apiFetch(API_URL + "/users");
       const data = await res.json();
       if (data.success) {
         setUsers(data.data);
@@ -48,7 +50,7 @@ function UsersList() {
   const handleDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(API_URL + "/users/" + deleteId, { method: "DELETE" });
+      const res = await apiFetch(API_URL + "/users/" + deleteId, { method: "DELETE" });
       if (res.ok) {
         toast.success("User deactivated successfully");
         fetchUsers();

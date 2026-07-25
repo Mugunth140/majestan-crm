@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-fetch";
+
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import { format } from "date-fns";
@@ -65,7 +67,7 @@ function AgentForm() {
     const fetchMasterData = async () => {
       try {
         setIsFetchingData(true);
-        const res = await fetch(API_URL + "/master/cities");
+        const res = await apiFetch(API_URL + "/master/cities");
         const cityData = await res.json();
         if (cityData.success) setCities(cityData.data);
       } catch {
@@ -134,7 +136,7 @@ function AgentForm() {
       const method = editId ? "PUT" : "POST";
       const endpoint = API_URL + (editId ? "/agents/" + editId : "/agents");
 
-      const res = await fetch(endpoint, {
+      const res = await apiFetch(endpoint, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

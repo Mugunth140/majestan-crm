@@ -1,10 +1,12 @@
-import { Controller, Get, Post, Param, Body, Req, Query } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Req, Query, UseGuards } from '@nestjs/common';
 import { LeadRoutingService } from './lead-routing.service';
 import { AssignLeadDto } from './dto/assign-lead.dto';
 import { TransferFeedbackDto } from './dto/transfer-feedback.dto';
 import { ConvertLeadDto } from './dto/convert-lead.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('api/v1/lead-routing')
+@UseGuards(JwtAuthGuard)
 export class LeadRoutingController {
   constructor(private readonly leadRoutingService: LeadRoutingService) {}
 
@@ -56,12 +58,7 @@ export class LeadRoutingController {
   // ── POST /claim/:leadId ────────────────────────────────────────────────────
   @Post('claim/:leadId')
   async claimLead(@Param('leadId') leadId: string, @Body() body: any, @Req() req: any) {
-    // TODO: add auth guard
-    const user = req.user;
-    const requestingUserId: number = body?.actioned_by_id || user?.sub || user?.id || 0;
-    if (!requestingUserId) {
-      throw new Error('User ID is required to claim a lead');
-    }
+    const requestingUserId: number = body?.actioned_by_id || req.user.sub;
     const data = await this.leadRoutingService.claimLead(Number(leadId), requestingUserId);
     return { success: true, data };
   }
@@ -73,9 +70,7 @@ export class LeadRoutingController {
     @Body() body: AssignLeadDto & { actioned_by_id?: number },
     @Req() req: any,
   ) {
-    // TODO: add auth guard
-    const user = req.user;
-    const actionedById: number | null = body.actioned_by_id || user?.sub || user?.id || null;
+    const actionedById: number | null = body.actioned_by_id || req.user.sub || null;
     const data = await this.leadRoutingService.assignLead(
       Number(leadId),
       body.to_user_id,
@@ -92,9 +87,7 @@ export class LeadRoutingController {
     @Body() body: TransferFeedbackDto & { actioned_by_id?: number },
     @Req() req: any,
   ) {
-    // TODO: add auth guard
-    const user = req.user;
-    const requestingUserId: number = body.actioned_by_id || user?.sub || user?.id || 0;
+    const requestingUserId: number = body.actioned_by_id || req.user.sub;
     await this.leadRoutingService.siteVisitComplete(
       Number(leadId),
       requestingUserId,
@@ -110,9 +103,7 @@ export class LeadRoutingController {
     @Body() body: TransferFeedbackDto,
     @Req() req: any,
   ) {
-    // TODO: add auth guard
-    const user = req.user;
-    const requestingUserId: number = user?.sub ?? user?.id ?? 0;
+    const requestingUserId: number = req.user.sub;
     await this.leadRoutingService.rnr5Release(
       Number(leadId),
       requestingUserId,
@@ -128,9 +119,7 @@ export class LeadRoutingController {
     @Body() body: ConvertLeadDto,
     @Req() req: any,
   ) {
-    // TODO: add auth guard
-    const user = req.user;
-    const requestingUserId: number = user?.sub ?? user?.id ?? 0;
+    const requestingUserId: number = req.user.sub;
     await this.leadRoutingService.convertLead(
       Number(leadId),
       body.convert_to,

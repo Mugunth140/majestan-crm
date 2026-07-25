@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-fetch";
+
 import { useState, useEffect, useCallback } from "react";
 import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
@@ -28,7 +30,7 @@ export default function LeadSourcesMasterPage() {
   const fetchSources = useCallback(async () => {
     try {
       setIsLoading(true);
-      const res = await fetch(`${API_URL}/master/all-lead-sources`);
+      const res = await apiFetch(`${API_URL}/master/all-lead-sources`);
       const data = await res.json();
       if (data.success) {
         setSources(data.data);
@@ -50,7 +52,7 @@ export default function LeadSourcesMasterPage() {
     
     setIsSubmitting(true);
     try {
-      const res = await fetch(`${API_URL}/master/lead-sources`, {
+      const res = await apiFetch(`${API_URL}/master/lead-sources`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: formData.name.trim() })
@@ -77,7 +79,7 @@ export default function LeadSourcesMasterPage() {
     
     setIsSubmitting(true);
     try {
-      const res = await fetch(`${API_URL}/master/lead-sources/${selectedSource.id}`, {
+      const res = await apiFetch(`${API_URL}/master/lead-sources/${selectedSource.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: formData.name.trim(), is_active: formData.is_active })
@@ -101,7 +103,7 @@ export default function LeadSourcesMasterPage() {
     if (!selectedSource) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch(`${API_URL}/master/lead-sources/${selectedSource.id}`, {
+      const res = await apiFetch(`${API_URL}/master/lead-sources/${selectedSource.id}`, {
         method: "DELETE",
       });
       const data = await res.json();

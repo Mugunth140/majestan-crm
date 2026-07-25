@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-fetch";
+
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
@@ -28,7 +30,7 @@ export default function AssetInventoryPage() {
   const fetchAssets = useCallback(async () => {
     try {
       setIsLoading(true);
-      const res = await fetch(API_URL + "/assets");
+      const res = await apiFetch(API_URL + "/assets");
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
         setAssets(data.data);
@@ -50,7 +52,7 @@ export default function AssetInventoryPage() {
   const handleDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete this asset?")) return;
     try {
-      const res = await fetch(API_URL + "/assets/" + id, { method: "DELETE" });
+      const res = await apiFetch(API_URL + "/assets/" + id, { method: "DELETE" });
       if (res.ok) {
         toast.success("Asset deleted successfully");
         fetchAssets();

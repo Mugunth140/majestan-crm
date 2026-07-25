@@ -1,4 +1,7 @@
 "use client";
+
+import { apiFetch } from "@/lib/api-fetch";
+
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -78,7 +81,7 @@ function HrCandidateForm() {
       const url = editId ? `${API_URL}/hr/${editId}` : `${API_URL}/hr`;
       const method = editId ? "PATCH" : "POST";
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method, 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)
@@ -91,7 +94,7 @@ function HrCandidateForm() {
       if (resumeFile && candidateId) {
         const fileData = new FormData();
         fileData.append("file", resumeFile);
-        await fetch(`${API_URL}/hr/${candidateId}/upload/resume`, {
+        await apiFetch(`${API_URL}/hr/${candidateId}/upload/resume`, {
           method: "POST",
           body: fileData
         });

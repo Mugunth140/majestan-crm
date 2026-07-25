@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-fetch";
+
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
@@ -58,7 +60,7 @@ export default function InboundPage() {
   const fetchInbounds = useCallback(async () => {
     try {
       setIsLoading(true);
-      const res = await fetch(API_URL + "/inbounds");
+      const res = await apiFetch(API_URL + "/inbounds");
       const data = await res.json();
       if (Array.isArray(data)) {
         setInbounds(data);
@@ -170,7 +172,7 @@ export default function InboundPage() {
   const handleDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(API_URL + "/inbounds/" + deleteId, { method: "DELETE" });
+      const res = await apiFetch(API_URL + "/inbounds/" + deleteId, { method: "DELETE" });
       if (res.ok) {
         toast.success("Inbound property deleted successfully");
         fetchInbounds();
@@ -183,7 +185,6 @@ export default function InboundPage() {
       setDeleteId(null);
     }
   };
-
 
   const columns: ColumnDef<any>[] = [
     {

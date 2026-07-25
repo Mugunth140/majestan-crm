@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-fetch";
+
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -12,7 +14,7 @@ interface StaffMember {
   id: number;
   name: string;
   department?: { name: string };
-  lead_count?: number;
+  current_lead_count?: number;
 }
 
 interface AssignLeadModalProps {
@@ -36,7 +38,7 @@ export function AssignLeadModal({ open, onClose, onConfirm, department, isLoadin
       setIsFetching(true);
       try {
         const params = department ? `?department=${encodeURIComponent(department.toLowerCase())}` : "";
-        const res = await fetch(`${API_URL}/lead-routing/staff-list${params}`);
+        const res = await apiFetch(`${API_URL}/lead-routing/staff-list${params}`);
         const data = await res.json();
         if (data.success) setStaffList(data.data);
         else toast.error("Failed to load staff list");
@@ -98,7 +100,7 @@ export function AssignLeadModal({ open, onClose, onConfirm, department, isLoadin
                   )}
                 </div>
                 <span className="text-xs font-bold text-muted-foreground shrink-0">
-                  {s.lead_count ?? 0} leads
+                  {s.current_lead_count ?? 0} leads
                 </span>
               </button>
             ))

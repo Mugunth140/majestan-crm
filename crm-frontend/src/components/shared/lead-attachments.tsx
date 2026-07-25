@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-fetch";
+
 import React, { useState, useRef } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -49,7 +51,7 @@ export function LeadAttachments({ leadId, documents = [], onRefresh }: LeadAttac
     formData.append("file", file);
 
     try {
-      const res = await fetch(`${API_URL}/leads/${leadId}/documents`, {
+      const res = await apiFetch(`${API_URL}/leads/${leadId}/documents`, {
         method: "POST",
         body: formData,
       });
@@ -72,7 +74,7 @@ export function LeadAttachments({ leadId, documents = [], onRefresh }: LeadAttac
     if (!confirm("Are you sure you want to delete this document?")) return;
     setDeletingId(docId);
     try {
-      const res = await fetch(`${API_URL}/leads/${leadId}/documents/${docId}`, {
+      const res = await apiFetch(`${API_URL}/leads/${leadId}/documents/${docId}`, {
         method: "DELETE",
       });
       const data = await res.json();

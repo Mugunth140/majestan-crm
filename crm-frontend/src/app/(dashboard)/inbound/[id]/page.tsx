@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-fetch";
+
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { format } from "date-fns";
@@ -230,7 +232,7 @@ export default function InboundViewPage() {
     if (!silent) setIsLoading(true);
     else setIsRefreshing(true);
     try {
-      const res = await fetch(`${API_URL}/inbounds/${id}`);
+      const res = await apiFetch(`${API_URL}/inbounds/${id}`);
       const result = await res.json();
       if (result && (result.id || result.property_id)) {
         setInbound(result.data || result);
@@ -253,7 +255,7 @@ export default function InboundViewPage() {
     if (!newStatus || newStatus === inbound.status) return;
     setIsUpdatingStatus(true);
     try {
-      const res = await fetch(`${API_URL}/inbounds/${id}`, {
+      const res = await apiFetch(`${API_URL}/inbounds/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
@@ -306,7 +308,7 @@ export default function InboundViewPage() {
       followUpTime: format(now, "HH:mm"),
     };
     try {
-      const res = await fetch(`${API_URL}/inbounds/${id}/follow-ups`, {
+      const res = await apiFetch(`${API_URL}/inbounds/${id}/follow-ups`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -554,7 +556,6 @@ export default function InboundViewPage() {
                  </div>
               </div>
             </div>
-
 
           </div>
         </div>

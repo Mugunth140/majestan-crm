@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-fetch";
+
 import React, { useState, useEffect } from "react";
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
@@ -146,7 +148,7 @@ export function FollowUpPanel({ entityId, entityType, followUps, onRefresh }: Fo
     if (!editFu) return;
     setIsSavingEdit(true);
     try {
-      const res = await fetch(`${API_URL}/${entityType}/${entityId}/follow-ups/${editFu.id}`, {
+      const res = await apiFetch(`${API_URL}/${entityType}/${entityId}/follow-ups/${editFu.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editFuForm),
@@ -167,7 +169,7 @@ export function FollowUpPanel({ entityId, entityType, followUps, onRefresh }: Fo
   const handleDeleteFu = async (fuId: number) => {
     if (!confirm("Are you sure you want to delete this follow-up?")) return;
     try {
-      const res = await fetch(`${API_URL}/${entityType}/${entityId}/follow-ups/${fuId}`, {
+      const res = await apiFetch(`${API_URL}/${entityType}/${entityId}/follow-ups/${fuId}`, {
         method: "DELETE",
       });
       const data = await res.json();

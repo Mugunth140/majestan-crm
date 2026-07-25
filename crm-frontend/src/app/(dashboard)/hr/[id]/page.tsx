@@ -1,4 +1,7 @@
 "use client";
+
+import { apiFetch } from "@/lib/api-fetch";
+
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -122,7 +125,7 @@ export default function HrDetail() {
   const fetchCandidate = async () => {
     if (!id) return;
     try {
-      const res = await fetch(`${API_URL}/hr/${id}`);
+      const res = await apiFetch(`${API_URL}/hr/${id}`);
       const data = await res.json();
       setCandidate(data);
       setSelectedStatus(data.status || "New Application");
@@ -135,7 +138,7 @@ export default function HrDetail() {
     if (!newStatus || newStatus === candidate.status) return;
     setIsUpdatingStatus(true);
     try {
-      const res = await fetch(`${API_URL}/hr/${id}`, {
+      const res = await apiFetch(`${API_URL}/hr/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
@@ -163,7 +166,7 @@ export default function HrDetail() {
     const formData = new FormData(); 
     formData.append("file", file);
     try {
-      await fetch(`${API_URL}/hr/${id}/upload/${docType}`, { method: "POST", body: formData });
+      await apiFetch(`${API_URL}/hr/${id}/upload/${docType}`, { method: "POST", body: formData });
       toast.success("Document uploaded successfully");
       fetchCandidate();
     } catch (err) {
@@ -174,7 +177,7 @@ export default function HrDetail() {
   const handleSaveFollowUp = async () => {
     setIsSavingFu(true);
     try {
-      const res = await fetch(`${API_URL}/hr/${id}/follow-ups`, {
+      const res = await apiFetch(`${API_URL}/hr/${id}/follow-ups`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newFollowUp),
@@ -297,9 +300,7 @@ export default function HrDetail() {
               </div>
             </div>
 
-
             {/* ── Row 3: Documents ── */}
-
 
         <div className="bg-card border rounded-2xl p-6 shadow-sm">
           <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">

@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-fetch";
+
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -94,7 +96,7 @@ function AssetForm() {
       };
 
       // 1. Create or Update Asset
-      const res = await fetch(`${API_URL}/assets${editId ? `/${editId}` : ""}`, {
+      const res = await apiFetch(`${API_URL}/assets${editId ? `/${editId}` : ""}`, {
         method: editId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -115,7 +117,7 @@ function AssetForm() {
         if (documentFile) mediaForm.append("document", documentFile);
         imageFiles.forEach(img => mediaForm.append("images", img));
 
-        const mediaRes = await fetch(`${API_URL}/assets/${assetId}/media`, {
+        const mediaRes = await apiFetch(`${API_URL}/assets/${assetId}/media`, {
           method: "POST",
           body: mediaForm
         });

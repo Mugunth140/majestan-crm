@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-fetch";
+
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
@@ -108,7 +110,7 @@ export default function LeadsPage() {
   const fetchLeads = useCallback(async () => {
     try {
       setIsLoading(true);
-      const res = await fetch(API_URL + "/leads");
+      const res = await apiFetch(API_URL + "/leads");
       const data = await res.json();
       if (data.success) setLeads(data.data);
     } catch {
@@ -137,7 +139,7 @@ export default function LeadsPage() {
     // Department filter for TeamLead / Manager / Admin
     if (role !== "Staff") {
       filtered = filtered.filter((l) => {
-        const dept = (l.department?.name || l.departmentName || "").toLowerCase();
+        const dept = (l.department ?? "").toLowerCase();
         return !dept || dept === deptFilter;
       });
     }
@@ -238,7 +240,7 @@ export default function LeadsPage() {
   const handleDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(API_URL + "/leads/" + deleteId, { method: "DELETE" });
+      const res = await apiFetch(API_URL + "/leads/" + deleteId, { method: "DELETE" });
       if (res.ok) {
         toast.success("Lead deleted successfully");
         fetchLeads();
@@ -262,7 +264,7 @@ export default function LeadsPage() {
         if (stored) currentUserId = JSON.parse(stored).id;
       } catch {}
 
-      const res = await fetch(`${API_URL}/lead-routing/assign/${assignLeadId}`, {
+      const res = await apiFetch(`${API_URL}/lead-routing/assign/${assignLeadId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ to_user_id: toUserId, actioned_by_id: currentUserId || null }),
@@ -406,7 +408,7 @@ export default function LeadsPage() {
                 className="h-8 text-xs font-medium bg-background hover:bg-muted text-muted-foreground hover:text-foreground"
                 onClick={async () => {
                   try {
-                    const res = await fetch(`${API_URL}/leads/${row.original.rawId}/status`, {
+                    const res = await apiFetch(`${API_URL}/leads/${row.original.rawId}/status`, {
                       method: "PUT",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ is_unqualified: false }),
@@ -544,7 +546,7 @@ export default function LeadsPage() {
          propertyType: p.propertyType,
       }));
       
-      const res = await fetch(API_URL + "/leads/bulk", {
+      const res = await apiFetch(API_URL + "/leads/bulk", {
          method: "POST",
          headers: { "Content-Type": "application/json" },
          body: JSON.stringify({ leads: payload })

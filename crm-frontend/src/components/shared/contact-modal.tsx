@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api-fetch";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -40,7 +41,7 @@ export function ContactModal({ open, type, to, entityId, entityType, onClose, on
   const handleSend = async () => {
     setIsSending(true);
     try {
-      await fetch(`${API_URL}/${entityType}/${entityId}/contact-log`, {
+      await apiFetch(`${API_URL}/${entityType}/${entityId}/contact-log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contact_type: type, subject, message }),

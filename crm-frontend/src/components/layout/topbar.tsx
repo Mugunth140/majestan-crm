@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-fetch";
 import { Bell, Moon, Sun, UserCircle, LogOut, X, Trash2 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -66,7 +67,7 @@ export function Topbar() {
   // Fetch notifications
   const fetchNotifications = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/notifications`, { credentials: "include" });
+      const res = await apiFetch(`${API_URL}/notifications`, { credentials: "include" });
       if (!res.ok) return;
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
@@ -101,7 +102,7 @@ export function Topbar() {
 
   const handleDeleteNotification = async (id: number, leadId?: number) => {
     try {
-      await fetch(`${API_URL}/notifications/${id}`, { method: "DELETE", credentials: "include" });
+      await apiFetch(`${API_URL}/notifications/${id}`, { method: "DELETE", credentials: "include" });
       setNotifications((prev) => prev.filter((n) => n.id !== id));
       if (leadId) {
         router.push(`/leads/${leadId}`);
@@ -112,9 +113,27 @@ export function Topbar() {
     }
   };
 
+  const handleMarkRead = async (id: number) => {
+    try {
+      await apiFetch(`${API_URL}/notifications/${id}/read`, { method: "PATCH", credentials: "include" });
+      setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, is_read: true } : n));
+    } catch {
+      // silently ignore
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await apiFetch(`${API_URL}/notifications/read-all`, { method: "PATCH", credentials: "include" });
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    } catch {
+      toast.error("Failed to mark notifications as read");
+    }
+  };
+
   const handleClearAll = async () => {
     try {
-      await fetch(`${API_URL}/notifications/all`, { method: "DELETE", credentials: "include" });
+      await apiFetch(`${API_URL}/notifications/all`, { method: "DELETE", credentials: "include" });
       setNotifications([]);
       toast.success("All notifications cleared");
     } catch {
@@ -179,6 +198,16 @@ export function Topbar() {
                   )}
                 </span>
                 <div className="flex items-center gap-1">
+                  {unreadCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-[#0052FF] hover:text-[#0052FF]/80 px-2"
+                      onClick={handleMarkAllRead}
+                    >
+                      Mark all read
+                    </Button>
+                  )}
                   {notifications.length > 0 && (
                     <Button
                       variant="ghost"
@@ -211,8 +240,9 @@ export function Topbar() {
                   notifications.map((n) => (
                     <div
                       key={n.id}
-                      className="flex items-start gap-3 px-4 py-3 hover:bg-muted/30 transition-colors group cursor-pointer"
+                      className={["flex items-start gap-3 px-4 py-3 hover:bg-muted/30 transition-colors group cursor-pointer", !n.is_read ? "bg-blue-50/40 dark:bg-blue-950/20" : ""].join(" ")}
                       onClick={() => {
+                        if (!n.is_read) handleMarkRead(n.id);
                         if (n.lead_id) {
                           handleDeleteNotification(n.id, n.lead_id);
                         }
@@ -220,7 +250,8 @@ export function Topbar() {
                     >
                       <div className="flex-1 min-w-0">
                         {n.title && (
-                          <p className="text-[13px] font-semibold text-foreground leading-tight truncate">
+                          <p className={["text-[13px] font-semibold leading-tight truncate", !n.is_read ? "text-foreground" : "text-muted-foreground"].join(" ")}>
+                            {!n.is_read && <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#0052FF] mr-1.5 mb-0.5" />}
                             {n.title}
                           </p>
                         )}

@@ -7,6 +7,7 @@ import { LeadInquiry } from '../../database/entities/lead-inquiry.entity';
 import { ContactLog } from '../../database/entities/contact-log.entity';
 import { User } from '../../database/entities/user.entity';
 import { LeadDocument } from '../../database/entities/lead-document.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 import { S3Client } from 'bun';
 import { extname } from 'path';
 
@@ -23,6 +24,7 @@ export class LeadsService {
   constructor(
     @InjectDataSource() private dataSource: DataSource,
     @InjectDataSource('siteConnection') private siteDataSource: DataSource,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   private get s3Client(): S3Client {
@@ -83,7 +85,8 @@ export class LeadsService {
 
   // ── Follow-Up CRUD ────────────────────────────────────────────────────────
   async addFollowUp(leadId: number, body: any) {
-    const lead = await this.dataSource.getRepository(Lead).findOne({ where: { id: leadId } });
+    const leadRepo = this.dataSource.getRepository(Lead);
+    const lead = await leadRepo.findOne({ where: { id: leadId } });
     if (!lead) throw new NotFoundException('Lead not found');
 
     const repo = this.dataSource.getRepository(LeadFollowUp);
@@ -99,7 +102,37 @@ export class LeadsService {
     followUp.rnr = body.rnr || null;
     followUp.notes = body.notes || null;
     followUp.created_by_id = body.createdById || null;
-    return repo.save(followUp);
+    const saved = await repo.save(followUp);
+
+    // Update rnr_consecutive_count on the lead based on the rnr field (e.g. 'rnr3' → count 3)
+    if (body.rnr && typeof body.rnr === 'string') {
+      const match = body.rnr.match(/rnr(\d+)/i);
+      if (match) {
+        lead.rnr_consecutive_count = parseInt(match[1], 10);
+        await leadRepo.save(lead);
+      }
+    } else if (!body.rnr) {
+      // Non-RNR follow-up resets the consecutive count
+      if (lead.rnr_consecutive_count > 0) {
+        lead.rnr_consecutive_count = 0;
+        await leadRepo.save(lead);
+      }
+    }
+
+    // Send followup_due notification to assigned staff when a next follow-up date is scheduled
+    if (body.nextFollowUpDate && lead.assigned_staff_id) {
+      const leadDisplayId = `L${String(leadId).padStart(5, '0')}`;
+      await this.notificationsService.createNotification(
+        lead.assigned_staff_id,
+        'Follow-up Scheduled',
+        `A follow-up for Lead ${leadDisplayId} is scheduled on ${body.nextFollowUpDate}`,
+        'followup_due',
+        leadId,
+        'lead',
+      );
+    }
+
+    return saved;
   }
 
   async updateFollowUp(leadId: number, followUpId: number, body: any) {
@@ -327,6 +360,7 @@ export class LeadsService {
         l.mobile_number as mobile, 
         l.email, 
         l.status, 
+        l.department,
         l.lead_source as source, 
         l.is_unqualified as isUnqualified, 
         l.created_at as createdAt,
@@ -376,6 +410,7 @@ export class LeadsService {
       assignedStaffId: row.assignedStaffId,
       source: row.source ?? '',
       status: row.status ?? 'New Lead',
+      department: row.department ?? 'telecalling',
       notes: '',
       nextFollowUpDate: row.nextFollowUpDate || null,
       lastFollowedUpDate: row.lastFollowedUpDate || null,

@@ -25,6 +25,7 @@ export class NotificationsService {
       type,
       entity_id: entityId ?? null,
       entity_type: entityType ?? null,
+      is_read: false,
     });
     return this.notificationRepo.save(notification);
   }
@@ -34,6 +35,14 @@ export class NotificationsService {
       where: { user_id: userId },
       order: { created_at: 'DESC' },
     });
+  }
+
+  async markAsRead(id: number, userId: number): Promise<void> {
+    await this.notificationRepo.update({ id, user_id: userId }, { is_read: true });
+  }
+
+  async markAllAsRead(userId: number): Promise<void> {
+    await this.notificationRepo.update({ user_id: userId }, { is_read: true });
   }
 
   async deleteNotification(id: number, userId: number): Promise<void> {
@@ -52,7 +61,7 @@ export class NotificationsService {
       .orderBy('n.created_at', 'DESC')
       .getMany();
 
-    const unread_count = await this.notificationRepo.count({ where: { user_id: userId } });
+    const unread_count = await this.notificationRepo.count({ where: { user_id: userId, is_read: false } });
 
     return { notifications, unread_count };
   }

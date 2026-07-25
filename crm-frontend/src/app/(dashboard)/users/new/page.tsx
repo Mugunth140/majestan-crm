@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-fetch";
+
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -61,7 +63,7 @@ function UserFormContent() {
         return;
       }
       try {
-        const res = await fetch(API_URL + "/users/" + editId);
+        const res = await apiFetch(API_URL + "/users/" + editId);
         const data = await res.json();
         if (data.success) {
           setFormData({
@@ -134,7 +136,7 @@ function UserFormContent() {
         delete payload.password;
       }
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

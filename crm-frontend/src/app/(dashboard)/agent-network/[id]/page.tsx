@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-fetch";
+
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { format } from "date-fns";
@@ -143,7 +145,7 @@ export default function AgentViewPage() {
     if (!silent) setIsLoading(true);
     else setIsRefreshing(true);
     try {
-      const res = await fetch(`${API_URL}/agents/${id}`);
+      const res = await apiFetch(`${API_URL}/agents/${id}`);
       const result = await res.json();
       if (result.success) setAgent(result.data);
       else { toast.error("Agent not found"); router.push("/agent-network"); }
@@ -191,7 +193,7 @@ export default function AgentViewPage() {
       followUpTime: format(now, "HH:mm"),
     };
     try {
-      const res = await fetch(`${API_URL}/agents/${id}/follow-ups`, {
+      const res = await apiFetch(`${API_URL}/agents/${id}/follow-ups`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -333,7 +335,7 @@ export default function AgentViewPage() {
                   onValueChange={async (v) => {
                     if (!v) return;
                     try {
-                      const res = await fetch(`${API_URL}/agents/${id}/status`, {
+                      const res = await apiFetch(`${API_URL}/agents/${id}/status`, {
                         method: "PUT",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ status_name: v }),

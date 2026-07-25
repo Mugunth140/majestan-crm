@@ -32,6 +32,9 @@ export class Notification {
   @Column({ type: 'varchar', length: 50, nullable: true })
   entity_type: string | null; // 'lead'
 
+  @Column({ type: 'boolean', default: false })
+  is_read: boolean;
+
   @CreateDateColumn()
   @Index()
   created_at: Date;

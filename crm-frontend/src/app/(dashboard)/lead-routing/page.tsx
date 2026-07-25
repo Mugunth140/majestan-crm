@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-fetch";
+
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
@@ -124,7 +126,7 @@ export default function LeadRoutingPage() {
         page: String(queuePage),
         limit: String(LIMIT),
       });
-      const res = await fetch(`${API_URL}/lead-routing/queue?${params}`);
+      const res = await apiFetch(`${API_URL}/lead-routing/queue?${params}`);
       const data = await res.json();
       if (data.success) {
         setQueue(data.data?.items || data.data || []);
@@ -149,7 +151,7 @@ export default function LeadRoutingPage() {
       if (historyEventFilter) params.set("event_type", historyEventFilter);
       if (historyDateFrom) params.set("date_from", format(historyDateFrom, "yyyy-MM-dd"));
       if (historyDateTo) params.set("date_to", format(historyDateTo, "yyyy-MM-dd"));
-      const res = await fetch(`${API_URL}/lead-routing/history?${params}`);
+      const res = await apiFetch(`${API_URL}/lead-routing/history?${params}`);
       const data = await res.json();
       if (data.success) {
         setHistory(data.data?.items || data.data || []);
@@ -184,7 +186,7 @@ export default function LeadRoutingPage() {
       const stored = localStorage.getItem("crm_user");
       if (stored) currentUserId = JSON.parse(stored).id;
 
-      const res = await fetch(`${API_URL}/lead-routing/claim/${leadId}`, { 
+      const res = await apiFetch(`${API_URL}/lead-routing/claim/${leadId}`, { 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ actioned_by_id: currentUserId || null })
@@ -213,7 +215,7 @@ export default function LeadRoutingPage() {
         if (stored) currentUserId = JSON.parse(stored).id;
       } catch {}
 
-      const res = await fetch(`${API_URL}/lead-routing/assign/${assignLeadId}`, {
+      const res = await apiFetch(`${API_URL}/lead-routing/assign/${assignLeadId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ to_user_id: toUserId, actioned_by_id: currentUserId || null }),
@@ -236,7 +238,7 @@ export default function LeadRoutingPage() {
   const handleDeleteQueueLead = async (leadId: number) => {
     setDeletingId(leadId);
     try {
-      const res = await fetch(`${API_URL}/leads/${leadId}`, { method: "DELETE" });
+      const res = await apiFetch(`${API_URL}/leads/${leadId}`, { method: "DELETE" });
       if (res.ok) {
         toast.success("Lead deleted");
         fetchQueue();

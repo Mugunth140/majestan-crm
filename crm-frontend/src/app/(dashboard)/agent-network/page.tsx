@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-fetch";
+
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -66,7 +68,7 @@ export default function AgentsPage() {
   const fetchAgents = useCallback(async () => {
     try {
       setIsLoading(true);
-      const res = await fetch(API_URL + "/agents");
+      const res = await apiFetch(API_URL + "/agents");
       const data = await res.json();
       if (data.success) {
         setAgents(data.data.map((a: any, i: number) => ({ ...a, sno: i + 1 })));
@@ -85,7 +87,7 @@ export default function AgentsPage() {
   const handleDelete = async () => {
     if (!deleteId) return;
     try {
-      const res = await fetch(`${API_URL}/agents/${deleteId}`, { method: "DELETE" });
+      const res = await apiFetch(`${API_URL}/agents/${deleteId}`, { method: "DELETE" });
       const data = await res.json();
       if (data.success) {
         toast.success("Agent deleted successfully.");

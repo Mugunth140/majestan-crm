@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-fetch";
+
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense, useRef } from "react";
 import { format } from "date-fns";
@@ -156,7 +158,7 @@ function InboundForm() {
     const fetchMasterData = async () => {
       try {
         setIsFetchingData(true);
-        const cityRes = await fetch(API_URL + "/master/cities");
+        const cityRes = await apiFetch(API_URL + "/master/cities");
         const cityData = await cityRes.json();
         if (cityData.success) setCities(cityData.data);
       } catch {
@@ -272,7 +274,7 @@ function InboundForm() {
       const method = editId ? "PATCH" : "POST";
       const endpoint = API_URL + (editId ? "/inbounds/" + editId : "/inbounds");
 
-      const res = await fetch(endpoint, {
+      const res = await apiFetch(endpoint, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -290,7 +292,7 @@ function InboundForm() {
          fileData.append('file', selectedFile);
          const uploadId = editId ? editId : result.id;
          
-         const uploadRes = await fetch(`${API_URL}/inbounds/${uploadId}/image`, {
+         const uploadRes = await apiFetch(`${API_URL}/inbounds/${uploadId}/image`, {
             method: 'POST',
             body: fileData
          });

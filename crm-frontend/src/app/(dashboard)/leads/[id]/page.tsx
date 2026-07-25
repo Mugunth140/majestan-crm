@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-fetch";
+
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { format } from "date-fns";
@@ -186,7 +188,6 @@ function PageSkeleton() {
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 
-
 export default function LeadViewPage() {
   const params = useParams();
   const router = useRouter();
@@ -228,7 +229,7 @@ export default function LeadViewPage() {
   const fetchAutoMatch = async () => {
     setIsMatching(true);
     try {
-      const res = await fetch(`${API_URL}/leads/${id}/auto-match`);
+      const res = await apiFetch(`${API_URL}/leads/${id}/auto-match`);
       const data = await res.json();
       if (data.success) {
         setAutoMatchResults(data.data);
@@ -248,7 +249,7 @@ export default function LeadViewPage() {
     if (!convertFeedback.trim()) return toast.error("Please enter feedback.");
     setIsConverting(true);
     try {
-      const res = await fetch(`${API_URL}/lead-routing/convert/${id}`, {
+      const res = await apiFetch(`${API_URL}/lead-routing/convert/${id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ convert_to: convertTo, feedback: convertFeedback }),
@@ -301,7 +302,7 @@ export default function LeadViewPage() {
     if (!silent) setIsLoading(true);
     else setIsRefreshing(true);
     try {
-      const res = await fetch(`${API_URL}/leads/${id}`);
+      const res = await apiFetch(`${API_URL}/leads/${id}`);
       const result = await res.json();
       if (result.success) setLead(result.data);
       else { toast.error("Lead not found"); router.push("/leads"); }
@@ -349,7 +350,7 @@ export default function LeadViewPage() {
       followUpTime: format(now, "HH:mm"),
     };
     try {
-      const res = await fetch(`${API_URL}/leads/${id}/follow-ups`, {
+      const res = await apiFetch(`${API_URL}/leads/${id}/follow-ups`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -526,7 +527,7 @@ export default function LeadViewPage() {
                       onValueChange={async (v) => {
                         if (!v) return;
                         try {
-                          const res = await fetch(`${API_URL}/leads/${id}/status`, {
+                          const res = await apiFetch(`${API_URL}/leads/${id}/status`, {
                             method: "PUT",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ status_name: v }),
@@ -537,7 +538,7 @@ export default function LeadViewPage() {
                             
                             // Auto-route to Sales if telecalling staff marks it as Site Visit Completed
                             if (v === "Site Visit Completed" && lead.department === "telecalling") {
-                              const routeRes = await fetch(`${API_URL}/lead-routing/site-visit-complete/${id}`, {
+                              const routeRes = await apiFetch(`${API_URL}/lead-routing/site-visit-complete/${id}`, {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({ 
@@ -571,7 +572,7 @@ export default function LeadViewPage() {
                         onClick={async () => {
                       const newVal = !lead.is_unqualified;
                       try {
-                        const res = await fetch(`${API_URL}/leads/${id}/status`, {
+                        const res = await apiFetch(`${API_URL}/leads/${id}/status`, {
                           method: "PUT",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({ 

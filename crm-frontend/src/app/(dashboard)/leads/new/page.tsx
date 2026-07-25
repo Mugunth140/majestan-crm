@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-fetch";
+
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import { format } from "date-fns";
@@ -84,8 +86,6 @@ const PRIORITIES = [
   { label: "High", value: "high" },
   { label: "Urgent", value: "urgent" },
 ];
-
-
 
 const PROJECTS = [
   { label: "Majestan Prestige", value: "majestan_prestige" },
@@ -238,7 +238,7 @@ function LeadForm() {
           // If Admin/Manager, pass 'all', else pass TL's department
           const isCrossDept = currentUser?.role?.name === "Admin" || currentUser?.role?.name === "Manager";
           const deptQuery = isCrossDept ? "all" : (currentUser?.department?.name || "");
-          const res = await fetch(`${API_URL}/lead-routing/staff-list?department=${encodeURIComponent(deptQuery.toLowerCase())}`);
+          const res = await apiFetch(`${API_URL}/lead-routing/staff-list?department=${encodeURIComponent(deptQuery.toLowerCase())}`);
           const data = await res.json();
           if (data.success) {
             setStaffList(data.data);
@@ -263,7 +263,7 @@ function LeadForm() {
       let sourceValue = formData.get("source") as string;
 
       if (sourceValue === "others" && otherSourceText.trim()) {
-        const res = await fetch(API_URL + "/master/lead-sources", {
+        const res = await apiFetch(API_URL + "/master/lead-sources", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: otherSourceText.trim() }),
@@ -317,7 +317,7 @@ function LeadForm() {
       const method = editId ? "PUT" : "POST";
       const endpoint = API_URL + (editId ? "/leads/" + editId : "/leads");
 
-      const res = await fetch(endpoint, {
+      const res = await apiFetch(endpoint, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
