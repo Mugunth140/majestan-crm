@@ -379,6 +379,31 @@ export class LeadRoutingService {
     return { items, total, page, limit };
   }
 
+  // ── Return to Queue ────────────────────────────────────────────────────────
+  async returnToQueue(leadId: number, requestingUserId: number, feedback: string) {
+    const leadRepo = this.dataSource.getRepository(Lead);
+    const lead = await leadRepo.findOne({ where: { id: leadId } });
+    if (!lead) throw new NotFoundException('Lead not found');
+
+    const prevAssignedId = lead.assigned_staff_id;
+
+    lead.assigned_staff_id = null as unknown as number;
+    await leadRepo.save(lead);
+
+    const rh = this.dataSource.getRepository(RoutingHistory).create({
+      lead_id: leadId,
+      event_type: 'Returned to Queue',
+      from_user_id: prevAssignedId ?? null,
+      to_user_id: null,
+      actioned_by_id: requestingUserId,
+      feedback,
+      department: lead.department,
+    });
+    await this.dataSource.getRepository(RoutingHistory).save(rh);
+
+    return { success: true };
+  }
+
   // ── Staff List ─────────────────────────────────────────────────────────────
   async getStaffList(department: string) {
     const qb = this.dataSource

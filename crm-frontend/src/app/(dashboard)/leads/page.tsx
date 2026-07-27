@@ -83,7 +83,13 @@ export default function LeadsPage() {
 
   // Assign lead modal state
   const [assignLeadId, setAssignLeadId] = useState<number | null>(null);
+  const [assignLeadIds, setAssignLeadIds] = useState<number[] | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
+
+  // Return to queue state
+  const [returnLeadId, setReturnLeadId] = useState<number | null>(null);
+  const [returnReason, setReturnReason] = useState("");
+  const [isReturning, setIsReturning] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -271,7 +277,9 @@ export default function LeadsPage() {
   };
 
   const handleAssignLead = async (toUserId: number) => {
-    if (!assignLeadId) return;
+    const idsToAssign = assignLeadIds || (assignLeadId ? [assignLeadId] : null);
+    if (!idsToAssign || idsToAssign.length === 0) return;
+    
     setIsAssigning(true);
     try {
       let currentUserId = 0;
@@ -280,23 +288,49 @@ export default function LeadsPage() {
         if (stored) currentUserId = JSON.parse(stored).id;
       } catch {}
 
-      const res = await apiFetch(`${API_URL}/lead-routing/assign/${assignLeadId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to_user_id: toUserId, actioned_by_id: currentUserId || null }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        toast.success("Lead assigned successfully");
-        fetchLeads();
-      } else {
-        toast.error(data.message || "Failed to assign lead");
-      }
+      const promises = idsToAssign.map(id => 
+        apiFetch(`${API_URL}/lead-routing/assign/${id}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ to_user_id: toUserId, actioned_by_id: currentUserId || null }),
+        })
+      );
+      
+      await Promise.all(promises);
+      toast.success(`${idsToAssign.length} lead(s) assigned successfully`);
+      fetchLeads();
     } catch {
-      toast.error("Failed to assign lead");
+      toast.error("Failed to assign lead(s)");
     } finally {
       setIsAssigning(false);
       setAssignLeadId(null);
+      setAssignLeadIds(null);
+    }
+  };
+
+  const handleReturnToQueue = async () => {
+    if (!returnLeadId) return;
+    if (!returnReason.trim()) return toast.error("Please enter a reason");
+    setIsReturning(true);
+    try {
+      const res = await apiFetch(`${API_URL}/lead-routing/return-to-queue/${returnLeadId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ feedback: returnReason }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Lead returned to routing queue");
+        fetchLeads();
+      } else {
+        toast.error(data.message || "Failed to return lead");
+      }
+    } catch {
+      toast.error("Failed to return lead");
+    } finally {
+      setIsReturning(false);
+      setReturnLeadId(null);
+      setReturnReason("");
     }
   };
 
@@ -759,13 +793,13 @@ export default function LeadsPage() {
                 showToolbar={true}
                 showDeleteAction={role === "Admin"}
                 onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.rawId))}
-                renderToolbarActions={(selectedRows) => {
-                  if (selectedRows.length !== 1) return null;
+                renderToolbarActions={(selectedRows, clearSelection) => {
+                  const isSingle = selectedRows.length === 1;
                   const row = selectedRows[0];
                   
                   return (
                     <>
-                      {activeTab === "Unqualified" && (
+                      {activeTab === "Unqualified" && isSingle && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -780,6 +814,7 @@ export default function LeadsPage() {
                               if (data.success) {
                                 toast.success("Lead reverted to qualified.");
                                 fetchLeads();
+                                clearSelection();
                               } else toast.error("Failed to revert lead.");
                             } catch {
                               toast.error("Failed to revert lead.");
@@ -790,18 +825,34 @@ export default function LeadsPage() {
                         </Button>
                       )}
                       
-                      {!row.isPendingImport && role !== "Staff" && role !== "Admin" && (!row.staff || row.staff === "Unassigned") && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
-                          onClick={() => setAssignLeadId(row.rawId)}
-                        >
-                          Assign Lead
-                        </Button>
+                      {role === "Staff" ? (
+                        isSingle && !row.isPendingImport && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+                            onClick={() => setReturnLeadId(row.rawId)}
+                          >
+                            Re Assign
+                          </Button>
+                        )
+                      ) : (
+                        !selectedRows.some(r => r.isPendingImport) && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+                            onClick={() => {
+                              setAssignLeadIds(selectedRows.map(r => r.rawId));
+                              setAssignLeadId(selectedRows[0].rawId); // for department inference
+                            }}
+                          >
+                            Assign Lead
+                          </Button>
+                        )
                       )}
 
-                      {!row.isPendingImport && (
+                      {isSingle && !row.isPendingImport && (
                         <>
                           <Button variant="outline" size="sm" onClick={() => router.push("/leads/" + row.rawId)}>
                             <Eye size={15} className="mr-1.5" /> View
@@ -849,12 +900,50 @@ export default function LeadsPage() {
       {/* Assign Lead Modal */}
       <AssignLeadModal
         open={assignLeadId !== null}
-        onClose={() => setAssignLeadId(null)}
+        onClose={() => {
+          setAssignLeadId(null);
+          setAssignLeadIds(null);
+        }}
         onConfirm={handleAssignLead}
         leadId={assignLeadId ?? undefined}
         department={deptFilter}
         isLoading={isAssigning}
       />
+
+      {/* Return to Queue Modal */}
+      <Dialog open={returnLeadId !== null} onOpenChange={(open) => {
+        if (!open) {
+          setReturnLeadId(null);
+          setReturnReason("");
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Re-Assign Lead</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for returning this lead to the routing queue.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Reason *</label>
+              <textarea
+                value={returnReason}
+                onChange={(e) => setReturnReason(e.target.value)}
+                placeholder="Why are you returning this lead?"
+                className="w-full h-24 rounded-xl border border-input bg-muted/30 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent resize-none"
+              />
+            </div>
+          </div>
+          <DialogFooter className="mt-2">
+            <Button variant="outline" onClick={() => setReturnLeadId(null)} disabled={isReturning}>Cancel</Button>
+            <Button onClick={handleReturnToQueue} disabled={isReturning || !returnReason.trim()} className="bg-[#0052FF] hover:bg-[#0040CC] text-white">
+              {isReturning ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Confirm Re-Assign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

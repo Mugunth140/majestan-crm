@@ -112,6 +112,22 @@ export class LeadRoutingController {
     return { success: true };
   }
 
+  // ── POST /return-to-queue/:leadId ──────────────────────────────────────────
+  @Post('return-to-queue/:leadId')
+  async returnToQueue(
+    @Param('leadId') leadId: string,
+    @Body() body: TransferFeedbackDto,
+    @Req() req: any,
+  ) {
+    const requestingUserId: number = req.user.sub;
+    await this.leadRoutingService.returnToQueue(
+      Number(leadId),
+      requestingUserId,
+      body.feedback,
+    );
+    return { success: true };
+  }
+
   // ── POST /convert/:leadId ──────────────────────────────────────────────────
   @Post('convert/:leadId')
   async convertLead(
