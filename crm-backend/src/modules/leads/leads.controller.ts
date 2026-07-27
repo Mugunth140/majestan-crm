@@ -61,6 +61,16 @@ export class LeadsController {
     return { success: true, data };
   }
 
+  @Put(':id/inquiries/:inquiryId')
+  async updateInquiry(
+    @Param('id') id: string,
+    @Param('inquiryId') inquiryId: string,
+    @Body() body: any,
+  ) {
+    const data = await this.leadsService.updateInquiry(Number(id), Number(inquiryId), body);
+    return { success: true, data };
+  }
+
   @Put(':id')
   async updateLead(@Param('id') id: string, @Body() body: any) {
     const data = await this.leadsService.updateLead(Number(id), body);

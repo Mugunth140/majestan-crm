@@ -13,101 +13,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { toast } from "sonner";
 import { FormSelect } from "@/components/shared/form-select";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
+import { 
+  PURCHASE_TYPES, PURCHASE_TIMELINES, QUALIFICATION_PURPOSES, 
+  PROPERTY_CATEGORIES, PROPERTY_TYPES_MAP, FUNDERS, PROJECTS 
+} from "@/lib/lead-constants";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
-
-const PURCHASE_TYPES = [
-  { label: "Rental", value: "rental" },
-  { label: "Construction", value: "construction" },
-  { label: "Liasioning", value: "liasioning" },
-  { label: "Property Management", value: "property_management" },
-  { label: "Sale", value: "sale" },
-  { label: "Buy", value: "buy" },
-];
-
-const PURCHASE_TIMELINES = [
-  { label: "Immediate", value: "immediate" },
-  { label: "Within 30 Days", value: "within_30_days" },
-  { label: "3 Months", value: "3_months" },
-  { label: "6 Months", value: "6_months" },
-  { label: "Just Enquiry", value: "just_enquiry" },
-];
-
-const QUALIFICATION_PURPOSES = [
-  { label: "Self Use", value: "self_use" },
-  { label: "Investment", value: "investment" },
-  { label: "Rental Income", value: "rental_income" },
-  { label: "Business Use", value: "business_use" },
-];
-
-const PROPERTY_CATEGORIES = [
-  { label: "Residential", value: "residential" },
-  { label: "Commercial", value: "commercial" },
-  { label: "Industrial", value: "industrial" },
-  { label: "Agricultural", value: "agricultural" },
-  { label: "Institutional", value: "institutional" },
-];
-
-const PROPERTY_TYPES_MAP: Record<string, { label: string; value: string }[]> = {
-  residential: [
-    { label: "Apartment", value: "apartment" },
-    { label: "Villa", value: "villa" },
-    { label: "Independent House", value: "independent_house" },
-    { label: "Plot", value: "plot" },
-    { label: "Farm House", value: "farm_house" },
-    { label: "Builder Floor", value: "builder_floor" },
-  ],
-  commercial: [
-    { label: "Office", value: "office" },
-    { label: "Shop", value: "shop" },
-    { label: "Showroom", value: "showroom" },
-    { label: "Commercial Building", value: "commercial_building" },
-    { label: "Warehouse", value: "warehouse" },
-    { label: "Hotel", value: "hotel" },
-    { label: "Restaurant", value: "restaurant" },
-    { label: "Commercial Land", value: "commercial_land" },
-  ],
-  industrial: [
-    { label: "Factory", value: "factory" },
-    { label: "Industrial Shed", value: "industrial_shed" },
-    { label: "Industrial Land", value: "industrial_land" },
-    { label: "Warehouse", value: "warehouse" },
-    { label: "Manufacturing Unit", value: "manufacturing_unit" },
-  ],
-  agricultural: [
-    { label: "Agricultural Land", value: "agricultural_land" },
-    { label: "Farm Land", value: "farm_land" },
-    { label: "Coconut Farm", value: "coconut_farm" },
-    { label: "Plantation", value: "plantation" },
-    { label: "Orchard", value: "orchard" },
-  ],
-  institutional: [
-    { label: "School", value: "school" },
-    { label: "College", value: "college" },
-    { label: "Hospital", value: "hospital" },
-    { label: "Clinic", value: "clinic" },
-    { label: "Training Centre", value: "training_centre" },
-  ],
-};
-
-const FUNDERS = [
-  { label: "Self Funded", value: "self" },
-  { label: "Bank Loan", value: "bank" },
-];
 
 const PRIORITIES = [
   { label: "Low", value: "low" },
   { label: "Medium", value: "medium" },
   { label: "High", value: "high" },
   { label: "Urgent", value: "urgent" },
-];
-
-const PROJECTS = [
-  { label: "Majestan Prestige", value: "majestan_prestige" },
-  { label: "Majestan Heights", value: "majestan_heights" },
-  { label: "Majestan Residency", value: "majestan_residency" },
-  { label: "Majestan Enclave", value: "majestan_enclave" },
-  { label: "Majestan Grand", value: "majestan_grand" },
 ];
 
 function parseIndianCurrency(input: string): number {
@@ -523,204 +440,223 @@ function LeadForm() {
           </div>
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Requirement Information</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="space-y-2 lg:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Purchase / Service Type</label>
-              <FormSelect name="purchaseType" defaultValue={leadData?.inquiries?.[0]?.purchase_type || null} placeholder="Select Purchase Type" options={PURCHASE_TYPES} required />
-            </div>
-            <div className="space-y-2 lg:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Property Category</label>
-              <FormSelect 
-                name="propertyCategory" 
-                defaultValue={leadData?.inquiries?.[0]?.property_category || null} 
-                value={selectedCategory}
-                onValueChange={(val) => {
-                  setSelectedCategory(val);
-                  setSelectedType(null);
-                }}
-                placeholder="Select Property Category" 
-                options={PROPERTY_CATEGORIES} 
-                required 
-              />
-            </div>
-            <div className="space-y-2 lg:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Property Type</label>
-              <FormSelect 
-                name="propertyType" 
-                defaultValue={leadData?.inquiries?.[0]?.property_type || null} 
-                value={selectedType}
-                onValueChange={setSelectedType}
-                placeholder={selectedCategory ? "Select Property Type" : "Select Category First"} 
-                options={selectedCategory ? PROPERTY_TYPES_MAP[selectedCategory] || [] : []} 
-                disabled={!selectedCategory}
-                required 
-              />
-            </div>
-            <div className="space-y-2 lg:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Funding</label>
-              <FormSelect name="funder" defaultValue={leadData?.inquiries?.[0]?.funder || null} placeholder="Select Funding" options={FUNDERS} required />
-            </div>
-            <div className="space-y-2 lg:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Project List</label>
-              <FormSelect name="project" defaultValue={leadData?.inquiries?.[0]?.project_list || null} placeholder="Select Project" options={PROJECTS} />
-            </div>
+        {editId ? (
+          <div className="bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/50 rounded-2xl p-6 text-center shadow-sm">
+            <h3 className="text-blue-900 dark:text-blue-400 font-semibold mb-2">Edit Customer Requirements</h3>
+            <p className="text-blue-700/80 dark:text-blue-300/80 text-[14px]">
+              To edit specific requirements, buyer qualifications, or preferences, please visit the lead's detailed view page.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.push(`/leads/${editId}`)}
+              className="mt-4 border-blue-200 text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-900/40 dark:bg-transparent"
+            >
+              Go to Detailed View
+            </Button>
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="bg-card border rounded-2xl p-8 shadow-sm">
+              <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Requirement Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="space-y-2 lg:col-span-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Purchase / Service Type</label>
+                  <FormSelect name="purchaseType" defaultValue={leadData?.inquiries?.[0]?.purchase_type || null} placeholder="Select Purchase Type" options={PURCHASE_TYPES} required />
+                </div>
+                <div className="space-y-2 lg:col-span-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Property Category</label>
+                  <FormSelect 
+                    name="propertyCategory" 
+                    defaultValue={leadData?.inquiries?.[0]?.property_category || null} 
+                    value={selectedCategory}
+                    onValueChange={(val) => {
+                      setSelectedCategory(val);
+                      setSelectedType(null);
+                    }}
+                    placeholder="Select Property Category" 
+                    options={PROPERTY_CATEGORIES} 
+                    required 
+                  />
+                </div>
+                <div className="space-y-2 lg:col-span-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Property Type</label>
+                  <FormSelect 
+                    name="propertyType" 
+                    defaultValue={leadData?.inquiries?.[0]?.property_type || null} 
+                    value={selectedType}
+                    onValueChange={setSelectedType}
+                    placeholder={selectedCategory ? "Select Property Type" : "Select Category First"} 
+                    options={selectedCategory ? PROPERTY_TYPES_MAP[selectedCategory] || [] : []} 
+                    disabled={!selectedCategory}
+                    required 
+                  />
+                </div>
+                <div className="space-y-2 lg:col-span-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Funding</label>
+                  <FormSelect name="funder" defaultValue={leadData?.inquiries?.[0]?.funder || null} placeholder="Select Funding" options={FUNDERS} required />
+                </div>
+                <div className="space-y-2 lg:col-span-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Project List</label>
+                  <FormSelect name="project" defaultValue={leadData?.inquiries?.[0]?.project_list || null} placeholder="Select Project" options={PROJECTS} />
+                </div>
+              </div>
+            </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Buyer Qualification</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="space-y-2 lg:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Target City</label>
-              {isFetchingData ? skeletonField : (
-                <FormSelect
-                  name="cityId"
-                  placeholder="Select City"
-                  options={cities.map((c) => ({ label: c.city_name, value: c.id.toString() }))}
-                  value={selectedCityId?.toString() || ""}
-                  onValueChange={(val) => {
-                    setSelectedCityId(val ? Number(val) : null);
-                    setSelectedSubLocations([]);
-                  }}
-                />
+            <div className="bg-card border rounded-2xl p-8 shadow-sm">
+              <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Buyer Qualification</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="space-y-2 lg:col-span-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Target City</label>
+                  {isFetchingData ? skeletonField : (
+                    <FormSelect
+                      name="cityId"
+                      placeholder="Select City"
+                      options={cities.map((c) => ({ label: c.city_name, value: c.id.toString() }))}
+                      value={selectedCityId?.toString() || ""}
+                      onValueChange={(val) => {
+                        setSelectedCityId(val ? Number(val) : null);
+                        setSelectedSubLocations([]);
+                      }}
+                    />
+                  )}
+                </div>
+
+                <div className="space-y-2 lg:col-span-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Sub Locations (Multiple)</label>
+                  <div className="flex flex-wrap gap-2 p-3 min-h-[48px] rounded-xl bg-muted/30 border border-border/60 max-h-[150px] overflow-y-auto">
+                    {!selectedCityId ? (
+                      <span className="text-sm text-muted-foreground">Select a city first...</span>
+                    ) : subLocations.length === 0 ? (
+                      <span className="text-sm text-muted-foreground">No sub-locations found.</span>
+                    ) : (
+                      subLocations.map((sub) => {
+                        const isSelected = selectedSubLocations.includes(sub.locality_name);
+                        return (
+                          <button
+                            type="button"
+                            key={sub.id}
+                            onClick={() => {
+                              if (isSelected) {
+                                setSelectedSubLocations(selectedSubLocations.filter(loc => loc !== sub.locality_name));
+                              } else {
+                                setSelectedSubLocations([...selectedSubLocations, sub.locality_name]);
+                              }
+                            }}
+                            className={`px-3 py-1 text-[13px] rounded-full border transition-colors ${
+                              isSelected 
+                                ? "bg-[#0052FF] text-white border-[#0052FF] shadow-sm" 
+                                : "bg-background text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground"
+                            }`}
+                          >
+                            {sub.locality_name}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2 lg:col-span-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Purchase Timeline</label>
+                  <FormSelect
+                    name="purchaseTimeline"
+                    defaultValue={leadData?.inquiries?.[0]?.purchase_timeline || null}
+                    placeholder="Select Timeline"
+                    options={PURCHASE_TIMELINES}
+                  />
+                </div>
+
+                <div className="space-y-2 lg:col-span-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Qualification Purpose</label>
+                  <FormSelect
+                    name="qualificationPurpose"
+                    defaultValue={leadData?.inquiries?.[0]?.qualification_purpose || null}
+                    placeholder="Select Purpose"
+                    options={QUALIFICATION_PURPOSES}
+                  />
+                </div>
+
+                <div className="space-y-2 lg:col-span-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Decision Maker</label>
+                  <Input
+                    name="decisionMaker"
+                    defaultValue={leadData?.inquiries?.[0]?.decision_maker || ""}
+                    placeholder="e.g. Self, Spouse, Father"
+                    className="h-12 rounded-xl bg-muted/30"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-card border rounded-2xl p-8 shadow-sm">
+              <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Customer Preferences</h3>
+              
+              {!selectedCategory ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Please select a Property Category above to define customer preferences.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Min Budget</label>
+                    <Input type="text" placeholder="e.g. 2.5Cr or 50L" value={preferences?.minBudget || ""} onChange={e => setPreferences({...preferences, minBudget: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
+                    {preferences?.minBudget && parseIndianCurrency(preferences.minBudget) > 0 && (
+                      <p className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 pl-1">
+                        {formatIndianCurrencyWords(parseIndianCurrency(preferences.minBudget))}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Max Budget</label>
+                    <Input type="text" placeholder="e.g. 3Cr or 75L" value={preferences?.maxBudget || ""} onChange={e => setPreferences({...preferences, maxBudget: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
+                    {preferences?.maxBudget && parseIndianCurrency(preferences.maxBudget) > 0 && (
+                      <p className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 pl-1">
+                        {formatIndianCurrencyWords(parseIndianCurrency(preferences.maxBudget))}
+                      </p>
+                    )}
+                  </div>
+
+                  {selectedCategory === "residential" && (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">BHK</label>
+                        <FormSelect name="_bhk" placeholder="Select BHK" options={[{label: "1", value: "1"}, {label: "2", value: "2"}, {label: "3", value: "3"}, {label: "4+", value: "4"}]} value={preferences?.bhk || null} onValueChange={v => setPreferences({...preferences, bhk: v})} />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Furnishing</label>
+                        <FormSelect name="_furnishing" placeholder="Select" options={[{label: "Furnished", value: "1"}, {label: "Semi Furnished", value: "2"}, {label: "Unfurnished", value: "0"}]} value={preferences?.furnished || null} onValueChange={v => setPreferences({...preferences, furnished: v})} />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Floor Number</label>
+                        <Input type="text" placeholder="e.g. Ground, 1st, High" value={preferences?.floorNumber || ""} onChange={e => setPreferences({...preferences, floorNumber: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Facing</label>
+                        <FormSelect name="_facing" placeholder="Select Facing" options={[{label: "North", value: "north"}, {label: "East", value: "east"}, {label: "South", value: "south"}, {label: "West", value: "west"}, {label: "North-East", value: "north_east"}]} value={preferences?.facing || null} onValueChange={v => setPreferences({...preferences, facing: v})} />
+                      </div>
+                    </>
+                  )}
+
+                  {['commercial', 'industrial', 'agricultural', 'institutional'].includes(selectedCategory) && (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Min Area</label>
+                        <Input type="number" placeholder="Min Area" value={preferences?.minArea || ""} onChange={e => setPreferences({...preferences, minArea: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Max Area</label>
+                        <Input type="number" placeholder="Max Area" value={preferences?.maxArea || ""} onChange={e => setPreferences({...preferences, maxArea: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
+                      </div>
+                    </>
+                  )}
+
+                </div>
               )}
             </div>
-
-            <div className="space-y-2 lg:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Sub Locations (Multiple)</label>
-              <div className="flex flex-wrap gap-2 p-3 min-h-[48px] rounded-xl bg-muted/30 border border-border/60 max-h-[150px] overflow-y-auto">
-                {!selectedCityId ? (
-                  <span className="text-sm text-muted-foreground">Select a city first...</span>
-                ) : subLocations.length === 0 ? (
-                  <span className="text-sm text-muted-foreground">No sub-locations found.</span>
-                ) : (
-                  subLocations.map((sub) => {
-                    const isSelected = selectedSubLocations.includes(sub.locality_name);
-                    return (
-                      <button
-                        type="button"
-                        key={sub.id}
-                        onClick={() => {
-                          if (isSelected) {
-                            setSelectedSubLocations(selectedSubLocations.filter(loc => loc !== sub.locality_name));
-                          } else {
-                            setSelectedSubLocations([...selectedSubLocations, sub.locality_name]);
-                          }
-                        }}
-                        className={`px-3 py-1 text-[13px] rounded-full border transition-colors ${
-                          isSelected 
-                            ? "bg-[#0052FF] text-white border-[#0052FF] shadow-sm" 
-                            : "bg-background text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground"
-                        }`}
-                      >
-                        {sub.locality_name}
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2 lg:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Purchase Timeline</label>
-              <FormSelect
-                name="purchaseTimeline"
-                defaultValue={leadData?.inquiries?.[0]?.purchase_timeline || null}
-                placeholder="Select Timeline"
-                options={PURCHASE_TIMELINES}
-              />
-            </div>
-
-            <div className="space-y-2 lg:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Qualification Purpose</label>
-              <FormSelect
-                name="qualificationPurpose"
-                defaultValue={leadData?.inquiries?.[0]?.qualification_purpose || null}
-                placeholder="Select Purpose"
-                options={QUALIFICATION_PURPOSES}
-              />
-            </div>
-
-            <div className="space-y-2 lg:col-span-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Decision Maker</label>
-              <Input
-                name="decisionMaker"
-                defaultValue={leadData?.inquiries?.[0]?.decision_maker || ""}
-                placeholder="e.g. Self, Spouse, Father"
-                className="h-12 rounded-xl bg-muted/30"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-            <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Customer Preferences</h3>
-            
-            {!selectedCategory ? (
-              <div className="text-center py-8 text-muted-foreground">
-                Please select a Property Category above to define customer preferences.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Min Budget</label>
-                  <Input type="text" placeholder="e.g. 2.5Cr or 50L" value={preferences?.minBudget || ""} onChange={e => setPreferences({...preferences, minBudget: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
-                  {preferences?.minBudget && parseIndianCurrency(preferences.minBudget) > 0 && (
-                    <p className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 pl-1">
-                      {formatIndianCurrencyWords(parseIndianCurrency(preferences.minBudget))}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Max Budget</label>
-                  <Input type="text" placeholder="e.g. 3Cr or 75L" value={preferences?.maxBudget || ""} onChange={e => setPreferences({...preferences, maxBudget: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
-                  {preferences?.maxBudget && parseIndianCurrency(preferences.maxBudget) > 0 && (
-                    <p className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 pl-1">
-                      {formatIndianCurrencyWords(parseIndianCurrency(preferences.maxBudget))}
-                    </p>
-                  )}
-                </div>
-
-                {selectedCategory === "residential" && (
-                  <>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">BHK</label>
-                      <FormSelect name="_bhk" placeholder="Select BHK" options={[{label: "1", value: "1"}, {label: "2", value: "2"}, {label: "3", value: "3"}, {label: "4+", value: "4"}]} value={preferences?.bhk || null} onValueChange={v => setPreferences({...preferences, bhk: v})} />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Furnishing</label>
-                      <FormSelect name="_furnishing" placeholder="Select" options={[{label: "Furnished", value: "1"}, {label: "Semi Furnished", value: "2"}, {label: "Unfurnished", value: "0"}]} value={preferences?.furnished || null} onValueChange={v => setPreferences({...preferences, furnished: v})} />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Floor Number</label>
-                      <Input type="text" placeholder="e.g. Ground, 1st, High" value={preferences?.floorNumber || ""} onChange={e => setPreferences({...preferences, floorNumber: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Facing</label>
-                      <FormSelect name="_facing" placeholder="Select Facing" options={[{label: "North", value: "north"}, {label: "East", value: "east"}, {label: "South", value: "south"}, {label: "West", value: "west"}, {label: "North-East", value: "north_east"}]} value={preferences?.facing || null} onValueChange={v => setPreferences({...preferences, facing: v})} />
-                    </div>
-                  </>
-                )}
-
-                {['commercial', 'industrial', 'agricultural', 'institutional'].includes(selectedCategory) && (
-                  <>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Min Area</label>
-                      <Input type="number" placeholder="Min Area" value={preferences?.minArea || ""} onChange={e => setPreferences({...preferences, minArea: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Max Area</label>
-                      <Input type="number" placeholder="Max Area" value={preferences?.maxArea || ""} onChange={e => setPreferences({...preferences, maxArea: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
-                    </div>
-                  </>
-                )}
-
-              </div>
-            )}
-          </div>
+          </>
+        )}
 
         {!editId && (
           <div className="bg-card border rounded-2xl p-8 shadow-sm">

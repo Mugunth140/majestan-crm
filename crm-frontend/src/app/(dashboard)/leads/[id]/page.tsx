@@ -20,11 +20,12 @@ import dynamic from "next/dynamic";
 const FollowUpPanel = dynamic(() => import("@/components/shared/follow-up-panel").then(mod => mod.FollowUpPanel), { ssr: false });
 const ContactModal = dynamic(() => import("@/components/shared/contact-modal").then(mod => mod.ContactModal), { ssr: false });
 const LeadAttachments = dynamic(() => import("@/components/shared/lead-attachments").then(mod => mod.LeadAttachments), { ssr: false });
+const EditRequirementModal = dynamic(() => import("@/components/shared/edit-requirement-modal").then(mod => mod.EditRequirementModal), { ssr: false });
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft, Loader2, User, Phone, MapPin, Building2,
   Briefcase, Mail, MessageSquare, Plus, ArrowUpRight,
-  Clock, Send, RefreshCw, History, TrendingUp, SlidersHorizontal, Sparkles,
+  Clock, Send, RefreshCw, History, TrendingUp, SlidersHorizontal, Sparkles, Edit,
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
@@ -223,6 +224,9 @@ export default function LeadViewPage() {
   const [isDroppedOpen, setIsDroppedOpen] = useState(false);
   const [dropReason, setDropReason] = useState("");
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+  // Edit Requirement
+  const [editInquiry, setEditInquiry] = useState<any>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -805,11 +809,18 @@ export default function LeadViewPage() {
                   <h3 className="text-base font-bold text-foreground flex items-center gap-2">
                     <Building2 className="h-4 w-4 text-muted-foreground" /> Requirement {lead.inquiries.length > 1 ? `#${idx + 1}` : ""}
                   </h3>
-                  {canEdit && idx === 0 && (
-                    <Button size="sm" onClick={() => fetchAutoMatch()} disabled={isMatching} className="h-8 bg-[#0052FF] hover:bg-[#0040CC] text-white rounded-lg px-4 shadow-sm">
-                      {isMatching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Auto Match"}
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {canEdit && (
+                      <Button size="sm" variant="outline" onClick={() => setEditInquiry(inq)} className="h-8 text-xs flex items-center gap-1.5 border-border/60 hover:bg-muted">
+                        <Edit className="h-3.5 w-3.5" /> Edit
+                      </Button>
+                    )}
+                    {canEdit && idx === 0 && (
+                      <Button size="sm" onClick={() => fetchAutoMatch()} disabled={isMatching} className="h-8 bg-[#0052FF] hover:bg-[#0040CC] text-white rounded-lg px-4 shadow-sm">
+                        {isMatching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Auto Match"}
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Unified Card Body (Grid) */}
@@ -1071,6 +1082,15 @@ export default function LeadViewPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Edit Requirement Modal ── */}
+      <EditRequirementModal
+        open={!!editInquiry}
+        onClose={() => setEditInquiry(null)}
+        inquiry={editInquiry}
+        leadId={Number(id)}
+        onSuccess={() => fetchLead(true)}
+      />
     </div>
   );
 }

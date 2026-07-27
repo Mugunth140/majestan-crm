@@ -246,6 +246,26 @@ export class LeadsService {
     });
   }
 
+  async updateInquiry(leadId: number, inquiryId: number, body: any) {
+    const inquiryRepo = this.dataSource.getRepository(LeadInquiry);
+    const inquiry = await inquiryRepo.findOne({ where: { id: inquiryId, lead_id: leadId } });
+    if (!inquiry) throw new NotFoundException('Inquiry not found');
+
+    if (body.project !== undefined) inquiry.project_list = body.project;
+    if (body.purchaseType !== undefined) inquiry.purchase_type = body.purchaseType;
+    if (body.propertyType !== undefined) inquiry.property_type = body.propertyType;
+    if (body.propertyCategory !== undefined) inquiry.property_category = body.propertyCategory;
+    if (body.funder !== undefined) inquiry.funder = body.funder;
+    if (body.preferences !== undefined) inquiry.preferences = body.preferences;
+    if (body.cityId !== undefined) inquiry.city_id = body.cityId;
+    if (body.subLocations !== undefined) inquiry.sub_locations = body.subLocations;
+    if (body.purchaseTimeline !== undefined) inquiry.purchase_timeline = body.purchaseTimeline;
+    if (body.qualificationPurpose !== undefined) inquiry.qualification_purpose = body.qualificationPurpose;
+    if (body.decisionMaker !== undefined) inquiry.decision_maker = body.decisionMaker;
+
+    return inquiryRepo.save(inquiry);
+  }
+
   async bulkCreateLeads(leads: any[]) {
     let count = 0;
     for (const body of leads) {
