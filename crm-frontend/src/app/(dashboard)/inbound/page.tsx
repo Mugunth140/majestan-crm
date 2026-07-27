@@ -309,44 +309,6 @@ export default function InboundPage() {
         return <Badge className={"font-medium shadow-sm border whitespace-nowrap " + cls}>{s}</Badge>;
       },
     },
-    {
-      id: "actions",
-      header: "Action",
-      cell: ({ row }) => {
-        const id = row.original.rawId || row.original.id;
-        return (
-          <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              title="View Details"
-              onClick={() => router.push("/inbound/" + id)}
-            >
-              <Eye size={15} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              title="Edit"
-              onClick={() => router.push("/inbound/new?edit=" + id)}
-            >
-              <Edit size={15} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-              title="Delete"
-              onClick={() => setDeleteId(id)}
-            >
-              <Trash2 size={15} />
-            </Button>
-          </div>
-        );
-      }
-    },
   ];
 
   const uniqueCategories = Array.from(new Set(inbounds.map(l => l.property_category || l.propertyCategory).filter(c => c && c !== "—")));
@@ -514,6 +476,21 @@ export default function InboundPage() {
               showToolbar={true} 
               showDeleteAction={role === "Admin"}
               onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.rawId || r.id))}
+              renderToolbarActions={(selectedRows) => {
+                if (selectedRows.length !== 1) return null;
+                const row = selectedRows[0];
+                const id = row.rawId || row.id;
+                return (
+                  <>
+                    <Button variant="outline" size="sm" onClick={() => router.push("/inbound/" + id)}>
+                      <Eye size={15} className="mr-1.5" /> View
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => router.push("/inbound/new?edit=" + id)}>
+                      <Edit size={15} className="mr-1.5" /> Edit
+                    </Button>
+                  </>
+                );
+              }}
             />
           )}
         </div>

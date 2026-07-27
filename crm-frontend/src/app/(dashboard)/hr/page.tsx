@@ -242,21 +242,7 @@ export default function HrPage() {
         const cls = STATUS_STYLES[s] ?? "bg-gray-100 text-gray-800 border-gray-200";
         return <Badge className={`font-medium shadow-sm border whitespace-nowrap ${cls}`}>{s}</Badge>;
       },
-    },
-    {
-      id: "actions",
-      header: "Action",
-      cell: ({ row }: any) => (
-        <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" title="View Details" onClick={() => router.push("/hr/" + row.original.id)}>
-            <Eye size={15} />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Edit" onClick={() => router.push("/hr/new?edit=" + row.original.id)}>
-            <Edit size={15} />
-          </Button>
-        </div>
-      )
-    },
+    }
   ];
 
   return (
@@ -411,6 +397,20 @@ export default function HrPage() {
               showToolbar={true} 
               showDeleteAction={role === "Admin"}
               onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
+              renderToolbarActions={(selectedRows) => {
+                if (selectedRows.length !== 1) return null;
+                const row = selectedRows[0];
+                return (
+                  <>
+                    <Button variant="outline" size="sm" onClick={() => router.push("/hr/" + row.id)}>
+                      <Eye size={15} className="mr-1.5" /> View
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => router.push("/hr/new?edit=" + row.id)}>
+                      <Edit size={15} className="mr-1.5" /> Edit
+                    </Button>
+                  </>
+                );
+              }}
             />
           )}
         </div>

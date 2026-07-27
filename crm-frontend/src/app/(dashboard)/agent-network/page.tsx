@@ -271,35 +271,7 @@ export default function AgentsPage() {
         const s = row.original.status as string;
         const cls = STATUS_STYLES[s] ?? "bg-gray-100 text-gray-800 border-gray-200";
         return <Badge className={`font-medium shadow-sm border whitespace-nowrap ${cls}`}>{s}</Badge>;
-      },
-    },
-    {
-      id: "actions",
-      header: "Action",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-[#0052FF] hover:bg-blue-50 dark:hover:bg-blue-950"
-            title="View Agent"
-            onClick={() => router.push(`/agent-network/${row.original.id}`)}
-          >
-            <Eye size={15} />
-          </Button>
-          {isAdmin && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-              title="Delete Agent"
-              onClick={() => setDeleteId(row.original.id)}
-            >
-              <Trash2 size={15} />
-            </Button>
-          )}
-        </div>
-      )
+      }
     }
   ];
 
@@ -461,6 +433,15 @@ export default function AgentsPage() {
               showToolbar={true} 
               showDeleteAction={role === "Admin"}
               onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
+              renderToolbarActions={(selectedRows) => {
+                if (selectedRows.length !== 1) return null;
+                const row = selectedRows[0];
+                return (
+                  <Button variant="outline" size="sm" onClick={() => router.push(`/agent-network/${row.id}`)}>
+                    <Eye size={15} className="mr-1.5" /> View
+                  </Button>
+                );
+              }}
             />
           )}
         </div>

@@ -356,7 +356,7 @@ export default function LeadRoutingPage() {
       ),
     },
     {
-      accessorKey: "days_in_queue",
+      id: "days_in_queue",
       header: "Days in Queue",
       cell: ({ row }) => {
         const days = row.original.days_in_queue ?? 0;
@@ -367,45 +367,7 @@ export default function LeadRoutingPage() {
         );
       },
     },
-    {
-      id: "actions",
-      header: "Action",
-      cell: ({ row }) => (
-        <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
-          {role === "Staff" ? (
-            <Button
-              size="sm"
-              className="h-8 px-4 text-xs rounded-full bg-[#0052FF] text-white hover:bg-[#0052FF]/90 shadow"
-              disabled={claimingId === row.original.id}
-              onClick={() => handleClaim(row.original.id)}
-            >
-              {claimingId === row.original.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Take Lead"}
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 px-4 text-xs rounded-full border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
-              onClick={() => setAssignLeadId(row.original.id)}
-            >
-              Assign Lead
-            </Button>
-          )}
-          {role === "Admin" && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-              title="Delete"
-              onClick={() => setDeletingId(row.original.id)}
-            >
-              <Trash2 size={15} />
-            </Button>
-          )}
-        </div>
-      ),
-    },
-  ], [role, claimingId, deletingId, router]);
+  ], [role, router]);
 
   const historyColumns = useMemo<ColumnDef<HistoryEntry>[]>(() => [
     {
@@ -565,6 +527,51 @@ export default function LeadRoutingPage() {
                   showToolbar={true}
                   showDeleteAction={role === "Admin"}
                   onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
+                  renderToolbarActions={(selectedRows, clearSelection) => {
+                    return (
+                      <>
+                        {role === "Staff" ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+                            onClick={async () => {
+                              try {
+                                const promises = selectedRows.map(r => 
+                                  apiFetch(`${API_URL}/lead-routing/claim/${r.id}`, { 
+                                    method: "POST", headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ actioned_by_id: null }) 
+                                  })
+                                );
+                                await Promise.all(promises);
+                                toast.success(`${selectedRows.length} lead(s) claimed successfully`);
+                                fetchQueue();
+                                clearSelection();
+                              } catch {
+                                toast.error("Failed to claim leads");
+                              }
+                            }}
+                          >
+                            Take Lead
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+                            onClick={() => {
+                              if (selectedRows.length > 0) {
+                                // Just open assign for the first selected for now
+                                setAssignLeadId(selectedRows[0].id);
+                              }
+                            }}
+                          >
+                            Assign Lead
+                          </Button>
+                        )}
+                      </>
+                    );
+                  }}
                 />
                 {/* Server-side pagination */}
                 {totalQueuePages > 1 && (

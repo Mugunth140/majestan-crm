@@ -31,6 +31,7 @@ interface DataTableProps<TData, TValue> {
   showToolbar?: boolean;
   showDeleteAction?: boolean;
   onDeleteSelected?: (selectedRows: TData[]) => void;
+  renderToolbarActions?: (selectedRows: TData[], clearSelection: () => void) => React.ReactNode;
 }
 
 export function DataTable<TData, TValue>({
@@ -40,6 +41,7 @@ export function DataTable<TData, TValue>({
   showToolbar = false,
   showDeleteAction = false,
   onDeleteSelected,
+  renderToolbarActions,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -71,6 +73,10 @@ export function DataTable<TData, TValue>({
             {Object.keys(rowSelection).length} Selected
           </span>
           <div className="flex gap-2">
+            {renderToolbarActions && renderToolbarActions(
+              table.getFilteredSelectedRowModel().rows.map(r => r.original),
+              table.resetRowSelection
+            )}
             {showDeleteAction && onDeleteSelected && (
               <Button 
                 variant="destructive" 

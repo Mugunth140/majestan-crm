@@ -373,26 +373,11 @@ export default function LeadsPage() {
           );
         }
         // Unassigned
-        if (role === "Admin" || role === "Staff") {
-          return (
-            <div className="flex items-center justify-center">
-              <Badge variant="outline" className="bg-muted/40 text-muted-foreground border-border/60">
-                Unassigned
-              </Badge>
-            </div>
-          );
-        }
-        // TeamLead / Manager — show Assign Lead button
         return (
-          <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs px-3 rounded-full border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
-              onClick={() => setAssignLeadId(row.original.rawId)}
-            >
-              Assign Lead
-            </Button>
+          <div className="flex items-center justify-center">
+            <Badge variant="outline" className="bg-muted/40 text-muted-foreground border-border/60">
+              Unassigned
+            </Badge>
           </div>
         );
       },
@@ -406,79 +391,6 @@ export default function LeadsPage() {
         const cls = STATUS_STYLES[s] ?? "bg-gray-100 text-gray-800 border-gray-200";
         return <Badge className={"font-medium shadow-sm border whitespace-nowrap " + cls}>{s}</Badge>;
       },
-    },
-    {
-      id: "actions",
-      header: "Action",
-      cell: ({ row }) => {
-        if (row.original.isPendingImport) {
-          return <Badge variant="outline" className="text-xs bg-amber-50 text-amber-600 border-amber-200">Pending</Badge>;
-        }
-        
-        if (activeTab === "Unqualified") {
-          return (
-            <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs font-medium bg-background hover:bg-muted text-muted-foreground hover:text-foreground"
-                onClick={async () => {
-                  try {
-                    const res = await apiFetch(`${API_URL}/leads/${row.original.rawId}/status`, {
-                      method: "PUT",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ is_unqualified: false }),
-                    });
-                    const data = await res.json();
-                    if (data.success) {
-                      toast.success("Lead reverted to qualified.");
-                      fetchLeads();
-                    } else toast.error("Failed to revert lead.");
-                  } catch {
-                    toast.error("Failed to revert lead.");
-                  }
-                }}
-              >
-                <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Revert
-              </Button>
-            </div>
-          );
-        }
-
-        return (
-          <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              title="View Details"
-              onClick={() => router.push("/leads/" + row.original.rawId)}
-            >
-              <Eye size={15} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              title="Edit"
-              onClick={() => router.push("/leads/new?edit=" + row.original.rawId)}
-            >
-              <Edit size={15} />
-            </Button>
-            {role === "Admin" && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-                title="Delete"
-                onClick={() => setDeleteId(row.original.rawId)}
-              >
-                <Trash2 size={15} />
-              </Button>
-            )}
-          </div>
-        );
-      }
     },
   ];
 
@@ -847,6 +759,61 @@ export default function LeadsPage() {
                 showToolbar={true}
                 showDeleteAction={role === "Admin"}
                 onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.rawId))}
+                renderToolbarActions={(selectedRows) => {
+                  if (selectedRows.length !== 1) return null;
+                  const row = selectedRows[0];
+                  
+                  return (
+                    <>
+                      {activeTab === "Unqualified" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              const res = await apiFetch(`${API_URL}/leads/${row.rawId}/status`, {
+                                method: "PUT",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ is_unqualified: false }),
+                              });
+                              const data = await res.json();
+                              if (data.success) {
+                                toast.success("Lead reverted to qualified.");
+                                fetchLeads();
+                              } else toast.error("Failed to revert lead.");
+                            } catch {
+                              toast.error("Failed to revert lead.");
+                            }
+                          }}
+                        >
+                          <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Revert
+                        </Button>
+                      )}
+                      
+                      {!row.isPendingImport && role !== "Staff" && role !== "Admin" && (!row.staff || row.staff === "Unassigned") && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+                          onClick={() => setAssignLeadId(row.rawId)}
+                        >
+                          Assign Lead
+                        </Button>
+                      )}
+
+                      {!row.isPendingImport && (
+                        <>
+                          <Button variant="outline" size="sm" onClick={() => router.push("/leads/" + row.rawId)}>
+                            <Eye size={15} className="mr-1.5" /> View
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => router.push("/leads/new?edit=" + row.rawId)}>
+                            <Edit size={15} className="mr-1.5" /> Edit
+                          </Button>
+                        </>
+                      )}
+                    </>
+                  );
+                }}
               />
             )
           )}

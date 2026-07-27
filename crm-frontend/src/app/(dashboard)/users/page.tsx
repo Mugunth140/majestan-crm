@@ -145,20 +145,6 @@ function UsersList() {
           {row.original.is_active ? "Active" : "Inactive"}
         </Badge>
       )
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={() => router.push("/users/new?edit=" + row.original.id)} className="h-8 w-8 hover:text-[#0052FF]">
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => setDeleteId(row.original.id)} className="h-8 w-8 hover:text-red-500 hover:bg-red-50">
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      )
     }
   ];
 
@@ -188,6 +174,15 @@ function UsersList() {
             showToolbar={true} 
             showDeleteAction={role === "Admin"}
             onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
+            renderToolbarActions={(selectedRows) => {
+              if (selectedRows.length !== 1) return null;
+              const row = selectedRows[0];
+              return (
+                <Button variant="outline" size="sm" onClick={() => router.push("/users/new?edit=" + row.id)}>
+                  <Edit size={15} className="mr-1.5" /> Edit
+                </Button>
+              );
+            }}
           />
         )}
       </div>
