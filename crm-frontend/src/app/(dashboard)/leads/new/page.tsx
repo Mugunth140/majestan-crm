@@ -231,7 +231,7 @@ function LeadForm() {
 
   useEffect(() => {
     if (editId) {
-      fetch(API_URL + "/leads/" + editId)
+      apiFetch(API_URL + "/leads/" + editId)
         .then((res) => res.json())
         .then((result) => {
           if (result.success) {
