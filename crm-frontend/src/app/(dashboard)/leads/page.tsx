@@ -53,6 +53,8 @@ export default function LeadsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
   
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
@@ -249,6 +251,22 @@ export default function LeadsPage() {
       toast.error("Failed to delete lead");
     } finally {
       setDeleteId(null);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!bulkDeleteIds || bulkDeleteIds.length === 0) return;
+    setIsDeletingBulk(true);
+    try {
+      const promises = bulkDeleteIds.map(id => apiFetch(API_URL + "/leads/" + id, { method: "DELETE" }));
+      await Promise.all(promises);
+      toast.success(`${bulkDeleteIds.length} lead(s) deleted successfully`);
+      fetchLeads();
+    } catch {
+      toast.error("Failed to delete some or all leads");
+    } finally {
+      setIsDeletingBulk(false);
+      setBulkDeleteIds(null);
     }
   };
 
@@ -822,23 +840,41 @@ export default function LeadsPage() {
               </Button>
             </div>
           ) : (
-            isLoading ? <TableSkeleton /> : <DataTable columns={columns} data={displayedLeads} showToolbar={true} />
+            isLoading ? <TableSkeleton /> : (
+              <DataTable 
+                columns={columns} 
+                data={displayedLeads} 
+                showToolbar={true}
+                showDeleteAction={role === "Admin"}
+                onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.rawId))}
+              />
+            )
           )}
         </div>
       </div>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteId !== null} onOpenChange={(open) => !open && setDeleteId(null)}>
+      <Dialog open={deleteId !== null || bulkDeleteIds !== null} onOpenChange={(open) => {
+        if (!open) {
+          setDeleteId(null);
+          setBulkDeleteIds(null);
+        }
+      }}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Delete Lead</DialogTitle>
+            <DialogTitle>Delete Lead(s)</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this lead? This action cannot be undone and will remove all associated requirements and follow-ups.
+              Are you sure you want to delete {bulkDeleteIds ? `${bulkDeleteIds.length} leads` : 'this lead'}? This action cannot be undone and will remove all associated requirements and follow-ups.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete}>Delete Lead</Button>
+            <Button variant="outline" onClick={() => {
+              setDeleteId(null);
+              setBulkDeleteIds(null);
+            }} disabled={isDeletingBulk}>Cancel</Button>
+            <Button variant="destructive" onClick={bulkDeleteIds ? handleBulkDelete : handleDelete} disabled={isDeletingBulk}>
+              {isDeletingBulk ? "Deleting..." : "Delete"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

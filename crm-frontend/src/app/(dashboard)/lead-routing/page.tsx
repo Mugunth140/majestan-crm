@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { DataTable } from "@/components/tables/data-table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +17,7 @@ import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { AssignLeadModal } from "@/components/shared/assign-lead-modal";
 import { FormSelect } from "@/components/shared/form-select";
 import { DatePicker } from "@/components/shared/date-picker";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
@@ -100,6 +102,8 @@ export default function LeadRoutingPage() {
 
   // Delete loading
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -235,10 +239,10 @@ export default function LeadRoutingPage() {
     }
   };
 
-  const handleDeleteQueueLead = async (leadId: number) => {
-    setDeletingId(leadId);
+  const executeDeleteQueueLead = async () => {
+    if (!deletingId) return;
     try {
-      const res = await apiFetch(`${API_URL}/leads/${leadId}`, { method: "DELETE" });
+      const res = await apiFetch(`${API_URL}/leads/${deletingId}`, { method: "DELETE" });
       if (res.ok) {
         toast.success("Lead deleted");
         fetchQueue();
@@ -252,7 +256,48 @@ export default function LeadRoutingPage() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (!bulkDeleteIds || bulkDeleteIds.length === 0) return;
+    setIsDeletingBulk(true);
+    try {
+      const promises = bulkDeleteIds.map(id => apiFetch(`${API_URL}/leads/${id}`, { method: "DELETE" }));
+      await Promise.all(promises);
+      toast.success(`${bulkDeleteIds.length} lead(s) deleted successfully`);
+      fetchQueue();
+    } catch {
+      toast.error("Failed to delete some or all leads");
+    } finally {
+      setIsDeletingBulk(false);
+      setBulkDeleteIds(null);
+    }
+  };
+
   const queueColumns = useMemo<ColumnDef<QueueLead>[]>(() => [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <div className="flex items-center justify-center">
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected()}
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Select all"
+            className="data-[state=checked]:bg-[#0052FF] data-[state=checked]:border-[#0052FF]"
+          />
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label="Select row"
+            className="data-[state=checked]:bg-[#0052FF] data-[state=checked]:border-[#0052FF]"
+          />
+        </div>
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
     {
       accessorKey: "display_id",
       header: "Lead ID",
@@ -352,10 +397,9 @@ export default function LeadRoutingPage() {
               size="icon"
               className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
               title="Delete"
-              disabled={deletingId === row.original.id}
-              onClick={() => handleDeleteQueueLead(row.original.id)}
+              onClick={() => setDeletingId(row.original.id)}
             >
-              {deletingId === row.original.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 size={15} />}
+              <Trash2 size={15} />
             </Button>
           )}
         </div>
@@ -515,7 +559,13 @@ export default function LeadRoutingPage() {
               <TableSkeleton />
             ) : (
               <>
-                <DataTable columns={queueColumns} data={queue} />
+                <DataTable 
+                  columns={queueColumns} 
+                  data={queue} 
+                  showToolbar={true}
+                  showDeleteAction={role === "Admin"}
+                  onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
+                />
                 {/* Server-side pagination */}
                 {totalQueuePages > 1 && (
                   <div className="flex items-center justify-between pt-2">
@@ -642,6 +692,29 @@ export default function LeadRoutingPage() {
         department={deptTab}
         isLoading={isAssigning}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deletingId !== null || bulkDeleteIds !== null} onOpenChange={(open) => {
+        if (!open) {
+          setDeletingId(null);
+          setBulkDeleteIds(null);
+        }
+      }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Lead(s)</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {bulkDeleteIds ? `${bulkDeleteIds.length} lead(s)` : 'this lead'}? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => { setDeletingId(null); setBulkDeleteIds(null); }} disabled={isDeletingBulk || deletingId !== null && isDeletingBulk}>Cancel</Button>
+            <Button variant="destructive" onClick={bulkDeleteIds ? handleBulkDelete : executeDeleteQueueLead} disabled={isDeletingBulk}>
+              {isDeletingBulk || (deletingId !== null && isDeletingBulk) ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { DataTable } from "@/components/tables/data-table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Plus, Eye, Edit, Search, Filter, X, RefreshCw } from "lucide-react";
@@ -12,6 +13,9 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FormSelect } from "@/components/shared/form-select";
+import { apiFetch } from "@/lib/api-fetch";
+import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
@@ -39,6 +43,19 @@ export default function HrPage() {
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [todayViewMode, setTodayViewMode] = useState<"pending" | "completed">("pending");
 
+  const [role, setRole] = useState<string>("");
+  const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
+        setRole(user?.role?.name || user?.role || "");
+      } catch {}
+    }
+  }, []);
+
   const [filters, setFilters] = useState({
     dateFrom: "",
     dateTo: "",
@@ -51,7 +68,7 @@ export default function HrPage() {
 
   const fetchCandidates = () => {
     setIsLoading(true);
-    fetch(`${API_URL}/hr`)
+    apiFetch(`${API_URL}/hr`)
       .then(res => res.json())
       .then(data => {
         const mapped = data.map((c: any, i: number) => ({
@@ -62,6 +79,22 @@ export default function HrPage() {
         setCandidates(mapped);
       })
       .finally(() => setIsLoading(false));
+  };
+
+  const handleBulkDelete = async () => {
+    if (!bulkDeleteIds || bulkDeleteIds.length === 0) return;
+    setIsDeletingBulk(true);
+    try {
+      const promises = bulkDeleteIds.map(id => apiFetch(API_URL + "/hr/" + id, { method: "DELETE" }));
+      await Promise.all(promises);
+      toast.success(`${bulkDeleteIds.length} candidate(s) deleted successfully`);
+      fetchCandidates();
+    } catch {
+      toast.error("Failed to delete some or all candidates");
+    } finally {
+      setIsDeletingBulk(false);
+      setBulkDeleteIds(null);
+    }
   };
 
   useEffect(() => {
@@ -161,6 +194,31 @@ export default function HrPage() {
   const clearFilters = () => setFilters({ dateFrom: "", dateTo: "", department: "", status: "" });
 
   const columns = [
+    {
+      id: "select",
+      header: ({ table }: any) => (
+        <div className="flex items-center justify-center">
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected()}
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Select all"
+            className="data-[state=checked]:bg-[#0052FF] data-[state=checked]:border-[#0052FF]"
+          />
+        </div>
+      ),
+      cell: ({ row }: any) => (
+        <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label="Select row"
+            className="data-[state=checked]:bg-[#0052FF] data-[state=checked]:border-[#0052FF]"
+          />
+        </div>
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
     { accessorKey: "sno", header: "#" },
     {
       accessorKey: "formattedId",
@@ -346,9 +404,34 @@ export default function HrPage() {
         )}
 
         <div className="p-6">
-          {isLoading ? <TableSkeleton /> : <DataTable columns={columns} data={displayedCandidates} showToolbar={true} />}
+          {isLoading ? <TableSkeleton /> : (
+            <DataTable 
+              columns={columns} 
+              data={displayedCandidates} 
+              showToolbar={true} 
+              showDeleteAction={role === "Admin"}
+              onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
+            />
+          )}
         </div>
       </div>
+
+      <Dialog open={bulkDeleteIds !== null} onOpenChange={(open) => !open && setBulkDeleteIds(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Candidate(s)</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {bulkDeleteIds?.length} candidate(s)? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setBulkDeleteIds(null)} disabled={isDeletingBulk}>Cancel</Button>
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={isDeletingBulk}>
+              {isDeletingBulk ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

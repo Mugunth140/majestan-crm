@@ -29,6 +29,8 @@ interface DataTableProps<TData, TValue> {
   data: TData[];
   onRowClick?: (row: TData) => void;
   showToolbar?: boolean;
+  showDeleteAction?: boolean;
+  onDeleteSelected?: (selectedRows: TData[]) => void;
 }
 
 export function DataTable<TData, TValue>({
@@ -36,6 +38,8 @@ export function DataTable<TData, TValue>({
   data,
   onRowClick,
   showToolbar = false,
+  showDeleteAction = false,
+  onDeleteSelected,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -67,9 +71,19 @@ export function DataTable<TData, TValue>({
             {Object.keys(rowSelection).length} Selected
           </span>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm">Duplicate</Button>
-            <Button variant="outline" size="sm">Print</Button>
-            <Button variant="destructive" size="sm">Delete</Button>
+            {showDeleteAction && onDeleteSelected && (
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={() => {
+                  const selectedRows = table.getFilteredSelectedRowModel().rows.map(r => r.original);
+                  onDeleteSelected(selectedRows);
+                  table.resetRowSelection();
+                }}
+              >
+                Delete
+              </Button>
+            )}
           </div>
         </div>
       )}
