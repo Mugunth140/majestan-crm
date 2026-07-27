@@ -41,6 +41,18 @@ export default function AgentsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
+  const [role, setRole] = useState<string>("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
+        setRole(user?.role?.name || user?.role || "");
+      } catch {}
+    }
+  }, []);
 
   const [todayViewMode, setTodayViewMode] = useState<"pending" | "completed">("pending");
 
@@ -93,12 +105,28 @@ export default function AgentsPage() {
         toast.success("Agent deleted successfully.");
         fetchAgents();
       } else {
-        toast.error("Failed to delete agent.");
+        toast.error(data.message || "Failed to delete agent.");
       }
     } catch {
       toast.error("An error occurred while deleting.");
     } finally {
       setDeleteId(null);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!bulkDeleteIds || bulkDeleteIds.length === 0) return;
+    setIsDeletingBulk(true);
+    try {
+      const promises = bulkDeleteIds.map(id => apiFetch(`${API_URL}/agents/${id}`, { method: "DELETE" }));
+      await Promise.all(promises);
+      toast.success(`${bulkDeleteIds.length} agent(s) deleted successfully`);
+      fetchAgents();
+    } catch {
+      toast.error("Failed to delete some or all agents");
+    } finally {
+      setIsDeletingBulk(false);
+      setBulkDeleteIds(null);
     }
   };
 
@@ -426,21 +454,36 @@ export default function AgentsPage() {
         )}
 
         <div className="p-6">
-          {isLoading ? <TableSkeleton columns={6} rows={5} /> : <DataTable columns={columns} data={displayedAgents} showToolbar={true} />}
+          {isLoading ? <TableSkeleton columns={6} rows={5} /> : (
+            <DataTable 
+              columns={columns} 
+              data={displayedAgents} 
+              showToolbar={true} 
+              showDeleteAction={role === "Admin"}
+              onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
+            />
+          )}
         </div>
       </div>
 
-      <Dialog open={deleteId !== null} onOpenChange={(open) => !open && setDeleteId(null)}>
+      <Dialog open={deleteId !== null || bulkDeleteIds !== null} onOpenChange={(open) => {
+        if (!open) {
+          setDeleteId(null);
+          setBulkDeleteIds(null);
+        }
+      }}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Delete Agent</DialogTitle>
+            <DialogTitle>Delete Agent(s)</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this agent? This action cannot be undone and will remove all associated logs and follow-ups.
+              Are you sure you want to delete {bulkDeleteIds ? `${bulkDeleteIds.length} agent(s)` : 'this agent'}? This action cannot be undone and will remove all associated logs and follow-ups.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete}>Delete Agent</Button>
+            <Button variant="outline" onClick={() => { setDeleteId(null); setBulkDeleteIds(null); }} disabled={isDeletingBulk}>Cancel</Button>
+            <Button variant="destructive" onClick={bulkDeleteIds ? handleBulkDelete : handleDelete} disabled={isDeletingBulk}>
+              {isDeletingBulk ? "Deleting..." : "Delete"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

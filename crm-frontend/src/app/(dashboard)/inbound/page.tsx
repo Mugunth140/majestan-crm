@@ -41,6 +41,18 @@ export default function InboundPage() {
   const [inbounds, setInbounds] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
+  const [role, setRole] = useState<string>("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
+        setRole(user?.role?.name || user?.role || "");
+      } catch {}
+    }
+  }, []);
 
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -183,6 +195,22 @@ export default function InboundPage() {
       toast.error("Failed to delete inbound property");
     } finally {
       setDeleteId(null);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!bulkDeleteIds || bulkDeleteIds.length === 0) return;
+    setIsDeletingBulk(true);
+    try {
+      const promises = bulkDeleteIds.map(id => apiFetch(API_URL + "/inbounds/" + id, { method: "DELETE" }));
+      await Promise.all(promises);
+      toast.success(`${bulkDeleteIds.length} inbound properties deleted successfully`);
+      fetchInbounds();
+    } catch {
+      toast.error("Failed to delete some or all properties");
+    } finally {
+      setIsDeletingBulk(false);
+      setBulkDeleteIds(null);
     }
   };
 
@@ -479,21 +507,36 @@ export default function InboundPage() {
         )}
 
         <div className="p-6">
-          {isLoading ? <TableSkeleton /> : <DataTable columns={columns} data={displayedInbounds} showToolbar={true} />}
+          {isLoading ? <TableSkeleton /> : (
+            <DataTable 
+              columns={columns} 
+              data={displayedInbounds} 
+              showToolbar={true} 
+              showDeleteAction={role === "Admin"}
+              onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.rawId || r.id))}
+            />
+          )}
         </div>
       </div>
 
-      <Dialog open={deleteId !== null} onOpenChange={(open) => !open && setDeleteId(null)}>
+      <Dialog open={deleteId !== null || bulkDeleteIds !== null} onOpenChange={(open) => {
+        if (!open) {
+          setDeleteId(null);
+          setBulkDeleteIds(null);
+        }
+      }}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Delete Inbound Property</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this inbound property? This action cannot be undone.
+              Are you sure you want to delete {bulkDeleteIds ? `${bulkDeleteIds.length} propert(ies)` : 'this inbound property'}? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete}>Delete</Button>
+            <Button variant="outline" onClick={() => { setDeleteId(null); setBulkDeleteIds(null); }} disabled={isDeletingBulk}>Cancel</Button>
+            <Button variant="destructive" onClick={bulkDeleteIds ? handleBulkDelete : handleDelete} disabled={isDeletingBulk}>
+              {isDeletingBulk ? "Deleting..." : "Delete"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
