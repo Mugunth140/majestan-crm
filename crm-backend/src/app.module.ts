@@ -46,6 +46,7 @@ import { AssetLocation } from './database/entities/asset-location.entity';
 import { AssetFinancials } from './database/entities/asset-financials.entity';
 import { AssetFeature } from './database/entities/asset-feature.entity';
 import { AssetDocument } from './database/entities/asset-document.entity';
+import { AssetLayout } from './database/entities/asset-layout.entity';
 import { RoutingHistory } from './database/entities/routing-history.entity';
 import { Notification } from './database/entities/notification.entity';
 
@@ -67,7 +68,7 @@ import { Notification } from './database/entities/notification.entity';
         username: configService.get<string>('DB_USERNAME', 'root'),
         password: configService.get<string>('DB_PASSWORD', '8220'),
         database: configService.get<string>('CRM_DB_NAME', 'majestan_crm'),
-        entities: [User, Role, Permission, RolePermission, Department, ActivityLog, LeadSource, Lead, LeadInquiry, LeadFollowUp, LeadDocument, ContactLog, Agent, AgentFollowUp, AgentContactLog, Inbound, InboundFollowUp, InboundContactLog, HrCandidate, HrFollowUp, Asset, AssetLocation, AssetFinancials, AssetFeature, AssetDocument, RoutingHistory, Notification],
+        entities: [User, Role, Permission, RolePermission, Department, ActivityLog, LeadSource, Lead, LeadInquiry, LeadFollowUp, LeadDocument, ContactLog, Agent, AgentFollowUp, AgentContactLog, Inbound, InboundFollowUp, InboundContactLog, HrCandidate, HrFollowUp, AssetLayout, Asset, AssetLocation, AssetFinancials, AssetFeature, AssetDocument, RoutingHistory, Notification],
         synchronize: false, // Migrations are used instead
       }),
     }),

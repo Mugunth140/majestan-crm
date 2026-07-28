@@ -1,3 +1,5 @@
+// fallow-ignore-file circular-dependencies
+import type { Relation } from "typeorm";
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { Asset } from './asset.entity';
 
@@ -9,9 +11,9 @@ export class AssetDocument {
   @Column({ name: 'asset_id' })
   asset_id: number;
 
-  @ManyToOne(() => Asset, { onDelete: 'CASCADE' })
+  @ManyToOne('Asset', { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'asset_id' })
-  asset: Asset;
+  asset: Relation<any>;
 
   @Column({ length: 255 })
   file_name: string;

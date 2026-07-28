@@ -1,3 +1,5 @@
+// fallow-ignore-file circular-dependencies
+import type { Relation } from "typeorm";
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, JoinColumn, ManyToOne, OneToMany, OneToOne } from 'typeorm';
 import { User } from './user.entity';
 import { AssetLayout } from './asset-layout.entity';
@@ -28,7 +30,7 @@ export class Asset {
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'assigned_staff_id' })
-  assigned_staff: User;
+  assigned_staff: Relation<User>;
 
   @CreateDateColumn()
   created_at: Date;
@@ -73,17 +75,17 @@ export class Asset {
   approved_by: string;
 
   @OneToMany(() => AssetLayout, layout => layout.asset)
-  layouts: AssetLayout[];
+  layouts: Relation<AssetLayout>[];
 
   @OneToMany(() => AssetDocument, doc => doc.asset)
-  documents: AssetDocument[];
+  documents: Relation<AssetDocument>[];
 
   @OneToOne(() => AssetLocation, location => location.asset)
-  location: AssetLocation;
+  location: Relation<AssetLocation>;
 
   @OneToOne(() => AssetFeature, feature => feature.asset)
-  feature: AssetFeature;
+  feature: Relation<AssetFeature>;
 
   @OneToOne(() => AssetFinancials, financials => financials.asset)
-  financials: AssetFinancials;
+  financials: Relation<AssetFinancials>;
 }

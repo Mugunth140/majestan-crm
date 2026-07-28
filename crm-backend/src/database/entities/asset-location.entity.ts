@@ -1,3 +1,5 @@
+// fallow-ignore-file circular-dependencies
+import type { Relation } from "typeorm";
 import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn } from 'typeorm';
 import { Asset } from './asset.entity';
 
@@ -57,9 +59,9 @@ export class AssetLocation {
   @Column({ type: 'decimal', precision: 10, scale: 7, nullable: true })
   longitude: number;
 
-  @OneToOne(() => Asset, { onDelete: 'CASCADE' })
+  @OneToOne('Asset', { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'asset_id' })
-  asset: Asset;
+  asset: Relation<any>;
 
   @Column({ name: 'asset_id' })
   asset_id: number;
