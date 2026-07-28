@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Loader2, Save, UploadCloud, X, FileText, Image as ImageIcon, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -373,21 +374,28 @@ function AssetForm() {
               <Input value={formData.features.soil_type} onChange={e => setFormData({...formData, features: {...formData.features, soil_type: e.target.value}})} placeholder="e.g. Red Soil" className="h-12 rounded-xl bg-muted/30" />
             </div>
 
-            {/* Selects for Yes/No attributes */}
-            {['high_voltage_line', 'canal', 'presence_of_well', 'borewell', 'near_railway', 'near_water_body', 'near_burial_ground'].map((field) => (
-              <div key={field} className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{field.replace(/_/g, ' ')}</label>
-                <select 
-                  className="flex h-12 w-full rounded-xl border border-input bg-muted/30 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  value={(formData.features as any)[field]}
-                  onChange={e => setFormData({...formData, features: {...formData.features, [field]: e.target.value}})}
-                >
-                  <option value="">Select...</option>
-                  <option value="Yes">Yes</option>
-                  <option value="No">No</option>
-                </select>
-              </div>
-            ))}
+            {/* Checkboxes for Yes/No attributes */}
+            <div className="lg:col-span-3 pt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {['high_voltage_line', 'canal', 'presence_of_well', 'borewell', 'near_railway', 'near_water_body', 'near_burial_ground'].map((field) => {
+                const val = (formData.features as any)[field];
+                const isChecked = val === "Yes" || val === true || val === "true" || val === 1;
+                return (
+                  <div key={field} className="flex items-center space-x-3 bg-muted/10 border border-border/40 p-4 rounded-xl transition-colors hover:bg-muted/30">
+                    <Checkbox 
+                      id={`feature_${field}`} 
+                      checked={isChecked} 
+                      onCheckedChange={(c) => {
+                        const newVal = field.startsWith('near_') ? !!c : (c ? "Yes" : "No");
+                        setFormData({...formData, features: {...formData.features, [field]: newVal}});
+                      }} 
+                    />
+                    <label htmlFor={`feature_${field}`} className="text-sm font-semibold cursor-pointer capitalize flex-1">
+                      {field.replace(/_/g, ' ')}
+                    </label>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
 
