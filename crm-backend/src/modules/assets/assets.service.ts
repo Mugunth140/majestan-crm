@@ -6,6 +6,8 @@ import { AssetLocation } from '../../database/entities/asset-location.entity';
 import { AssetFinancials } from '../../database/entities/asset-financials.entity';
 import { AssetFeature } from '../../database/entities/asset-feature.entity';
 import { AssetDocument } from '../../database/entities/asset-document.entity';
+import { AssetLayout } from '../../database/entities/asset-layout.entity';
+import { UpdateAssetDto } from './dto/update-asset.dto';
 import { CreateAssetDto } from './dto/create-asset.dto';
 
 @Injectable()
@@ -35,9 +37,16 @@ export class AssetsService {
     try {
       const asset = queryRunner.manager.create(Asset, { 
         owner_name: dto.owner_name, 
-        mobile_number: dto.mobile_number 
+        mobile_number: dto.mobile_number,
+        source: dto.source,
+        mediator_name: dto.mediator_name,
+        cp_reference_name: dto.cp_reference_name,
+        remarks: dto.remarks
       });
       const savedAsset = await queryRunner.manager.save(asset);
+      
+      savedAsset.display_id = `AST${String(savedAsset.id).padStart(4, '0')}`;
+      await queryRunner.manager.save(savedAsset);
 
       if (dto.location) {
         await queryRunner.manager.save(queryRunner.manager.create(AssetLocation, { ...dto.location, asset_id: savedAsset.id }));
@@ -49,6 +58,11 @@ export class AssetsService {
         await queryRunner.manager.save(queryRunner.manager.create(AssetFeature, { ...dto.features, asset_id: savedAsset.id }));
       }
 
+      if (dto.layouts && Array.isArray(dto.layouts)) {
+        for (const layoutDto of dto.layouts) {
+          await queryRunner.manager.save(queryRunner.manager.create(AssetLayout, { ...layoutDto, asset_id: savedAsset.id }));
+        }
+      }
       await queryRunner.commitTransaction();
       return savedAsset;
     } catch (err) {
@@ -76,8 +90,74 @@ export class AssetsService {
     const financials = await this.dataSource.getRepository(AssetFinancials).findOne({ where: { asset_id: id } });
     const features = await this.dataSource.getRepository(AssetFeature).findOne({ where: { asset_id: id } });
     const documents = await this.dataSource.getRepository(AssetDocument).find({ where: { asset_id: id } });
+    const layouts = await this.dataSource.getRepository(AssetLayout).find({ where: { asset_id: id } });
 
-    return { ...asset, location, financials, features, documents };
+    return { ...asset, location, financials, features, documents, layouts };
+  }
+
+  
+  async update(id: number, dto: UpdateAssetDto) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const assetRepo = queryRunner.manager.getRepository(Asset);
+      const asset = await assetRepo.findOne({ where: { id } });
+      if (!asset) throw new NotFoundException('Asset not found');
+
+      // Update core fields
+      if (dto.owner_name !== undefined) asset.owner_name = dto.owner_name;
+      if (dto.mobile_number !== undefined) asset.mobile_number = dto.mobile_number;
+      if (dto.source !== undefined) asset.source = dto.source;
+      if (dto.mediator_name !== undefined) asset.mediator_name = dto.mediator_name;
+      if (dto.cp_reference_name !== undefined) asset.cp_reference_name = dto.cp_reference_name;
+      if (dto.remarks !== undefined) asset.remarks = dto.remarks;
+
+      await queryRunner.manager.save(asset);
+
+      if (dto.location) {
+        let loc = await queryRunner.manager.findOne(AssetLocation, { where: { asset_id: id } });
+        if (!loc) {
+          loc = queryRunner.manager.create(AssetLocation, { asset_id: id });
+        }
+        Object.assign(loc, dto.location);
+        await queryRunner.manager.save(loc);
+      }
+
+      if (dto.financials) {
+        let fin = await queryRunner.manager.findOne(AssetFinancials, { where: { asset_id: id } });
+        if (!fin) {
+          fin = queryRunner.manager.create(AssetFinancials, { asset_id: id });
+        }
+        Object.assign(fin, dto.financials);
+        await queryRunner.manager.save(fin);
+      }
+
+      if (dto.features) {
+        let feat = await queryRunner.manager.findOne(AssetFeature, { where: { asset_id: id } });
+        if (!feat) {
+          feat = queryRunner.manager.create(AssetFeature, { asset_id: id });
+        }
+        Object.assign(feat, dto.features);
+        await queryRunner.manager.save(feat);
+      }
+
+      if (dto.layouts && Array.isArray(dto.layouts)) {
+        await queryRunner.manager.delete(AssetLayout, { asset_id: id });
+        for (const layoutDto of dto.layouts) {
+          await queryRunner.manager.save(queryRunner.manager.create(AssetLayout, { ...layoutDto, asset_id: id }));
+        }
+      }
+
+      await queryRunner.commitTransaction();
+      return this.findOne(id);
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   async uploadMedia(assetId: number, files: { document?: Express.Multer.File[], images?: Express.Multer.File[] }) {

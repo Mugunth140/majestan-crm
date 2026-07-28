@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Param, UseInterceptors, UploadedFiles, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, UseInterceptors, UploadedFiles, BadRequestException } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { AssetsService } from './assets.service';
 import { CreateAssetDto } from './dto/create-asset.dto';
+import { UpdateAssetDto } from './dto/update-asset.dto';
 
 @Controller('api/v1/assets')
 export class AssetsController {
@@ -10,6 +11,12 @@ export class AssetsController {
   @Post()
   async create(@Body() createAssetDto: CreateAssetDto) {
     const data = await this.assetsService.create(createAssetDto);
+    return { success: true, data };
+  }
+
+  @Put(':id')
+  async update(@Param('id') id: string, @Body() updateAssetDto: UpdateAssetDto) {
+    const data = await this.assetsService.update(+id, updateAssetDto);
     return { success: true, data };
   }
 

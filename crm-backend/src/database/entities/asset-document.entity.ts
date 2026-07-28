@@ -25,6 +25,9 @@ export class AssetDocument {
   @Column({ length: 50, default: 'image' }) // 'image' or 'document'
   file_type: string;
 
+  @Column({ type: 'varchar', length: 50, default: 'general' })
+  document_category: string;
+
   @CreateDateColumn()
   created_at: Date;
 }

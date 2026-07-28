@@ -18,6 +18,15 @@ export class AssetFinancials {
   @Column({ type: 'varchar', nullable: true })
   payment_options: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  business_mode: string;
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true })
+  lo_price: number;
+
+  @Column({ type: 'varchar', nullable: true })
+  registration_time: string;
+
   @OneToOne(() => Asset, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'asset_id' })
   asset: Asset;

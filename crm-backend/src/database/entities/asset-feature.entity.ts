@@ -24,6 +24,33 @@ export class AssetFeature {
   @Column({ type: 'boolean', default: false })
   near_burial_ground: boolean;
 
+  @Column({ type: 'varchar', nullable: true })
+  classification_type: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  classified_area: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  saleable_area: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  tslr: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  water_depth: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  high_voltage_line: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  canal: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  presence_of_well: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  borewell: string;
+
   @OneToOne(() => Asset, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'asset_id' })
   asset: Asset;
