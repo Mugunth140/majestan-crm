@@ -17,14 +17,14 @@ export class AssetFeature {
   @Column({ type: 'varchar', nullable: true })
   water_source: string;
 
-  @Column({ type: 'boolean', default: false })
-  near_railway: boolean;
+  @Column({ type: 'varchar', nullable: true })
+  near_railway: string;
 
-  @Column({ type: 'boolean', default: false })
-  near_water_body: boolean;
+  @Column({ type: 'varchar', nullable: true })
+  near_water_body: string;
 
-  @Column({ type: 'boolean', default: false })
-  near_burial_ground: boolean;
+  @Column({ type: 'varchar', nullable: true })
+  near_burial_ground: string;
 
   @Column({ type: 'varchar', nullable: true })
   classification_type: string;

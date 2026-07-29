@@ -35,11 +35,13 @@ export class AssetsController {
   @Post(':id/media')
   @UseInterceptors(FileFieldsInterceptor([
     { name: 'document', maxCount: 1 },
-    { name: 'images', maxCount: 4 }
+    { name: 'images', maxCount: 4 },
+    { name: 'fmb', maxCount: 1 },
+    { name: 'barcode', maxCount: 1 }
   ]))
   async uploadMedia(
     @Param('id') id: string,
-    @UploadedFiles() files: { document?: Express.Multer.File[], images?: Express.Multer.File[] }
+    @UploadedFiles() files: { document?: Express.Multer.File[], images?: Express.Multer.File[], fmb?: Express.Multer.File[], barcode?: Express.Multer.File[] }
   ) {
     if (!files) throw new BadRequestException('No files uploaded');
     const data = await this.assetsService.uploadMedia(+id, files);

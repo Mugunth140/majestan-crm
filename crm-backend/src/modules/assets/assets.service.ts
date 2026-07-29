@@ -160,51 +160,49 @@ export class AssetsService {
     }
   }
 
-  async uploadMedia(assetId: number, files: { document?: Express.Multer.File[], images?: Express.Multer.File[] }) {
+  async uploadMedia(assetId: number, files: { document?: Express.Multer.File[], images?: Express.Multer.File[], fmb?: Express.Multer.File[], barcode?: Express.Multer.File[] }) {
     const asset = await this.dataSource.getRepository(Asset).findOne({ where: { id: assetId } });
     if (!asset) throw new NotFoundException('Asset not found');
 
     const repo = this.dataSource.getRepository(AssetDocument);
-    const uploadedDocs = [];
+    const uploadedDocs: any[] = [];
 
-    // Process Document (Max 1)
-    if (files.document && files.document.length > 0) {
-      const docFile = files.document[0];
-      const ext = docFile.originalname.split('.').pop();
-      const fileName = docFile.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const fileKey = `asset-inventory/${assetId}/doc_${Date.now()}_${fileName}`;
-      
-      await this.s3Client.write(fileKey, docFile.buffer, { type: docFile.mimetype });
+    const processFile = async (file: Express.Multer.File, type: string, category: string, prefix: string) => {
+      const fileName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const fileKey = `asset-inventory/${assetId}/${prefix}_${Date.now()}_${fileName}`;
+      await this.s3Client.write(fileKey, file.buffer, { type: file.mimetype });
       const fileUrl = `${process.env.R2_PUBLIC_URL}/${fileKey}`;
-      
       const saved = await repo.save(repo.create({
         asset_id: assetId,
         file_name: fileName,
         file_url: fileUrl,
         file_key: fileKey,
-        file_type: 'document'
+        file_type: type,
+        document_category: category
       }));
       uploadedDocs.push(saved);
+    };
+
+    // Process Document (Max 1)
+    if (files.document && files.document.length > 0) {
+      await processFile(files.document[0], 'document', 'general', 'doc');
+    }
+
+    // Process FMB (Max 1)
+    if (files.fmb && files.fmb.length > 0) {
+      await processFile(files.fmb[0], 'image', 'fmb', 'fmb');
+    }
+
+    // Process Barcode (Max 1)
+    if (files.barcode && files.barcode.length > 0) {
+      await processFile(files.barcode[0], 'image', 'barcode', 'barcode');
     }
 
     // Process Images (Max 4)
     if (files.images && files.images.length > 0) {
       const imagesToProcess = files.images.slice(0, 4); // enforce max 4 just in case
       for (const imgFile of imagesToProcess) {
-        const fileName = imgFile.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const fileKey = `asset-inventory/${assetId}/img_${Date.now()}_${fileName}`;
-        
-        await this.s3Client.write(fileKey, imgFile.buffer, { type: imgFile.mimetype });
-        const fileUrl = `${process.env.R2_PUBLIC_URL}/${fileKey}`;
-        
-        const saved = await repo.save(repo.create({
-          asset_id: assetId,
-          file_name: fileName,
-          file_url: fileUrl,
-          file_key: fileKey,
-          file_type: 'image'
-        }));
-        uploadedDocs.push(saved);
+        await processFile(imgFile, 'image', 'general', 'img');
       }
     }
 
