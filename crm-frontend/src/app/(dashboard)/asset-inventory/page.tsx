@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
@@ -26,6 +27,20 @@ export default function AssetInventoryPage() {
   const router = useRouter();
   const [assets, setAssets] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
+  const [role, setRole] = useState<string>("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
+        setRole(user?.role?.name || user?.role || "");
+      } catch {}
+    }
+  }, []);
 
   const fetchAssets = useCallback(async () => {
     try {
@@ -49,10 +64,10 @@ export default function AssetInventoryPage() {
     fetchAssets();
   }, [fetchAssets]);
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this asset?")) return;
+  const handleDelete = async () => {
+    if (!deleteId) return;
     try {
-      const res = await apiFetch(API_URL + "/assets/" + id, { method: "DELETE" });
+      const res = await apiFetch(API_URL + "/assets/" + deleteId, { method: "DELETE" });
       if (res.ok) {
         toast.success("Asset deleted successfully");
         fetchAssets();
@@ -61,6 +76,24 @@ export default function AssetInventoryPage() {
       }
     } catch {
       toast.error("Failed to delete asset");
+    } finally {
+      setDeleteId(null);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!bulkDeleteIds || bulkDeleteIds.length === 0) return;
+    setIsDeletingBulk(true);
+    try {
+      const promises = bulkDeleteIds.map(id => apiFetch(API_URL + "/assets/" + id, { method: "DELETE" }));
+      await Promise.all(promises);
+      toast.success(`${bulkDeleteIds.length} asset(s) deleted successfully`);
+      fetchAssets();
+    } catch {
+      toast.error("Failed to delete some or all assets");
+    } finally {
+      setIsDeletingBulk(false);
+      setBulkDeleteIds(null);
     }
   };
 
@@ -93,7 +126,11 @@ export default function AssetInventoryPage() {
     {
       accessorKey: "id",
       header: "Asset ID",
-      cell: ({ row }) => <span className="font-medium text-foreground">#{row.original.id}</span>,
+      cell: ({ row }) => (
+        <Link href={`/asset-inventory/${row.original.id}`} className="text-[#0052FF] hover:underline font-medium">
+          AST{String(row.original.id).padStart(5, "0")}
+        </Link>
+      ),
     },
     {
       accessorKey: "owner_name",
@@ -132,42 +169,7 @@ export default function AssetInventoryPage() {
           </Badge>
         );
       },
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-            title="View Details"
-            onClick={() => router.push("/asset-inventory/" + row.original.id)}
-          >
-            <Eye size={15} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-            title="Edit"
-            onClick={() => router.push("/asset-inventory/new?edit=" + row.original.id)}
-          >
-            <Edit size={15} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-            title="Delete"
-            onClick={() => handleDelete(row.original.id)}
-          >
-            <Trash2 size={15} />
-          </Button>
-        </div>
-      ),
-    },
+    }
   ];
 
   return (
@@ -185,8 +187,50 @@ export default function AssetInventoryPage() {
         </div>
       </div>
       <div className="bg-card border rounded-2xl shadow-sm overflow-hidden p-6">
-        <DataTable columns={columns} data={assets} />
+        <DataTable 
+          columns={columns} 
+          data={assets} 
+          showToolbar={true}
+          showDeleteAction={role === "Admin"}
+          onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
+          renderToolbarActions={(selectedRows) => {
+            if (selectedRows.length !== 1) return null;
+            const row = selectedRows[0];
+            return (
+              <>
+                <Button variant="outline" size="sm" onClick={() => router.push("/asset-inventory/" + row.id)}>
+                  <Eye size={15} className="mr-1.5" /> View
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => router.push("/asset-inventory/new?edit=" + row.id)}>
+                  <Edit size={15} className="mr-1.5" /> Edit
+                </Button>
+              </>
+            );
+          }}
+        />
       </div>
+
+      <Dialog open={deleteId !== null || bulkDeleteIds !== null} onOpenChange={(open) => {
+        if (!open) {
+          setDeleteId(null);
+          setBulkDeleteIds(null);
+        }
+      }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Asset(s)</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {bulkDeleteIds ? `${bulkDeleteIds.length} asset(s)` : 'this asset'}? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => { setDeleteId(null); setBulkDeleteIds(null); }} disabled={isDeletingBulk}>Cancel</Button>
+            <Button variant="destructive" onClick={bulkDeleteIds ? handleBulkDelete : handleDelete} disabled={isDeletingBulk}>
+              {isDeletingBulk ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
