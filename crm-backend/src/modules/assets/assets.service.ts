@@ -73,19 +73,31 @@ export class AssetsService {
     }
   }
 
-  async findAll() {
+  async findAll(user?: any) {
+    const whereClause: any = {};
+    if (user && user.role === 'Staff') {
+      whereClause.assigned_staff_id = user.id;
+    } else if (user && user.role === 'Team Lead') {
+      whereClause.assigned_staff = { department_id: user.department_id };
+    }
+
     return this.dataSource.getRepository(Asset).find({
+      where: whereClause,
       order: { created_at: 'DESC' },
       relations: { location: true, financials: true, feature: true }
     });
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, user?: any) {
     const asset = await this.dataSource.getRepository(Asset).findOne({
       where: { id },
       relations: { assigned_staff: true }
     });
     if (!asset) throw new NotFoundException('Asset not found');
+
+    if (user && user.role === 'Staff' && asset.assigned_staff_id !== user.id) {
+      throw new NotFoundException('Asset not found');
+    }
 
     const location = await this.dataSource.getRepository(AssetLocation).findOne({ where: { asset_id: id } });
     const financials = await this.dataSource.getRepository(AssetFinancials).findOne({ where: { asset_id: id } });

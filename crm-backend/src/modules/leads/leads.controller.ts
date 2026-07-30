@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Put, Delete, Param, Query, UseInterceptors, UploadedFile, BadRequestException, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, Delete, Param, Query, UseInterceptors, UploadedFile, BadRequestException, UseGuards, Request } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { LeadsService } from './leads.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -21,14 +21,14 @@ export class LeadsController {
   }
 
   @Get()
-  async getLeads() {
-    const data = await this.leadsService.getLeads();
+  async getLeads(@Request() req: any) {
+    const data = await this.leadsService.getLeads(req.user);
     return { success: true, data };
   }
 
   @Get(':id')
-  async getLead(@Param('id') id: string) {
-    const data = await this.leadsService.getLeadById(Number(id));
+  async getLead(@Param('id') id: string, @Request() req: any) {
+    const data = await this.leadsService.getLeadById(Number(id), req.user);
     return { success: true, data };
   }
 

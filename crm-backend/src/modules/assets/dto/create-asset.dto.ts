@@ -9,4 +9,5 @@ export class CreateAssetDto {
   financials?: any;
   features?: any;
   layouts?: any[];
+  assigned_staff_id?: number;
 }

@@ -1,15 +1,20 @@
-import { Controller, Get, Post, Put, Body, Param, UseInterceptors, UploadedFiles, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, UseInterceptors, UploadedFiles, BadRequestException, UseGuards, Request } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { AssetsService } from './assets.service';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('api/v1/assets')
+@UseGuards(JwtAuthGuard)
 export class AssetsController {
   constructor(private readonly assetsService: AssetsService) {}
 
   @Post()
-  async create(@Body() createAssetDto: CreateAssetDto) {
+  async create(@Body() createAssetDto: CreateAssetDto, @Request() req: any) {
+    if (req.user && req.user.role === 'Staff' && !createAssetDto.assigned_staff_id) {
+      createAssetDto.assigned_staff_id = req.user.id;
+    }
     const data = await this.assetsService.create(createAssetDto);
     return { success: true, data };
   }
@@ -21,14 +26,14 @@ export class AssetsController {
   }
 
   @Get()
-  async findAll() {
-    const data = await this.assetsService.findAll();
+  async findAll(@Request() req: any) {
+    const data = await this.assetsService.findAll(req.user);
     return { success: true, data };
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string) {
-    const data = await this.assetsService.findOne(+id);
+  async findOne(@Param('id') id: string, @Request() req: any) {
+    const data = await this.assetsService.findOne(+id, req.user);
     return { success: true, data };
   }
 

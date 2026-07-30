@@ -16,7 +16,14 @@ export interface CreateAgentResult {
 export class AgentsService {
   constructor(@InjectDataSource() private dataSource: DataSource) {}
 
-  async getAgents(): Promise<any[]> {
+  async getAgents(user?: any): Promise<any[]> {
+    let roleFilter = '';
+    if (user && user.role === 'Staff') {
+      roleFilter = `WHERE a.assigned_staff_id = ${Number(user.id)}`;
+    } else if (user && user.role === 'Team Lead') {
+      roleFilter = `WHERE a.assigned_staff_id IN (SELECT id FROM users WHERE department_id = ${Number(user.department_id)})`;
+    }
+
     const rawAgents = await this.dataSource.query(`
       SELECT 
         a.id as rawId, 
@@ -44,6 +51,7 @@ export class AgentsService {
         FROM agent_follow_ups
         WHERE follow_up_date IS NOT NULL
       ) latest_actual_f ON latest_actual_f.agent_id = a.id AND latest_actual_f.rn = 1
+      ${roleFilter}
       ORDER BY a.created_at DESC
     `);
 
@@ -62,7 +70,7 @@ export class AgentsService {
     }));
   }
 
-  async getAgentById(id: number) {
+  async getAgentById(id: number, user?: any) {
     const agent = await this.dataSource.getRepository(Agent).findOne({
       where: { id },
       relations: {
@@ -70,6 +78,10 @@ export class AgentsService {
       },
     });
     if (!agent) throw new NotFoundException('Agent not found');
+
+    if (user && user.role === 'Staff' && agent.assigned_staff_id !== user.id) {
+      throw new NotFoundException('Agent not found');
+    }
 
     const followUps = await this.dataSource.getRepository(AgentFollowUp).find({
       where: { agent_id: id },

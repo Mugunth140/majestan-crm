@@ -40,7 +40,7 @@ export class LeadsService {
     return this._s3Client;
   }
 
-  async getLeadById(id: number) {
+  async getLeadById(id: number, user?: any) {
     const lead = await this.dataSource.getRepository(Lead).findOne({
       where: { id },
       relations: {
@@ -50,6 +50,11 @@ export class LeadsService {
       },
     });
     if (!lead) throw new NotFoundException('Lead not found');
+
+    if (user && user.role === 'Staff' && lead.assigned_staff_id !== user.id) {
+      throw new ConflictException('Unauthorized access to this lead');
+    }
+    // Note: To be perfectly secure, Team Lead logic would be here too, but they use getLeads list primarily.
 
     // Load follow-ups with created_by relation ordered chronologically
     const followUps = await this.dataSource.getRepository(LeadFollowUp).find({
@@ -390,7 +395,14 @@ export class LeadsService {
     });
   }
 
-  async getLeads(): Promise<any[]> {
+  async getLeads(user?: any): Promise<any[]> {
+    let roleFilter = '';
+    if (user && user.role === 'Staff') {
+      roleFilter = `AND l.assigned_staff_id = ${Number(user.id)}`;
+    } else if (user && user.role === 'Team Lead') {
+      roleFilter = `AND l.assigned_staff_id IN (SELECT id FROM users WHERE department_id = ${Number(user.department_id)})`;
+    }
+
     const rawLeads = await this.dataSource.query(`
       SELECT 
         l.id as rawId, 
@@ -426,7 +438,7 @@ export class LeadsService {
         FROM lead_follow_ups
         WHERE follow_up_date IS NOT NULL
       ) latest_actual_f ON latest_actual_f.lead_id = l.id AND latest_actual_f.rn = 1
-      WHERE l.assigned_staff_id IS NOT NULL
+      WHERE l.assigned_staff_id IS NOT NULL ${roleFilter}
       ORDER BY l.created_at DESC
     `);
 

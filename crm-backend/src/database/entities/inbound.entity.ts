@@ -7,8 +7,11 @@ import {
   BeforeInsert,
   BeforeUpdate,
   OneToMany,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 
+import { User } from './user.entity';
 import { InboundFollowUp } from './inbound-follow-up.entity';
 import { InboundContactLog } from './inbound-contact-log.entity';
 
@@ -201,6 +204,13 @@ export class Inbound {
   // Score
   @Column({ type: 'int', default: 0 })
   quality_score: number;
+
+  @Column({ name: 'assigned_staff_id', nullable: true })
+  assigned_staff_id: number;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'assigned_staff_id' })
+  assigned_staff: User;
 
   @CreateDateColumn()
   created_at: Date;

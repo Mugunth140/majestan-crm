@@ -1,19 +1,21 @@
-import { Body, Controller, Get, Post, Put, Delete, Param } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, Delete, Param, UseGuards, Request } from '@nestjs/common';
 import { AgentsService } from './agents.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('api/v1/agents')
+@UseGuards(JwtAuthGuard)
 export class AgentsController {
   constructor(private readonly agentsService: AgentsService) {}
 
   @Get()
-  async getAgents() {
-    const data = await this.agentsService.getAgents();
+  async getAgents(@Request() req: any) {
+    const data = await this.agentsService.getAgents(req.user);
     return { success: true, data };
   }
 
   @Get(':id')
-  async getAgent(@Param('id') id: string) {
-    const data = await this.agentsService.getAgentById(Number(id));
+  async getAgent(@Param('id') id: string, @Request() req: any) {
+    const data = await this.agentsService.getAgentById(Number(id), req.user);
     return { success: true, data };
   }
 
@@ -24,7 +26,10 @@ export class AgentsController {
   }
 
   @Post()
-  async createAgent(@Body() body: any) {
+  async createAgent(@Body() body: any, @Request() req: any) {
+    if (req.user && req.user.role === 'Staff' && !body.assigned_staff_id) {
+      body.assigned_staff_id = req.user.id;
+    }
     const result = await this.agentsService.createAgent(body);
     return {
       success: true,

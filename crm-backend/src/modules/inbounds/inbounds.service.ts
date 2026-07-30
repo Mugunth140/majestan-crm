@@ -91,8 +91,16 @@ export class InboundsService {
     return savedInbound;
   }
 
-  async findAll(): Promise<any[]> {
+  async findAll(user?: any): Promise<any[]> {
+    const whereClause: any = {};
+    if (user && user.role === 'Staff') {
+      whereClause.assigned_staff_id = user.id;
+    } else if (user && user.role === 'Team Lead') {
+      whereClause.assigned_staff = { department_id: user.department_id };
+    }
+
     const inbounds = await this.inboundsRepository.find({
+      where: whereClause,
       relations: { follow_ups: true },
       order: { created_at: 'DESC' }
     });
@@ -124,7 +132,7 @@ export class InboundsService {
     });
   }
 
-  async findOne(id: number): Promise<Inbound> {
+  async findOne(id: number, user?: any): Promise<Inbound> {
     const inbound = await this.inboundsRepository.findOne({
       where: { id },
       relations: {
@@ -145,6 +153,11 @@ export class InboundsService {
     if (!inbound) {
       throw new NotFoundException(`Inbound with ID ${id} not found`);
     }
+
+    if (user && user.role === 'Staff' && inbound.assigned_staff_id !== user.id) {
+      throw new NotFoundException(`Inbound with ID ${id} not found`);
+    }
+
     return inbound;
   }
 

@@ -1,11 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException, UseGuards, Request } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { InboundsService } from './inbounds.service';
 import { Inbound } from '../../database/entities/inbound.entity';
 import { InboundFollowUp } from '../../database/entities/inbound-follow-up.entity';
 import { InboundContactLog } from '../../database/entities/inbound-contact-log.entity';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('api/v1/inbounds')
+@UseGuards(JwtAuthGuard)
 export class InboundsController {
   constructor(private readonly inboundsService: InboundsService) {}
 
@@ -22,18 +24,21 @@ export class InboundsController {
   }
 
   @Post()
-  create(@Body() createInboundDto: Partial<Inbound>) {
+  create(@Body() createInboundDto: Partial<Inbound>, @Request() req: any) {
+    if (req.user && req.user.role === 'Staff') {
+      createInboundDto.assigned_staff_id = req.user.id;
+    }
     return this.inboundsService.create(createInboundDto);
   }
 
   @Get()
-  findAll() {
-    return this.inboundsService.findAll();
+  findAll(@Request() req: any) {
+    return this.inboundsService.findAll(req.user);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.inboundsService.findOne(+id);
+  findOne(@Param('id') id: string, @Request() req: any) {
+    return this.inboundsService.findOne(+id, req.user);
   }
 
   @Patch(':id')
