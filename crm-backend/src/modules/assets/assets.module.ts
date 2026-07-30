@@ -8,9 +8,10 @@ import { AssetFinancials } from '../../database/entities/asset-financials.entity
 import { AssetFeature } from '../../database/entities/asset-feature.entity';
 import { AssetLayout } from '../../database/entities/asset-layout.entity';
 import { AssetDocument } from '../../database/entities/asset-document.entity';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Asset, AssetLocation, AssetFinancials, AssetFeature, AssetLayout, AssetDocument])],
+  imports: [TypeOrmModule.forFeature([Asset, AssetLocation, AssetFinancials, AssetFeature, AssetLayout, AssetDocument]), AuthModule],
   controllers: [AssetsController],
   providers: [AssetsService],
 })
