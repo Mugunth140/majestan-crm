@@ -97,6 +97,22 @@ export default function AssetInventoryPage() {
     }
   };
 
+  function formatBudget(expectation: number | null | undefined): string {
+    if (!expectation) return "-";
+    // expectation is in lakhs; multiply by 1,00,000 to get actual value
+    const val = expectation * 100000;
+    if (val >= 10000000) return `${(val / 10000000).toFixed(2)} Cr`;
+    if (val >= 100000) return `${(val / 100000).toFixed(2)} Lakhs`;
+    return String(val);
+  }
+
+  function formatTotalPrice(price: number | null | undefined): string {
+    if (!price) return "-";
+    if (price >= 10000000) return `${(price / 10000000).toFixed(2)} Cr`;
+    if (price >= 100000) return `${(price / 100000).toFixed(2)} Lakhs`;
+    return String(price);
+  }
+
   const columns: ColumnDef<any>[] = [
     {
       id: "select",
@@ -133,29 +149,45 @@ export default function AssetInventoryPage() {
       ),
     },
     {
-      accessorKey: "owner_name",
-      header: "Owner Name",
-      cell: ({ row }) => <div className="font-medium">{row.original.owner_name || "-"}</div>,
-    },
-    {
-      accessorKey: "mobile_number",
-      header: "Mobile",
-      cell: ({ row }) => <div className="text-muted-foreground">{row.original.mobile_number || "-"}</div>,
-    },
-    {
-      accessorKey: "quality_score",
-      header: "Score",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <div className="h-1.5 w-16 bg-muted rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-[#0052FF]" 
-              style={{ width: `${row.original.quality_score || 0}%` }}
-            />
+      id: "address",
+      header: "Address",
+      cell: ({ row }) => {
+        const loc = row.original.location;
+        if (!loc) return <span className="text-muted-foreground">-</span>;
+        const parts = [loc.district, loc.taluk, loc.village].filter(Boolean);
+        const zone = loc.zone || null;
+        return (
+          <div>
+            <div className="font-medium">{parts.join(", ") || "-"}</div>
+            {zone && <div className="text-xs text-muted-foreground">{zone}</div>}
           </div>
-          <span className="text-xs font-medium text-muted-foreground">{row.original.quality_score || 0}</span>
-        </div>
-      ),
+        );
+      },
+    },
+    {
+      id: "extent",
+      header: "Extent",
+      cell: ({ row }) => {
+        const feat = row.original.feature;
+        const extent = feat?.extent ?? null;
+        return <div className="text-muted-foreground">{extent != null ? `${extent} Acres` : "-"}</div>;
+      },
+    },
+    {
+      id: "budget",
+      header: "Budget",
+      cell: ({ row }) => {
+        const fin = row.original.financials;
+        return <div className="text-muted-foreground">{formatBudget(fin?.expectation)}</div>;
+      },
+    },
+    {
+      id: "total_price",
+      header: "Total Price",
+      cell: ({ row }) => {
+        const fin = row.original.financials;
+        return <div className="text-muted-foreground">{formatTotalPrice(fin?.land_price)}</div>;
+      },
     },
     {
       accessorKey: "status",

@@ -75,7 +75,8 @@ export class AssetsService {
 
   async findAll() {
     return this.dataSource.getRepository(Asset).find({
-      order: { created_at: 'DESC' }
+      order: { created_at: 'DESC' },
+      relations: { location: true, financials: true, feature: true }
     });
   }
 
