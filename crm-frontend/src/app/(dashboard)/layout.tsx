@@ -18,7 +18,7 @@ export default function DashboardLayout({
         </Suspense>
         <div className="flex flex-col flex-1 overflow-hidden relative">
           <Topbar />
-          <main className="flex-1 overflow-y-auto px-8 pb-8 pt-8">
+          <main className="flex-1 overflow-y-auto px-4 lg:px-8 pb-8 pt-8">
             {children}
           </main>
         </div>

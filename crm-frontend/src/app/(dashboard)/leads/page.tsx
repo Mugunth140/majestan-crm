@@ -789,54 +789,54 @@ export default function LeadsPage() {
             isLoading ? <TableSkeleton /> : (
               <DataTable 
                 columns={columns} 
-                data={displayedLeads} 
-                showToolbar={true}
-                showDeleteAction={role === "Admin"}
-                onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.rawId))}
-                renderToolbarActions={(selectedRows, clearSelection) => {
-                  const isSingle = selectedRows.length === 1;
-                  const row = selectedRows[0];
-                  
-                  return (
-                    <>
-                      {activeTab === "Unqualified" && isSingle && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={async () => {
-                            try {
-                              const res = await apiFetch(`${API_URL}/leads/${row.rawId}/status`, {
-                                method: "PUT",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ is_unqualified: false }),
-                              });
-                              const data = await res.json();
-                              if (data.success) {
-                                toast.success("Lead reverted to qualified.");
-                                fetchLeads();
-                                clearSelection();
-                              } else toast.error("Failed to revert lead.");
-                            } catch {
-                              toast.error("Failed to revert lead.");
-                            }
-                          }}
-                        >
-                          <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Revert
-                        </Button>
-                      )}
+                    data={displayedLeads} 
+                    showToolbar={true}
+                    showDeleteAction={role === "Admin"}
+                    onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.rawId))}
+                    renderToolbarActions={(selectedRows, clearSelection) => {
+                      const isSingle = selectedRows.length === 1;
+                      const row = selectedRows[0];
                       
-                      {role === "Staff" ? (
-                        isSingle && !row.isPendingImport && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
-                            onClick={() => setReturnLeadId(row.rawId)}
-                          >
-                            Re Assign
-                          </Button>
-                        )
-                      ) : (
+                      return (
+                        <>
+                          {activeTab === "Unqualified" && isSingle && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                try {
+                                  const res = await apiFetch(`${API_URL}/leads/${row.rawId}/status`, {
+                                    method: "PUT",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ is_unqualified: false }),
+                                  });
+                                  const data = await res.json();
+                                  if (data.success) {
+                                    toast.success("Lead reverted to qualified.");
+                                    fetchLeads();
+                                    clearSelection();
+                                  } else toast.error("Failed to revert lead.");
+                                } catch {
+                                  toast.error("Failed to revert lead.");
+                                }
+                              }}
+                            >
+                              <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Revert
+                            </Button>
+                          )}
+                          
+                          {role === "Staff" ? (
+                            isSingle && !row.isPendingImport && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+                                onClick={() => setReturnLeadId(row.rawId)}
+                              >
+                                Re Assign
+                              </Button>
+                            )
+                          ) : (
                         !selectedRows.some(r => r.isPendingImport) && (
                           <Button
                             variant="outline"
