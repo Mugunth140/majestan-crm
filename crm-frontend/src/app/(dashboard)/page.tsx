@@ -1,41 +1,97 @@
 "use client";
 
-import { User, Building2, Layers, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { 
+  User, Building2, Layers, Users, TrendingUp, Route, 
+  Inbox, Network, Briefcase, Package, UserPen, Target, 
+  Activity, Settings, Database, Contact, Home
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    try {
+      const u = localStorage.getItem("crm_user");
+      if (u) setUser(JSON.parse(u));
+    } catch {}
+  }, []);
+
+  const isAdmin = user?.role === "Admin" || user?.role === "Super Admin";
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Welcome to Majestan CRM. Select a module from the sidebar.
+      
+      {/* Universal Greeting */}
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">
+          Welcome back, {user?.name?.split(' ')[0] || "Team"} 👋
+        </h1>
+        <p className="text-muted-foreground text-sm lg:text-base">
+          <span className="hidden md:inline">Overview of all CRM activities.</span>
+          <span className="inline md:hidden">Select a module below to get started.</span>
         </p>
       </div>
-      
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Placeholder metric cards */}
-        <div className="rounded-xl border bg-card text-card-foreground shadow p-6">
+
+      {/* MOBILE ONLY: Master Navigation Hub */}
+      <div className="md:hidden space-y-6 pb-6">
+        <MenuSection title="Core Pipeline">
+          <MenuCard icon={Contact} label="Leads" onClick={() => router.push('/leads')} color="text-blue-600" bg="bg-blue-500/10" />
+          <MenuCard icon={Route} label="Lead Routing" onClick={() => router.push('/lead-routing')} color="text-indigo-600" bg="bg-indigo-500/10" />
+          <MenuCard icon={Inbox} label="Inbound" onClick={() => router.push('/inbound')} color="text-emerald-600" bg="bg-emerald-500/10" />
+        </MenuSection>
+
+        <MenuSection title="Inventory & Projects">
+          <MenuCard icon={Briefcase} label="Projects" onClick={() => router.push('/projects')} color="text-rose-600" bg="bg-rose-500/10" />
+          <MenuCard icon={Home} label="Properties" onClick={() => router.push('/properties')} color="text-teal-600" bg="bg-teal-500/10" />
+          <MenuCard icon={Package} label="Asset Inventory" onClick={() => router.push('/asset-inventory')} color="text-amber-600" bg="bg-amber-500/10" />
+        </MenuSection>
+
+        <MenuSection title="Network & Team">
+          <MenuCard icon={Network} label="Agent Network" onClick={() => router.push('/agent-network')} color="text-cyan-600" bg="bg-cyan-500/10" />
+          <MenuCard icon={UserPen} label="HR Panel" onClick={() => router.push('/hr')} color="text-fuchsia-600" bg="bg-fuchsia-500/10" />
+          {isAdmin && <MenuCard icon={Users} label="Users" onClick={() => router.push('/users')} color="text-violet-600" bg="bg-violet-500/10" />}
+        </MenuSection>
+
+        <MenuSection title="System">
+          <MenuCard icon={Target} label="Target Insights" onClick={() => router.push('/insights')} color="text-orange-600" bg="bg-orange-500/10" />
+          <MenuCard icon={Settings} label="Settings" onClick={() => router.push('/settings')} color="text-slate-600" bg="bg-slate-500/10" />
+          {isAdmin && (
+            <>
+              <MenuCard icon={Activity} label="Activity Logs" onClick={() => router.push('/activity-logs')} color="text-red-600" bg="bg-red-500/10" />
+              <MenuCard icon={Database} label="Master Registry" onClick={() => router.push('/master/sources')} color="text-zinc-600" bg="bg-zinc-500/10" />
+            </>
+          )}
+        </MenuSection>
+      </div>
+
+      {/* DESKTOP ONLY: Analytics Dashboard */}
+      <div className="hidden md:grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-xl border bg-card text-card-foreground shadow p-6 flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <h3 className="tracking-tight text-sm font-medium">Total Leads</h3>
             <User className="h-4 w-4 text-muted-foreground" />
           </div>
           <div className="text-2xl font-bold mt-2">--</div>
         </div>
-        <div className="rounded-xl border bg-card text-card-foreground shadow p-6">
+        <div className="rounded-xl border bg-card text-card-foreground shadow p-6 flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <h3 className="tracking-tight text-sm font-medium">Inbounds</h3>
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </div>
           <div className="text-2xl font-bold mt-2">--</div>
         </div>
-        <div className="rounded-xl border bg-card text-card-foreground shadow p-6">
+        <div className="rounded-xl border bg-card text-card-foreground shadow p-6 flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <h3 className="tracking-tight text-sm font-medium">Active Assets</h3>
             <Layers className="h-4 w-4 text-muted-foreground" />
           </div>
           <div className="text-2xl font-bold mt-2">--</div>
         </div>
-        <div className="rounded-xl border bg-card text-card-foreground shadow p-6">
+        <div className="rounded-xl border bg-card text-card-foreground shadow p-6 flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <h3 className="tracking-tight text-sm font-medium">Agents</h3>
             <Users className="h-4 w-4 text-muted-foreground" />
@@ -43,6 +99,32 @@ export default function DashboardPage() {
           <div className="text-2xl font-bold mt-2">--</div>
         </div>
       </div>
+
     </div>
   );
+}
+
+function MenuSection({ title, children }: { title: string, children: React.ReactNode }) {
+  return (
+    <div className="space-y-3">
+      <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">{title}</h3>
+      <div className="grid grid-cols-2 gap-3">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function MenuCard({ icon: Icon, label, onClick, color, bg }: any) {
+  return (
+    <button 
+      onClick={onClick} 
+      className="bg-card hover:bg-muted/50 border border-border p-4 rounded-[1.25rem] flex flex-col items-start gap-4 transition-colors active:scale-95 shadow-sm"
+    >
+      <div className={cn("w-10 h-10 rounded-full flex items-center justify-center", bg)}>
+        <Icon className={cn("w-5 h-5", color)} strokeWidth={2.5} />
+      </div>
+      <span className="font-semibold text-[13px] text-foreground text-left leading-tight">{label}</span>
+    </button>
+  )
 }
