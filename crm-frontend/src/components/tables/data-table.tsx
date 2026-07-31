@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -65,7 +66,7 @@ export function DataTable<TData, TValue>({
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 md:space-y-0 md:flex md:flex-col md:flex-1 md:h-full md:min-h-0 md:gap-4 w-full">
       {/* Floating Toolbar for Selected Actions */}
       {Object.keys(rowSelection).length > 0 && showToolbar && (
         <div className="flex items-center justify-between p-2 bg-muted/50 rounded-md border border-border/50 animate-in fade-in slide-in-from-bottom-2">
@@ -94,15 +95,18 @@ export function DataTable<TData, TValue>({
         </div>
       )}
 
-      <div className="rounded-md border bg-card overflow-x-auto">
-        <Table className="min-w-max w-full">
-          <TableHeader className="bg-muted/40 border-b">
+      <div className="rounded-md border bg-card overflow-x-auto md:flex-1 md:h-full md:overflow-y-auto w-full relative">
+        <table className="min-w-max w-full caption-bottom text-sm">
+          <TableHeader className="border-b border-border sticky top-0 z-20 shadow-sm">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent border-none">
-                {headerGroup.headers.map((header) => (
+                {headerGroup.headers.map((header, idx) => (
                   <TableHead
                     key={header.id}
-                    className="text-[13px] h-11 font-semibold tracking-wide text-muted-foreground whitespace-nowrap border-r border-border/60 last:border-r-0 px-4 text-center"
+                    className={cn(
+                      "text-[13px] h-11 font-semibold tracking-wide text-muted-foreground whitespace-nowrap border-r border-border last:border-r-0 px-4 text-center bg-muted",
+                      idx === 0 ? "sticky left-0 z-30" : ""
+                    )}
                   >
                     {header.isPlaceholder
                       ? null
@@ -114,23 +118,41 @@ export function DataTable<TData, TValue>({
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                  onClick={() => onRowClick && onRowClick(row.original)}
-                  className="hover:bg-muted/50 transition-colors duration-150 cursor-pointer border-b border-border/60 active:scale-[0.998]"
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell
-                      key={cell.id}
-                      className="py-2.5 px-4 text-[14px] border-r border-border/60 last:border-r-0 text-center"
-                    >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+              <>
+                {table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && "selected"}
+                    onClick={() => onRowClick && onRowClick(row.original)}
+                    className="hover:bg-muted/50 transition-colors duration-150 cursor-pointer border-b border-border/40 active:scale-[0.998]"
+                  >
+                    {row.getVisibleCells().map((cell, idx) => (
+                      <TableCell
+                        key={cell.id}
+                        className={cn(
+                          "py-2.5 px-4 text-[14px] border-r border-border/40 last:border-r-0 text-center",
+                          idx === 0 ? "sticky left-0 z-10 bg-card" : ""
+                        )}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+                {Array.from({ length: Math.max(0, table.getState().pagination.pageSize - table.getRowModel().rows.length) }).map((_, i) => (
+                  <TableRow key={`empty-${i}`} className="hover:bg-transparent border-b border-border/40">
+                    {columns.map((_, colIdx) => (
+                      <TableCell 
+                        key={`empty-cell-${i}-${colIdx}`} 
+                        className={cn(
+                          "py-2.5 px-4 h-[45px] border-r border-border/40 last:border-r-0",
+                          colIdx === 0 ? "sticky left-0 z-10 bg-card" : ""
+                        )} 
+                      />
+                    ))}
+                  </TableRow>
+                ))}
+              </>
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
@@ -139,10 +161,10 @@ export function DataTable<TData, TValue>({
               </TableRow>
             )}
           </TableBody>
-        </Table>
+        </table>
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between md:mt-auto pt-1">
         <div className="text-sm text-muted-foreground">
           Showing{" "}
           {table.getFilteredRowModel().rows.length > 0

@@ -833,7 +833,7 @@ export default function LeadsPage() {
   return (
     <>
       <MobileHeader title="Leads Dashboard" />
-      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0">
+      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:flex-1 md:h-full md:min-h-0">
         <Device
           mobile={null}
           desktop={
@@ -888,7 +888,7 @@ export default function LeadsPage() {
       />
 
       <Device mobile={mobileFilters} desktop={desktopFilters} />
-        <div className="w-full p-3 md:p-6">
+        <div className="w-full px-4 md:px-0 pt-2 pb-6 md:flex-1 md:h-full md:flex md:flex-col md:min-h-0">
           {pendingImports.length > 0 && activeTab === "Open Pipeline" && (
              <div className="mb-6 p-5 bg-blue-50/50 border border-blue-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
                 <div>
