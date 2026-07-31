@@ -12,6 +12,7 @@ import { ArrowLeft, CheckCircle2, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { FormSelect } from "@/components/shared/form-select";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
+import { MobileHeader } from "@/components/layout/mobile-header";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -176,7 +177,8 @@ function AgentForm() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center justify-between pr-[150px] min-h-[48px]">
+      <MobileHeader title={editId ? "Edit Agent" : "Add Agent"} showBack />
+      <div className="hidden md:flex items-center justify-between pr-[150px] min-h-[48px]">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" onClick={() => router.push("/agent-network")}>
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />

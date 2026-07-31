@@ -21,30 +21,12 @@ import { useRouter } from "next/navigation";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
 import { AssignLeadModal } from "@/components/shared/assign-lead-modal";
+import { ContactModal } from "@/components/shared/contact-modal";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { MobileLeadList } from "@/components/leads/mobile-lead-list";
+import { LEAD_STATUS_STYLES as STATUS_STYLES } from "@/lib/lead-constants";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
-
-const STATUS_STYLES: Record<string, string> = {
-  "New Lead":             "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300",
-  "Contacted":            "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400",
-  "Qualified":            "bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400",
-  "Property Shared":      "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400",
-  "Other Location":       "bg-violet-100 text-violet-800 border-violet-200 dark:bg-violet-900/30 dark:text-violet-400",
-  "Interested":           "bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200 dark:bg-fuchsia-900/30 dark:text-fuchsia-400",
-  "Site Visit Scheduled": "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
-  "Site Visit Completed": "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400",
-  "Re Visit Scheduled":   "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400",
-  "Re Visit Completed":   "bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-900/30 dark:text-rose-400",
-  "Negotiation":          "bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-900/30 dark:text-pink-400",
-  "Booking Advance":      "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400",
-  "Agreement":            "bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/30 dark:text-teal-400",
-  "Closed Won":           "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
-  "Not Interested":       "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400",
-  "Dropped":              "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/40 dark:text-red-400",
-  "Lost":                 "bg-red-200 text-red-900 border-red-300 dark:bg-red-900/50 dark:text-red-300",
-  "Future Follow-up":     "bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-800 dark:text-slate-300",
-};
 
 export default function LeadsPage() {
   const router = useRouter();
@@ -86,6 +68,9 @@ export default function LeadsPage() {
   const [assignLeadId, setAssignLeadId] = useState<number | null>(null);
   const [assignLeadIds, setAssignLeadIds] = useState<number[] | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
+
+  // Contact modal state (mobile quick actions)
+  const [contactModal, setContactModal] = useState<{ open: boolean; type: string; to: string; rawId: number }>({ open: false, type: "", to: "", rawId: 0 });
 
   // Return to queue state
   const [returnLeadId, setReturnLeadId] = useState<number | null>(null);
@@ -333,6 +318,10 @@ export default function LeadsPage() {
       setReturnLeadId(null);
       setReturnReason("");
     }
+  };
+
+  const openMobileContact = (type: string, lead: any) => {
+    setContactModal({ open: true, type, to: lead.mobile, rawId: lead.rawId });
   };
 
   const columns: ColumnDef<any>[] = [
@@ -609,10 +598,10 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-transparent md:bg-card border-0 md:border rounded-none md:rounded-xl overflow-hidden shadow-none md:shadow-sm">
         
         {/* Tabs & Pipeline Toggles Row */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-6 border-b bg-muted/10 pt-4 gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 md:px-6 border-b bg-muted/10 pt-4 gap-4">
           <div className="flex items-center gap-8 overflow-x-auto scrollbar-hide relative">
             {tabs.map((tab) => (
               <button
@@ -649,8 +638,8 @@ export default function LeadsPage() {
         </div>
 
         {/* Search & Filters Row */}
-        <div className="flex flex-wrap items-center gap-3 px-6 py-4 border-b bg-background">
-          <div className="relative flex-1 min-w-[240px] max-w-md">
+        <div className="flex flex-wrap items-center gap-3 px-4 md:px-6 py-4 border-b bg-background">
+          <div className="relative flex-1 min-w-0 md:min-w-[240px] max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
               placeholder="Search ID, Name, Phone, Email..." 
@@ -720,7 +709,7 @@ export default function LeadsPage() {
         </div>
 
         {activeTab === "Action Required" && (
-          <div className="flex items-center gap-2 px-6 pt-5 min-h-[60px] animate-in slide-in-from-top-2 fade-in duration-200 flex-wrap">
+          <div className="flex items-center gap-2 px-4 md:px-6 pt-5 min-h-[60px] animate-in slide-in-from-top-2 fade-in duration-200 flex-wrap">
             <div className="flex items-center gap-2">
               {actionFilters.map((filter) => {
                 const isActive = actionFilter === filter;
@@ -769,9 +758,9 @@ export default function LeadsPage() {
           </div>
         )}
 
-        <div className="p-6">
+        <div className="p-4 md:p-6">
           {pendingImports.length > 0 && activeTab === "Open Pipeline" && (
-             <div className="mb-6 p-5 bg-blue-50/50 border border-blue-200 rounded-xl flex items-center justify-between shadow-sm">
+             <div className="mb-6 p-5 bg-blue-50/50 border border-blue-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
                 <div>
                    <h3 className="text-blue-900 font-bold text-[15px]">Review Pending Imports</h3>
                    <p className="text-blue-700/80 text-sm mt-0.5">Please review the <strong>{pendingImports.length}</strong> imported leads below. They have not been saved yet.</p>
@@ -796,87 +785,100 @@ export default function LeadsPage() {
               </Button>
             </div>
           ) : (
-            isLoading ? <TableSkeleton /> : (
-              <DataTable 
-                columns={columns} 
-                    data={displayedLeads} 
-                    showToolbar={true}
-                    showDeleteAction={role === "Admin"}
-                    onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.rawId))}
-                    renderToolbarActions={(selectedRows, clearSelection) => {
-                      const isSingle = selectedRows.length === 1;
-                      const row = selectedRows[0];
-                      
-                      return (
-                        <>
-                          {activeTab === "Unqualified" && isSingle && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={async () => {
-                                try {
-                                  const res = await apiFetch(`${API_URL}/leads/${row.rawId}/status`, {
-                                    method: "PUT",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ is_unqualified: false }),
-                                  });
-                                  const data = await res.json();
-                                  if (data.success) {
-                                    toast.success("Lead reverted to qualified.");
-                                    fetchLeads();
-                                    clearSelection();
-                                  } else toast.error("Failed to revert lead.");
-                                } catch {
-                                  toast.error("Failed to revert lead.");
-                                }
-                              }}
-                            >
-                              <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Revert
-                            </Button>
-                          )}
+            <>
+              <div className="hidden md:block">
+                {isLoading ? <TableSkeleton /> : (
+                  <DataTable 
+                    columns={columns} 
+                        data={displayedLeads} 
+                        showToolbar={true}
+                        showDeleteAction={role === "Admin"}
+                        onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.rawId))}
+                        renderToolbarActions={(selectedRows, clearSelection) => {
+                          const isSingle = selectedRows.length === 1;
+                          const row = selectedRows[0];
                           
-                          {role === "Staff" ? (
-                            isSingle && !row.isPendingImport && (
+                          return (
+                            <>
+                              {activeTab === "Unqualified" && isSingle && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={async () => {
+                                    try {
+                                      const res = await apiFetch(`${API_URL}/leads/${row.rawId}/status`, {
+                                        method: "PUT",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ is_unqualified: false }),
+                                      });
+                                      const data = await res.json();
+                                      if (data.success) {
+                                        toast.success("Lead reverted to qualified.");
+                                        fetchLeads();
+                                        clearSelection();
+                                      } else toast.error("Failed to revert lead.");
+                                    } catch {
+                                      toast.error("Failed to revert lead.");
+                                    }
+                                  }}
+                                >
+                                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Revert
+                                </Button>
+                              )}
+                              
+                              {role === "Staff" ? (
+                                isSingle && !row.isPendingImport && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+                                    onClick={() => setReturnLeadId(row.rawId)}
+                                  >
+                                    Re Assign
+                                  </Button>
+                                )
+                              ) : (
+                            !selectedRows.some(r => r.isPendingImport) && (
                               <Button
                                 variant="outline"
                                 size="sm"
                                 className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
-                                onClick={() => setReturnLeadId(row.rawId)}
+                                onClick={() => {
+                                  setAssignLeadIds(selectedRows.map(r => r.rawId));
+                                  setAssignLeadId(selectedRows[0].rawId); // for department inference
+                                }}
                               >
-                                Re Assign
+                                Assign Lead
                               </Button>
                             )
-                          ) : (
-                        !selectedRows.some(r => r.isPendingImport) && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
-                            onClick={() => {
-                              setAssignLeadIds(selectedRows.map(r => r.rawId));
-                              setAssignLeadId(selectedRows[0].rawId); // for department inference
-                            }}
-                          >
-                            Assign Lead
-                          </Button>
-                        )
-                      )}
+                          )}
 
-                      {isSingle && !row.isPendingImport && (
-                        <>
-                          <Button variant="outline" size="sm" onClick={() => router.push("/leads/" + row.rawId)}>
-                            <Eye size={15} className="mr-1.5" /> View
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => router.push("/leads/new?edit=" + row.rawId)}>
-                            <Edit size={15} className="mr-1.5" /> Edit
-                          </Button>
+                          {isSingle && !row.isPendingImport && (
+                            <>
+                              <Button variant="outline" size="sm" onClick={() => router.push("/leads/" + row.rawId)}>
+                                <Eye size={15} className="mr-1.5" /> View
+                              </Button>
+                              <Button variant="outline" size="sm" onClick={() => router.push("/leads/new?edit=" + row.rawId)}>
+                                <Edit size={15} className="mr-1.5" /> Edit
+                              </Button>
+                            </>
+                          )}
                         </>
-                      )}
-                    </>
-                  );
-                }}
-              />
-            )
+                      );
+                    }}
+                  />
+                )}
+              </div>
+              <div className="md:hidden">
+                <MobileLeadList
+                  leads={displayedLeads}
+                  isLoading={isLoading}
+                  onCardClick={(lead) => router.push("/leads/" + lead.rawId)}
+                  onCall={(lead) => openMobileContact("call", lead)}
+                  onWhatsApp={(lead) => openMobileContact("whatsapp", lead)}
+                />
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -954,6 +956,17 @@ export default function LeadsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Contact Modal (mobile quick actions) */}
+      <ContactModal
+        open={contactModal.open}
+        type={contactModal.type}
+        to={contactModal.to}
+        entityId={contactModal.rawId}
+        entityType="leads"
+        onClose={() => setContactModal({ open: false, type: "", to: "", rawId: 0 })}
+        onSent={() => fetchLeads()}
+      />
       </div>
     </>
   );

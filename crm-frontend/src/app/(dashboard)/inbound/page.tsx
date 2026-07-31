@@ -20,6 +20,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
+import { MobileHeader } from "@/components/layout/mobile-header";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -321,7 +322,8 @@ export default function InboundPage() {
 
   return (
     <div className="flex flex-col space-y-6">
-      <div className="flex h-[48px] items-center justify-between pr-[150px]">
+      <MobileHeader title="Inbound" />
+      <div className="hidden md:flex h-[48px] items-center justify-between pr-[150px]">
         <h1 className="text-[28px] font-bold tracking-tight">Inbound Dashboard</h1>
 
         <div className="flex items-center gap-3">

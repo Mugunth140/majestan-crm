@@ -56,9 +56,9 @@ export function MobileNavbar() {
         initial={{ y: 150, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ type: "spring", stiffness: 300, damping: 30, delay: 0.1 }}
-        className="md:hidden fixed bottom-6 left-0 right-0 px-4 z-50 flex items-center justify-center gap-4 safe-bottom pointer-events-none"
+        className="md:hidden fixed left-0 right-0 px-4 z-50 flex items-center justify-center gap-4 pointer-events-none bottom-3"
       >
-        <div className="flex-1 max-w-[320px] bg-[#1C1C1E]/95 backdrop-blur-xl border border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.4)] rounded-[2.5rem] p-1.5 flex items-center justify-around pointer-events-auto relative overflow-hidden">
+        <div className="flex-1 max-w-[320px] bg-white/90 dark:bg-[#1C1C1E]/95 backdrop-blur-xl border border-border/60 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.15)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.4)] rounded-[2.5rem] p-1.5 flex items-center justify-around pointer-events-auto relative overflow-hidden">
           {navItems.map((item) => {
             const isActive = item.href === "/" ? pathname === "/" : pathname?.startsWith(item.href);
             return (
@@ -70,7 +70,7 @@ export function MobileNavbar() {
                 {isActive && (
                   <motion.div
                     layoutId="activeNavBackground"
-                    className="absolute inset-0 bg-white/15 rounded-[2rem]"
+                    className="absolute inset-0 bg-[#0052FF]/10 dark:bg-white/15 rounded-[2rem]"
                     initial={false}
                     transition={{ type: "spring", stiffness: 400, damping: 35 }}
                   />
@@ -78,13 +78,13 @@ export function MobileNavbar() {
                 <item.icon 
                   className={cn(
                     "w-[22px] h-[22px] mb-1 transition-colors relative z-20", 
-                    isActive ? "text-white" : "text-white/60"
+                    isActive ? "text-[#0052FF] dark:text-white" : "text-muted-foreground dark:text-white/60"
                   )} 
                   strokeWidth={isActive ? 2.5 : 2} 
                 />
                 <span className={cn(
                   "text-[10px] font-medium transition-colors tracking-wide relative z-20",
-                  isActive ? "text-white" : "text-white/60"
+                  isActive ? "text-[#0052FF] dark:text-white" : "text-muted-foreground dark:text-white/60"
                 )}>
                   {item.label}
                 </span>
@@ -95,7 +95,7 @@ export function MobileNavbar() {
 
         <button
           onClick={handleAddClick}
-          className="w-[3.5rem] h-[3.5rem] shrink-0 bg-[#2C2C2E]/95 backdrop-blur-xl text-white rounded-[2rem] shadow-[0_8px_20px_-6px_rgba(0,0,0,0.5)] flex items-center justify-center active:scale-90 transition-all pointer-events-auto border border-white/10 hover:bg-[#3C3C3E]"
+          className="w-[3.5rem] h-[3.5rem] shrink-0 bg-white/90 dark:bg-[#2C2C2E]/95 backdrop-blur-xl text-foreground dark:text-white rounded-[2rem] shadow-[0_8px_20px_-6px_rgba(0,0,0,0.15)] dark:shadow-[0_8px_20px_-6px_rgba(0,0,0,0.5)] flex items-center justify-center active:scale-90 transition-all pointer-events-auto border border-border/60 dark:border-white/10 hover:bg-muted dark:hover:bg-[#3C3C3E]"
         >
           <Plus className="w-7 h-7" strokeWidth={2} />
         </button>
@@ -114,7 +114,7 @@ export function MobileNavbar() {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", stiffness: 350, damping: 30 }}
-              className="bg-card border-t border-border rounded-t-[2.5rem] p-6 pb-safe shadow-2xl"
+              className="bg-card border-t border-border rounded-t-[2.5rem] p-6 shadow-2xl pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
             >
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold tracking-tight">Create New...</h2>

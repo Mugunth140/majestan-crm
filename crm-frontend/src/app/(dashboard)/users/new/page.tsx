@@ -10,6 +10,7 @@ import { ArrowLeft, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { FormSelect } from "@/components/shared/form-select";
 import { Switch } from "@/components/ui/switch";
+import { MobileHeader } from "@/components/layout/mobile-header";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -161,7 +162,8 @@ function UserFormContent() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20">
-      <div className="flex items-center gap-4">
+      <MobileHeader title={editId ? "Edit User" : "Add User"} showBack />
+      <div className="hidden md:flex items-center gap-4">
         <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" onClick={() => router.push("/users")}>
           <ArrowLeft className="h-5 w-5 text-muted-foreground" />
         </Button>

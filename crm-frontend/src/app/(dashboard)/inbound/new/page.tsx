@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { FormSelect } from "@/components/shared/form-select";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
 import { TimePicker } from "@/components/shared/time-picker";
+import { MobileHeader } from "@/components/layout/mobile-header";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -345,7 +346,8 @@ function InboundForm() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center justify-between pr-[150px] min-h-[48px]">
+      <MobileHeader title={editId ? "Edit Inbound" : "Add Inbound"} showBack />
+      <div className="hidden md:flex items-center justify-between pr-[150px] min-h-[48px]">
         <div className="flex items-center gap-4">
           <Button type="button" variant="outline" size="icon" className="h-10 w-10 rounded-full" onClick={() => router.push("/inbound")}>
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />

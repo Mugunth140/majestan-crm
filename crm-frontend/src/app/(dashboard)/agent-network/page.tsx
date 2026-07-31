@@ -19,6 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { FormSelect } from "@/components/shared/form-select";
 import { Trash2, Plus, RefreshCw, Search, Eye, Filter } from "lucide-react";
 import { motion } from "framer-motion";
+import { MobileHeader } from "@/components/layout/mobile-header";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -282,7 +283,8 @@ export default function AgentsPage() {
 
   return (
     <div className="flex flex-col space-y-6">
-      <div className="flex h-[48px] items-center justify-between pr-[150px]">
+      <MobileHeader title="Agents" />
+      <div className="hidden md:flex h-[48px] items-center justify-between pr-[150px]">
         <h1 className="text-[28px] font-bold tracking-tight">Agent Network</h1>
 
         <div className="flex items-center gap-3">

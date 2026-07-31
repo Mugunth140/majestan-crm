@@ -21,6 +21,7 @@ const FollowUpPanel = dynamic(() => import("@/components/shared/follow-up-panel"
 const ContactModal = dynamic(() => import("@/components/shared/contact-modal").then(mod => mod.ContactModal), { ssr: false });
 const LeadAttachments = dynamic(() => import("@/components/shared/lead-attachments").then(mod => mod.LeadAttachments), { ssr: false });
 const EditRequirementModal = dynamic(() => import("@/components/shared/edit-requirement-modal").then(mod => mod.EditRequirementModal), { ssr: false });
+import { MobileHeader } from "@/components/layout/mobile-header";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft, Loader2, User, Phone, MapPin, Building2,
@@ -434,8 +435,11 @@ export default function LeadViewPage() {
   return (
     <div className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
 
+      {/* ── Mobile Header ── */}
+      <MobileHeader title="Lead Details" showBack />
+
       {/* ── Header ── */}
-      <div className="flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
+      <div className="hidden md:flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shrink-0" onClick={() => router.push("/leads")}>
             <ArrowLeft className="h-4 w-4 text-muted-foreground" />

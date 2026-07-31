@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { MobileHeader } from "@/components/layout/mobile-header";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -206,7 +207,8 @@ export default function AssetInventoryPage() {
 
   return (
     <div className="flex flex-col space-y-6">
-      <div className="flex h-[48px] items-center justify-between pr-[150px]">
+      <MobileHeader title="Assets" />
+      <div className="hidden md:flex h-[48px] items-center justify-between pr-[150px]">
         <h1 className="text-[28px] font-bold tracking-tight">Asset Inventory</h1>
         <div className="flex items-center gap-3">
           <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={fetchAssets} title="Refresh">

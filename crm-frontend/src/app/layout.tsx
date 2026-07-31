@@ -2,15 +2,16 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/providers/theme-provider";
+import { ThemeStatusBar } from "@/components/layout/theme-status-bar";
 import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const viewport: Viewport = {
-  themeColor: "#ffffff",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  viewportFit: "cover",
 };
 
 export const metadata: Metadata = {
@@ -29,7 +30,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "Majestan",
   },
 };
@@ -37,6 +38,9 @@ export const metadata: Metadata = {
 // Inline script injected into <head> before any rendering.
 // Reads the saved theme from localStorage and immediately applies the class
 // to <html> so there is no flash of light mode on dark-mode refreshes.
+// Also syncs the theme-color meta so Android Chrome's status bar matches.
+// Note: apple-mobile-web-app-status-bar-style is static "black-translucent"
+// (set in metadata) because iOS only reads it at page load / PWA launch.
 const themeScript = `
 (function() {
   try {
@@ -44,11 +48,20 @@ const themeScript = `
     var preferred = saved
       ? saved
       : window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    if (preferred === 'dark') {
+    var isDark = preferred === 'dark';
+    if (isDark) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
+    var color = isDark ? '#1C1C1E' : '#ffffff';
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.setAttribute('name', 'theme-color');
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute('content', color);
   } catch (_) {}
 })();
 `;
@@ -71,8 +84,14 @@ export default function RootLayout({
           enableSystem
           storageKey="theme"
         >
+          <ThemeStatusBar />
           {children}
-          <Toaster position="top-right" richColors />
+          <Toaster
+            position="top-right"
+            richColors
+            offset={{ top: "calc(env(safe-area-inset-top) + 12px)", right: 16 }}
+            mobileOffset={{ top: "calc(env(safe-area-inset-top) + 12px)", right: 12 }}
+          />
         </ThemeProvider>
       </body>
     </html>

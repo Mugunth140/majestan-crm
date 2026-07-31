@@ -17,6 +17,7 @@ import {
   PURCHASE_TYPES, PURCHASE_TIMELINES, QUALIFICATION_PURPOSES, 
   PROPERTY_CATEGORIES, PROPERTY_TYPES_MAP, FUNDERS, PROJECTS 
 } from "@/lib/lead-constants";
+import { MobileHeader } from "@/components/layout/mobile-header";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -335,7 +336,8 @@ function LeadForm() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center justify-between pr-[150px] min-h-[48px]">
+      <MobileHeader title={editId ? "Edit Lead" : "Add Lead"} showBack />
+      <div className="hidden md:flex items-center justify-between pr-[150px] min-h-[48px]">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" onClick={() => router.push("/leads")}>
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />

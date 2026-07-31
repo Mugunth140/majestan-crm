@@ -10,6 +10,7 @@ import { ArrowLeft, Loader2, Save, UploadCloud, X, FileText, Image as ImageIcon,
 import { toast } from "sonner";
 import { RadioPills } from "./RadioPills";
 import { FormSelect } from "@/components/shared/form-select";
+import { MobileHeader } from "@/components/layout/mobile-header";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -324,7 +325,8 @@ function AssetForm() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center justify-between pr-[150px] min-h-[48px]">
+      <MobileHeader title={editId ? "Edit Asset" : "Add Asset"} showBack />
+      <div className="hidden md:flex items-center justify-between pr-[150px] min-h-[48px]">
         <div className="flex items-center gap-4">
           <Button type="button" variant="outline" size="icon" className="h-10 w-10 rounded-full" onClick={() => router.push("/asset-inventory")}>
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
