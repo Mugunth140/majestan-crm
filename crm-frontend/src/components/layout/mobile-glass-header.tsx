@@ -25,7 +25,7 @@ export function MobileGlassHeader() {
   const borderGlass = isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)";
 
   return (
-    <header className="md:hidden absolute inset-x-0 top-0 z-40">
+    <header className="md:hidden fixed inset-x-0 top-0 z-40">
       <motion.div 
         className="relative pt-[env(safe-area-inset-top)] border-b"
         animate={{

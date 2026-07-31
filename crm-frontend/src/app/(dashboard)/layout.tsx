@@ -17,11 +17,11 @@ export default function DashboardLayout({
   return (
     <SidebarProvider>
       <MobileHeaderProvider>
-        <div className="flex h-[100dvh] overflow-hidden bg-muted/30 transition-colors duration-500 relative">
+        <div className="flex w-full min-h-[100dvh] md:h-[100dvh] md:overflow-hidden bg-muted/30 transition-colors duration-500 relative">
           <Suspense fallback={<div className="w-64 bg-card border-r h-full hidden lg:block" />}>
             <Sidebar />
           </Suspense>
-          <div className="flex flex-col flex-1 overflow-hidden relative">
+          <div className="flex flex-col flex-1 w-full relative md:overflow-hidden">
             <Topbar />
             <MobileGlassHeader />
             <MainScrollArea>
