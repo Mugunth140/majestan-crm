@@ -433,7 +433,7 @@ export default function LeadViewPage() {
   const canEdit = role === "Admin" || (lead?.assigned_staff?.id === currentUserId);
 
   return (
-    <div className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="flex flex-col md:h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
 
       {/* ── Mobile Header ── */}
       <MobileHeader title={lead.name || "Lead Details"} showBack />
@@ -516,7 +516,7 @@ export default function LeadViewPage() {
       </div>
 
       {/* ── Main Layout ── */}
-      <div className="flex-1 overflow-y-auto min-h-0 pb-6 lg:pr-2 space-y-6 px-4 lg:px-0">
+      <div className="flex-1 md:overflow-y-auto md:min-h-0 pb-6 lg:pr-2 space-y-6 px-4 lg:px-0">
 
         {/* ── Row 1: Customer Info (2/3) + Quick Actions (1/3) ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -934,10 +934,10 @@ export default function LeadViewPage() {
             <div className="flex items-center justify-between px-4 h-14">
               <button 
                 onClick={() => setIsHistoryOpen(false)} 
-                aria-label="Close"
-                className="h-10 w-10 shrink-0 rounded-full flex items-center justify-center transition-all active:scale-90 bg-white/70 dark:bg-white/15 backdrop-blur-xl border border-black/[0.07] dark:border-white/20 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.6)] dark:shadow-[0_2px_10px_-2px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.15)]"
+                className="flex items-center text-[#007AFF] dark:text-[#0A84FF] active:opacity-70 -ml-2 shrink-0"
               >
-                <ChevronRight className="w-6 h-6 text-[#007AFF] dark:text-[#0A84FF]" strokeWidth={2.5} />
+                <ChevronLeft className="w-[28px] h-[28px]" strokeWidth={2.5} />
+                <span className="text-[17px] font-medium tracking-tight">Back</span>
               </button>
               <span className="absolute inset-x-0 text-center pointer-events-none text-[17px] font-semibold tracking-tight text-foreground truncate px-20">
                 Timeline

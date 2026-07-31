@@ -122,6 +122,25 @@
   *, *::before, *::after {
     @apply border-border outline-ring/50;
   }
+  
+  /* Hide scrollbar globally for a native app feel */
+  * {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+  }
+  *::-webkit-scrollbar {
+    display: none; /* Chrome, Safari and Opera */
+    width: 0px;
+    height: 0px;
+  }
+
+  html, body {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    position: fixed;
+    touch-action: none;
+  }
   html {
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;

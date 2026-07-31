@@ -46,10 +46,10 @@ export function MobileGlassHeader() {
             {showBack && (
               <button
                 onClick={() => router.back()}
-                aria-label="Back"
-                className="h-10 w-10 rounded-full flex items-center justify-center transition-all active:scale-90 bg-white/70 dark:bg-white/15 backdrop-blur-xl border border-black/[0.07] dark:border-white/20 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.6)] dark:shadow-[0_2px_10px_-2px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.15)]"
+                className="flex items-center text-[#007AFF] dark:text-[#0A84FF] active:opacity-70 -ml-2 shrink-0"
               >
-                <ChevronLeft className="w-6 h-6 text-[#007AFF] dark:text-[#0A84FF]" strokeWidth={2.5} />
+                <ChevronLeft className="w-[28px] h-[28px]" strokeWidth={2.5} />
+                <span className="text-[17px] font-medium tracking-tight">Back</span>
               </button>
             )}
           </div>
