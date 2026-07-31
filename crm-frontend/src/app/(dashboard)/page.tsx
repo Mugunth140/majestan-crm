@@ -57,7 +57,7 @@ export default function DashboardPage() {
         </MenuSection>
 
         <MenuSection title="System">
-          <MenuCard icon={Target} label="Target Insights" onClick={() => router.push('/insights')} color="text-orange-600" bg="bg-orange-500/10" />
+          <MenuCard icon={Target} label="Tasks" onClick={() => router.push('/tasks')} color="text-orange-600" bg="bg-orange-500/10" />
           <MenuCard icon={Settings} label="Settings" onClick={() => router.push('/settings')} color="text-slate-600" bg="bg-slate-500/10" />
           {isAdmin && (
             <>

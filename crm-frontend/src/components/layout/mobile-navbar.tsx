@@ -2,25 +2,28 @@
 
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "motion/react";
 import { 
-  Home, 
-  UserCircle, 
-  Building2, 
-  Layers, 
+  LayoutGrid, 
+  MessageSquareText, 
+  Settings, 
+  CheckCircle2, 
   Plus, 
   Contact,
   X,
   Briefcase,
   Users,
-  Network
+  Network,
+  Building2,
+  Layers
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/", icon: Home, label: "Home" },
-  { href: "/leads", icon: Contact, label: "Leads" },
-  { href: "/inbound", icon: Building2, label: "Inbound" },
-  { href: "/asset-inventory", icon: Layers, label: "Assets" },
+  { href: "/", icon: LayoutGrid, label: "Overview" },
+  { href: "/tasks", icon: CheckCircle2, label: "Tasks" },
+  { href: "/logs", icon: MessageSquareText, label: "Logs" },
+  { href: "/settings", icon: Settings, label: "Settings" },
 ];
 
 export function MobileNavbar() {
@@ -35,7 +38,7 @@ export function MobileNavbar() {
     if (pathname.startsWith("/agent-network")) return "/agent-network/new";
     if (pathname.startsWith("/hr")) return "/hr/new";
     if (pathname.startsWith("/users")) return "/users/new";
-    return null; // Signals to open the generic menu
+    return null; 
   };
 
   const handleAddClick = () => {
@@ -49,32 +52,39 @@ export function MobileNavbar() {
 
   return (
     <>
-      {/* Floating Navbar Container */}
-      <div className="md:hidden fixed bottom-6 left-0 right-0 px-4 z-50 flex items-center gap-3 safe-bottom pointer-events-none">
-        
-        {/* Main Nav Pill */}
-        <div className="flex-1 bg-card/90 backdrop-blur-xl border border-border shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-[2rem] p-1.5 flex items-center justify-around pointer-events-auto">
+      <motion.div 
+        initial={{ y: 150, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30, delay: 0.1 }}
+        className="md:hidden fixed bottom-6 left-0 right-0 px-4 z-50 flex items-center justify-center gap-4 safe-bottom pointer-events-none"
+      >
+        <div className="flex-1 max-w-[320px] bg-[#1C1C1E]/95 backdrop-blur-xl border border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.4)] rounded-[2.5rem] p-1.5 flex items-center justify-around pointer-events-auto relative overflow-hidden">
           {navItems.map((item) => {
             const isActive = item.href === "/" ? pathname === "/" : pathname?.startsWith(item.href);
             return (
               <button
                 key={item.label}
                 onClick={() => router.push(item.href)}
-                className={cn(
-                  "relative flex flex-col items-center justify-center w-14 h-[3.25rem] rounded-[1.5rem] transition-all duration-300 active:scale-95",
-                  isActive ? "bg-muted/60" : "hover:bg-muted/30"
-                )}
+                className="relative flex flex-col items-center justify-center w-16 h-[3.5rem] rounded-[2rem] transition-all duration-300 active:scale-95 z-10"
               >
+                {isActive && (
+                  <motion.div
+                    layoutId="activeNavBackground"
+                    className="absolute inset-0 bg-white/15 rounded-[2rem]"
+                    initial={false}
+                    transition={{ type: "spring", stiffness: 400, damping: 35 }}
+                  />
+                )}
                 <item.icon 
                   className={cn(
-                    "w-[22px] h-[22px] mb-1 transition-colors", 
-                    isActive ? "text-foreground" : "text-muted-foreground"
+                    "w-[22px] h-[22px] mb-1 transition-colors relative z-20", 
+                    isActive ? "text-white" : "text-white/60"
                   )} 
                   strokeWidth={isActive ? 2.5 : 2} 
                 />
                 <span className={cn(
-                  "text-[9px] font-semibold transition-colors tracking-wide",
-                  isActive ? "text-foreground" : "text-muted-foreground"
+                  "text-[10px] font-medium transition-colors tracking-wide relative z-20",
+                  isActive ? "text-white" : "text-white/60"
                 )}>
                   {item.label}
                 </span>
@@ -83,37 +93,48 @@ export function MobileNavbar() {
           })}
         </div>
 
-        {/* Dynamic Context-Aware Action Button */}
         <button
           onClick={handleAddClick}
-          className="w-14 h-14 shrink-0 bg-[#1e3a8a] text-white rounded-full shadow-[0_8px_20px_-6px_rgba(30,58,138,0.5)] flex items-center justify-center active:scale-90 transition-all pointer-events-auto border border-blue-800/50"
+          className="w-[3.5rem] h-[3.5rem] shrink-0 bg-[#2C2C2E]/95 backdrop-blur-xl text-white rounded-[2rem] shadow-[0_8px_20px_-6px_rgba(0,0,0,0.5)] flex items-center justify-center active:scale-90 transition-all pointer-events-auto border border-white/10 hover:bg-[#3C3C3E]"
         >
-          <Plus className="w-7 h-7" strokeWidth={2.5} />
+          <Plus className="w-7 h-7" strokeWidth={2} />
         </button>
-      </div>
+      </motion.div>
 
-      {/* Universal 'Add' Overlay Menu (Used when on Home page) */}
-      {isAddMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-[60] bg-background/80 backdrop-blur-sm flex flex-col justify-end">
-          <div className="bg-card border-t border-border rounded-t-[2rem] p-6 shadow-2xl animate-in slide-in-from-bottom-full duration-300">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold tracking-tight">Create New...</h2>
-              <button onClick={() => setIsAddMenuOpen(false)} className="p-2 bg-muted rounded-full active:scale-95">
-                <X className="w-5 h-5 text-muted-foreground" />
-              </button>
-            </div>
-            
-            <div className="grid grid-cols-4 gap-y-6 gap-x-2">
-              <QuickAddButton icon={Contact} label="Lead" onClick={() => { setIsAddMenuOpen(false); router.push("/leads/new"); }} color="bg-blue-500/10 text-blue-600" />
-              <QuickAddButton icon={Building2} label="Inbound" onClick={() => { setIsAddMenuOpen(false); router.push("/inbound/new"); }} color="bg-emerald-500/10 text-emerald-600" />
-              <QuickAddButton icon={Layers} label="Asset" onClick={() => { setIsAddMenuOpen(false); router.push("/asset-inventory/new"); }} color="bg-amber-500/10 text-amber-600" />
-              <QuickAddButton icon={Network} label="Agent" onClick={() => { setIsAddMenuOpen(false); router.push("/agent-network/new"); }} color="bg-indigo-500/10 text-indigo-600" />
-              <QuickAddButton icon={Briefcase} label="Project" onClick={() => { setIsAddMenuOpen(false); router.push("/projects/new"); }} color="bg-rose-500/10 text-rose-600" />
-              <QuickAddButton icon={Users} label="User" onClick={() => { setIsAddMenuOpen(false); router.push("/users/new"); }} color="bg-purple-500/10 text-purple-600" />
-            </div>
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {isAddMenuOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="md:hidden fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex flex-col justify-end"
+          >
+            <motion.div 
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", stiffness: 350, damping: 30 }}
+              className="bg-card border-t border-border rounded-t-[2.5rem] p-6 pb-safe shadow-2xl"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold tracking-tight">Create New...</h2>
+                <button onClick={() => setIsAddMenuOpen(false)} className="p-2 bg-muted rounded-full active:scale-95 transition-transform">
+                  <X className="w-5 h-5 text-muted-foreground" />
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-4 gap-y-6 gap-x-2">
+                <QuickAddButton icon={Contact} label="Lead" onClick={() => { setIsAddMenuOpen(false); router.push("/leads/new"); }} color="bg-blue-500/10 text-blue-600" />
+                <QuickAddButton icon={Building2} label="Inbound" onClick={() => { setIsAddMenuOpen(false); router.push("/inbound/new"); }} color="bg-emerald-500/10 text-emerald-600" />
+                <QuickAddButton icon={Layers} label="Asset" onClick={() => { setIsAddMenuOpen(false); router.push("/asset-inventory/new"); }} color="bg-amber-500/10 text-amber-600" />
+                <QuickAddButton icon={Network} label="Agent" onClick={() => { setIsAddMenuOpen(false); router.push("/agent-network/new"); }} color="bg-indigo-500/10 text-indigo-600" />
+                <QuickAddButton icon={Briefcase} label="Project" onClick={() => { setIsAddMenuOpen(false); router.push("/projects/new"); }} color="bg-rose-500/10 text-rose-600" />
+                <QuickAddButton icon={Users} label="User" onClick={() => { setIsAddMenuOpen(false); router.push("/users/new"); }} color="bg-purple-500/10 text-purple-600" />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }
@@ -121,7 +142,7 @@ export function MobileNavbar() {
 function QuickAddButton({ icon: Icon, label, onClick, color }: any) {
   return (
     <button onClick={onClick} className="flex flex-col items-center gap-2 active:scale-95 transition-transform">
-      <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center border border-border/50 shadow-sm", color)}>
+      <div className={cn("w-14 h-14 rounded-[1.2rem] flex items-center justify-center border border-border/50 shadow-sm", color)}>
         <Icon className="w-6 h-6" strokeWidth={2} />
       </div>
       <span className="text-[11px] font-semibold text-muted-foreground">{label}</span>

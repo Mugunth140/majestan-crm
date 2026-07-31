@@ -36,7 +36,7 @@ const navigation = [
   { name: "Properties", href: "/properties", icon: Home },
   { name: "Asset Inventory", href: "/asset-inventory", icon: Package },
   { name: "HR Panel", href: "/hr", icon: UserPen },
-  { name: "Target Insights", href: "/insights", icon: Target },
+  { name: "Tasks", href: "/tasks", icon: Target },
   { name: "Activity Logs", adminOnly: true, href: "/activity-logs", icon: Activity },
     { 
     name: "Users", 
