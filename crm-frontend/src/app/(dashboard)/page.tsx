@@ -28,7 +28,7 @@ export default function DashboardPage() {
   return (
     <>
       <MobileHeader title="Dashboard" />
-      <div className="space-y-6 px-4 pt-4 lg:p-0">
+      <div className="space-y-6 px-2 pt-4 lg:p-0">
         
         {/* Universal Greeting */}
         <div className="flex flex-col gap-1 hidden md:flex">

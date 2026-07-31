@@ -24,6 +24,7 @@ import { AssignLeadModal } from "@/components/shared/assign-lead-modal";
 import { ContactModal } from "@/components/shared/contact-modal";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { MobileLeadList } from "@/components/leads/mobile-lead-list";
+import { Device } from "@/components/shared/device";
 import { LEAD_STATUS_STYLES as STATUS_STYLES } from "@/lib/lead-constants";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -549,9 +550,12 @@ export default function LeadsPage() {
           </Button>
         } 
       />
-      <div className="flex flex-col space-y-6 px-4 pt-4 lg:p-0">
-        <div className="hidden md:flex h-[48px] items-center justify-between pr-[150px]">
-          <h1 className="text-[28px] font-bold tracking-tight">Leads Dashboard</h1>
+      <div className="flex flex-col space-y-6 pt-4 lg:p-0">
+        <Device
+          mobile={null}
+          desktop={
+            <div className="flex h-[48px] items-center justify-between pr-[150px]">
+              <h1 className="text-[28px] font-bold tracking-tight">Leads Dashboard</h1>
 
         <div className="flex items-center gap-3">
           <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={fetchLeads} title="Refresh">
@@ -596,12 +600,14 @@ export default function LeadsPage() {
             Add New Lead
           </Link>
         </div>
-      </div>
+          </div>
+        }
+      />
 
       <div className="bg-transparent md:bg-card border-0 md:border rounded-none md:rounded-xl overflow-hidden shadow-none md:shadow-sm">
         
         {/* Tabs & Pipeline Toggles Row */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 md:px-6 border-b bg-muted/10 pt-4 gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-3 md:px-6 border-b bg-muted/10 pt-4 gap-4">
           <div className="flex items-center gap-8 overflow-x-auto scrollbar-hide relative">
             {tabs.map((tab) => (
               <button
@@ -638,7 +644,7 @@ export default function LeadsPage() {
         </div>
 
         {/* Search & Filters Row */}
-        <div className="flex flex-wrap items-center gap-3 px-4 md:px-6 py-4 border-b bg-background">
+        <div className="flex flex-wrap items-center gap-3 px-3 md:px-6 py-4 border-b bg-background">
           <div className="relative flex-1 min-w-0 md:min-w-[240px] max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
@@ -709,7 +715,7 @@ export default function LeadsPage() {
         </div>
 
         {activeTab === "Action Required" && (
-          <div className="flex items-center gap-2 px-4 md:px-6 pt-5 min-h-[60px] animate-in slide-in-from-top-2 fade-in duration-200 flex-wrap">
+          <div className="flex items-center gap-2 px-3 md:px-6 pt-5 min-h-[60px] animate-in slide-in-from-top-2 fade-in duration-200 flex-wrap">
             <div className="flex items-center gap-2">
               {actionFilters.map((filter) => {
                 const isActive = actionFilter === filter;
@@ -758,7 +764,7 @@ export default function LeadsPage() {
           </div>
         )}
 
-        <div className="p-4 md:p-6">
+        <div className="p-3 md:p-6">
           {pendingImports.length > 0 && activeTab === "Open Pipeline" && (
              <div className="mb-6 p-5 bg-blue-50/50 border border-blue-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
                 <div>
@@ -786,98 +792,100 @@ export default function LeadsPage() {
             </div>
           ) : (
             <>
-              <div className="hidden md:block">
-                {isLoading ? <TableSkeleton /> : (
-                  <DataTable 
-                    columns={columns} 
-                        data={displayedLeads} 
-                        showToolbar={true}
-                        showDeleteAction={role === "Admin"}
-                        onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.rawId))}
-                        renderToolbarActions={(selectedRows, clearSelection) => {
-                          const isSingle = selectedRows.length === 1;
-                          const row = selectedRows[0];
-                          
-                          return (
-                            <>
-                              {activeTab === "Unqualified" && isSingle && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={async () => {
-                                    try {
-                                      const res = await apiFetch(`${API_URL}/leads/${row.rawId}/status`, {
-                                        method: "PUT",
-                                        headers: { "Content-Type": "application/json" },
-                                        body: JSON.stringify({ is_unqualified: false }),
-                                      });
-                                      const data = await res.json();
-                                      if (data.success) {
-                                        toast.success("Lead reverted to qualified.");
-                                        fetchLeads();
-                                        clearSelection();
-                                      } else toast.error("Failed to revert lead.");
-                                    } catch {
-                                      toast.error("Failed to revert lead.");
-                                    }
-                                  }}
-                                >
-                                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Revert
-                                </Button>
-                              )}
-                              
-                              {role === "Staff" ? (
-                                isSingle && !row.isPendingImport && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
-                                    onClick={() => setReturnLeadId(row.rawId)}
-                                  >
-                                    Re Assign
-                                  </Button>
-                                )
-                              ) : (
-                            !selectedRows.some(r => r.isPendingImport) && (
+              <Device
+                mobile={
+                  <MobileLeadList
+                    leads={displayedLeads}
+                    isLoading={isLoading}
+                    onCardClick={(lead) => router.push("/leads/" + lead.rawId)}
+                    onCall={(lead) => openMobileContact("call", lead)}
+                    onWhatsApp={(lead) => openMobileContact("whatsapp", lead)}
+                  />
+                }
+                desktop={
+                  isLoading ? <TableSkeleton /> : (
+                    <DataTable 
+                      columns={columns} 
+                      data={displayedLeads} 
+                      showToolbar={true}
+                      showDeleteAction={role === "Admin"}
+                      onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.rawId))}
+                      renderToolbarActions={(selectedRows, clearSelection) => {
+                        const isSingle = selectedRows.length === 1;
+                        const row = selectedRows[0];
+                        
+                        return (
+                          <>
+                            {activeTab === "Unqualified" && isSingle && (
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
-                                onClick={() => {
-                                  setAssignLeadIds(selectedRows.map(r => r.rawId));
-                                  setAssignLeadId(selectedRows[0].rawId); // for department inference
+                                onClick={async () => {
+                                  try {
+                                    const res = await apiFetch(`${API_URL}/leads/${row.rawId}/status`, {
+                                      method: "PUT",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ is_unqualified: false }),
+                                    });
+                                    const data = await res.json();
+                                    if (data.success) {
+                                      toast.success("Lead reverted to qualified.");
+                                      fetchLeads();
+                                      clearSelection();
+                                    } else toast.error("Failed to revert lead.");
+                                  } catch {
+                                    toast.error("Failed to revert lead.");
+                                  }
                                 }}
                               >
-                                Assign Lead
+                                <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Revert
                               </Button>
-                            )
-                          )}
+                            )}
+                            
+                            {role === "Staff" ? (
+                              isSingle && !row.isPendingImport && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+                                  onClick={() => setReturnLeadId(row.rawId)}
+                                >
+                                  Re Assign
+                                </Button>
+                              )
+                            ) : (
+                          !selectedRows.some(r => r.isPendingImport) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+                              onClick={() => {
+                                setAssignLeadIds(selectedRows.map(r => r.rawId));
+                                setAssignLeadId(selectedRows[0].rawId); // for department inference
+                              }}
+                            >
+                              Assign Lead
+                            </Button>
+                          )
+                        )}
 
-                          {isSingle && !row.isPendingImport && (
-                            <>
-                              <Button variant="outline" size="sm" onClick={() => router.push("/leads/" + row.rawId)}>
-                                <Eye size={15} className="mr-1.5" /> View
-                              </Button>
-                              <Button variant="outline" size="sm" onClick={() => router.push("/leads/new?edit=" + row.rawId)}>
-                                <Edit size={15} className="mr-1.5" /> Edit
-                              </Button>
-                            </>
-                          )}
-                        </>
-                      );
-                    }}
-                  />
-                )}
-              </div>
-              <div className="md:hidden">
-                <MobileLeadList
-                  leads={displayedLeads}
-                  isLoading={isLoading}
-                  onCardClick={(lead) => router.push("/leads/" + lead.rawId)}
-                  onCall={(lead) => openMobileContact("call", lead)}
-                  onWhatsApp={(lead) => openMobileContact("whatsapp", lead)}
-                />
-              </div>
+                        {isSingle && !row.isPendingImport && (
+                          <>
+                            <Button variant="outline" size="sm" onClick={() => router.push("/leads/" + row.rawId)}>
+                              <Eye size={15} className="mr-1.5" /> View
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => router.push("/leads/new?edit=" + row.rawId)}>
+                              <Edit size={15} className="mr-1.5" /> Edit
+                            </Button>
+                          </>
+                        )}
+                      </>
+                    );
+                  }}
+                    />
+                  )
+                }
+              />
             </>
           )}
         </div>
