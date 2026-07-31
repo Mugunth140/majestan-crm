@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+import { MobileHeader } from "@/components/layout/mobile-header";
+
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
@@ -21,20 +23,22 @@ export default function DashboardPage() {
   }, []);
 
   const isAdmin = user?.role === "Admin" || user?.role === "Super Admin";
+  const isStaff = user?.role === "Staff";
 
   return (
-    <div className="space-y-6">
-      
-      {/* Universal Greeting */}
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">
-          Welcome back, {user?.name?.split(' ')[0] || "Team"} 👋
-        </h1>
-        <p className="text-muted-foreground text-sm lg:text-base">
-          <span className="hidden md:inline">Overview of all CRM activities.</span>
-          <span className="inline md:hidden">Select a module below to get started.</span>
-        </p>
-      </div>
+    <>
+      <MobileHeader title="Dashboard" />
+      <div className="space-y-6 px-4 pt-4 lg:p-0">
+        
+        {/* Universal Greeting */}
+        <div className="flex flex-col gap-1 hidden md:flex">
+          <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">
+            Welcome back, {user?.name?.split(' ')[0] || "Team"} 👋
+          </h1>
+          <p className="text-muted-foreground text-sm lg:text-base">
+            <span className="hidden md:inline">Overview of all CRM activities.</span>
+          </p>
+        </div>
 
       {/* MOBILE ONLY: Master Navigation Hub */}
       <div className="md:hidden space-y-6 pb-6">
@@ -99,8 +103,8 @@ export default function DashboardPage() {
           <div className="text-2xl font-bold mt-2">--</div>
         </div>
       </div>
-
-    </div>
+      </div>
+    </>
   );
 }
 

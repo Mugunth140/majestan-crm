@@ -21,6 +21,7 @@ import { useRouter } from "next/navigation";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
 import { AssignLeadModal } from "@/components/shared/assign-lead-modal";
+import { MobileHeader } from "@/components/layout/mobile-header";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -550,9 +551,18 @@ export default function LeadsPage() {
     : deptPipelines;
 
   return (
-    <div className="flex flex-col space-y-6">
-      <div className="flex h-[48px] items-center justify-between pr-[150px]">
-        <h1 className="text-[28px] font-bold tracking-tight">Leads Dashboard</h1>
+    <>
+      <MobileHeader 
+        title="Leads Dashboard" 
+        rightAction={
+          <Button variant="ghost" size="icon" onClick={() => router.push('/leads/new')} className="text-[#007AFF]">
+            <Plus className="w-6 h-6" />
+          </Button>
+        } 
+      />
+      <div className="flex flex-col space-y-6 px-4 pt-4 lg:p-0">
+        <div className="hidden md:flex h-[48px] items-center justify-between pr-[150px]">
+          <h1 className="text-[28px] font-bold tracking-tight">Leads Dashboard</h1>
 
         <div className="flex items-center gap-3">
           <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={fetchLeads} title="Refresh">
@@ -944,6 +954,7 @@ export default function LeadsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </>
   );
 }
