@@ -17,17 +17,17 @@ interface MobileLeadListProps {
 export function MobileLeadList({ leads, isLoading, onCardClick, onCall, onWhatsApp }: MobileLeadListProps) {
   if (isLoading) {
     return (
-      <div className="space-y-3">
+      <div className="space-y-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="bg-card border border-border/60 rounded-2xl p-4 shadow-sm space-y-3">
+          <div key={i} className="bg-card border border-border/60 rounded-3xl p-5 shadow-sm space-y-4">
             <div className="flex items-center gap-3">
-              <Skeleton className="h-11 w-11 rounded-full" />
+              <Skeleton className="h-12 w-12 rounded-full" />
               <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-1/2" />
-                <Skeleton className="h-3 w-1/3" />
+                <Skeleton className="h-5 w-1/2" />
+                <Skeleton className="h-4 w-1/3" />
               </div>
             </div>
-            <Skeleton className="h-8 w-full rounded-xl" />
+            <Skeleton className="h-10 w-full rounded-xl" />
           </div>
         ))}
       </div>
@@ -47,7 +47,7 @@ export function MobileLeadList({ leads, isLoading, onCardClick, onCall, onWhatsA
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4 pb-6">
       {leads.map((lead) => {
         const isPending = lead.isPendingImport === true;
         const statusCls = LEAD_STATUS_STYLES[lead.status] ?? "bg-gray-100 text-gray-800 border-gray-200";
@@ -60,97 +60,74 @@ export function MobileLeadList({ leads, isLoading, onCardClick, onCall, onWhatsA
             key={lead.rawId ?? lead.id}
             onClick={() => !isPending && onCardClick(lead)}
             className={cn(
-              "bg-card border border-border/60 rounded-2xl p-4 shadow-sm transition-all",
+              "bg-card border border-border/50 rounded-[1.5rem] p-4 shadow-sm transition-all flex flex-col gap-4",
               !isPending && "active:scale-[0.98]"
             )}
           >
-            {/* Row 1: avatar + name + status */}
+            {/* Header: Avatar, Name, Status, Assignment */}
             <div className="flex items-start gap-3">
-              <div className="h-11 w-11 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center font-bold text-[15px] text-blue-900 dark:text-blue-300 shrink-0">
+              <div className="h-[46px] w-[46px] rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center font-bold text-[18px] text-blue-600 dark:text-blue-400 shrink-0 border border-blue-100 dark:border-blue-800/50">
                 {initial}
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-semibold text-[15px] text-foreground truncate">{lead.name}</p>
-                  <Badge className={"font-medium shadow-sm border whitespace-nowrap shrink-0 " + statusCls}>
+              <div className="flex-1 min-w-0 pt-0.5">
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-bold text-[17px] text-foreground truncate leading-tight">{lead.name}</h3>
+                  <Badge className={cn("font-medium shadow-sm border whitespace-nowrap shrink-0", statusCls)}>
                     {lead.status}
                   </Badge>
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {lead.id} · {lead.date}
-                </p>
-              </div>
-            </div>
-
-            {/* Row 2: mobile + chips + quick actions */}
-            <div className="flex items-center justify-between gap-3 mt-3">
-              <div className="flex flex-col gap-1.5 min-w-0">
-                {lead.mobile && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); if (canContact) onCall(lead); }}
-                    disabled={!canContact}
-                    className={cn(
-                      "flex items-center gap-1.5 text-[13.5px] font-semibold text-[#007AFF] w-fit",
-                      canContact ? "active:opacity-60" : "opacity-40"
-                    )}
-                  >
-                    <Phone className="h-3.5 w-3.5" /> {lead.mobile}
-                  </button>
-                )}
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {lead.propertyType && lead.propertyType !== "—" && (
-                    <span className="text-[11px] px-2 py-0.5 rounded-full border bg-muted/40 text-muted-foreground capitalize">
-                      {String(lead.propertyType).replace(/_/g, " ")}
-                    </span>
-                  )}
-                  {lead.source && (
-                    <span className="text-[11px] px-2 py-0.5 rounded-full border bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400">
-                      {lead.source}
-                    </span>
+                <div className="flex items-center gap-2 mt-1.5 text-[13px]">
+                  <span className="text-muted-foreground font-medium">{lead.id}</span>
+                  <span className="w-1 h-1 rounded-full bg-border" />
+                  {assigned ? (
+                    <span className="text-foreground font-medium truncate">{assigned}</span>
+                  ) : (
+                    <span className="text-muted-foreground italic">Unassigned</span>
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={(e) => { e.stopPropagation(); if (canContact) onCall(lead); }}
-                  disabled={!canContact}
-                  className="h-11 w-11 rounded-full bg-[#007AFF]/10 text-[#007AFF] border border-[#007AFF]/20 flex items-center justify-center active:scale-90 transition-transform disabled:opacity-40 disabled:active:scale-100"
-                  aria-label="Log call"
-                >
-                  <Phone className="w-5 h-5" strokeWidth={2} />
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); if (canContact) onWhatsApp(lead); }}
-                  disabled={!canContact}
-                  className="h-11 w-11 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 flex items-center justify-center active:scale-90 transition-transform disabled:opacity-40 disabled:active:scale-100"
-                  aria-label="Send WhatsApp"
-                >
-                  <MessageSquare className="w-5 h-5" strokeWidth={2} />
-                </button>
-              </div>
             </div>
 
-            {/* Row 3: assigned + next follow-up */}
-            <div className="flex items-center justify-between border-t border-border/50 mt-3 pt-3">
-              <div className="flex items-center gap-1.5 min-w-0">
-                {assigned ? (
-                  <>
-                    <span className="h-5 w-5 rounded-full bg-muted flex items-center justify-center font-bold text-[10px] text-muted-foreground shrink-0">
-                      {assigned.charAt(0).toUpperCase()}
-                    </span>
-                    <span className="text-xs font-medium text-foreground truncate">{assigned}</span>
-                  </>
-                ) : (
-                  <Badge variant="outline" className="bg-muted/40 text-muted-foreground border-border/60">
-                    Unassigned
-                  </Badge>
+            {/* Details: Chips & Next Follow-up */}
+            <div className="flex items-center justify-between gap-3 bg-muted/30 rounded-xl p-2.5">
+              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                {lead.propertyType && lead.propertyType !== "—" && (
+                  <span className="text-[12px] px-2.5 py-1 rounded-lg bg-background border text-foreground font-medium capitalize shadow-sm">
+                    {String(lead.propertyType).replace(/_/g, " ")}
+                  </span>
+                )}
+                {lead.source && (
+                  <span className="text-[12px] px-2.5 py-1 rounded-lg bg-background border text-foreground font-medium shadow-sm">
+                    {lead.source}
+                  </span>
                 )}
               </div>
               {lead.nextFollowUpDate && (
-                <span className="text-xs font-medium text-amber-700 dark:text-amber-400 shrink-0">
-                  Follow-up {lead.nextFollowUpDate}
-                </span>
+                <div className="text-[12px] font-semibold text-amber-600 dark:text-amber-500 shrink-0 text-right">
+                  Follow-up<br />
+                  <span className="font-medium text-muted-foreground text-[11px]">{lead.nextFollowUpDate}</span>
+                </div>
               )}
+            </div>
+
+            {/* Actions Row */}
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <button
+                onClick={(e) => { e.stopPropagation(); if (canContact) onCall(lead); }}
+                disabled={!canContact}
+                className="flex items-center justify-center gap-2 h-12 rounded-xl bg-[#007AFF]/10 text-[#007AFF] font-semibold text-[15px] active:scale-95 transition-transform disabled:opacity-40 disabled:active:scale-100"
+              >
+                <Phone className="w-[18px] h-[18px]" strokeWidth={2.5} />
+                Call
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); if (canContact) onWhatsApp(lead); }}
+                disabled={!canContact}
+                className="flex items-center justify-center gap-2 h-12 rounded-xl bg-[#25D366]/10 text-[#25D366] font-semibold text-[15px] active:scale-95 transition-transform disabled:opacity-40 disabled:active:scale-100"
+              >
+                <MessageSquare className="w-[18px] h-[18px]" strokeWidth={2.5} />
+                WhatsApp
+              </button>
             </div>
           </div>
         );

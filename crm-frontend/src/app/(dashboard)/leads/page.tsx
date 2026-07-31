@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Edit, Trash2, Plus, FileSpreadsheet, UploadCloud, RefreshCw, Eye, Search, Filter, X, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FormSelect } from "@/components/shared/form-select";
@@ -540,6 +541,295 @@ export default function LeadsPage() {
     ? deptPipelines.filter((d) => d.value === (userDept === "sales" ? "sales" : "telecalling"))
     : deptPipelines;
 
+
+  const renderFilterPopover = (isMobile: boolean) => (
+    <Popover>
+      <PopoverTrigger render={
+        isMobile ? (
+          <Button variant="outline" size="icon" className="h-12 w-12 rounded-2xl bg-black/5 dark:bg-white/10 border-transparent relative shrink-0">
+            <Filter className="h-5 w-5 text-foreground" />
+            {activeFiltersCount > 0 && (
+              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#0052FF] border-2 border-background text-white text-[10px] font-bold flex items-center justify-center">
+                {activeFiltersCount}
+              </span>
+            )}
+          </Button>
+        ) : (
+          <Button variant="outline" className="h-10 rounded-xl bg-muted/30 border-border/60 px-4 flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium text-[13.5px]">Filters</span>
+            {activeFiltersCount > 0 && (
+              <Badge className="ml-1 bg-[#0052FF] text-white px-1.5 py-0.5 rounded-md text-[10px]">{activeFiltersCount}</Badge>
+            )}
+          </Button>
+        )
+      } />
+      <PopoverContent align="start" className="w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60">
+                <div className="flex items-center justify-between p-4 border-b bg-muted/10">
+                  <h4 className="font-semibold text-foreground text-sm">Filter Leads</h4>
+                  {activeFiltersCount > 0 && (
+                    <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 text-xs text-muted-foreground hover:text-red-600">
+                      Clear All
+                    </Button>
+                  )}
+                </div>
+                <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Created From</label>
+                    <Input type="date" value={filters.dateFrom} onChange={e => setFilters(f => ({...f, dateFrom: e.target.value}))} className="h-9 rounded-lg text-sm" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Created To</label>
+                    <Input type="date" value={filters.dateTo} onChange={e => setFilters(f => ({...f, dateTo: e.target.value}))} className="h-9 rounded-lg text-sm" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Status</label>
+                    <FormSelect name="status" options={uniqueStatuses.map(s => ({label: s, value: s}))} value={filters.status} onValueChange={v => setFilters(f => ({...f, status: v || ""}))} placeholder="All Statuses" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Staff</label>
+                    <FormSelect name="staff" options={uniqueStaff.map(s => ({label: s, value: s}))} value={filters.staff} onValueChange={v => setFilters(f => ({...f, staff: v || ""}))} placeholder="All Staff" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Lead Source</label>
+                    <FormSelect name="source" options={uniqueSources.map(s => ({label: s, value: s}))} value={filters.source} onValueChange={v => setFilters(f => ({...f, source: v || ""}))} placeholder="All Sources" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Property Category</label>
+                    <FormSelect name="category" options={uniqueCategories.map(s => ({label: s, value: s}))} value={filters.category} onValueChange={v => setFilters(f => ({...f, category: v || ""}))} placeholder="All Categories" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Property Type</label>
+                    <FormSelect name="type" options={uniqueTypes.map(s => ({label: s, value: s}))} value={filters.type} onValueChange={v => setFilters(f => ({...f, type: v || ""}))} placeholder="All Types" />
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+  );
+
+  const desktopFilters = (
+    <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
+      {/* Tabs & Pipeline Toggles Row */}
+      <div className="flex items-center justify-between px-6 border-b bg-muted/10 pt-4 gap-4">
+        <div className="flex items-center gap-8 overflow-x-auto scrollbar-hide relative">
+          {tabs.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={"relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " + (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")}
+            >
+              {tab}
+              {activeTab === tab && (
+                <motion.div layoutId="desktopActiveTabUnderline" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full" initial={false} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {visiblePipelines.length > 1 && (
+          <div className="flex items-center gap-2 pb-4 shrink-0">
+            {visiblePipelines.map((d) => (
+              <button
+                key={d.value}
+                onClick={() => setDeptFilter(d.value)}
+                className={[
+                  "h-9 px-4 rounded-full text-[13px] font-medium transition-all duration-200 border",
+                  deptFilter === d.value
+                    ? "bg-[#0052FF] text-white border-[#0052FF] shadow-sm"
+                    : "bg-background text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground",
+                ].join(" ")}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Search & Filters Row */}
+      <div className="flex flex-wrap items-center gap-3 px-6 py-4 border-b bg-background">
+        <div className="relative flex-1 min-w-[240px] max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Search ID, Name, Phone, Email..." 
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="pl-9 h-10 bg-muted/30 rounded-xl border-border/60 text-[13.5px]"
+          />
+        </div>
+        
+        {renderFilterPopover(false)}
+        
+        {(searchQuery || activeFiltersCount > 0) && (
+          <Button variant="ghost" size="icon" onClick={() => { setSearchQuery(""); clearFilters(); }} className="h-10 w-10 rounded-full text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors" title="Clear Search & Filters">
+            <X className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
+
+      {activeTab === "Action Required" && (
+        <div className="flex items-center gap-2 px-6 pt-5 min-h-[60px] animate-in slide-in-from-top-2 fade-in duration-200 flex-wrap">
+          <div className="flex items-center gap-2">
+            {actionFilters.map((filter) => {
+              const isActive = actionFilter === filter;
+              let activeClass = "bg-primary/10 text-primary border-primary/30";
+              if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
+              else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
+              else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
+              return (
+                <button
+                  key={filter}
+                  className={"h-10 flex items-center justify-center cursor-pointer px-5 rounded-full text-[13.5px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
+                  onClick={() => setActionFilter(filter)}
+                >
+                  {filter}
+                </button>
+              );
+            })}
+          </div>
+          
+          <div className={`ml-auto flex items-center h-10 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+            {[
+              { id: "pending", label: "Follow Up" },
+              { id: "completed", label: "Followed Up" }
+            ].map((mode) => {
+              const isSelected = todayViewMode === mode.id;
+              return (
+                <button
+                  key={mode.id}
+                  onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
+                  className={`relative h-full flex items-center px-4 rounded-full text-[13px] font-bold transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  {isSelected && (
+                    <motion.div
+                      layoutId="desktopTodayToggleBg"
+                      className="absolute inset-0 bg-[#0052FF] shadow-md rounded-full"
+                      initial={false}
+                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                      style={{ zIndex: -1 }}
+                    />
+                  )}
+                  <span className="relative z-10">{mode.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const mobileFilters = (
+    <div className="px-4 pb-2 space-y-4">
+      {/* iOS Search Bar & Filter */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Input 
+            placeholder="Search leads..." 
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="pl-11 h-12 bg-black/5 dark:bg-white/10 border-transparent rounded-2xl text-[16px] focus-visible:ring-1 focus-visible:ring-primary shadow-none"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery("")} className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 bg-muted-foreground/20 rounded-full text-foreground hover:bg-muted-foreground/30">
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+        {renderFilterPopover(true)}
+      </div>
+
+      {/* Pill Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 -mx-4 px-4">
+        {tabs.map(tab => {
+          const isActive = activeTab === tab;
+          return (
+            <button 
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={cn(
+                "px-5 h-10 rounded-full text-[14px] font-semibold whitespace-nowrap transition-all border active:scale-95",
+                isActive ? "bg-foreground text-background border-foreground shadow-sm" : "bg-card text-muted-foreground border-border hover:bg-muted"
+              )}
+            >
+              {tab}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Pipeline Toggles */}
+      {visiblePipelines.length > 1 && (
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 -mx-4 px-4">
+          {visiblePipelines.map((d) => (
+            <button
+              key={d.value}
+              onClick={() => setDeptFilter(d.value)}
+              className={cn(
+                "px-4 h-9 rounded-full text-[13px] font-medium whitespace-nowrap transition-all border active:scale-95",
+                deptFilter === d.value ? "bg-[#0052FF] text-white border-[#0052FF] shadow-sm" : "bg-background text-muted-foreground border-border hover:bg-muted"
+              )}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Action Required Row */}
+      {activeTab === "Action Required" && (
+        <div className="flex flex-col gap-3 pt-1">
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
+            {actionFilters.map((filter) => {
+              const isActive = actionFilter === filter;
+              let activeClass = "bg-primary/10 text-primary border-primary/30";
+              if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
+              else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
+              else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
+              return (
+                <button
+                  key={filter}
+                  className={"h-9 flex items-center justify-center cursor-pointer px-4 rounded-full text-[13px] font-medium transition-all ease-out active:scale-95 border whitespace-nowrap " + (isActive ? activeClass : "bg-card text-muted-foreground border-border hover:bg-muted")}
+                  onClick={() => setActionFilter(filter)}
+                >
+                  {filter}
+                </button>
+              );
+            })}
+          </div>
+          
+          <div className={`flex items-center h-10 bg-black/5 dark:bg-white/10 p-1 rounded-xl relative transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+            {[
+              { id: "pending", label: "Follow Up" },
+              { id: "completed", label: "Followed Up" }
+            ].map((mode) => {
+              const isSelected = todayViewMode === mode.id;
+              return (
+                <button
+                  key={mode.id}
+                  onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
+                  className={`flex-1 relative h-full flex items-center justify-center rounded-lg text-[13px] font-bold transition-colors z-10 active:scale-[0.98] ${isSelected ? "text-foreground" : "text-muted-foreground"}`}
+                >
+                  {isSelected && (
+                    <motion.div
+                      layoutId="mobileTodayToggleBg"
+                      className="absolute inset-0 bg-background shadow-sm rounded-lg"
+                      initial={false}
+                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                      style={{ zIndex: -1 }}
+                    />
+                  )}
+                  <span className="relative z-10">{mode.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <>
       <MobileHeader title="Leads Dashboard" />
@@ -597,166 +887,7 @@ export default function LeadsPage() {
         }
       />
 
-      <div className="bg-transparent md:bg-card border-0 md:border rounded-none md:rounded-xl overflow-hidden shadow-none md:shadow-sm">
-        
-        {/* Tabs & Pipeline Toggles Row */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-3 md:px-6 border-b bg-muted/10 pt-4 gap-4">
-          <div className="flex items-center gap-8 overflow-x-auto scrollbar-hide relative">
-            {tabs.map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={"relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " + (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")}
-              >
-                {tab}
-                {activeTab === tab && (
-                  <motion.div layoutId="activeTabUnderline" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full" initial={false} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
-                )}
-              </button>
-            ))}
-          </div>
-
-          {visiblePipelines.length > 1 && (
-            <div className="flex items-center gap-2 pb-3 sm:pb-4 shrink-0">
-              {visiblePipelines.map((d) => (
-                <button
-                  key={d.value}
-                  onClick={() => setDeptFilter(d.value)}
-                  className={[
-                    "h-9 px-4 rounded-full text-[13px] font-medium transition-all duration-200 border",
-                    deptFilter === d.value
-                      ? "bg-[#0052FF] text-white border-[#0052FF] shadow-sm"
-                      : "bg-background text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground",
-                  ].join(" ")}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Search & Filters Row */}
-        <div className="flex flex-wrap items-center gap-3 px-3 md:px-6 py-4 border-b bg-background">
-          <div className="relative flex-1 min-w-0 md:min-w-[240px] max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search ID, Name, Phone, Email..." 
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="pl-9 h-10 bg-muted/30 rounded-xl border-border/60 text-[13.5px]"
-            />
-          </div>
-          
-          <Popover>
-            <PopoverTrigger render={
-              <Button variant="outline" className="h-10 rounded-xl bg-muted/30 border-border/60 px-4 flex items-center gap-2">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium text-[13.5px]">Filters</span>
-                {activeFiltersCount > 0 && (
-                  <Badge className="ml-1 bg-[#0052FF] text-white px-1.5 py-0.5 rounded-md text-[10px]">{activeFiltersCount}</Badge>
-                )}
-              </Button>
-            } />
-              <PopoverContent align="start" className="w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60">
-                <div className="flex items-center justify-between p-4 border-b bg-muted/10">
-                  <h4 className="font-semibold text-foreground text-sm">Filter Leads</h4>
-                  {activeFiltersCount > 0 && (
-                    <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 text-xs text-muted-foreground hover:text-red-600">
-                      Clear All
-                    </Button>
-                  )}
-                </div>
-                <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Created From</label>
-                    <Input type="date" value={filters.dateFrom} onChange={e => setFilters(f => ({...f, dateFrom: e.target.value}))} className="h-9 rounded-lg text-sm" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Created To</label>
-                    <Input type="date" value={filters.dateTo} onChange={e => setFilters(f => ({...f, dateTo: e.target.value}))} className="h-9 rounded-lg text-sm" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Status</label>
-                    <FormSelect name="status" options={uniqueStatuses.map(s => ({label: s, value: s}))} value={filters.status} onValueChange={v => setFilters(f => ({...f, status: v || ""}))} placeholder="All Statuses" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Staff</label>
-                    <FormSelect name="staff" options={uniqueStaff.map(s => ({label: s, value: s}))} value={filters.staff} onValueChange={v => setFilters(f => ({...f, staff: v || ""}))} placeholder="All Staff" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Lead Source</label>
-                    <FormSelect name="source" options={uniqueSources.map(s => ({label: s, value: s}))} value={filters.source} onValueChange={v => setFilters(f => ({...f, source: v || ""}))} placeholder="All Sources" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Property Category</label>
-                    <FormSelect name="category" options={uniqueCategories.map(s => ({label: s, value: s}))} value={filters.category} onValueChange={v => setFilters(f => ({...f, category: v || ""}))} placeholder="All Categories" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Property Type</label>
-                    <FormSelect name="type" options={uniqueTypes.map(s => ({label: s, value: s}))} value={filters.type} onValueChange={v => setFilters(f => ({...f, type: v || ""}))} placeholder="All Types" />
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-            
-            {(searchQuery || activeFiltersCount > 0) && (
-              <Button variant="ghost" size="icon" onClick={() => { setSearchQuery(""); clearFilters(); }} className="h-10 w-10 rounded-full text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors" title="Clear Search & Filters">
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-        </div>
-
-        {activeTab === "Action Required" && (
-          <div className="flex items-center gap-2 px-3 md:px-6 pt-5 min-h-[60px] animate-in slide-in-from-top-2 fade-in duration-200 flex-wrap">
-            <div className="flex items-center gap-2">
-              {actionFilters.map((filter) => {
-                const isActive = actionFilter === filter;
-                let activeClass = "bg-primary/10 text-primary border-primary/30";
-                if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
-                else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
-                else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
-                return (
-                  <button
-                    key={filter}
-                    className={"h-10 flex items-center justify-center cursor-pointer px-5 rounded-full text-[13.5px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
-                    onClick={() => setActionFilter(filter)}
-                  >
-                    {filter}
-                  </button>
-                );
-              })}
-            </div>
-            
-            <div className={`ml-auto flex items-center h-10 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
-              {[
-                { id: "pending", label: "Follow Up" },
-                { id: "completed", label: "Followed Up" }
-              ].map((mode) => {
-                const isSelected = todayViewMode === mode.id;
-                return (
-                  <button
-                    key={mode.id}
-                    onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
-                    className={`relative h-full flex items-center px-4 rounded-full text-[13px] font-bold transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
-                  >
-                    {isSelected && (
-                      <motion.div
-                        layoutId="todayToggleBg"
-                        className="absolute inset-0 bg-[#0052FF] shadow-md rounded-full"
-                        initial={false}
-                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                        style={{ zIndex: -1 }}
-                      />
-                    )}
-                    <span className="relative z-10">{mode.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
+      <Device mobile={mobileFilters} desktop={desktopFilters} />
         <div className="p-3 md:p-6">
           {pendingImports.length > 0 && activeTab === "Open Pipeline" && (
              <div className="mb-6 p-5 bg-blue-50/50 border border-blue-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
@@ -882,8 +1013,6 @@ export default function LeadsPage() {
             </>
           )}
         </div>
-      </div>
-
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteId !== null || bulkDeleteIds !== null} onOpenChange={(open) => {
         if (!open) {
