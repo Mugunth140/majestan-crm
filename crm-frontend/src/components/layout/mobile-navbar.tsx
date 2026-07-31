@@ -65,14 +65,14 @@ export function MobileNavbar() {
               <button
                 key={item.label}
                 onClick={() => router.push(item.href)}
-                className="relative flex flex-col items-center justify-center w-16 h-[3.5rem] rounded-[2rem] transition-all duration-300 active:scale-95 z-10"
+                className="relative flex flex-col items-center justify-center w-19 h-[3.5rem] rounded-[2rem] transition-all duration-300 active:scale-90 z-10"
               >
                 {isActive && (
                   <motion.div
                     layoutId="activeNavBackground"
                     className="absolute inset-0 bg-[#0052FF]/10 dark:bg-white/15 rounded-[2rem]"
                     initial={false}
-                    transition={{ type: "spring", stiffness: 400, damping: 35 }}
+                    transition={{ type: "spring", stiffness: 450, damping: 30 }}
                   />
                 )}
                 <item.icon 
@@ -80,7 +80,7 @@ export function MobileNavbar() {
                     "w-[22px] h-[22px] mb-1 transition-colors relative z-20", 
                     isActive ? "text-[#0052FF] dark:text-white" : "text-muted-foreground dark:text-white/60"
                   )} 
-                  strokeWidth={isActive ? 2.5 : 2} 
+                  strokeWidth={isActive ? 2 : 2} 
                 />
                 <span className={cn(
                   "text-[10px] font-medium transition-colors tracking-wide relative z-20",
@@ -117,7 +117,7 @@ export function MobileNavbar() {
               className="bg-card border-t border-border rounded-t-[2.5rem] p-6 shadow-2xl pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
             >
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold tracking-tight">Create New...</h2>
+                <h2 className="text-xl font-bold tracking-tight">Create New</h2>
                 <button onClick={() => setIsAddMenuOpen(false)} className="p-2 bg-muted rounded-full active:scale-95 transition-transform">
                   <X className="w-5 h-5 text-muted-foreground" />
                 </button>
