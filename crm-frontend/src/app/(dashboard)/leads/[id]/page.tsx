@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 import {
   ArrowLeft, Loader2, User, Phone, MapPin, Building2,
   Briefcase, Mail, MessageSquare, Plus, ArrowUpRight,
-  Clock, Send, RefreshCw, History, TrendingUp, SlidersHorizontal, Sparkles, Edit,
+  Clock, Send, RefreshCw, History, TrendingUp, SlidersHorizontal, Sparkles, Edit, ChevronLeft, ChevronRight
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -436,7 +436,7 @@ export default function LeadViewPage() {
     <div className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
 
       {/* ── Mobile Header ── */}
-      <MobileHeader title="Lead Details" showBack />
+      <MobileHeader title={lead.name || "Lead Details"} showBack />
 
       {/* ── Header ── */}
       <div className="hidden md:flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
@@ -482,16 +482,49 @@ export default function LeadViewPage() {
         </div>
       </div>
 
+      {/* ── Mobile Summary & Actions ── */}
+      <div className="md:hidden flex flex-col gap-4 px-4 pb-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge className={`font-medium px-2.5 py-0.5 shadow-sm border ${badgeCls}`}>{statusName}</Badge>
+          {(lead.inquiries && lead.inquiries.length > 1) && (
+            <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200">
+              Repeat ({lead.inquiries.length - 1})
+            </Badge>
+          )}
+          <span className="text-sm font-semibold text-muted-foreground ml-1">L{String(lead.id).padStart(5, "0")}</span>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-3">
+          {canEdit && (
+            <Button variant="outline" onClick={() => router.push(`/leads/new?edit=${lead.id}`)} className="h-11 rounded-xl text-foreground font-semibold border-border/60">
+              <Edit className="w-4 h-4 mr-2 text-muted-foreground" /> Edit
+            </Button>
+          )}
+          {canEdit && (!lead.is_converted && (role === "Admin" || role === "Manager" || ((role === "Staff" || role === "Team Lead") && userDept === "telecalling"))) ? (
+            <Button
+              onClick={() => { setConvertTo(""); setConvertFeedback(""); setIsConvertOpen(true); }}
+              className="h-11 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm font-semibold"
+            >
+              <TrendingUp className="w-4 h-4 mr-2" /> Convert
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={() => fetchLead(true)} className="h-11 rounded-xl border-border/60 font-semibold text-foreground">
+              <RefreshCw className={`w-4 h-4 mr-2 text-muted-foreground ${isRefreshing ? "animate-spin" : ""}`} /> Refresh
+            </Button>
+          )}
+        </div>
+      </div>
+
       {/* ── Main Layout ── */}
-      <div className="flex-1 overflow-y-auto min-h-0 pb-6 pr-2 space-y-6">
+      <div className="flex-1 overflow-y-auto min-h-0 pb-6 lg:pr-2 space-y-6 px-4 lg:px-0">
 
         {/* ── Row 1: Customer Info (2/3) + Quick Actions (1/3) ── */}
-        <div className="grid grid-cols-3 gap-6">
-          <div className="col-span-2 bg-card border rounded-2xl p-6 shadow-sm h-full">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 bg-card border rounded-2xl p-6 shadow-sm h-full">
             <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
               <User className="h-4 w-4 text-muted-foreground" /> Customer Information
             </h3>
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-y-6 gap-x-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-6 gap-x-6">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Mobile</p>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -547,7 +580,7 @@ export default function LeadViewPage() {
             </div>
           </div>
 
-          <div className="col-span-1 bg-card border rounded-2xl p-6 shadow-sm h-full flex flex-col">
+          <div className="lg:col-span-1 bg-card border rounded-2xl p-6 shadow-sm h-full flex flex-col">
             <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
               <RefreshCw className="h-4 w-4 text-muted-foreground" /> Quick Actions
             </h3>
@@ -666,7 +699,7 @@ export default function LeadViewPage() {
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contacted Via *</label>
                   <FormSelect name="contactedVia" placeholder="Select..." options={CONTACTED_VIA} value={fuForm.contactedVia} onValueChange={v => setFuForm(f => ({ ...f, contactedVia: v || "" }))} />
@@ -680,7 +713,7 @@ export default function LeadViewPage() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Priority</label>
                   <FormSelect name="priority" placeholder="Select..." options={PRIORITIES} value={fuForm.priority} onValueChange={v => setFuForm(f => ({ ...f, priority: v || "" }))} />
@@ -737,8 +770,8 @@ export default function LeadViewPage() {
         )}
 
         {/* ── Row 3: Contact Log (2/3) + Assignment/Requirement (1/3) ── */}
-        <div className="grid grid-cols-3 gap-6">
-          <div className="col-span-2 bg-card border rounded-2xl p-6 shadow-sm">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 bg-card border rounded-2xl p-6 shadow-sm">
             <div className="flex items-center justify-between border-b pb-3 mb-5">
               <h3 className="text-base font-bold text-foreground flex items-center gap-2">
                 <Clock className="h-4 w-4 text-muted-foreground" /> Contact Log
@@ -781,7 +814,7 @@ export default function LeadViewPage() {
             )}
           </div>
 
-          <div className="col-span-1 space-y-6">
+          <div className="lg:col-span-1 space-y-6">
             {/* Assignment */}
             <div className="bg-card border rounded-2xl p-6 shadow-sm">
               <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
@@ -893,13 +926,30 @@ export default function LeadViewPage() {
 
       {/* ── Follow-Up History Slider (Sheet) ── */}
       <Sheet open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-        <SheetContent side="right" className="w-[450px] !max-w-[450px] p-0 flex flex-col border-l">
-          <SheetHeader className="p-6 border-b shrink-0">
+        <SheetContent side="right" className="!w-full sm:!w-[450px] sm:!max-w-[450px] p-0 flex flex-col border-l [&>button[data-slot='sheet-close']]:hidden sm:[&>button[data-slot='sheet-close']]:flex">
+          
+          {/* ── Mobile Header for Sheet ── */}
+          <div className="md:hidden flex flex-col shrink-0 bg-background/90 backdrop-blur-xl border-b z-10">
+            <div className="h-[env(safe-area-inset-top)] w-full" />
+            <div className="flex items-center justify-between px-4 h-14">
+              <button 
+                onClick={() => setIsHistoryOpen(false)} 
+                aria-label="Close"
+                className="h-10 w-10 shrink-0 rounded-full flex items-center justify-center transition-all active:scale-90 bg-white/70 dark:bg-white/15 backdrop-blur-xl border border-black/[0.07] dark:border-white/20 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.6)] dark:shadow-[0_2px_10px_-2px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.15)]"
+              >
+                <ChevronRight className="w-6 h-6 text-[#007AFF] dark:text-[#0A84FF]" strokeWidth={2.5} />
+              </button>
+              <span className="absolute inset-x-0 text-center pointer-events-none text-[17px] font-semibold tracking-tight text-foreground truncate px-20">
+                Timeline
+              </span>
+              <div className="w-10 shrink-0" />
+            </div>
+          </div>
+
+          <SheetHeader className="hidden md:block p-6 border-b shrink-0">
             <SheetTitle className="text-lg">Follow Up Timeline {followUps.length > 0 && `(${followUps.length})`}</SheetTitle>
-            {/* <SheetDescription>
-              Timeline of all logged follow-ups and interactions for this lead.
-            </SheetDescription> */}
           </SheetHeader>
+          
           <div className="flex-1 overflow-hidden relative">
             <FollowUpPanel
               entityId={Number(id)}

@@ -54,7 +54,7 @@ export function MobileGlassHeader() {
             )}
           </div>
 
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-20 overflow-hidden">
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-24 overflow-hidden">
             <AnimatePresence initial={false}>
               {isScrolled && (
                 <motion.h1
@@ -63,7 +63,7 @@ export function MobileGlassHeader() {
                   animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                   exit={{ opacity: 0, y: -10, filter: "blur(3px)" }}
                   transition={{ duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
-                  className="text-[17px] font-semibold tracking-tight text-foreground truncate max-w-[55%]"
+                  className="text-[17px] font-semibold tracking-tight text-foreground truncate max-w-full"
                 >
                   {resolvedTitle}
                 </motion.h1>
