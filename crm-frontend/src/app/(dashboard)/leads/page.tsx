@@ -542,14 +542,7 @@ export default function LeadsPage() {
 
   return (
     <>
-      <MobileHeader 
-        title="Leads Dashboard" 
-        rightAction={
-          <Button variant="ghost" size="icon" onClick={() => router.push('/leads/new')} className="text-[#007AFF]">
-            <Plus className="w-6 h-6" />
-          </Button>
-        } 
-      />
+      <MobileHeader title="Leads Dashboard" />
       <div className="flex flex-col space-y-6 pt-4 lg:p-0">
         <Device
           mobile={null}
