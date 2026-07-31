@@ -58,7 +58,7 @@ const navigation = [
 export function Sidebar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { isCollapsed, setIsCollapsed } = useSidebar();
+  const { isCollapsed, setIsCollapsed, isMobileOpen, setIsMobileOpen } = useSidebar();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
 
@@ -94,13 +94,42 @@ export function Sidebar() {
   const isAdmin = userRole === "Admin" || userRole === "Super Admin";
 
   return (
-    <aside
-      className={cn(
-        "flex flex-col my-3 ml-3 rounded-xl border bg-card shadow-sm transition-all duration-300 overflow-hidden relative group",
-        isCollapsed ? "w-16" : "w-64"
+    <>
+      {/* Mobile Overlay */}
+      {isMobileOpen && (
+        <div 
+          className="fixed inset-0 z-[50] bg-black/50 lg:hidden"
+          onClick={() => setIsMobileOpen(false)}
+        />
       )}
-    >
-      {/* Toggle Button */}
+
+      <aside
+        className={cn(
+          // Hardware-accelerated transitions for 60fps mobile sliding
+          "fixed inset-y-0 left-0 z-[60] flex flex-col bg-card overflow-hidden group transition-[transform,width] duration-300 ease-in-out will-change-transform",
+          
+          // Mobile: Full screen edge-to-edge
+          "h-[100dvh] lg:h-auto w-full sm:w-[350px] border-r border-transparent sm:border-border",
+          
+          // Desktop: Floating card aesthetics
+          "lg:relative lg:my-3 lg:ml-3 lg:rounded-xl lg:border lg:shadow-sm",
+          
+          // Width states
+          isCollapsed ? "lg:w-16" : "lg:w-64",
+          
+          // Open/Close states
+          isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        )}
+      >
+        {/* Mobile Close Button */}
+        <button
+          onClick={() => setIsMobileOpen(false)}
+          className="absolute right-4 top-5 z-50 flex h-10 w-10 items-center justify-center rounded-xl bg-muted/50 text-muted-foreground hover:bg-muted active:scale-95 transition-all lg:hidden"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+
+        {/* Toggle Button */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
         className="absolute -right-2 top-13 z-20 flex h-7 w-7 items-center justify-center rounded-lg border bg-background shadow-sm transition-all hover:bg-accent opacity-0 group-hover:opacity-100"
@@ -125,7 +154,7 @@ export function Sidebar() {
       </div>
 
       <div className="flex-1 overflow-x-hidden overflow-y-auto py-3 scrollbar-none">
-        <nav className="grid items-start px-2 gap-1 text-[15px] font-medium">
+        <nav className="grid items-start px-2 gap-1 text-[14px] font-medium">
           {navigation.map((item) => {
             if (item.adminOnly && !isAdmin) return null;
 
@@ -205,7 +234,7 @@ export function Sidebar() {
                               key={sub.name}
                               href={sub.href}
                               className={cn(
-                                "rounded-lg px-3 py-2 text-[14px] transition-colors",
+                                "rounded-lg px-3 py-2 text-[13px] transition-colors",
                                 isSubActive 
                                   ? "text-[#0052FF] font-semibold bg-blue-50/50 dark:bg-blue-900/10" 
                                   : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
@@ -242,16 +271,17 @@ export function Sidebar() {
           )} />
           {!isCollapsed && (
             <div className="flex flex-col flex-1 overflow-hidden text-left">
-              <span className="truncate text-[14px] font-bold leading-tight">
-                System Settings
+              <span className="truncate text-[13px] font-bold leading-tight">
+                {userRole || "Loading..."}
               </span>
               <span className={cn("truncate text-[10px] font-medium leading-tight mt-0.5", pathname.startsWith("/settings") ? "text-blue-100" : "text-muted-foreground")}>
-                Preferences & Config
+                Majestan CRM
               </span>
             </div>
           )}
         </Link>
       </div>
     </aside>
+  </>
   );
 }

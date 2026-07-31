@@ -1,12 +1,13 @@
 "use client";
 
 import { apiFetch } from "@/lib/api-fetch";
-import { Bell, Moon, Sun, UserCircle, LogOut, X, Trash2 } from "lucide-react";
+import { Bell, Moon, Sun, UserCircle, LogOut, X, Trash2, Menu } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useSidebar } from "./sidebar-context";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -150,19 +151,35 @@ export function Topbar() {
   };
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
+  const { setIsMobileOpen } = useSidebar();
 
   return (
-    <header className="absolute right-8 top-8 z-50 flex items-center justify-end bg-transparent pointer-events-none">
-      <div className="flex items-center gap-1 rounded-full border bg-card px-2 py-1.5 shadow-sm pointer-events-auto">
+    <header className="absolute left-0 right-0 top-0 lg:left-auto lg:right-8 lg:top-8 z-50 flex items-center justify-between lg:justify-end px-3 py-3 lg:p-0 bg-background/95 backdrop-blur-md border-b border-border/50 lg:bg-transparent lg:backdrop-blur-none lg:border-none pointer-events-auto lg:pointer-events-none safe-top">
+      
+      {/* Mobile Hamburger & Logo */}
+      <div className="flex items-center gap-2.5 lg:hidden">
+        <button 
+          onClick={() => setIsMobileOpen(true)}
+          className="p-1.5 -ml-1 text-muted-foreground hover:text-foreground active:scale-95 transition-transform"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+        <div className="flex items-center gap-2">
+          <img src="/logo/logo.png" alt="Majestan" className="w-6 h-6 object-contain" />
+          <span className="font-semibold text-[14px] text-foreground tracking-tight">Majestan CRM</span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-0.5 rounded-full lg:border bg-transparent lg:bg-card lg:px-2 lg:py-1.5 shadow-none lg:shadow-sm pointer-events-auto">
         {mounted && (
           <Button 
             variant="ghost" 
             size="icon" 
-            className="rounded-full"
+            className="rounded-full h-8 w-8 lg:h-9 lg:w-9"
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           >
             <span className="sr-only">Toggle theme</span>
-            {theme === 'dark' ? <Sun size={18} strokeWidth={2} /> : <Moon size={18} strokeWidth={2} />}
+            {theme === 'dark' ? <Sun size={18} strokeWidth={2} className="w-4 h-4 lg:w-[18px] lg:h-[18px]" /> : <Moon size={18} strokeWidth={2} className="w-4 h-4 lg:w-[18px] lg:h-[18px]" />}
           </Button>
         )}
 
@@ -171,13 +188,13 @@ export function Topbar() {
           <Button
             variant="ghost"
             size="icon"
-            className="rounded-full relative"
+            className="rounded-full relative h-8 w-8 lg:h-9 lg:w-9"
             onClick={() => {
               setNotifOpen((o) => !o);
               if (!notifOpen) fetchNotifications();
             }}
           >
-            <Bell size={18} />
+            <Bell size={18} className="w-4 h-4 lg:w-[18px] lg:h-[18px] text-muted-foreground" />
             {unreadCount > 0 && (
               <span className="absolute top-1 right-1 h-4 w-4 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
                 {unreadCount > 99 ? "99+" : unreadCount}
@@ -285,8 +302,8 @@ export function Topbar() {
         </div>
 
         <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
-          <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 w-9 rounded-full">
-            <UserCircle size={20} />
+          <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-8 w-8 lg:h-9 lg:w-9 rounded-full">
+            <UserCircle size={20} className="w-[18px] h-[18px] lg:w-5 lg:h-5 text-muted-foreground" />
             <span className="sr-only">Toggle user menu</span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="center" className="w-40 mr-10">
