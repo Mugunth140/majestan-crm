@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Loader2, MapPin, Building2, Briefcase, FileText, IndianRupee, Image as ImageIcon, Map, Layers, RefreshCw, FileImage } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 function PageSkeleton() {
   return (

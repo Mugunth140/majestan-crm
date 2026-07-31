@@ -22,7 +22,7 @@ import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
 import { AssignLeadModal } from "@/components/shared/assign-lead-modal";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 const STATUS_STYLES: Record<string, string> = {
   "New Lead":             "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300",

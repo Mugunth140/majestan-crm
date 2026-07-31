@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import { FormSelect } from "@/components/shared/form-select";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 const DEPARTMENTS = [
   { label: "Sales", value: "Sales" },

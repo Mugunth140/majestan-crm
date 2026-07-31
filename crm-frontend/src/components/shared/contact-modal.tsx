@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Send, Mail, MessageSquare, Phone } from "lucide-react";
 import { toast } from "sonner";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 const CONTACT_TYPE_STYLES: Record<string, string> = {
   email:    "bg-blue-100 text-blue-700 border-blue-200",

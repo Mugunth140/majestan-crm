@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { FormSelect } from "@/components/shared/form-select";
 import { Switch } from "@/components/ui/switch";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 function UserFormContent() {
   const router = useRouter();

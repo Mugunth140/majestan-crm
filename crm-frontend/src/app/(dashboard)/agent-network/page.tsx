@@ -20,7 +20,7 @@ import { FormSelect } from "@/components/shared/form-select";
 import { Trash2, Plus, RefreshCw, Search, Eye, Filter } from "lucide-react";
 import { motion } from "framer-motion";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 const STATUS_STYLES: Record<string, string> = {
   "New": "bg-gray-100 text-gray-800 border-gray-200",

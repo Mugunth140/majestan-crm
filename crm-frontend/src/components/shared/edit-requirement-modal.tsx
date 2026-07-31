@@ -13,7 +13,7 @@ import {
   PROPERTY_CATEGORIES, PROPERTY_TYPES_MAP, FUNDERS, PROJECTS 
 } from "@/lib/lead-constants";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 function parseIndianCurrency(input: string): number {
   if (!input) return 0;

@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { FormSelect } from "@/components/shared/form-select";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 const PARTNER_TYPES = [
   { label: "Individual Broker", value: "individual_broker" },

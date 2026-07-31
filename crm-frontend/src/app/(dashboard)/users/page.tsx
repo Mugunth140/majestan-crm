@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 function UsersList() {
   const router = useRouter();

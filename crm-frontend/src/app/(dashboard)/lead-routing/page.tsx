@@ -19,7 +19,7 @@ import { FormSelect } from "@/components/shared/form-select";
 import { DatePicker } from "@/components/shared/date-picker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 type MainTab = "queue" | "history";
 type DeptTab = "telecalling" | "sales";

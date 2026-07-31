@@ -15,7 +15,7 @@ import { FormSelect } from "@/components/shared/form-select";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
 import { TimePicker } from "@/components/shared/time-picker";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 const PROPERTY_CATEGORIES = [
   { label: "Residential", value: "residential" },

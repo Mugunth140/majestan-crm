@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LottieAnimation } from "@/components/shared/LottieAnimation";
-import { Mail, Lock, Loader2 } from "lucide-react";
+import { Mail, Lock, Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
 // Reusable SVG Cloud Component
@@ -29,6 +29,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("admin@majestanrealty.com");
   const [password, setPassword] = useState("Prismark@2026");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -36,7 +37,7 @@ export default function LoginPage() {
     setIsLoading(true);
     
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/auth/login`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/api/v1'}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -70,10 +71,10 @@ export default function LoginPage() {
   return (
     <>
       {/* Main Login UI - Full Screen Background */}
-      <div className="flex h-screen w-screen overflow-hidden relative bg-linear-to-br from-[#D4F1FF] via-[#A8E0FF] to-[#87CEEB]">
+      <div className="flex h-[100dvh] w-full overflow-hidden relative bg-linear-to-br from-[#D4F1FF] via-[#A8E0FF] to-[#87CEEB]">
         
         {/* Background Clouds & Elements (Visible globally, optimized for right side on desktop) */}
-        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+        <div className="hidden lg:block absolute inset-0 z-0 pointer-events-none overflow-hidden">
           <Cloud className="absolute top-[10%] left-[60%] w-64 drop-shadow-xl" opacity={0.9} />
           <Cloud className="absolute top-[25%] right-[5%] w-48 drop-shadow-xl" opacity={0.8} />
           <Cloud className="absolute top-[50%] right-[35%] w-80 drop-shadow-lg" opacity={0.6} />
@@ -91,78 +92,90 @@ export default function LoginPage() {
         </div>
 
         {/* Floating Form Container */}
-        <div className="relative z-20 flex h-full w-full lg:w-1/2 items-center justify-center p-6 lg:p-16">
-          <div className="flex w-full max-w-120 flex-col justify-center p-10 md:p-12 bg-card/95 backdrop-blur-xl rounded-[2.5rem] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] border border-white/50">
+        <div className="relative z-20 flex h-full w-full lg:w-1/2 items-center justify-center p-4 sm:p-6 lg:p-16">
+          <div className="flex w-full max-w-[480px] flex-col justify-center p-8 sm:p-10 md:p-12 bg-white/95 backdrop-blur-xl rounded-[2rem] sm:rounded-[2.5rem] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] border border-white/50">
             
-            <div className="mb-10 flex items-center justify-center">
+            <div className="mb-8 sm:mb-10 flex items-center justify-center">
               <div>
                 <Image 
                   src="/logo/logo.png" 
                   alt="Majestan Logo" 
                   width={64} 
                   height={64} 
-                  className="object-contain filter drop-shadow-sm saturate-120"
+                  className="object-contain filter saturate-120"
                   priority
                 />
               </div>
             </div>
 
-            <div className="mb-10">
-              <h1 className="mb-2 text-3xl md:text-4xl font-bold tracking-tight text-foreground text-center">
+            <div className="mb-8 sm:mb-10">
+              <h1 className="mb-2 text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-gray-900 text-center">
                 Welcome back
               </h1>
-              <p className="text-[15px] text-muted-foreground mt-3 text-center">
+              <p className="text-[14px] sm:text-[15px] text-gray-500 mt-2 sm:mt-3 text-center leading-relaxed">
                 Log in to access your dashboard and manage your projects seamlessly.
               </p>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-6">
-              <div className="space-y-2 relative group">
-                <label className="text-xs font-medium tracking-wide text-muted-foreground ml-2">
+            <form onSubmit={handleLogin} className="space-y-5 sm:space-y-6">
+              <div className="space-y-1.5 relative group">
+                <label className="text-xs font-semibold tracking-wide text-gray-500 ml-1">
                   Email Address
                 </label>
                 <div className="relative mt-1">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-blue-900 transition-colors" />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-blue-900 transition-colors" />
                   <Input 
                     type="email" 
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    autoComplete="username"
                     placeholder="admin@majestanrealty.com" 
-                    className="h-14 rounded-xl bg-muted/40 pl-11 pr-4 text-[15px] border-border/60 hover:bg-muted/60 focus-visible:bg-transparent focus-visible:ring-2 focus-visible:ring-blue-900/20 focus-visible:border-blue-900 transition-all"
+                    className="h-12 sm:h-14 rounded-xl bg-gray-50 text-gray-900 pl-11 pr-4 text-[15px] border-gray-200 hover:bg-gray-100 placeholder:text-gray-400 focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-blue-900/20 focus-visible:border-blue-900 transition-all shadow-none"
                   />
                 </div>
               </div>
               
-              <div className="space-y-2 relative group">
-                <div className="flex justify-between items-center ml-2">
-                  <label className="text-xs font-medium tracking-wide text-muted-foreground">
+              <div className="space-y-1.5 relative group">
+                <div className="flex justify-between items-center ml-1">
+                  <label className="text-xs font-semibold tracking-wide text-gray-500">
                     Password
                   </label>
                 </div>
                 <div className="relative mt-1">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-blue-900 transition-colors" />
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-blue-900 transition-colors" />
                   <Input 
-                    type="password" 
+                    type={showPassword ? "text" : "password"} 
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    autoComplete="current-password"
                     placeholder="••••••••" 
-                    className="h-14 rounded-xl bg-muted/40 pl-11 pr-4 text-[15px] border-border/60 hover:bg-muted/60 focus-visible:bg-transparent focus-visible:ring-2 focus-visible:ring-blue-900/20 focus-visible:border-blue-900 transition-all"
+                    className="h-12 sm:h-14 rounded-xl bg-gray-50 text-gray-900 pl-11 pr-12 text-[15px] border-gray-200 hover:bg-gray-100 placeholder:text-gray-400 focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-blue-900/20 focus-visible:border-blue-900 transition-all shadow-none"
                   />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setShowPassword(!showPassword);
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 flex items-center justify-center text-gray-400 hover:text-gray-600 focus:outline-none transition-colors z-10"
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
                 </div>
               </div>
 
-              <div className="pt-4 space-y-4 flex flex-col items-center justify-center">
+              <div className="pt-2 sm:pt-4 space-y-4 flex flex-col items-center justify-center">
                 <Button 
                   type="submit"
                   disabled={isLoading}
-                  className="group flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-blue-900 text-white hover:bg-blue-800 shadow-[0_8px_20px_-6px_rgba(30,58,138,0.4)] transition-all active:scale-[0.98] text-[15px] font-semibold disabled:opacity-70 disabled:cursor-not-allowed"
+                  className="group flex h-12 sm:h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#1e3a8a] text-white hover:bg-[#1e3a8a]/90 shadow-[0_8px_20px_-6px_rgba(30,58,138,0.4)] transition-all active:scale-[0.98] text-[15px] font-semibold disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Sign In"}
                 </Button>
-                <p className="text-sm font-normal text-muted-foreground">
-                  Having trouble signing in? <a href="#" className="text-blue-900 font-medium hover:underline transition-colors">Report</a>
+                <p className="text-xs sm:text-sm font-medium text-gray-500">
+                  Having trouble signing in? <a href="#" className="text-[#1e3a8a] font-semibold hover:underline transition-colors">Report</a>
                 </p>
               </div>
             </form>

@@ -20,7 +20,7 @@ interface LeadAttachmentsProps {
   onRefresh: () => void;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 export function LeadAttachments({ leadId, documents = [], onRefresh }: LeadAttachmentsProps) {
   const [isUploading, setIsUploading] = useState(false);

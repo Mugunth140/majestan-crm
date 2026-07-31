@@ -9,6 +9,15 @@ const withPWA = withPWAInit({
 
 const nextConfig: NextConfig = {
   turbopack: {},
+  allowedDevOrigins: ['192.168.106.167', 'localhost'],
+  async rewrites() {
+    return [
+      {
+        source: '/api/v1/:path*',
+        destination: process.env.BACKEND_URL || 'http://localhost:8000/api/v1/:path*',
+      },
+    ];
+  },
 };
 
 export default withPWA(nextConfig);
