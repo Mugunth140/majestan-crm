@@ -381,7 +381,7 @@ export default function AgentsPage() {
         </div>
 
         {activeTab === "Action Required" && (
-          <div className="flex items-center gap-2 px-6 pt-5 min-h-[60px] animate-in slide-in-from-top-2 fade-in duration-200 flex-wrap">
+          <div className="flex items-center gap-2 px-6 py-4 border-b border-border/40 animate-in slide-in-from-top-2 fade-in duration-200 flex-wrap">
             <div className="flex items-center gap-2">
               {actionFilters.map((filter) => {
                 const isActive = actionFilter === filter;
@@ -430,9 +430,10 @@ export default function AgentsPage() {
           </div>
         )}
 
-        <div className="p-6">
+        <div className="w-full">
           {isLoading ? <TableSkeleton columns={6} rows={5} /> : (
             <DataTable 
+              flush
               columns={columns} 
               data={displayedAgents} 
               showToolbar={true} 

@@ -33,6 +33,7 @@ interface DataTableProps<TData, TValue> {
   showDeleteAction?: boolean;
   onDeleteSelected?: (selectedRows: TData[]) => void;
   renderToolbarActions?: (selectedRows: TData[], clearSelection: () => void) => React.ReactNode;
+  flush?: boolean;
 }
 
 export function DataTable<TData, TValue>({
@@ -43,6 +44,7 @@ export function DataTable<TData, TValue>({
   showDeleteAction = false,
   onDeleteSelected,
   renderToolbarActions,
+  flush = false,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -69,7 +71,10 @@ export function DataTable<TData, TValue>({
     <div className="space-y-4 md:space-y-0 md:flex md:flex-col md:flex-1 md:h-full md:min-h-0 md:gap-4 w-full">
       {/* Floating Toolbar for Selected Actions */}
       {Object.keys(rowSelection).length > 0 && showToolbar && (
-        <div className="flex items-center justify-between p-2 bg-muted/50 rounded-md border border-border/50 animate-in fade-in slide-in-from-bottom-2">
+        <div className={cn(
+          "flex items-center justify-between p-2 bg-muted/50 rounded-md border border-border/50 animate-in fade-in slide-in-from-bottom-2",
+          flush ? "mx-6 mt-4" : ""
+        )}>
           <span className="text-sm font-medium px-2 text-primary">
             {Object.keys(rowSelection).length} Selected
           </span>
@@ -95,7 +100,10 @@ export function DataTable<TData, TValue>({
         </div>
       )}
 
-      <div className="rounded-md border bg-card overflow-x-auto md:flex-1 md:h-full md:overflow-y-auto w-full relative">
+      <div className={cn(
+        "overflow-x-auto md:flex-1 md:h-full md:overflow-y-auto w-full relative",
+        flush ? "" : "rounded-md border bg-card"
+      )}>
         <table className="min-w-max md:min-w-full w-full caption-bottom text-sm">
           <TableHeader className="border-b border-border sticky top-0 z-20 shadow-sm">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -167,7 +175,10 @@ export function DataTable<TData, TValue>({
         </table>
       </div>
 
-      <div className="flex items-center justify-between md:mt-auto pt-1">
+      <div className={cn(
+        "flex items-center justify-between md:mt-auto",
+        flush ? "px-6 py-4 border-t border-border/40" : "pt-1"
+      )}>
         <div className="text-sm text-muted-foreground">
           Showing{" "}
           {table.getFilteredRowModel().rows.length > 0

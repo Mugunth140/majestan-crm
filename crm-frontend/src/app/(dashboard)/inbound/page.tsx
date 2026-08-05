@@ -425,7 +425,7 @@ export default function InboundPage() {
         </div>
 
         {activeTab === "Action Required" && (
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 px-4 sm:px-6 pt-5 min-h-[60px] animate-in slide-in-from-top-2 fade-in duration-200">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 px-4 sm:px-6 py-4 border-b border-border/40 animate-in slide-in-from-top-2 fade-in duration-200">
             <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0 scrollbar-hide">
               {actionFilters.map((filter) => {
                 const isActive = actionFilter === filter;
@@ -474,9 +474,10 @@ export default function InboundPage() {
           </div>
         )}
 
-        <div className="p-0 sm:p-6 w-full max-w-full overflow-x-hidden">
+        <div className="w-full">
           {isLoading ? <TableSkeleton /> : (
             <DataTable 
+              flush
               columns={columns} 
               data={displayedInbounds} 
               showToolbar={true} 

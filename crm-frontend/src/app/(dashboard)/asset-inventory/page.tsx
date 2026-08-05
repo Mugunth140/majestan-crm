@@ -263,8 +263,9 @@ export default function AssetInventoryPage() {
             </Link>
           </div>
         </div>
-        <div className="p-0 sm:p-6">
+        <div className="w-full">
           <DataTable
+            flush
             columns={columns}
             data={filteredAssets}
             showToolbar={true}
