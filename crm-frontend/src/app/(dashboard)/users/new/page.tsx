@@ -45,8 +45,8 @@ function UserFormContent() {
     const fetchMasterData = async () => {
       try {
         const [rolesRes, deptRes] = await Promise.all([
-          fetch(API_URL + "/roles"),
-          fetch(API_URL + "/departments"),
+          apiFetch(API_URL + "/roles"),
+          apiFetch(API_URL + "/departments"),
         ]);
         const rolesData = await rolesRes.json();
         const deptData = await deptRes.json();
@@ -161,7 +161,7 @@ function UserFormContent() {
   if (isLoading) return <div className="p-10 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#0052FF]" /></div>;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-20">
+    <div className="max-w-4xl mx-auto space-y-6 pb-20 px-2.5 md:px-0 mt-2 md:mt-0 mb-20 md:mb-0">
       <MobileHeader title={editId ? "Edit User" : "Add User"} showBack />
       <div className="hidden md:flex items-center gap-4">
         <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" onClick={() => router.push("/users")}>
@@ -315,8 +315,8 @@ function UserFormContent() {
         </div>
 
         <div className="flex justify-end pt-8 mt-10 border-t border-border/50">
-          <Button type="button" variant="ghost" className="mr-4 h-12 px-6 rounded-xl font-medium" onClick={() => router.push("/users")}>Cancel</Button>
-          <Button type="submit" disabled={isSubmitting} className="bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-lg px-8 rounded-xl font-bold gap-2 h-12 text-[15px]">
+          <Button type="button" variant="ghost" className="mr-4 h-12 px-6 rounded-xl font-medium w-full sm:w-auto" onClick={() => router.push("/users")}>Cancel</Button>
+          <Button type="submit" disabled={isSubmitting} className="bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-lg px-8 rounded-xl font-bold gap-2 h-12 text-[15px] w-full sm:w-auto">
             {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
             Save User
           </Button>

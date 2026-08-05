@@ -176,7 +176,7 @@ function InboundForm() {
 
   useEffect(() => {
     if (editId) {
-      fetch(API_URL + "/inbounds/" + editId)
+      apiFetch(API_URL + "/inbounds/" + editId)
         .then((res) => res.json())
         .then((result) => {
           if (result) {
@@ -345,7 +345,7 @@ function InboundForm() {
   const showRentalBrokerage = selectedPurpose === 'Rent' || selectedPurpose === 'Lease';
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="max-w-5xl mx-auto space-y-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500 px-2.5 md:px-0 mt-2 md:mt-0 mb-20 md:mb-0">
       <MobileHeader title={editId ? "Edit Inbound" : "Add Inbound"} showBack />
       <div className="hidden md:flex items-center justify-between pr-[150px] min-h-[48px]">
         <div className="flex items-center gap-4">
@@ -760,11 +760,11 @@ function InboundForm() {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex justify-end gap-4 pt-4">
-          <Button type="button" variant="ghost" className="h-12 px-8 rounded-xl font-medium text-[15px]" onClick={() => router.push("/inbound")} disabled={isSubmitting}>
+        <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 sm:gap-4 pt-4 pb-4 md:pb-0">
+          <Button type="button" variant="ghost" className="h-12 px-8 rounded-xl font-medium text-[15px] w-full sm:w-auto" onClick={() => router.push("/inbound")} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting} className="h-12 px-10 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-lg font-semibold flex items-center gap-2 text-[15px] active:scale-[0.97]">
+          <Button type="submit" disabled={isSubmitting} className="h-12 px-10 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-lg font-semibold flex items-center gap-2 text-[15px] active:scale-[0.97] w-full sm:w-auto">
             {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : (editId ? <Save size={18} /> : <CheckCircle2 size={18} />)}
             {isSubmitting ? "Saving..." : (editId ? "Update Inbound" : "Create Inbound")}
           </Button>

@@ -159,7 +159,7 @@ function AssetForm() {
   useEffect(() => {
     if (editId) {
       setIsFetchingData(true);
-      fetch(`${API_URL}/assets/${editId}`)
+      apiFetch(`${API_URL}/assets/${editId}`)
         .then((res) => res.json())
         .then((data) => {
           if (data.success) {
@@ -324,7 +324,7 @@ function AssetForm() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="max-w-5xl mx-auto space-y-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500 px-2.5 md:px-0 mt-2 md:mt-0 mb-20 md:mb-0">
       <MobileHeader title={editId ? "Edit Asset" : "Add Asset"} showBack />
       <div className="hidden md:flex items-center justify-between pr-[150px] min-h-[48px]">
         <div className="flex items-center gap-4">
