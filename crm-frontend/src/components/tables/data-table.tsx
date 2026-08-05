@@ -104,7 +104,7 @@ export function DataTable<TData, TValue>({
         "overflow-x-auto md:flex-1 md:h-full md:overflow-y-auto w-full relative",
         flush ? "" : "rounded-md border bg-card"
       )}>
-        <table className="min-w-max md:min-w-full w-full caption-bottom text-sm">
+        <table className="min-w-max w-full caption-bottom text-sm">
           <TableHeader className="border-b border-border sticky top-0 z-20 shadow-sm">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent border-none">

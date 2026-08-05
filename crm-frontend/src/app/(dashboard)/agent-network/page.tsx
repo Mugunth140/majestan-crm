@@ -228,7 +228,7 @@ export default function AgentsPage() {
       enableSorting: false,
       enableHiding: false,
     },
-    { accessorKey: "sno", header: "#", meta: { hideOnMobile: true } },
+    { accessorKey: "sno", header: "#",  },
     {
       accessorKey: "id",
       header: "ID",
@@ -253,19 +253,19 @@ export default function AgentsPage() {
     {
       accessorKey: "company_name",
       header: "Company",
-      meta: { hideOnMobile: true },
+      
       cell: ({ row }) => <span className="text-foreground/80 whitespace-nowrap">{row.original.company_name || "\u2014"}</span>,
     },
     {
       accessorKey: "mobile",
       header: "Mobile",
-      meta: { hideOnMobile: true },
+      
       cell: ({ row }) => <span className="font-mono text-muted-foreground whitespace-nowrap">{row.original.mobile}</span>,
     },
     {
       accessorKey: "partner_type",
       header: "Partner Type",
-      meta: { hideOnMobile: true },
+      
       cell: ({ row }) => <span className="capitalize whitespace-nowrap">{row.original.partner_type ? row.original.partner_type.replace(/_/g, " ") : "\u2014"}</span>,
     },
     {

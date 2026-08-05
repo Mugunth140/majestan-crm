@@ -21,6 +21,8 @@ import { useRouter } from "next/navigation";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { Device } from "@/components/shared/device";
+import { cn } from "@/lib/utils";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -244,7 +246,7 @@ export default function InboundPage() {
     { 
       id: "sno", 
       header: "#",
-      meta: { hideOnMobile: true },
+      
       cell: ({ row }) => <span>{row.index + 1}</span>
     },
     {
@@ -259,7 +261,7 @@ export default function InboundPage() {
     { 
       accessorKey: "date", 
       header: "Date",
-      meta: { hideOnMobile: true },
+      
       cell: ({ row }) => {
         const d = row.original.createdAt || row.original.created_at || row.original.date;
         return <span>{d ? new Date(d).toLocaleDateString() : "-"}</span>;
@@ -278,13 +280,13 @@ export default function InboundPage() {
     {
       id: "mobile",
       header: "Mobile Number",
-      meta: { hideOnMobile: true },
+      
       cell: ({ row }) => <span>{row.original.mobile_number || row.original.owner_mobile || "-"}</span>,
     },
     {
       id: "address",
       header: "Address",
-      meta: { hideOnMobile: true },
+      
       cell: ({ row }) => {
         const addr = row.original.address || row.original.location || "";
         if (!addr) return <span>-</span>;
@@ -324,160 +326,281 @@ export default function InboundPage() {
 
   const clearFilters = () => setFilters({ dateFrom: "", dateTo: "", category: "", type: "", status: "" });
 
-  return (
-    <div className="flex flex-col space-y-6">
-      <MobileHeader title="Inbound" />
-      <div className="hidden md:flex h-[48px] items-center justify-between pr-[150px]">
-        <h1 className="text-[28px] font-bold tracking-tight">Inbound Dashboard</h1>
-
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={fetchInbounds} title="Refresh">
-            <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+  const renderFilterPopover = (isMobile: boolean) => (
+    <Popover>
+      <PopoverTrigger render={
+        isMobile ? (
+          <Button variant="outline" size="icon" className="h-12 w-12 rounded-2xl bg-black/5 dark:bg-white/10 border-transparent relative shrink-0">
+            <Filter className="h-5 w-5 text-foreground" />
+            {activeFiltersCount > 0 && (
+              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#0052FF] border-2 border-background text-white text-[10px] font-bold flex items-center justify-center">
+                {activeFiltersCount}
+              </span>
+            )}
           </Button>
+        ) : (
+          <Button variant="outline" className="h-10 rounded-xl bg-muted/30 border-border/60 px-4 flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium text-[13.5px]">Filters</span>
+            {activeFiltersCount > 0 && (
+              <Badge className="ml-1 bg-[#0052FF] text-white px-1.5 py-0.5 rounded-md text-[10px]">{activeFiltersCount}</Badge>
+            )}
+          </Button>
+        )
+      } />
+      <PopoverContent align={isMobile ? "end" : "start"} className="w-[calc(100vw-32px)] sm:w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60 mx-4 sm:mx-0">
+        <div className="flex items-center justify-between p-4 border-b bg-muted/10">
+          <h4 className="font-semibold text-foreground text-sm">Filter Inbound</h4>
+          {activeFiltersCount > 0 && (
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 text-xs text-muted-foreground hover:text-red-600">
+              Clear All
+            </Button>
+          )}
+        </div>
+        <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Created From</label>
+            <Input type="date" value={filters.dateFrom} onChange={e => setFilters(f => ({...f, dateFrom: e.target.value}))} className="h-9 rounded-lg text-sm" />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Created To</label>
+            <Input type="date" value={filters.dateTo} onChange={e => setFilters(f => ({...f, dateTo: e.target.value}))} className="h-9 rounded-lg text-sm" />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Status</label>
+            <FormSelect name="status" options={uniqueStatuses.map(s => ({label: s, value: s}))} value={filters.status} onValueChange={v => setFilters(f => ({...f, status: v || ""}))} placeholder="All Statuses" />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Property Category</label>
+            <FormSelect name="category" options={uniqueCategories.map(s => ({label: s, value: s}))} value={filters.category} onValueChange={v => setFilters(f => ({...f, category: v || ""}))} placeholder="All Categories" />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Property Type</label>
+            <FormSelect name="type" options={uniqueTypes.map(s => ({label: s, value: s}))} value={filters.type} onValueChange={v => setFilters(f => ({...f, type: v || ""}))} placeholder="All Types" />
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 
-          <Link href="/inbound/new" className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
-            <Plus size={18} />
-            Add New Inbound
-          </Link>
+  const mobileFilters = (
+    <div className="px-4 pb-2 space-y-4">
+      {/* iOS Search Bar & Filter */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Input 
+            placeholder="Search Inbound..." 
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="pl-11 h-12 bg-black/5 dark:bg-white/10 border-transparent rounded-2xl text-[16px] focus-visible:ring-1 focus-visible:ring-primary shadow-none"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery("")} className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 bg-muted-foreground/20 rounded-full text-foreground hover:bg-muted-foreground/30">
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+        {renderFilterPopover(true)}
+      </div>
+
+      {/* Pill Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 -mx-4 px-4">
+        {tabs.map(tab => {
+          const isActive = activeTab === tab;
+          return (
+            <button 
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={cn(
+                "px-5 h-10 rounded-full text-[14px] font-semibold whitespace-nowrap transition-all border active:scale-95",
+                isActive ? "bg-foreground text-background border-foreground shadow-sm" : "bg-card text-muted-foreground border-border hover:bg-muted"
+              )}
+            >
+              {tab}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Action Required Row */}
+      {activeTab === "Action Required" && (
+        <div className="flex flex-col gap-3 -mx-4 px-4">
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
+            {actionFilters.map((filter) => {
+              const isActive = actionFilter === filter;
+              let activeClass = "bg-primary/10 text-primary border-primary/30";
+              if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
+              else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
+              else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
+              return (
+                <button
+                  key={filter}
+                  className={"h-9 shrink-0 flex items-center justify-center cursor-pointer px-4 rounded-full text-[13px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-card text-muted-foreground border-border hover:bg-muted hover:text-foreground")}
+                  onClick={() => setActionFilter(filter)}
+                >
+                  {filter}
+                </button>
+              );
+            })}
+          </div>
+          
+          <div className={`flex items-center h-10 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "hidden opacity-0 pointer-events-none"}`}>
+            {[
+              { id: "pending", label: "Follow Up" },
+              { id: "completed", label: "Followed Up" }
+            ].map((mode) => {
+              const isSelected = todayViewMode === mode.id;
+              return (
+                <button
+                  key={mode.id}
+                  onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
+                  className={`flex-1 relative h-full flex items-center justify-center rounded-full text-[13px] font-bold transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  {isSelected && (
+                    <motion.div
+                      layoutId="todayToggleBgMobile"
+                      className="absolute inset-0 bg-[#0052FF] shadow-md rounded-full"
+                      initial={false}
+                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                      style={{ zIndex: -1 }}
+                    />
+                  )}
+                  <span className="relative z-10">{mode.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const desktopFilters = (
+    <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
+      {/* Tabs Row */}
+      <div className="flex items-center justify-between px-6 border-b bg-muted/10 pt-4 gap-4">
+        <div className="flex items-center gap-8 overflow-x-auto scrollbar-hide relative">
+          {tabs.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={"relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " + (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")}
+            >
+              {tab}
+              {activeTab === tab && (
+                <motion.div layoutId="desktopActiveTabUnderline" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full" initial={false} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
+              )}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-end px-4 sm:px-6 border-b bg-muted/10 pt-4 gap-3 sm:gap-6">
-          {/* Tabs */}
-          <div className="flex items-center justify-start gap-6 sm:gap-8 overflow-x-auto scrollbar-hide relative shrink-0">
-            {tabs.map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={"relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " + (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")}
-              >
-                {tab}
-                {activeTab === tab && (
-                  <motion.div layoutId="activeTabUnderline" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full" initial={false} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Search & Filters — pushed to the right */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 pb-3 sm:pb-4 ml-auto w-full sm:w-auto">
-            <div className="relative w-full sm:w-64 xl:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search Property ID, Type..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="pl-9 w-full h-10 bg-background rounded-full border-border/60 shadow-sm text-[13.5px]"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Popover>
-                <PopoverTrigger render={
-                  <Button variant="outline" className="h-10 rounded-full bg-background border-border/60 shadow-sm px-4 flex items-center gap-2">
-                    <Filter className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium text-[13.5px]">Filters</span>
-                    {activeFiltersCount > 0 && (
-                      <Badge className="ml-1 bg-[#0052FF] text-white px-1.5 py-0.5 rounded-md text-[10px]">{activeFiltersCount}</Badge>
-                    )}
-                  </Button>
-                } />
-                <PopoverContent align="end" className="w-[calc(100vw-32px)] sm:w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60 mx-4 sm:mx-0">
-                  <div className="flex items-center justify-between p-4 border-b bg-muted/10">
-                    <h4 className="font-semibold text-foreground text-sm">Filter Inbound</h4>
-                    {activeFiltersCount > 0 && (
-                      <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 text-xs text-muted-foreground hover:text-red-600">
-                        Clear All
-                      </Button>
-                    )}
-                  </div>
-                  <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Created From</label>
-                      <Input type="date" value={filters.dateFrom} onChange={e => setFilters(f => ({...f, dateFrom: e.target.value}))} className="h-9 rounded-lg text-sm" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Created To</label>
-                      <Input type="date" value={filters.dateTo} onChange={e => setFilters(f => ({...f, dateTo: e.target.value}))} className="h-9 rounded-lg text-sm" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Status</label>
-                      <FormSelect name="status" options={uniqueStatuses.map(s => ({label: s, value: s}))} value={filters.status} onValueChange={v => setFilters(f => ({...f, status: v || ""}))} placeholder="All Statuses" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Property Category</label>
-                      <FormSelect name="category" options={uniqueCategories.map(s => ({label: s, value: s}))} value={filters.category} onValueChange={v => setFilters(f => ({...f, category: v || ""}))} placeholder="All Categories" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Property Type</label>
-                      <FormSelect name="type" options={uniqueTypes.map(s => ({label: s, value: s}))} value={filters.type} onValueChange={v => setFilters(f => ({...f, type: v || ""}))} placeholder="All Types" />
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-              {(searchQuery || activeFiltersCount > 0) && (
-                <Button variant="ghost" size="icon" onClick={() => { setSearchQuery(""); clearFilters(); }} className="h-10 w-10 shrink-0 rounded-full text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors" title="Clear Search & Filters">
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          </div>
+      {/* Search & Filters Row */}
+      <div className="flex flex-wrap items-center gap-3 px-6 py-4 border-b bg-background">
+        <div className="relative flex-1 min-w-[240px] max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Search Property ID, Type..." 
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="pl-9 h-10 bg-background rounded-xl border-border/60 shadow-sm text-[13.5px] focus-visible:ring-1 focus-visible:ring-primary"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-muted-foreground/10 rounded-full text-foreground hover:bg-muted-foreground/20">
+              <X className="h-3 w-3" />
+            </button>
+          )}
         </div>
 
-        {activeTab === "Action Required" && (
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 px-4 sm:px-6 py-4 border-b border-border/40 animate-in slide-in-from-top-2 fade-in duration-200">
-            <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0 scrollbar-hide">
-              {actionFilters.map((filter) => {
-                const isActive = actionFilter === filter;
-                let activeClass = "bg-primary/10 text-primary border-primary/30";
-                if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
-                else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
-                else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
-                return (
-                  <button
-                    key={filter}
-                    className={"h-10 shrink-0 flex items-center justify-center cursor-pointer px-4 sm:px-5 rounded-full text-[13px] sm:text-[13.5px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
-                    onClick={() => setActionFilter(filter)}
-                  >
-                    {filter}
-                  </button>
-                );
-              })}
-            </div>
-            
-            <div className={`sm:ml-auto w-full sm:w-auto flex items-center h-10 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "hidden sm:flex opacity-0 pointer-events-none"}`}>
-              {[
-                { id: "pending", label: "Follow Up" },
-                { id: "completed", label: "Followed Up" }
-              ].map((mode) => {
-                const isSelected = todayViewMode === mode.id;
-                return (
-                  <button
-                    key={mode.id}
-                    onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
-                    className={`relative h-full flex items-center px-4 rounded-full text-[13px] font-bold transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
-                  >
-                    {isSelected && (
-                      <motion.div
-                        layoutId="todayToggleBg"
-                        className="absolute inset-0 bg-[#0052FF] shadow-md rounded-full"
-                        initial={false}
-                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                        style={{ zIndex: -1 }}
-                      />
-                    )}
-                    <span className="relative z-10">{mode.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {renderFilterPopover(false)}
+        </div>
+      </div>
 
-        <div className="w-full">
+      {/* Action Required Row */}
+      {activeTab === "Action Required" && (
+        <div className="flex items-center gap-4 px-6 py-3 bg-muted/5 border-b border-border/40 animate-in slide-in-from-top-2 fade-in duration-200">
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+            {actionFilters.map((filter) => {
+              const isActive = actionFilter === filter;
+              let activeClass = "bg-primary/10 text-primary border-primary/30";
+              if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
+              else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
+              else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
+              return (
+                <button
+                  key={filter}
+                  className={"h-9 shrink-0 flex items-center justify-center cursor-pointer px-4 rounded-full text-[13px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
+                  onClick={() => setActionFilter(filter)}
+                >
+                  {filter}
+                </button>
+              );
+            })}
+          </div>
+          
+          <div className={`flex items-center h-9 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "hidden opacity-0 pointer-events-none"}`}>
+            {[
+              { id: "pending", label: "Follow Up" },
+              { id: "completed", label: "Followed Up" }
+            ].map((mode) => {
+              const isSelected = todayViewMode === mode.id;
+              return (
+                <button
+                  key={mode.id}
+                  onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
+                  className={`relative h-full flex items-center px-4 rounded-full text-[12px] font-bold transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  {isSelected && (
+                    <motion.div
+                      layoutId="todayToggleBgDesktop"
+                      className="absolute inset-0 bg-[#0052FF] shadow-md rounded-full"
+                      initial={false}
+                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                      style={{ zIndex: -1 }}
+                    />
+                  )}
+                  <span className="relative z-10">{mode.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+
+  return (
+    <>
+      <MobileHeader title="Inbound Dashboard" />
+      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:flex-1 md:h-full md:min-h-0">
+        <Device
+          mobile={null}
+          desktop={
+            <div className="flex h-[48px] items-center justify-between pr-[150px]">
+              <h1 className="text-[28px] font-bold tracking-tight">Inbound Dashboard</h1>
+
+              <div className="flex items-center gap-3">
+                <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={fetchInbounds} title="Refresh">
+                  <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+                </Button>
+
+                <Link href="/inbound/new" className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
+                  <Plus size={18} />
+                  Add New Inbound
+                </Link>
+              </div>
+            </div>
+          }
+        />
+        
+        <Device mobile={mobileFilters} desktop={desktopFilters} />
+        
+        <div className="w-full px-4 md:px-0 pt-2 pb-6 md:flex-1 md:h-full md:flex md:flex-col md:min-h-0">
           {isLoading ? <TableSkeleton /> : (
             <DataTable 
-              flush
               columns={columns} 
               data={displayedInbounds} 
               showToolbar={true} 
@@ -524,6 +647,6 @@ export default function InboundPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

@@ -182,7 +182,7 @@ export default function AssetInventoryPage() {
     {
       id: "extent",
       header: "Extent",
-      meta: { hideOnMobile: true },
+      
       cell: ({ row }) => {
         const feat = row.original.feature;
         const extent = feat?.extent ?? null;
@@ -192,7 +192,7 @@ export default function AssetInventoryPage() {
     {
       id: "budget",
       header: "Budget",
-      meta: { hideOnMobile: true },
+      
       cell: ({ row }) => {
         const fin = row.original.financials;
         return <div className="text-muted-foreground">{formatBudget(fin?.expectation)}</div>;
@@ -201,7 +201,7 @@ export default function AssetInventoryPage() {
     {
       id: "total_price",
       header: "Total Price",
-      meta: { hideOnMobile: true },
+      
       cell: ({ row }) => {
         const fin = row.original.financials;
         return <div className="text-muted-foreground">{formatTotalPrice(fin?.land_price)}</div>;

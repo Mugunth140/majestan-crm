@@ -220,7 +220,7 @@ export default function HrPage() {
       enableSorting: false,
       enableHiding: false,
     },
-    { accessorKey: "sno", header: "#", meta: { hideOnMobile: true } },
+    { accessorKey: "sno", header: "#",  },
     {
       accessorKey: "formattedId",
       header: "Candidate ID",
@@ -231,10 +231,10 @@ export default function HrPage() {
       ),
     },
     { accessorKey: "name", header: "Candidate Name" },
-    { accessorKey: "mobile", header: "Mobile Number", meta: { hideOnMobile: true } },
-    { accessorKey: "department", header: "Department", meta: { hideOnMobile: true } },
-    { accessorKey: "position", header: "Position", meta: { hideOnMobile: true } },
-    { accessorKey: "experience", header: "Experience", meta: { hideOnMobile: true } },
+    { accessorKey: "mobile", header: "Mobile Number",  },
+    { accessorKey: "department", header: "Department",  },
+    { accessorKey: "position", header: "Position",  },
+    { accessorKey: "experience", header: "Experience",  },
     {
       accessorKey: "status",
       header: "Status",
