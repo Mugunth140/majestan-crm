@@ -7,7 +7,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Loader2, MapPin, Building2, Briefcase, FileText, IndianRupee, Image as ImageIcon, Map, Layers, RefreshCw, FileImage } from "lucide-react";
+import { ArrowLeft, Loader2, MapPin, Building2, Briefcase, FileText, IndianRupee, Image as ImageIcon, Map, Layers, RefreshCw, FileImage, Edit } from "lucide-react";
+import { MobileHeader } from "@/components/layout/mobile-header";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -74,8 +75,11 @@ export default function AssetViewPage() {
   return (
     <div className="flex flex-col md:h-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
       
-      {/* Header */}
-      <div className="flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
+      {/* ── Mobile Header ── */}
+      <MobileHeader title={`Asset #${asset.id}`} showBack />
+
+      {/* ── Header (desktop only) ── */}
+      <div className="hidden md:flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shrink-0" onClick={() => router.push("/asset-inventory")}>
             <ArrowLeft className="h-4 w-4 text-muted-foreground" />
@@ -99,7 +103,23 @@ export default function AssetViewPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+      {/* ── Mobile Summary Strip ── */}
+      <div className="md:hidden flex flex-col gap-3 px-4 pb-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge className="bg-blue-100 text-blue-800 border-blue-200">{asset.status || "New"}</Badge>
+          <span className="text-sm font-semibold text-muted-foreground">{asset.owner_name}</span>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Button variant="outline" onClick={() => router.push(`/asset-inventory/new?edit=${asset.id}`)} className="h-11 rounded-xl text-foreground font-semibold border-border/60">
+            <Edit className="w-4 h-4 mr-2 text-muted-foreground" /> Edit
+          </Button>
+          <Button variant="outline" onClick={fetchAsset} className="h-11 rounded-xl border-border/60 font-semibold text-foreground">
+            <RefreshCw className="w-4 h-4 mr-2 text-muted-foreground" /> Refresh
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto space-y-6 px-4 lg:px-0 lg:pr-2">
         
         {/* Core Details & Financials */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

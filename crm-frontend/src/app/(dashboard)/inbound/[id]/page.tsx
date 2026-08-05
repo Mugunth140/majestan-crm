@@ -20,11 +20,12 @@ import dynamic from "next/dynamic";
 const FollowUpPanel = dynamic(() => import("@/components/shared/follow-up-panel").then(mod => mod.FollowUpPanel), { ssr: false });
 const ContactModal = dynamic(() => import("@/components/shared/contact-modal").then(mod => mod.ContactModal), { ssr: false });
 
+import { MobileHeader } from "@/components/layout/mobile-header";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft, Loader2, User, Phone, MapPin, Building2,
   Briefcase, Mail, MessageSquare, Plus, ArrowUpRight,
-  Clock, Send, RefreshCw, History, Edit, Shield, CheckCircle, Image as ImageIcon
+  Clock, Send, RefreshCw, History, Edit, Shield, CheckCircle, Image as ImageIcon, ChevronLeft
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -395,8 +396,11 @@ export default function InboundViewPage() {
   return (
     <div className="flex flex-col md:h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
       
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between pr-4 sm:pr-[150px] min-h-[48px] mb-6 shrink-0">
+      {/* ── Mobile Header ── */}
+      <MobileHeader title={inbound.property_id || `Inbound #${inbound.id}`} showBack />
+
+      {/* ── Header (desktop only) ── */}
+      <div className="hidden md:flex items-center justify-between pr-4 sm:pr-[150px] min-h-[48px] mb-6 shrink-0">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shrink-0" onClick={() => router.push("/inbound")}>
             <ArrowLeft className="h-4 w-4 text-muted-foreground" />
@@ -422,8 +426,24 @@ export default function InboundViewPage() {
         </div>
       </div>
 
+      {/* ── Mobile Summary Strip ── */}
+      <div className="md:hidden flex flex-col gap-3 px-4 pb-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge className={`font-medium px-2.5 py-0.5 shadow-sm border ${badgeCls}`}>{statusName}</Badge>
+          <span className="text-sm font-semibold text-muted-foreground">{inbound.property_id || `#${inbound.id}`}</span>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Button variant="outline" onClick={() => router.push(`/inbound/new?edit=${inbound.id}`)} className="h-11 rounded-xl text-foreground font-semibold border-border/60">
+            <Edit className="w-4 h-4 mr-2 text-muted-foreground" /> Edit
+          </Button>
+          <Button variant="outline" onClick={() => fetchInbound(true)} className="h-11 rounded-xl border-border/60 font-semibold text-foreground">
+            <RefreshCw className={`w-4 h-4 mr-2 text-muted-foreground ${isRefreshing ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+        </div>
+      </div>
+
       {/* ── Main Layout ── */}
-      <div className="flex-1 md:overflow-y-auto min-h-0 pb-6 pr-0 sm:pr-2 space-y-6">
+      <div className="flex-1 md:overflow-y-auto min-h-0 pb-6 space-y-6 px-4 lg:px-0 lg:pr-2">
 
         {/* ── Row 1: Basic Info (2/3) + Quick Actions (1/3) ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -825,8 +845,20 @@ export default function InboundViewPage() {
 
       {/* ── Follow-Up History Slider (Sheet) ── */}
       <Sheet open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-        <SheetContent side="right" className="w-[100vw] sm:w-[450px] !max-w-[100vw] sm:!max-w-[450px] p-0 flex flex-col border-l">
-          <SheetHeader className="p-6 border-b shrink-0">
+        <SheetContent side="right" className="!w-full sm:!w-[450px] sm:!max-w-[450px] p-0 flex flex-col border-l [&>button[data-slot='sheet-close']]:hidden sm:[&>button[data-slot='sheet-close']]:flex">
+          {/* Mobile back header */}
+          <div className="md:hidden flex flex-col shrink-0 bg-background/90 backdrop-blur-xl border-b z-10">
+            <div className="h-[env(safe-area-inset-top)] w-full" />
+            <div className="flex items-center justify-between px-4 h-14">
+              <button onClick={() => setIsHistoryOpen(false)} className="flex items-center text-[#007AFF] dark:text-[#0A84FF] active:opacity-70 -ml-2 shrink-0">
+                <ChevronLeft className="w-[28px] h-[28px]" strokeWidth={2.5} />
+                <span className="text-[17px] font-medium tracking-tight">Back</span>
+              </button>
+              <span className="absolute inset-x-0 text-center pointer-events-none text-[17px] font-semibold tracking-tight text-foreground truncate px-20">Timeline</span>
+              <div className="w-10 shrink-0" />
+            </div>
+          </div>
+          <SheetHeader className="hidden md:block p-6 border-b shrink-0">
             <SheetTitle className="text-lg">Follow Up Timeline {followUps.length > 0 && `(${followUps.length})`}</SheetTitle>
           </SheetHeader>
           <div className="flex-1 overflow-hidden relative">

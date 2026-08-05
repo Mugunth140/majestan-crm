@@ -12,9 +12,10 @@ import { FormSelect } from "@/components/shared/form-select";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { ArrowLeft, User, Phone, Mail, MapPin, Plus, FileText, Briefcase, Clock, Calendar, RefreshCw, Save, History, Shield, Loader2, CheckCircle } from "lucide-react";
+import { ArrowLeft, User, Phone, Mail, MapPin, Plus, FileText, Briefcase, Clock, Calendar, RefreshCw, Save, History, Shield, Loader2, CheckCircle, Edit, ChevronLeft } from "lucide-react";
 import dynamic from "next/dynamic";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { MobileHeader } from "@/components/layout/mobile-header";
 
 const FollowUpPanel = dynamic(() => import("@/components/shared/follow-up-panel").then(mod => mod.FollowUpPanel), { ssr: false });
 
@@ -206,8 +207,11 @@ export default function HrDetail() {
   return (
     <div className="flex flex-col md:h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
       
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
+      {/* ── Mobile Header ── */}
+      <MobileHeader title={candidate.name || "Candidate"} showBack />
+
+      {/* ── Header (desktop only) ── */}
+      <div className="hidden md:flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shrink-0" onClick={() => router.push("/hr")}>
             <ArrowLeft className="h-4 w-4 text-muted-foreground" />
@@ -229,8 +233,24 @@ export default function HrDetail() {
         </div>
       </div>
 
+      {/* ── Mobile Summary Strip ── */}
+      <div className="md:hidden flex flex-col gap-3 px-4 pb-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge className={`font-medium px-2.5 py-0.5 shadow-sm border ${badgeCls}`}>{selectedStatus || candidate.status}</Badge>
+          <span className="text-sm font-semibold text-muted-foreground">{formattedId}</span>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Button variant="outline" onClick={() => router.push(`/hr/new?edit=${candidate.id}`)} className="h-11 rounded-xl text-foreground font-semibold border-border/60">
+            <Edit className="w-4 h-4 mr-2 text-muted-foreground" /> Edit
+          </Button>
+          <Button variant="outline" onClick={fetchCandidate} className="h-11 rounded-xl border-border/60 font-semibold text-foreground">
+            <RefreshCw className="w-4 h-4 mr-2 text-muted-foreground" /> Refresh
+          </Button>
+        </div>
+      </div>
+
             {/* ── Main Layout ── */}
-      <div className="flex-1 md:overflow-y-auto min-h-0 pb-6 pr-2 space-y-6">
+      <div className="flex-1 md:overflow-y-auto min-h-0 pb-6 space-y-6 px-4 lg:px-0 lg:pr-2">
         
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Left Column */}
@@ -241,7 +261,7 @@ export default function HrDetail() {
               <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground" /> Candidate Information
               </h3>
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-y-6 gap-x-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-6 gap-x-6">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Mobile</p>
                   <p className="text-[14px] font-medium text-foreground flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-muted-foreground" /> {candidate.mobile || "—"}</p>
@@ -307,7 +327,7 @@ export default function HrDetail() {
           <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
             <FileText className="h-4 w-4 text-muted-foreground" /> Documents
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="p-4 border rounded-xl bg-muted/10 space-y-3">
               <p className="text-sm font-semibold flex items-center gap-2"><FileText className="h-4 w-4 text-blue-500" /> Resume / CV</p>
               {candidate.resumeUrl ? (
@@ -428,7 +448,7 @@ export default function HrDetail() {
               <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
                 <Briefcase className="h-4 w-4 text-muted-foreground" /> Job Details
               </h3>
-              <div className="grid grid-cols-2 gap-y-6 gap-x-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-4">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Department</p>
                   <p className="text-[14px] font-medium">{candidate.department || "—"}</p>
@@ -483,8 +503,19 @@ export default function HrDetail() {
         </div>
 
       <Sheet open={isFollowUpOpen} onOpenChange={setIsFollowUpOpen}>
-        <SheetContent side="right" className="w-[450px] !max-w-[450px] p-0 flex flex-col border-l">
-          <div className="p-6 border-b shrink-0 bg-blue-50 dark:bg-blue-900/20">
+        <SheetContent side="right" className="!w-full sm:!w-[450px] sm:!max-w-[450px] p-0 flex flex-col border-l [&>button[data-slot='sheet-close']]:hidden sm:[&>button[data-slot='sheet-close']]:flex">
+          <div className="md:hidden flex flex-col shrink-0 bg-background/90 backdrop-blur-xl border-b z-10">
+            <div className="h-[env(safe-area-inset-top)] w-full" />
+            <div className="flex items-center justify-between px-4 h-14">
+              <button onClick={() => setIsFollowUpOpen(false)} className="flex items-center text-[#007AFF] dark:text-[#0A84FF] active:opacity-70 -ml-2 shrink-0">
+                <ChevronLeft className="w-[28px] h-[28px]" strokeWidth={2.5} />
+                <span className="text-[17px] font-medium tracking-tight">Back</span>
+              </button>
+              <span className="absolute inset-x-0 text-center pointer-events-none text-[17px] font-semibold tracking-tight text-foreground truncate px-20">Timeline</span>
+              <div className="w-10 shrink-0" />
+            </div>
+          </div>
+          <div className="hidden md:block p-6 border-b shrink-0 bg-blue-50 dark:bg-blue-900/20">
             <h2 className="text-lg font-bold text-[#0052FF] dark:text-blue-400">Follow Up Timeline</h2>
             <p className="text-sm text-muted-foreground mt-1">Review the history for {candidate.name}</p>
           </div>
