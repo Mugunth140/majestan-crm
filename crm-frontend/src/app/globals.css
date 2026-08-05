@@ -138,6 +138,8 @@
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* iOS PWA: html background fills safe-area zones; use card color to match mobile shell */
+    background-color: var(--card);
   }
   body {
     @apply bg-background text-foreground font-sans;
