@@ -17,6 +17,7 @@ import { apiFetch } from "@/lib/api-fetch";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { Device } from "@/components/shared/device";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -37,7 +38,6 @@ export default function HrPage() {
   const [candidates, setCandidates] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Layout states
   const [activeTab, setActiveTab] = useState("All Candidates");
   const [actionFilter, setActionFilter] = useState("Today");
   const [searchQuery, setSearchQuery] = useState("");
@@ -100,6 +100,10 @@ export default function HrPage() {
 
   useEffect(() => {
     fetchCandidates();
+    // Scroll to top on mount (mobile body scroll + desktop main scroll)
+    window.scrollTo(0, 0);
+    const main = document.querySelector("main");
+    if (main) main.scrollTop = 0;
   }, []);
 
   const displayedCandidates = useMemo(() => {
@@ -107,7 +111,7 @@ export default function HrPage() {
 
     if (debouncedSearchQuery.trim()) {
       const q = debouncedSearchQuery.toLowerCase();
-      filtered = filtered.filter(c => 
+      filtered = filtered.filter(c =>
         (c.name && c.name.toLowerCase().includes(q)) ||
         (c.formattedId && c.formattedId.toLowerCase().includes(q)) ||
         (c.mobile && c.mobile.includes(q)) ||
@@ -132,13 +136,10 @@ export default function HrPage() {
     if (activeTab === "Action Required") {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
-
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
-
       const actionStatuses = ["New Application", "Hold"];
 
       return filtered.filter(l => {
@@ -150,19 +151,15 @@ export default function HrPage() {
           d.setHours(0, 0, 0, 0);
           return d;
         };
-
         const fDate = parseLocal(l.nextFollowUpDate);
         const lDate = parseLocal(l.lastFollowedUpDate);
-
         let matchesTimeFilter = false;
-
         if (actionFilter === "Overdue") {
           matchesTimeFilter = !!(fDate && fDate < today);
         } else if (actionFilter === "Yesterday") {
           matchesTimeFilter = !!(lDate && lDate.getTime() === yesterday.getTime());
         } else if (actionFilter === "Today") {
           const isFollowedUpToday = !!(lDate && lDate.getTime() === today.getTime());
-          
           if (todayViewMode === "completed") {
             matchesTimeFilter = isFollowedUpToday;
           } else {
@@ -173,19 +170,12 @@ export default function HrPage() {
         } else if (actionFilter === "All Scheduled") {
           matchesTimeFilter = !!(fDate && fDate > tomorrow);
         }
-
         return matchesTimeFilter || (actionStatuses.includes(l.status) && !fDate);
       });
     }
 
-    if (activeTab === "Rejected") {
-      return filtered.filter(c => c.status === "Rejected");
-    }
-
-    if (activeTab === "All Candidates") {
-      return filtered.filter(c => c.status !== "Rejected");
-    }
-
+    if (activeTab === "Rejected") return filtered.filter(c => c.status === "Rejected");
+    if (activeTab === "All Candidates") return filtered.filter(c => c.status !== "Rejected");
     return filtered;
   }, [candidates, debouncedSearchQuery, filters, activeTab, actionFilter, todayViewMode]);
 
@@ -220,7 +210,7 @@ export default function HrPage() {
       enableSorting: false,
       enableHiding: false,
     },
-    { accessorKey: "sno", header: "#",  },
+    { accessorKey: "sno", header: "#" },
     {
       accessorKey: "formattedId",
       header: "Candidate ID",
@@ -231,10 +221,10 @@ export default function HrPage() {
       ),
     },
     { accessorKey: "name", header: "Candidate Name" },
-    { accessorKey: "mobile", header: "Mobile Number",  },
-    { accessorKey: "department", header: "Department",  },
-    { accessorKey: "position", header: "Position",  },
-    { accessorKey: "experience", header: "Experience",  },
+    { accessorKey: "mobile", header: "Mobile Number" },
+    { accessorKey: "department", header: "Department" },
+    { accessorKey: "position", header: "Position" },
+    { accessorKey: "experience", header: "Experience" },
     {
       accessorKey: "status",
       header: "Status",
@@ -246,176 +236,330 @@ export default function HrPage() {
     }
   ];
 
-  return (
-    <div className="flex flex-col space-y-6">
-      <MobileHeader title="HR" />
-      <div className="hidden md:flex h-[48px] items-center justify-between pr-[150px]">
-        <h1 className="text-[28px] font-bold tracking-tight">HR Dashboard</h1>
-
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={fetchCandidates} title="Refresh">
-            <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+  const renderFilterPopover = (isMobile: boolean) => (
+    <Popover>
+      <PopoverTrigger render={
+        isMobile ? (
+          <Button variant="outline" size="icon" className="h-12 w-12 rounded-2xl bg-black/5 dark:bg-white/10 border-transparent relative shrink-0">
+            <Filter className="h-5 w-5 text-foreground" />
+            {activeFiltersCount > 0 && (
+              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#0052FF] border-2 border-background text-white text-[10px] font-bold flex items-center justify-center">
+                {activeFiltersCount}
+              </span>
+            )}
           </Button>
+        ) : (
+          <Button variant="outline" className="h-10 rounded-xl bg-muted/30 border-border/60 px-4 flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium text-[13.5px]">Filters</span>
+            {activeFiltersCount > 0 && (
+              <Badge className="ml-1 bg-[#0052FF] text-white px-1.5 py-0.5 rounded-md text-[10px]">{activeFiltersCount}</Badge>
+            )}
+          </Button>
+        )
+      } />
+      <PopoverContent align={isMobile ? "end" : "start"} className="w-[calc(100vw-32px)] sm:w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60 mx-4 sm:mx-0">
+        <div className="flex items-center justify-between p-4 border-b bg-muted/10">
+          <h4 className="font-semibold text-foreground text-sm">Filter Candidates</h4>
+          {activeFiltersCount > 0 && (
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 text-xs text-muted-foreground hover:text-red-600">
+              Clear All
+            </Button>
+          )}
+        </div>
+        <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Created From</label>
+            <Input type="date" value={filters.dateFrom} onChange={e => setFilters(f => ({...f, dateFrom: e.target.value}))} className="h-9 rounded-lg text-sm" />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Created To</label>
+            <Input type="date" value={filters.dateTo} onChange={e => setFilters(f => ({...f, dateTo: e.target.value}))} className="h-9 rounded-lg text-sm" />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Status</label>
+            <FormSelect name="status" options={uniqueStatuses.map(s => ({label: s, value: s as string}))} value={filters.status} onValueChange={v => setFilters(f => ({...f, status: v || ""}))} placeholder="All Statuses" />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Department</label>
+            <FormSelect name="department" options={uniqueDepartments.map(s => ({label: s as string, value: s as string}))} value={filters.department} onValueChange={v => setFilters(f => ({...f, department: v || ""}))} placeholder="All Departments" />
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 
-          <Link href="/hr/new" className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
-            <Plus size={18} />
-            Add New Candidate
-          </Link>
+  const mobileFilters = (
+    <div className="px-4 pb-2 space-y-4">
+      {/* Search & Filter */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Input
+            placeholder="Search HR..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="pl-11 h-12 bg-black/5 dark:bg-white/10 border-transparent rounded-2xl text-[16px] focus-visible:ring-1 focus-visible:ring-primary shadow-none"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery("")} className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 bg-muted-foreground/20 rounded-full text-foreground hover:bg-muted-foreground/30">
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+        {renderFilterPopover(true)}
+      </div>
+
+      {/* Pill Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 -mx-4 px-4">
+        {tabs.map(tab => {
+          const isActive = activeTab === tab;
+          return (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-5 h-10 rounded-full text-[14px] font-semibold whitespace-nowrap transition-all border active:scale-95 ${isActive ? "bg-foreground text-background border-foreground shadow-sm" : "bg-card text-muted-foreground border-border hover:bg-muted"}`}
+            >
+              {tab}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Action Required sub-filters */}
+      {activeTab === "Action Required" && (
+        <div className="flex flex-col gap-3 -mx-4 px-4">
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
+            {actionFilters.map((filter) => {
+              const isActive = actionFilter === filter;
+              let activeClass = "bg-primary/10 text-primary border-primary/30";
+              if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
+              else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
+              else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
+              return (
+                <button
+                  key={filter}
+                  className={"h-9 shrink-0 flex items-center justify-center cursor-pointer px-4 rounded-full text-[13px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-card text-muted-foreground border-border hover:bg-muted hover:text-foreground")}
+                  onClick={() => setActionFilter(filter)}
+                >
+                  {filter}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className={`flex items-center h-10 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "hidden opacity-0 pointer-events-none"}`}>
+            {[
+              { id: "pending", label: "Follow Up" },
+              { id: "completed", label: "Followed Up" }
+            ].map((mode) => {
+              const isSelected = todayViewMode === mode.id;
+              return (
+                <button
+                  key={mode.id}
+                  onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
+                  className={`flex-1 relative h-full flex items-center justify-center rounded-full text-[13px] font-bold transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  {isSelected && (
+                    <motion.div
+                      layoutId="hrTodayToggleBgMobile"
+                      className="absolute inset-0 bg-[#0052FF] shadow-md rounded-full"
+                      initial={false}
+                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                      style={{ zIndex: -1 }}
+                    />
+                  )}
+                  <span className="relative z-10">{mode.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const desktopFilters = (
+    <div className="bg-card border rounded-xl overflow-hidden shadow-sm md:flex md:flex-col md:flex-1 md:min-h-0">
+      {/* Tabs Row */}
+      <div className="flex items-center justify-between px-6 border-b bg-muted/10 pt-4 gap-4">
+        <div className="flex items-center gap-8 overflow-x-auto scrollbar-hide relative">
+          {tabs.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={"relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " + (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")}
+            >
+              {tab}
+              {activeTab === tab && (
+                <motion.div layoutId="hrDesktopActiveTabUnderline" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full" initial={false} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Search & Filters */}
+        <div className="flex items-center gap-2 pb-4">
+          <div className="relative w-64 xl:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search ID, Name, Phone..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-9 h-10 bg-background rounded-xl border-border/60 shadow-sm text-[13.5px] focus-visible:ring-1 focus-visible:ring-primary"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-muted-foreground/10 rounded-full text-foreground hover:bg-muted-foreground/20">
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {renderFilterPopover(false)}
+          </div>
         </div>
       </div>
 
-      <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-end px-6 border-b bg-muted/10 pt-4 gap-3 sm:gap-6">
-          {/* Tabs */}
-          <div className="flex items-center justify-start gap-8 overflow-x-auto scrollbar-hide relative shrink-0">
-            {tabs.map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={"relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " + (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")}
-              >
-                {tab}
-                {activeTab === tab && (
-                  <motion.div layoutId="activeTabUnderline" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full" initial={false} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
-                )}
-              </button>
-            ))}
+      {/* Action Required Row */}
+      {activeTab === "Action Required" && (
+        <div className="flex items-center gap-4 px-6 py-3 bg-muted/5 border-b border-border/40 animate-in slide-in-from-top-2 fade-in duration-200">
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+            {actionFilters.map((filter) => {
+              const isActive = actionFilter === filter;
+              let activeClass = "bg-primary/10 text-primary border-primary/30";
+              if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
+              else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
+              else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
+              return (
+                <button
+                  key={filter}
+                  className={"h-9 shrink-0 flex items-center justify-center cursor-pointer px-4 rounded-full text-[13px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
+                  onClick={() => setActionFilter(filter)}
+                >
+                  {filter}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Search & Filters — pushed to the right */}
-          <div className="flex items-center gap-2 pb-3 sm:pb-4 ml-auto w-full sm:w-auto">
-            <div className="relative flex-1 sm:w-64 xl:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search ID, Name, Phone..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="pl-9 h-10 bg-background rounded-full border-border/60 shadow-sm text-[13.5px]"
-              />
-            </div>
-            <Popover>
-              <PopoverTrigger render={
-                <Button variant="outline" className="h-10 rounded-full bg-background border-border/60 shadow-sm px-4 flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium text-[13.5px]">Filters</span>
-                  {activeFiltersCount > 0 && (
-                    <Badge className="ml-1 bg-[#0052FF] text-white px-1.5 py-0.5 rounded-md text-[10px]">{activeFiltersCount}</Badge>
+          <div className={`ml-auto flex items-center h-9 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "hidden opacity-0 pointer-events-none"}`}>
+            {[
+              { id: "pending", label: "Follow Up" },
+              { id: "completed", label: "Followed Up" }
+            ].map((mode) => {
+              const isSelected = todayViewMode === mode.id;
+              return (
+                <button
+                  key={mode.id}
+                  onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
+                  className={`relative h-full flex items-center px-4 rounded-full text-[12px] font-bold transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  {isSelected && (
+                    <motion.div
+                      layoutId="hrTodayToggleBgDesktop"
+                      className="absolute inset-0 bg-[#0052FF] shadow-md rounded-full"
+                      initial={false}
+                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                      style={{ zIndex: -1 }}
+                    />
                   )}
-                </Button>
-              } />
-              <PopoverContent align="end" className="w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60">
-                <div className="flex items-center justify-between p-4 border-b bg-muted/10">
-                  <h4 className="font-semibold text-foreground text-sm">Filter Candidates</h4>
-                  {activeFiltersCount > 0 && (
-                    <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 text-xs text-muted-foreground hover:text-red-600">
-                      Clear All
-                    </Button>
-                  )}
-                </div>
-                <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Created From</label>
-                    <Input type="date" value={filters.dateFrom} onChange={e => setFilters(f => ({...f, dateFrom: e.target.value}))} className="h-9 rounded-lg text-sm" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Created To</label>
-                    <Input type="date" value={filters.dateTo} onChange={e => setFilters(f => ({...f, dateTo: e.target.value}))} className="h-9 rounded-lg text-sm" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Status</label>
-                    <FormSelect name="status" options={uniqueStatuses.map(s => ({label: s, value: s as string}))} value={filters.status} onValueChange={v => setFilters(f => ({...f, status: v || ""}))} placeholder="All Statuses" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Department</label>
-                    <FormSelect name="department" options={uniqueDepartments.map(s => ({label: s as string, value: s as string}))} value={filters.department} onValueChange={v => setFilters(f => ({...f, department: v || ""}))} placeholder="All Departments" />
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-            {(searchQuery || activeFiltersCount > 0) && (
-              <Button variant="ghost" size="icon" onClick={() => { setSearchQuery(""); clearFilters(); }} className="h-10 w-10 rounded-full text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors" title="Clear Search & Filters">
-                <X className="h-4 w-4" />
-              </Button>
-            )}
+                  <span className="relative z-10">{mode.label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
+      )}
 
-        {activeTab === "Action Required" && (
-          <div className="flex items-center gap-2 px-6 py-4 border-b border-border/40 animate-in slide-in-from-top-2 fade-in duration-200 flex-wrap">
-            <div className="flex items-center gap-2">
-              {actionFilters.map((filter) => {
-                const isActive = actionFilter === filter;
-                let activeClass = "bg-primary/10 text-primary border-primary/30";
-                if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
-                else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
-                else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
-                return (
-                  <button
-                    key={filter}
-                    className={"h-10 flex items-center justify-center cursor-pointer px-5 rounded-full text-[13.5px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
-                    onClick={() => setActionFilter(filter)}
-                  >
-                    {filter}
-                  </button>
-                );
-              })}
-            </div>
-            
-            <div className={`ml-auto flex items-center h-10 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
-              {[
-                { id: "pending", label: "Follow Up" },
-                { id: "completed", label: "Followed Up" }
-              ].map((mode) => {
-                const isSelected = todayViewMode === mode.id;
-                return (
-                  <button
-                    key={mode.id}
-                    onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
-                    className={`relative h-full flex items-center px-4 rounded-full text-[13px] font-bold transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
-                  >
-                    {isSelected && (
-                      <motion.div
-                        layoutId="todayToggleBg"
-                        className="absolute inset-0 bg-[#0052FF] shadow-md rounded-full"
-                        initial={false}
-                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                        style={{ zIndex: -1 }}
-                      />
-                    )}
-                    <span className="relative z-10">{mode.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+      {/* Table */}
+      <div className="w-full md:flex-1 md:min-h-0 md:overflow-hidden">
+        {isLoading ? <TableSkeleton /> : (
+          <DataTable
+            flush
+            columns={columns}
+            data={displayedCandidates}
+            showToolbar={true}
+            showDeleteAction={role === "Admin"}
+            onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
+            renderToolbarActions={(selectedRows) => {
+              if (selectedRows.length !== 1) return null;
+              const row = selectedRows[0];
+              return (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => router.push("/hr/" + row.id)}>
+                    <Eye size={15} className="mr-1.5" /> View
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => router.push("/hr/new?edit=" + row.id)}>
+                    <Edit size={15} className="mr-1.5" /> Edit
+                  </Button>
+                </>
+              );
+            }}
+          />
         )}
+      </div>
+    </div>
+  );
 
-        <div className="w-full">
-          {isLoading ? <TableSkeleton /> : (
-            <DataTable 
-              flush
-              columns={columns} 
-              data={displayedCandidates} 
-              showToolbar={true} 
-              showDeleteAction={role === "Admin"}
-              onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
-              renderToolbarActions={(selectedRows) => {
-                if (selectedRows.length !== 1) return null;
-                const row = selectedRows[0];
-                return (
-                  <>
-                    <Button variant="outline" size="sm" onClick={() => router.push("/hr/" + row.id)}>
-                      <Eye size={15} className="mr-1.5" /> View
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => router.push("/hr/new?edit=" + row.id)}>
-                      <Edit size={15} className="mr-1.5" /> Edit
-                    </Button>
-                  </>
-                );
-              }}
-            />
-          )}
-        </div>
+  return (
+    <>
+      <MobileHeader title="HR Panel" />
+
+      <div className="flex flex-col space-y-4 md:space-y-6 md:flex-1 md:min-h-0">
+        {/* Desktop page header */}
+        <Device
+          mobile={null}
+          desktop={
+            <div className="flex h-[48px] items-center justify-between pr-[150px]">
+              <h1 className="text-[28px] font-bold tracking-tight">HR Panel</h1>
+              <div className="flex items-center gap-3">
+                <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={fetchCandidates} title="Refresh">
+                  <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+                </Button>
+                <Link href="/hr/new" className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
+                  <Plus size={18} />
+                  Add New Candidate
+                </Link>
+              </div>
+            </div>
+          }
+        />
+
+        {/* Filters + Table */}
+        <Device mobile={mobileFilters} desktop={desktopFilters} />
+
+        {/* Mobile table */}
+        <Device
+          desktop={null}
+          mobile={
+            <div className="w-full px-4 pb-4">
+              {isLoading ? <TableSkeleton /> : (
+                <DataTable
+                  flush
+                  columns={columns}
+                  data={displayedCandidates}
+                  showToolbar={true}
+                  showDeleteAction={role === "Admin"}
+                  onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
+                  renderToolbarActions={(selectedRows) => {
+                    if (selectedRows.length !== 1) return null;
+                    const row = selectedRows[0];
+                    return (
+                      <>
+                        <Button variant="outline" size="sm" onClick={() => router.push("/hr/" + row.id)}>
+                          <Eye size={15} className="mr-1.5" /> View
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => router.push("/hr/new?edit=" + row.id)}>
+                          <Edit size={15} className="mr-1.5" /> Edit
+                        </Button>
+                      </>
+                    );
+                  }}
+                />
+              )}
+            </div>
+          }
+        />
       </div>
 
       <Dialog open={bulkDeleteIds !== null} onOpenChange={(open) => !open && setBulkDeleteIds(null)}>
@@ -434,6 +578,6 @@ export default function HrPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

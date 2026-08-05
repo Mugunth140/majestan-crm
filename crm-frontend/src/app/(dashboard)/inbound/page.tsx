@@ -91,6 +91,9 @@ export default function InboundPage() {
 
   useEffect(() => {
     fetchInbounds();
+    window.scrollTo(0, 0);
+    const main = document.querySelector("main");
+    if (main) main.scrollTop = 0;
   }, [fetchInbounds]);
 
   const displayedInbounds = useMemo(() => {
@@ -326,6 +329,31 @@ export default function InboundPage() {
 
   const clearFilters = () => setFilters({ dateFrom: "", dateTo: "", category: "", type: "", status: "" });
 
+  
+  const tableProps = {
+    flush: true as const,
+    columns,
+    data: displayedInbounds,
+    showToolbar: true,
+    showDeleteAction: role === "Admin",
+    onDeleteSelected: (rows: any[]) => setBulkDeleteIds(rows.map(r => r.rawId || r.id)),
+    renderToolbarActions: (selectedRows: any[]) => {
+      if (selectedRows.length !== 1) return null;
+      const row = selectedRows[0];
+      const id = row.rawId || row.id;
+      return (
+        <>
+          <Button variant="outline" size="sm" onClick={() => router.push("/inbound/" + id)}>
+            <Eye size={15} className="mr-1.5" /> View
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => router.push("/inbound/new?edit=" + id)}>
+            <Edit size={15} className="mr-1.5" /> Edit
+          </Button>
+        </>
+      );
+    }
+  };
+
   const renderFilterPopover = (isMobile: boolean) => (
     <Popover>
       <PopoverTrigger render={
@@ -473,11 +501,13 @@ export default function InboundPage() {
           </div>
         </div>
       )}
+
     </div>
   );
 
+
   const desktopFilters = (
-    <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
+    <div className="bg-card border rounded-xl overflow-hidden shadow-sm md:flex md:flex-col md:flex-1 md:min-h-0">
       {/* Tabs Row */}
       <div className="flex items-center justify-between px-6 border-b bg-muted/10 pt-4 gap-4">
         <div className="flex items-center gap-8 overflow-x-auto scrollbar-hide relative">
@@ -568,14 +598,20 @@ export default function InboundPage() {
           </div>
         </div>
       )}
+
+      {/* Table */}
+      <div className="w-full md:flex-1 md:min-h-0 md:overflow-hidden">
+        {isLoading ? <TableSkeleton /> : <DataTable {...tableProps} />}
+      </div>
     </div>
   );
+
 
 
   return (
     <>
       <MobileHeader title="Inbound Dashboard" />
-      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:flex-1 md:h-full md:min-h-0">
+      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:flex-1 md:min-h-0">
         <Device
           mobile={null}
           desktop={
@@ -597,33 +633,16 @@ export default function InboundPage() {
         />
         
         <Device mobile={mobileFilters} desktop={desktopFilters} />
-        
-        <div className="w-full px-4 md:px-0 pt-2 pb-6 md:flex-1 md:h-full md:flex md:flex-col md:min-h-0">
-          {isLoading ? <TableSkeleton /> : (
-            <DataTable 
-              columns={columns} 
-              data={displayedInbounds} 
-              showToolbar={true} 
-              showDeleteAction={role === "Admin"}
-              onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.rawId || r.id))}
-              renderToolbarActions={(selectedRows) => {
-                if (selectedRows.length !== 1) return null;
-                const row = selectedRows[0];
-                const id = row.rawId || row.id;
-                return (
-                  <>
-                    <Button variant="outline" size="sm" onClick={() => router.push("/inbound/" + id)}>
-                      <Eye size={15} className="mr-1.5" /> View
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => router.push("/inbound/new?edit=" + id)}>
-                      <Edit size={15} className="mr-1.5" /> Edit
-                    </Button>
-                  </>
-                );
-              }}
-            />
-          )}
-        </div>
+
+        {/* Mobile table */}
+        <Device
+          desktop={null}
+          mobile={
+            <div className="w-full px-4 pb-4">
+              {isLoading ? <TableSkeleton /> : <DataTable {...tableProps} />}
+            </div>
+          }
+        />
       </div>
 
       <Dialog open={deleteId !== null || bulkDeleteIds !== null} onOpenChange={(open) => {

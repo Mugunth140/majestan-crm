@@ -116,6 +116,9 @@ export default function LeadsPage() {
 
   useEffect(() => {
     fetchLeads();
+    window.scrollTo(0, 0);
+    const main = document.querySelector("main");
+    if (main) main.scrollTop = 0;
   }, [fetchLeads]);
 
   const displayedLeads = useMemo(() => {
@@ -608,7 +611,7 @@ export default function LeadsPage() {
   );
 
   const desktopFilters = (
-    <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
+    <div className="bg-card border rounded-xl overflow-hidden shadow-sm md:flex md:flex-col md:flex-1 md:min-h-0">
       {/* Tabs & Pipeline Toggles Row */}
       <div className="flex items-center justify-between px-6 border-b bg-muted/10 pt-4 gap-4">
         <div className="flex items-center gap-8 overflow-x-auto scrollbar-hide relative">
@@ -833,7 +836,7 @@ export default function LeadsPage() {
   return (
     <>
       <MobileHeader title="Leads Dashboard" />
-      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:flex-1 md:h-full md:min-h-0">
+      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:flex-1 md:min-h-0">
         <Device
           mobile={null}
           desktop={
@@ -888,7 +891,7 @@ export default function LeadsPage() {
       />
 
       <Device mobile={mobileFilters} desktop={desktopFilters} />
-        <div className="w-full px-4 md:px-0 pt-2 pb-6 md:flex-1 md:h-full md:flex md:flex-col md:min-h-0">
+        <div className="w-full px-4 md:px-0 md:flex-1 md:min-h-0 md:overflow-hidden">
           {pendingImports.length > 0 && activeTab === "Open Pipeline" && (
              <div className="mb-6 p-5 bg-blue-50/50 border border-blue-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
                 <div>
