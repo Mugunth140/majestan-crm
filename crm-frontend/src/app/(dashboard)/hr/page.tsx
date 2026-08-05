@@ -506,7 +506,7 @@ export default function HrPage() {
     <>
       <MobileHeader title="HR Panel" />
 
-      <div className="flex flex-col space-y-4 md:space-y-6 md:flex-1 md:min-h-0">
+      <div className="flex flex-col space-y-4 md:space-y-6 md:h-full">
         {/* Desktop page header */}
         <Device
           mobile={null}

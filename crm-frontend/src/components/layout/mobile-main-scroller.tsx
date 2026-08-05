@@ -29,7 +29,7 @@ export function MainScrollArea({ children }: { children: ReactNode }) {
     <main
       ref={mainRef}
       onScroll={handleElementScroll}
-      className="flex-1 w-full md:overflow-x-hidden md:overflow-y-auto scrollbar-hide lg:px-8 lg:pb-8 lg:pt-8 relative md:flex md:flex-col"
+      className="flex-1 w-full md:overflow-x-hidden md:overflow-y-auto scrollbar-hide lg:px-8 lg:pb-8 lg:pt-8 relative md:flex md:flex-col md:min-h-0"
     >
       <div className="md:hidden px-4 pb-2 pt-[calc(env(safe-area-inset-top)+4.5rem)]">
         <h1 className="text-[34px] font-bold tracking-tight text-foreground leading-tight">{resolvedTitle}</h1>

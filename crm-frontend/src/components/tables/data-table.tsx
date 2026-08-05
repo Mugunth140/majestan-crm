@@ -101,7 +101,7 @@ export function DataTable<TData, TValue>({
       )}
 
       <div className={cn(
-        "overflow-x-auto md:flex-1 md:h-full md:overflow-y-auto w-full relative",
+        "overflow-x-auto md:flex-1 md:h-full md:min-h-0 md:overflow-y-auto w-full relative",
         flush ? "" : "rounded-md border bg-card"
       )}>
         <table className="min-w-max w-full caption-bottom text-sm">
