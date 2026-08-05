@@ -361,7 +361,7 @@ function InboundForm() {
       <form onSubmit={handleSubmit} className="space-y-6">
         
         {/* Basic Information */}
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
+        <div className="bg-card border rounded-2xl p-5 sm:p-8 shadow-sm">
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Basic Information</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="space-y-2 lg:col-span-3">
@@ -516,7 +516,7 @@ function InboundForm() {
         </div>
 
         {/* Owner Information */}
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
+        <div className="bg-card border rounded-2xl p-5 sm:p-8 shadow-sm">
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Owner Information</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="space-y-2">
@@ -570,7 +570,7 @@ function InboundForm() {
         </div>
 
         {/* Contact Information */}
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
+        <div className="bg-card border rounded-2xl p-5 sm:p-8 shadow-sm">
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Contact & Accessibility Information</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="space-y-2">
@@ -633,7 +633,7 @@ function InboundForm() {
         </div>
 
         {/* Brokerage Details */}
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
+        <div className="bg-card border rounded-2xl p-5 sm:p-8 shadow-sm">
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Brokerage Details</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="space-y-2">
@@ -710,7 +710,7 @@ function InboundForm() {
         </div>
 
         {/* Media & Inventory */}
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
+        <div className="bg-card border rounded-2xl p-5 sm:p-8 shadow-sm">
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Media & Inventory Flags</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 border-b pb-8">

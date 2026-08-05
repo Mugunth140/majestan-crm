@@ -105,7 +105,7 @@ function formatTimestamp(ts: string) {
 // ── Loading Skeleton ─────────────────────────────────────────────────────────
 function PageSkeleton() {
   return (
-    <div className="animate-in fade-in duration-500 h-full flex flex-col">
+    <div className="animate-in fade-in duration-500 md:h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
         <div className="flex items-center gap-4">
@@ -125,7 +125,7 @@ function PageSkeleton() {
         </div>
       </div>
 
-      <div className="flex-1 space-y-6 overflow-y-auto min-h-0 pb-6 pr-2">
+      <div className="flex-1 space-y-6 md:overflow-y-auto min-h-0 pb-6 pr-2">
         {/* Top Row */}
         <div className="grid grid-cols-3 gap-6">
           <div className="col-span-2 bg-card border rounded-2xl p-6 shadow-sm">

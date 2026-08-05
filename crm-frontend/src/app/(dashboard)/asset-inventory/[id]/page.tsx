@@ -72,7 +72,7 @@ export default function AssetViewPage() {
   const layouts = asset.layouts || [];
 
   return (
-    <div className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
+    <div className="flex flex-col md:h-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
       
       {/* Header */}
       <div className="flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">

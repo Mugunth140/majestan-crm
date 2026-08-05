@@ -88,7 +88,7 @@ function formatTimestamp(ts: string) {
 // ── Loading Skeleton ─────────────────────────────────────────────────────────
 function PageSkeleton() {
   return (
-    <div className="animate-in fade-in duration-500 h-full flex flex-col">
+    <div className="animate-in fade-in duration-500 md:h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
         <div className="flex items-center gap-4">
@@ -108,12 +108,12 @@ function PageSkeleton() {
         </div>
       </div>
 
-      <div className="flex-1 space-y-6 overflow-y-auto min-h-0 pb-6 pr-2">
+      <div className="flex-1 space-y-6 md:overflow-y-auto min-h-0 pb-6 pr-0 sm:pr-2">
         {/* Top Row */}
-        <div className="grid grid-cols-3 gap-6">
-          <div className="col-span-2 bg-card border rounded-2xl p-6 shadow-sm">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="col-span-1 lg:col-span-2 bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
             <Skeleton className="h-5 w-48 mb-6" />
-            <div className="grid grid-cols-3 gap-y-6 gap-x-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-6 gap-x-6">
               {[...Array(6)].map((_, i) => (
                 <div key={i}>
                   <Skeleton className="h-3 w-20 mb-2" />
@@ -122,7 +122,7 @@ function PageSkeleton() {
               ))}
             </div>
           </div>
-          <div className="col-span-1 bg-card border rounded-2xl p-6 shadow-sm">
+          <div className="col-span-1 bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
             <Skeleton className="h-5 w-32 mb-6" />
             <div className="space-y-6">
               {[...Array(3)].map((_, i) => (
@@ -136,14 +136,14 @@ function PageSkeleton() {
         </div>
 
         {/* Row 2 */}
-        <div className="bg-card border rounded-2xl p-6 shadow-sm">
+        <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
           <Skeleton className="h-5 w-40 mb-6" />
           <Skeleton className="h-40 w-full rounded-xl" />
         </div>
 
         {/* Row 3 */}
-        <div className="grid grid-cols-3 gap-6">
-          <div className="col-span-2 bg-card border rounded-2xl p-6 shadow-sm">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="col-span-1 lg:col-span-2 bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
             <Skeleton className="h-5 w-32 mb-6" />
             <div className="space-y-6">
               {[...Array(3)].map((_, i) => (
@@ -158,7 +158,7 @@ function PageSkeleton() {
             </div>
           </div>
           <div className="col-span-1 space-y-6">
-            <div className="bg-card border rounded-2xl p-6 shadow-sm">
+            <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
               <Skeleton className="h-5 w-32 mb-4" />
               <div className="space-y-4">
                 {[...Array(4)].map((_, i) => (
@@ -166,7 +166,7 @@ function PageSkeleton() {
                 ))}
               </div>
             </div>
-            <div className="bg-card border rounded-2xl p-6 shadow-sm">
+            <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
               <Skeleton className="h-5 w-32 mb-4" />
               <div className="space-y-4">
                 {[...Array(4)].map((_, i) => (
@@ -393,45 +393,45 @@ export default function InboundViewPage() {
   const isRnrMaxed = highestRnr >= 5;
 
   return (
-    <div className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="flex flex-col md:h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
       
       {/* ── Header ── */}
-      <div className="flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
+      <div className="flex items-center justify-between pr-4 sm:pr-[150px] min-h-[48px] mb-6 shrink-0">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shrink-0" onClick={() => router.push("/inbound")}>
             <ArrowLeft className="h-4 w-4 text-muted-foreground" />
           </Button>
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
               {inbound.property_id || inbound.propertyId || `Inbound #${inbound.id}`}
             </h1>
             <Badge className={`font-medium px-2.5 py-0.5 shadow-sm border ${badgeCls}`}>{statusName}</Badge>
-            <span className="text-muted-foreground/40 text-xs">&bull;</span>
-            <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+            <span className="hidden sm:inline text-muted-foreground/40 text-xs">&bull;</span>
+            <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5">
               Created on {new Date(inbound.created_at || inbound.createdAt || inbound.date || Date.now()).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
             </span>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full" onClick={() => fetchInbound(true)} title="Refresh">
+          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shrink-0" onClick={() => fetchInbound(true)} title="Refresh">
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
           </Button>
-          <Button onClick={() => router.push(`/inbound/new?edit=${inbound.id}`)} className="rounded-full px-8 py-5 bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md flex items-center gap-2">
-            <Edit className="h-4 w-4" /> Edit Details
+          <Button onClick={() => router.push(`/inbound/new?edit=${inbound.id}`)} className="rounded-full px-4 sm:px-8 py-5 bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md flex items-center gap-2 text-sm sm:text-base">
+            <Edit className="h-4 w-4" /> <span className="hidden sm:inline">Edit Details</span><span className="sm:hidden">Edit</span>
           </Button>
         </div>
       </div>
 
       {/* ── Main Layout ── */}
-      <div className="flex-1 overflow-y-auto min-h-0 pb-6 pr-2 space-y-6">
+      <div className="flex-1 md:overflow-y-auto min-h-0 pb-6 pr-0 sm:pr-2 space-y-6">
 
         {/* ── Row 1: Basic Info (2/3) + Quick Actions (1/3) ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="col-span-2 bg-card border rounded-2xl p-6 shadow-sm h-full">
+          <div className="col-span-1 lg:col-span-2 bg-card border rounded-2xl p-4 sm:p-6 shadow-sm h-full">
             <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
               <Building2 className="h-4 w-4 text-muted-foreground" /> Basic Information
             </h3>
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-y-6 gap-x-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-6 gap-x-6">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Property Category</p>
                 <p className="text-[14px] font-medium text-foreground">{inbound.property_category || inbound.propertyCategory || "\u2014"}</p>
@@ -488,12 +488,12 @@ export default function InboundViewPage() {
                   <p className="text-[14px] font-medium text-foreground">{inbound.floor_number}</p>
                 </div>
               )}
-              <div className="col-span-2 lg:col-span-3">
+              <div className="col-span-1 sm:col-span-2 lg:col-span-3">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Full Address / Location</p>
                   {inbound.image_url && (
                     <Button variant="outline" size="sm" className="h-8 text-xs flex items-center gap-1.5 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800" onClick={() => setIsImageModalOpen(true)}>
-                      <ImageIcon className="h-3.5 w-3.5" /> View Inbound Image
+                      <ImageIcon className="h-3.5 w-3.5" /> <span className="hidden sm:inline">View Inbound Image</span><span className="sm:hidden">View Image</span>
                     </Button>
                   )}
                 </div>
@@ -503,7 +503,7 @@ export default function InboundViewPage() {
           </div>
 
           <div className="col-span-1 flex flex-col gap-6">
-            <div className="bg-card border rounded-2xl p-6 shadow-sm flex flex-col">
+            <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-sm flex flex-col">
               <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
                 <Shield className="h-4 w-4 text-muted-foreground" /> Actions & Score
               </h3>
@@ -519,7 +519,7 @@ export default function InboundViewPage() {
                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Current Status</p>
                        {isUpdatingStatus && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
         
                        <div className="flex-1">
                          <FormSelect 
@@ -540,7 +540,7 @@ export default function InboundViewPage() {
                           handleDirectStatusUpdate("Closed");
                         }}
                         disabled={isUpdatingStatus || selectedStatus === "Closed"}
-                        className="border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700 h-11 px-6 rounded-xl font-bold transition-all"
+                        className="border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700 h-11 px-6 rounded-xl font-bold transition-all w-full sm:w-auto"
                      >
                         Close
                      </Button>
@@ -575,14 +575,14 @@ export default function InboundViewPage() {
         </div>
 
         {/* ── Row 2: Log New Follow Up Form ── */}
-        <div className="bg-card border rounded-2xl p-6 shadow-sm">
+        <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
           <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
             <Plus className="h-4 w-4 text-[#0052FF]" /> Log New Follow Up
           </h3>
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contacted Via *</label>
                   <FormSelect name="contactedVia" placeholder="Select..." options={CONTACTED_VIA} value={fuForm.contactedVia} onValueChange={v => setFuForm(f => ({ ...f, contactedVia: v || "" }))} />
@@ -596,7 +596,7 @@ export default function InboundViewPage() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Priority</label>
                   <FormSelect name="priority" placeholder="Select..." options={PRIORITIES} value={fuForm.priority} onValueChange={v => setFuForm(f => ({ ...f, priority: v || "" }))} />
@@ -642,7 +642,7 @@ export default function InboundViewPage() {
               <Button
                 onClick={handleSaveFollowUp}
                 disabled={isSavingFu}
-                className="w-full h-11 bg-[#0052FF] text-white hover:bg-[#0040CC] rounded-xl shadow font-semibold text-sm gap-2"
+                className="w-full h-11 bg-[#0052FF] text-white hover:bg-[#0040CC] rounded-xl shadow font-semibold text-sm gap-2 shrink-0"
               >
                 {isSavingFu ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpRight className="h-4 w-4" />}
                 Save Follow Up
@@ -653,8 +653,8 @@ export default function InboundViewPage() {
 
         {/* ── Row 3: Contact Log (2/3) + Owner/Brokerage (1/3) ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="col-span-1 lg:col-span-2 bg-card border rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center justify-between border-b pb-3 mb-5">
+          <div className="col-span-1 lg:col-span-2 bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-3 mb-5 gap-3">
               <h3 className="text-base font-bold text-foreground flex items-center gap-2">
                 <Clock className="h-4 w-4 text-muted-foreground" /> Contact Log
               </h3>
@@ -679,16 +679,16 @@ export default function InboundViewPage() {
                     <div className={`relative z-10 h-10 w-10 shrink-0 rounded-full border-2 border-background flex items-center justify-center ${CONTACT_TYPE_STYLES[log.contact_type] || "bg-gray-100"}`}>
                       {CONTACT_TYPE_ICONS[log.contact_type] || <MessageSquare className="h-3.5 w-3.5" />}
                     </div>
-                    <div className="flex-1 pt-1.5">
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <p className="text-[13.5px] font-semibold text-foreground">
+                    <div className="flex-1 pt-1.5 min-w-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2 flex-wrap">
+                        <p className="text-[13.5px] font-semibold text-foreground truncate max-w-full">
                           <span className="capitalize">{log.contact_type}</span> by{" "}
                           <span className="text-[#0052FF]">{log.sent_by?.name || "Staff"}</span>
                         </p>
-                        <span className="text-xs text-muted-foreground">{formatTimestamp(log.created_at)}</span>
+                        <span className="text-xs text-muted-foreground shrink-0">{formatTimestamp(log.created_at)}</span>
                       </div>
-                      {log.subject && <p className="text-xs text-muted-foreground mt-0.5">Subject: {log.subject}</p>}
-                      {log.message && <p className="text-[13px] text-foreground/70 mt-1 bg-muted/30 rounded-lg px-3 py-2">{log.message}</p>}
+                      {log.subject && <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-full">Subject: {log.subject}</p>}
+                      {log.message && <p className="text-[13px] text-foreground/70 mt-1 bg-muted/30 rounded-lg px-3 py-2 break-words whitespace-pre-wrap">{log.message}</p>}
                     </div>
                   </div>
                 ))}
@@ -697,23 +697,23 @@ export default function InboundViewPage() {
           </div>
 
           <div className="col-span-1 space-y-6">
-            <div className="bg-card border rounded-2xl p-6 shadow-sm">
+            <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
              <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground" /> Owner & Contact Info
              </h3>
              <div className="space-y-4">
                 <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
                   <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Owner Name</span>
-                  <span className="font-medium text-[14px]">{inbound.owner_name || inbound.ownerName || "\u2014"}</span>
+                  <span className="font-medium text-[14px] text-right ml-2">{inbound.owner_name || inbound.ownerName || "\u2014"}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
-                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Mobile Number</span>
+                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide shrink-0">Mobile</span>
                   <div className="flex items-center gap-3">
-                    <span className="font-medium text-[14px]">
+                    <span className="font-medium text-[14px] truncate text-right">
                        {inbound.owner_mobile || inbound.mobile_number || "\u2014"}
                     </span>
                     {(inbound.owner_mobile || inbound.mobile_number) && (
-                      <div className="flex gap-1">
+                      <div className="flex gap-1 shrink-0">
                         <Button variant="outline" size="icon" className="h-7 w-7 rounded-full bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700" onClick={() => openContact("call", inbound.owner_mobile || inbound.mobile_number)}>
                           <Phone className="h-3 w-3" />
                         </Button>
@@ -725,9 +725,9 @@ export default function InboundViewPage() {
                   </div>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
-                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Email Address</span>
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium text-[14px] truncate max-w-[200px]">
+                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide shrink-0">Email</span>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="font-medium text-[14px] truncate max-w-[150px] sm:max-w-[200px] text-right">
                        {inbound.owner_email || inbound.email || "\u2014"}
                     </span>
                     {(inbound.owner_email || inbound.email) && (
@@ -739,22 +739,22 @@ export default function InboundViewPage() {
                 </div>
 
                 <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
-                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Primary Contact Role</span>
-                  <span className="font-medium text-[14px]">{inbound.primary_contact || "\u2014"}</span>
+                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Primary Contact</span>
+                  <span className="font-medium text-[14px] text-right ml-2">{inbound.primary_contact || "\u2014"}</span>
                 </div>
 
                 {inbound.primary_contact && inbound.primary_contact !== "Owner" && (
                   <>
                     <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
                       <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Primary Name</span>
-                      <span className="font-medium text-[14px]">{inbound.primary_contact_name || "\u2014"}</span>
+                      <span className="font-medium text-[14px] text-right ml-2">{inbound.primary_contact_name || "\u2014"}</span>
                     </div>
                     <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
-                      <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Primary Number</span>
+                      <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide shrink-0">Primary Number</span>
                       <div className="flex items-center gap-3">
-                        <span className="font-medium text-[14px]">{inbound.primary_contact_number || "\u2014"}</span>
+                        <span className="font-medium text-[14px] text-right">{inbound.primary_contact_number || "\u2014"}</span>
                         {inbound.primary_contact_number && (
-                          <Button variant="outline" size="icon" className="h-7 w-7 rounded-full bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700" onClick={() => openContact("call", inbound.primary_contact_number)}>
+                          <Button variant="outline" size="icon" className="h-7 w-7 rounded-full bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700 shrink-0" onClick={() => openContact("call", inbound.primary_contact_number)}>
                             <Phone className="h-3 w-3" />
                           </Button>
                         )}
@@ -764,22 +764,22 @@ export default function InboundViewPage() {
                 )}
 
                 <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
-                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Key Available With</span>
-                  <span className="font-medium text-[14px]">{inbound.key_available_with || "\u2014"}</span>
+                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide text-left">Key Available With</span>
+                  <span className="font-medium text-[14px] text-right ml-2">{inbound.key_available_with || "\u2014"}</span>
                 </div>
 
                 {inbound.key_available_with && inbound.key_available_with !== "Owner" && inbound.key_available_with !== inbound.primary_contact && (
                   <>
                     <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
                       <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Key Name</span>
-                      <span className="font-medium text-[14px]">{inbound.key_contact_name || "\u2014"}</span>
+                      <span className="font-medium text-[14px] text-right ml-2">{inbound.key_contact_name || "\u2014"}</span>
                     </div>
                     <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
-                      <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Key Number</span>
+                      <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide shrink-0">Key Number</span>
                       <div className="flex items-center gap-3">
-                        <span className="font-medium text-[14px]">{inbound.key_contact_number || "\u2014"}</span>
+                        <span className="font-medium text-[14px] text-right">{inbound.key_contact_number || "\u2014"}</span>
                         {inbound.key_contact_number && (
-                          <Button variant="outline" size="icon" className="h-7 w-7 rounded-full bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700" onClick={() => openContact("call", inbound.key_contact_number)}>
+                          <Button variant="outline" size="icon" className="h-7 w-7 rounded-full bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700 shrink-0" onClick={() => openContact("call", inbound.key_contact_number)}>
                             <Phone className="h-3 w-3" />
                           </Button>
                         )}
@@ -791,22 +791,22 @@ export default function InboundViewPage() {
              </div>
             </div>
 
-            <div className="bg-card border rounded-2xl p-6 shadow-sm">
+            <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
              <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
                 <Briefcase className="h-4 w-4 text-muted-foreground" /> Brokerage Details
              </h3>
              <div className="space-y-4">
                 <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
                   <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Accepted</span>
-                  <span className="font-medium text-[14px]">{inbound.brokerage_accepted || "\u2014"}</span>
+                  <span className="font-medium text-[14px] text-right ml-2">{inbound.brokerage_accepted || "\u2014"}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
                   <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Type</span>
-                  <span className="font-medium text-[14px]">{inbound.brokerage_type || "\u2014"}</span>
+                  <span className="font-medium text-[14px] text-right ml-2">{inbound.brokerage_type || "\u2014"}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
                   <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Brokerage</span>
-                  <span className="font-medium text-[14px]">
+                  <span className="font-medium text-[14px] text-right ml-2">
                     {inbound.brokerage_type === 'Days' 
                       ? (inbound.brokerage_days ? `${inbound.brokerage_days} Days` : "\u2014") 
                       : (inbound.percentage ? `${inbound.percentage}%` : (inbound.fixed_amount ? `₹${inbound.fixed_amount}` : "\u2014"))
@@ -815,7 +815,7 @@ export default function InboundViewPage() {
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
                   <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Remarks</span>
-                  <span className="font-medium text-[14px] truncate max-w-[200px]" title={inbound.brokerage_remarks || ""}>{inbound.brokerage_remarks || "\u2014"}</span>
+                  <span className="font-medium text-[14px] truncate max-w-[150px] sm:max-w-[200px] text-right ml-2" title={inbound.brokerage_remarks || ""}>{inbound.brokerage_remarks || "\u2014"}</span>
                 </div>
              </div>
             </div>
@@ -825,7 +825,7 @@ export default function InboundViewPage() {
 
       {/* ── Follow-Up History Slider (Sheet) ── */}
       <Sheet open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-        <SheetContent side="right" className="w-[450px] !max-w-[450px] p-0 flex flex-col border-l">
+        <SheetContent side="right" className="w-[100vw] sm:w-[450px] !max-w-[100vw] sm:!max-w-[450px] p-0 flex flex-col border-l">
           <SheetHeader className="p-6 border-b shrink-0">
             <SheetTitle className="text-lg">Follow Up Timeline {followUps.length > 0 && `(${followUps.length})`}</SheetTitle>
           </SheetHeader>

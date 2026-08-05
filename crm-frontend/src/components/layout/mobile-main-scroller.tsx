@@ -36,7 +36,7 @@ export function MainScrollArea({ children }: { children: ReactNode }) {
       </div>
       {children}
       {/* Spacer to ensure content isn't hidden behind the floating bottom navbar on mobile */}
-      <div className="md:hidden h-[calc(6.5rem+env(safe-area-inset-bottom))] shrink-0 w-full" />
+      <div className="md:hidden h-[calc(5rem+env(safe-area-inset-bottom))] shrink-0 w-full" />
     </main>
   );
 }

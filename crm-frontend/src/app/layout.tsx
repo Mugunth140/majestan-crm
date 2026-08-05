@@ -77,7 +77,7 @@ export default function RootLayout({
         {/* Blocking script — prevents flash by applying theme class before first paint */}
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className={`${inter.className} text-[14px] transition-colors duration-500 ease-in-out`}>
+      <body className={`${inter.className} text-[14px] bg-background text-foreground transition-colors duration-500 ease-in-out antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

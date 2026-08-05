@@ -82,7 +82,7 @@ function formatTimestamp(ts: string) {
 
 function PageSkeleton() {
   return (
-    <div className="animate-in fade-in duration-500 h-full flex flex-col">
+    <div className="animate-in fade-in duration-500 md:h-full flex flex-col">
       <div className="flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
         <div className="flex items-center gap-4">
           <Skeleton className="h-9 w-9 rounded-full shrink-0" />
@@ -95,7 +95,7 @@ function PageSkeleton() {
           </div>
         </div>
       </div>
-      <div className="flex-1 space-y-6 overflow-y-auto min-h-0 pb-6 pr-2">
+      <div className="flex-1 space-y-6 md:overflow-y-auto min-h-0 pb-6 pr-2">
         <Skeleton className="h-64 w-full rounded-2xl" />
         <Skeleton className="h-40 w-full rounded-2xl" />
       </div>
@@ -243,7 +243,7 @@ export default function AgentViewPage() {
   const isRnrMaxed = highestRnr >= 5;
 
   return (
-    <div className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="flex flex-col md:h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* ── Header ── */}
       <div className="flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
         <div className="flex items-center gap-4">
@@ -271,7 +271,7 @@ export default function AgentViewPage() {
       </div>
 
       {/* ── Main Layout ── */}
-      <div className="flex-1 overflow-y-auto min-h-0 pb-6 pr-2 space-y-6">
+      <div className="flex-1 md:overflow-y-auto min-h-0 pb-6 pr-2 space-y-6">
         {/* ── Row 1 ── */}
         <div className="grid grid-cols-3 gap-6">
           <div className="col-span-2 bg-card border rounded-2xl p-6 shadow-sm h-full">

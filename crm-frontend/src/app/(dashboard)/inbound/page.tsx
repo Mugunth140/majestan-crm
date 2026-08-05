@@ -339,72 +339,74 @@ export default function InboundPage() {
       </div>
 
       <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
-        <div className="flex flex-col xl:flex-row xl:items-end justify-between px-6 border-b bg-muted/10 pt-4 gap-4">
-          <div className="flex items-center gap-3 pb-3 xl:pb-4 w-full xl:w-auto">
+        <div className="flex flex-col xl:flex-row xl:items-end justify-between px-4 sm:px-6 border-b bg-muted/10 pt-4 gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pb-3 xl:pb-4 w-full xl:w-auto">
             {/* Search Input */}
-            <div className="relative flex-1 xl:w-72">
+            <div className="relative w-full sm:flex-1 sm:w-64 xl:w-72">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input 
                 placeholder="Search Property ID, Type..." 
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="pl-9 h-10 bg-background rounded-full border-border/60 shadow-sm text-[13.5px]"
+                className="pl-9 w-full h-10 bg-background rounded-full border-border/60 shadow-sm text-[13.5px]"
               />
             </div>
             
-            {/* Filters Popover */}
-            <Popover>
-              <PopoverTrigger render={
-                <Button variant="outline" className="h-10 rounded-full bg-background border-border/60 shadow-sm px-4 flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium text-[13.5px]">Filters</span>
-                  {activeFiltersCount > 0 && (
-                    <Badge className="ml-1 bg-[#0052FF] text-white px-1.5 py-0.5 rounded-md text-[10px]">{activeFiltersCount}</Badge>
-                  )}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              {/* Filters Popover */}
+              <Popover>
+                <PopoverTrigger render={
+                  <Button variant="outline" className="h-10 flex-1 sm:flex-none rounded-full bg-background border-border/60 shadow-sm px-4 flex items-center justify-center gap-2">
+                    <Filter className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium text-[13.5px]">Filters</span>
+                    {activeFiltersCount > 0 && (
+                      <Badge className="ml-1 bg-[#0052FF] text-white px-1.5 py-0.5 rounded-md text-[10px]">{activeFiltersCount}</Badge>
+                    )}
+                  </Button>
+                } />
+                <PopoverContent align="start" className="w-[calc(100vw-32px)] sm:w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60 mx-4 sm:mx-0">
+                  <div className="flex items-center justify-between p-4 border-b bg-muted/10">
+                    <h4 className="font-semibold text-foreground text-sm">Filter Inbound</h4>
+                    {activeFiltersCount > 0 && (
+                      <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 text-xs text-muted-foreground hover:text-red-600">
+                        Clear All
+                      </Button>
+                    )}
+                  </div>
+                  <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Created From</label>
+                      <Input type="date" value={filters.dateFrom} onChange={e => setFilters(f => ({...f, dateFrom: e.target.value}))} className="h-9 rounded-lg text-sm" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Created To</label>
+                      <Input type="date" value={filters.dateTo} onChange={e => setFilters(f => ({...f, dateTo: e.target.value}))} className="h-9 rounded-lg text-sm" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Status</label>
+                      <FormSelect name="status" options={uniqueStatuses.map(s => ({label: s, value: s}))} value={filters.status} onValueChange={v => setFilters(f => ({...f, status: v || ""}))} placeholder="All Statuses" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Property Category</label>
+                      <FormSelect name="category" options={uniqueCategories.map(s => ({label: s, value: s}))} value={filters.category} onValueChange={v => setFilters(f => ({...f, category: v || ""}))} placeholder="All Categories" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Property Type</label>
+                      <FormSelect name="type" options={uniqueTypes.map(s => ({label: s, value: s}))} value={filters.type} onValueChange={v => setFilters(f => ({...f, type: v || ""}))} placeholder="All Types" />
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              
+              {(searchQuery || activeFiltersCount > 0) && (
+                <Button variant="ghost" size="icon" onClick={() => { setSearchQuery(""); clearFilters(); }} className="h-10 w-10 shrink-0 rounded-full text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors" title="Clear Search & Filters">
+                  <X className="h-4 w-4" />
                 </Button>
-              } />
-              <PopoverContent align="start" className="w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60">
-                <div className="flex items-center justify-between p-4 border-b bg-muted/10">
-                  <h4 className="font-semibold text-foreground text-sm">Filter Inbound</h4>
-                  {activeFiltersCount > 0 && (
-                    <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 text-xs text-muted-foreground hover:text-red-600">
-                      Clear All
-                    </Button>
-                  )}
-                </div>
-                <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Created From</label>
-                    <Input type="date" value={filters.dateFrom} onChange={e => setFilters(f => ({...f, dateFrom: e.target.value}))} className="h-9 rounded-lg text-sm" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Created To</label>
-                    <Input type="date" value={filters.dateTo} onChange={e => setFilters(f => ({...f, dateTo: e.target.value}))} className="h-9 rounded-lg text-sm" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Status</label>
-                    <FormSelect name="status" options={uniqueStatuses.map(s => ({label: s, value: s}))} value={filters.status} onValueChange={v => setFilters(f => ({...f, status: v || ""}))} placeholder="All Statuses" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Property Category</label>
-                    <FormSelect name="category" options={uniqueCategories.map(s => ({label: s, value: s}))} value={filters.category} onValueChange={v => setFilters(f => ({...f, category: v || ""}))} placeholder="All Categories" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Property Type</label>
-                    <FormSelect name="type" options={uniqueTypes.map(s => ({label: s, value: s}))} value={filters.type} onValueChange={v => setFilters(f => ({...f, type: v || ""}))} placeholder="All Types" />
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-            
-            {(searchQuery || activeFiltersCount > 0) && (
-              <Button variant="ghost" size="icon" onClick={() => { setSearchQuery(""); clearFilters(); }} className="h-10 w-10 rounded-full text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors" title="Clear Search & Filters">
-                <X className="h-4 w-4" />
-              </Button>
-            )}
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-8 overflow-x-auto scrollbar-hide relative xl:pr-6">
+          <div className="flex items-center gap-6 sm:gap-8 overflow-x-auto scrollbar-hide relative xl:pr-6 pb-2 w-full">
             {tabs.map((tab) => (
             <button
               key={tab}
@@ -421,8 +423,8 @@ export default function InboundPage() {
         </div>
 
         {activeTab === "Action Required" && (
-          <div className="flex items-center gap-2 px-6 pt-5 min-h-[60px] animate-in slide-in-from-top-2 fade-in duration-200 flex-wrap">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 px-4 sm:px-6 pt-5 min-h-[60px] animate-in slide-in-from-top-2 fade-in duration-200">
+            <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0 scrollbar-hide">
               {actionFilters.map((filter) => {
                 const isActive = actionFilter === filter;
                 let activeClass = "bg-primary/10 text-primary border-primary/30";
@@ -432,7 +434,7 @@ export default function InboundPage() {
                 return (
                   <button
                     key={filter}
-                    className={"h-10 flex items-center justify-center cursor-pointer px-5 rounded-full text-[13.5px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
+                    className={"h-10 shrink-0 flex items-center justify-center cursor-pointer px-4 sm:px-5 rounded-full text-[13px] sm:text-[13.5px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
                     onClick={() => setActionFilter(filter)}
                   >
                     {filter}
@@ -441,7 +443,7 @@ export default function InboundPage() {
               })}
             </div>
             
-            <div className={`ml-auto flex items-center h-10 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+            <div className={`sm:ml-auto w-full sm:w-auto flex items-center h-10 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "hidden sm:flex opacity-0 pointer-events-none"}`}>
               {[
                 { id: "pending", label: "Follow Up" },
                 { id: "completed", label: "Followed Up" }
@@ -470,7 +472,7 @@ export default function InboundPage() {
           </div>
         )}
 
-        <div className="p-6">
+        <div className="p-0 sm:p-6 w-full max-w-full overflow-x-hidden">
           {isLoading ? <TableSkeleton /> : (
             <DataTable 
               columns={columns} 
