@@ -7,7 +7,7 @@ import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Plus, RefreshCw, Eye, Search, X } from "lucide-react";
+import { Edit, Plus, RefreshCw, Eye, Search, X, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -17,6 +17,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { FormSelect } from "@/components/shared/form-select";
+
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -32,6 +35,7 @@ export default function AssetInventoryPage() {
   const [assets, setAssets] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [filters, setFilters] = useState({ status: "" });
 
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
@@ -116,16 +120,73 @@ export default function AssetInventoryPage() {
   }
 
   const filteredAssets = useMemo(() => {
-    if (!searchQuery.trim()) return assets;
-    const q = searchQuery.toLowerCase();
-    return assets.filter(a => {
-      const id = `AST${String(a.id).padStart(5, "0")}`.toLowerCase();
-      const owner = (a.owner_name || "").toLowerCase();
-      const loc = a.location;
-      const address = [loc?.district, loc?.taluk, loc?.village, loc?.zone].filter(Boolean).join(" ").toLowerCase();
-      return id.includes(q) || owner.includes(q) || address.includes(q);
-    });
-  }, [assets, searchQuery]);
+    let filtered = assets;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(a => {
+        const id = `AST${String(a.id).padStart(5, "0")}`.toLowerCase();
+        const owner = (a.owner_name || "").toLowerCase();
+        const loc = a.location;
+        const address = [loc?.district, loc?.taluk, loc?.village, loc?.zone].filter(Boolean).join(" ").toLowerCase();
+        return id.includes(q) || owner.includes(q) || address.includes(q);
+      });
+    }
+    if (filters.status) {
+      filtered = filtered.filter(a => a.status === filters.status);
+    }
+    return filtered;
+  }, [assets, searchQuery, filters]);
+
+  const uniqueStatuses = Array.from(new Set(assets.map(a => a.status).filter(Boolean)));
+  const activeFiltersCount = Object.values(filters).filter(v => v !== "").length;
+  const clearFilters = () => setFilters({ status: "" });
+
+  const renderFilterPopover = (isMobile: boolean) => (
+    <Popover>
+      <PopoverTrigger render={
+        isMobile ? (
+          <Button variant="outline" size="icon" className="h-12 w-12 rounded-2xl bg-black/5 dark:bg-white/10 border-transparent relative shrink-0">
+            <Filter className="h-5 w-5 text-foreground" />
+            {activeFiltersCount > 0 && (
+              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#0052FF] border-2 border-background text-white text-[10px] font-bold flex items-center justify-center">
+                {activeFiltersCount}
+              </span>
+            )}
+          </Button>
+        ) : (
+          <Button variant="outline" className="h-10 rounded-xl bg-muted/30 border-border/60 px-4 flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium text-[13.5px]">Filters</span>
+            {activeFiltersCount > 0 && (
+              <Badge className="ml-1 bg-[#0052FF] text-white px-1.5 py-0.5 rounded-md text-[10px]">{activeFiltersCount}</Badge>
+            )}
+          </Button>
+        )
+      } />
+      <PopoverContent align={isMobile ? "end" : "start"} className="w-[calc(100vw-32px)] sm:w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60 mx-4 sm:mx-0">
+        <div className="flex items-center justify-between p-4 border-b bg-muted/10">
+          <h4 className="font-semibold text-foreground text-sm">Filter Assets</h4>
+          {activeFiltersCount > 0 && (
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 text-xs text-muted-foreground hover:text-red-600">
+              Clear All
+            </Button>
+          )}
+        </div>
+        <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Status</label>
+            <FormSelect
+              name="status"
+              options={uniqueStatuses.map(s => ({label: s, value: s as string}))}
+              value={filters.status}
+              onValueChange={v => setFilters(f => ({...f, status: v || ""}))}
+              placeholder="All Statuses"
+            />
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 
   const columns: ColumnDef<any>[] = [
     {
@@ -247,7 +308,7 @@ export default function AssetInventoryPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input
-            placeholder="Search ID, Owner, Address..."
+            placeholder="Search Assets..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="pl-11 h-12 bg-black/5 dark:bg-white/10 border-transparent rounded-2xl text-[16px] focus-visible:ring-1 focus-visible:ring-primary shadow-none"
@@ -258,27 +319,33 @@ export default function AssetInventoryPage() {
             </button>
           )}
         </div>
+        {renderFilterPopover(true)}
       </div>
     </div>
   );
 
   const desktopFilters = (
     <div className="bg-card border rounded-xl overflow-hidden shadow-sm md:flex md:flex-col md:flex-1 md:min-h-0">
-      {/* Search Row */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b bg-muted/10">
-        <div className="relative flex-1 max-w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search ID, Owner, Address..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="pl-9 h-10 bg-background rounded-xl border-border/60 shadow-sm text-[13.5px] focus-visible:ring-1 focus-visible:ring-primary"
-          />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-muted-foreground/10 rounded-full text-foreground hover:bg-muted-foreground/20">
-              <X className="h-3 w-3" />
-            </button>
-          )}
+      {/* Search & Filters Row */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between px-6 border-b bg-muted/10 pt-4 gap-6">
+        <div className="flex items-center gap-3 pb-3 xl:pb-4 w-full xl:w-auto">
+          <div className="relative w-64 xl:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search ID, Owner, Address..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-9 h-10 bg-background rounded-xl border-border/60 shadow-sm text-[13.5px] focus-visible:ring-1 focus-visible:ring-primary"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-muted-foreground/10 rounded-full text-foreground hover:bg-muted-foreground/20">
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {renderFilterPopover(false)}
+          </div>
         </div>
       </div>
 
