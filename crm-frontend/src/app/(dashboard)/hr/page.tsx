@@ -16,6 +16,7 @@ import { FormSelect } from "@/components/shared/form-select";
 import { apiFetch } from "@/lib/api-fetch";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { MobileHeader } from "@/components/layout/mobile-header";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -219,7 +220,7 @@ export default function HrPage() {
       enableSorting: false,
       enableHiding: false,
     },
-    { accessorKey: "sno", header: "#" },
+    { accessorKey: "sno", header: "#", meta: { hideOnMobile: true } },
     {
       accessorKey: "formattedId",
       header: "Candidate ID",
@@ -230,10 +231,10 @@ export default function HrPage() {
       ),
     },
     { accessorKey: "name", header: "Candidate Name" },
-    { accessorKey: "mobile", header: "Mobile Number" },
-    { accessorKey: "department", header: "Department" },
-    { accessorKey: "position", header: "Position" },
-    { accessorKey: "experience", header: "Experience" },
+    { accessorKey: "mobile", header: "Mobile Number", meta: { hideOnMobile: true } },
+    { accessorKey: "department", header: "Department", meta: { hideOnMobile: true } },
+    { accessorKey: "position", header: "Position", meta: { hideOnMobile: true } },
+    { accessorKey: "experience", header: "Experience", meta: { hideOnMobile: true } },
     {
       accessorKey: "status",
       header: "Status",
@@ -247,7 +248,8 @@ export default function HrPage() {
 
   return (
     <div className="flex flex-col space-y-6">
-      <div className="flex h-[48px] items-center justify-between pr-[150px]">
+      <MobileHeader title="HR" />
+      <div className="hidden md:flex h-[48px] items-center justify-between pr-[150px]">
         <h1 className="text-[28px] font-bold tracking-tight">HR Dashboard</h1>
 
         <div className="flex items-center gap-3">
@@ -263,19 +265,34 @@ export default function HrPage() {
       </div>
 
       <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
-        <div className="flex flex-col xl:flex-row xl:items-end justify-between px-6 border-b bg-muted/10 pt-4 gap-4">
-          <div className="flex items-center gap-3 pb-3 xl:pb-4 w-full xl:w-auto">
-            
-            <div className="relative flex-1 xl:w-72">
+        <div className="flex flex-col sm:flex-row sm:items-end px-6 border-b bg-muted/10 pt-4 gap-3 sm:gap-6">
+          {/* Tabs */}
+          <div className="flex items-center justify-start gap-8 overflow-x-auto scrollbar-hide relative shrink-0">
+            {tabs.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={"relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " + (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")}
+              >
+                {tab}
+                {activeTab === tab && (
+                  <motion.div layoutId="activeTabUnderline" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full" initial={false} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Search & Filters — pushed to the right */}
+          <div className="flex items-center gap-2 pb-3 sm:pb-4 ml-auto w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64 xl:w-72">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Search ID, Name, Phone..." 
+              <Input
+                placeholder="Search ID, Name, Phone..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className="pl-9 h-10 bg-background rounded-full border-border/60 shadow-sm text-[13.5px]"
               />
             </div>
-            
             <Popover>
               <PopoverTrigger render={
                 <Button variant="outline" className="h-10 rounded-full bg-background border-border/60 shadow-sm px-4 flex items-center gap-2">
@@ -286,7 +303,7 @@ export default function HrPage() {
                   )}
                 </Button>
               } />
-              <PopoverContent align="start" className="w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60">
+              <PopoverContent align="end" className="w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60">
                 <div className="flex items-center justify-between p-4 border-b bg-muted/10">
                   <h4 className="font-semibold text-foreground text-sm">Filter Candidates</h4>
                   {activeFiltersCount > 0 && (
@@ -315,27 +332,11 @@ export default function HrPage() {
                 </div>
               </PopoverContent>
             </Popover>
-
             {(searchQuery || activeFiltersCount > 0) && (
               <Button variant="ghost" size="icon" onClick={() => { setSearchQuery(""); clearFilters(); }} className="h-10 w-10 rounded-full text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors" title="Clear Search & Filters">
                 <X className="h-4 w-4" />
               </Button>
             )}
-          </div>
-
-          <div className="flex items-center gap-8 overflow-x-auto scrollbar-hide relative xl:pr-6">
-            {tabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={"relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " + (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")}
-            >
-              {tab}
-              {activeTab === tab && (
-                <motion.div layoutId="activeTabUnderline" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full" initial={false} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
-              )}
-            </button>
-          ))}
           </div>
         </div>
 

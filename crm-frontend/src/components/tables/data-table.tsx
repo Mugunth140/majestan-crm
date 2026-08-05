@@ -96,7 +96,7 @@ export function DataTable<TData, TValue>({
       )}
 
       <div className="rounded-md border bg-card overflow-x-auto md:flex-1 md:h-full md:overflow-y-auto w-full relative">
-        <table className="min-w-max w-full caption-bottom text-sm">
+        <table className="min-w-max md:min-w-full w-full caption-bottom text-sm">
           <TableHeader className="border-b border-border sticky top-0 z-20 shadow-sm">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent border-none">
@@ -105,7 +105,8 @@ export function DataTable<TData, TValue>({
                     key={header.id}
                     className={cn(
                       "text-[13px] h-11 font-semibold tracking-wide text-muted-foreground whitespace-nowrap border-r border-border last:border-r-0 px-4 text-center bg-muted",
-                      idx === 0 ? "sticky left-0 z-30" : ""
+                      idx === 0 ? "sticky left-0 z-30" : "",
+                      (header.column.columnDef.meta as any)?.hideOnMobile ? "hidden md:table-cell" : ""
                     )}
                   >
                     {header.isPlaceholder
@@ -131,7 +132,8 @@ export function DataTable<TData, TValue>({
                         key={cell.id}
                         className={cn(
                           "py-2.5 px-4 text-[14px] border-r border-border/40 last:border-r-0 text-center",
-                          idx === 0 ? "sticky left-0 z-10 bg-card" : ""
+                          idx === 0 ? "sticky left-0 z-10 bg-card" : "",
+                          (cell.column.columnDef.meta as any)?.hideOnMobile ? "hidden md:table-cell" : ""
                         )}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -141,12 +143,13 @@ export function DataTable<TData, TValue>({
                 ))}
                 {Array.from({ length: Math.max(0, table.getState().pagination.pageSize - table.getRowModel().rows.length) }).map((_, i) => (
                   <TableRow key={`empty-${i}`} className="hover:bg-transparent border-b border-border/40">
-                    {columns.map((_, colIdx) => (
+                    {columns.map((col, colIdx) => (
                       <TableCell 
                         key={`empty-cell-${i}-${colIdx}`} 
                         className={cn(
                           "py-2.5 px-4 h-[45px] border-r border-border/40 last:border-r-0",
-                          colIdx === 0 ? "sticky left-0 z-10 bg-card" : ""
+                          colIdx === 0 ? "sticky left-0 z-10 bg-card" : "",
+                          (col.meta as any)?.hideOnMobile ? "hidden md:table-cell" : ""
                         )} 
                       />
                     ))}

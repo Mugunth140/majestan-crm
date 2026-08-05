@@ -7,8 +7,9 @@ import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Plus, RefreshCw, Eye } from "lucide-react";
+import { Edit, Trash2, Plus, RefreshCw, Eye, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -28,6 +29,7 @@ export default function AssetInventoryPage() {
   const router = useRouter();
   const [assets, setAssets] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
@@ -114,6 +116,18 @@ export default function AssetInventoryPage() {
     return String(price);
   }
 
+  const filteredAssets = useMemo(() => {
+    if (!searchQuery.trim()) return assets;
+    const q = searchQuery.toLowerCase();
+    return assets.filter(a => {
+      const id = `AST${String(a.id).padStart(5, "0")}`.toLowerCase();
+      const owner = (a.owner_name || "").toLowerCase();
+      const loc = a.location;
+      const address = [loc?.district, loc?.taluk, loc?.village, loc?.zone].filter(Boolean).join(" ").toLowerCase();
+      return id.includes(q) || owner.includes(q) || address.includes(q);
+    });
+  }, [assets, searchQuery]);
+
   const columns: ColumnDef<any>[] = [
     {
       id: "select",
@@ -168,6 +182,7 @@ export default function AssetInventoryPage() {
     {
       id: "extent",
       header: "Extent",
+      meta: { hideOnMobile: true },
       cell: ({ row }) => {
         const feat = row.original.feature;
         const extent = feat?.extent ?? null;
@@ -177,6 +192,7 @@ export default function AssetInventoryPage() {
     {
       id: "budget",
       header: "Budget",
+      meta: { hideOnMobile: true },
       cell: ({ row }) => {
         const fin = row.original.financials;
         return <div className="text-muted-foreground">{formatBudget(fin?.expectation)}</div>;
@@ -185,6 +201,7 @@ export default function AssetInventoryPage() {
     {
       id: "total_price",
       header: "Total Price",
+      meta: { hideOnMobile: true },
       cell: ({ row }) => {
         const fin = row.original.financials;
         return <div className="text-muted-foreground">{formatTotalPrice(fin?.land_price)}</div>;
@@ -220,28 +237,55 @@ export default function AssetInventoryPage() {
           </Link>
         </div>
       </div>
-      <div className="bg-card border rounded-2xl shadow-sm overflow-hidden p-6">
-        <DataTable 
-          columns={columns} 
-          data={assets} 
-          showToolbar={true}
-          showDeleteAction={role === "Admin"}
-          onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
-          renderToolbarActions={(selectedRows) => {
-            if (selectedRows.length !== 1) return null;
-            const row = selectedRows[0];
-            return (
-              <>
-                <Button variant="outline" size="sm" onClick={() => router.push("/asset-inventory/" + row.id)}>
-                  <Eye size={15} className="mr-1.5" /> View
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => router.push("/asset-inventory/new?edit=" + row.id)}>
-                  <Edit size={15} className="mr-1.5" /> Edit
-                </Button>
-              </>
-            );
-          }}
-        />
+      <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
+        <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b bg-muted/10">
+          <div className="relative flex-1 md:max-w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search ID, Owner, Address..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-9 h-10 bg-background rounded-full border-border/60 shadow-sm text-[13.5px]"
+            />
+          </div>
+          {searchQuery && (
+            <Button variant="ghost" size="icon" onClick={() => setSearchQuery("")} className="h-10 w-10 shrink-0 rounded-full text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors" title="Clear Search">
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+          <div className="ml-auto flex items-center gap-3 md:hidden">
+            <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={fetchAssets} title="Refresh">
+              <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+            </Button>
+            <Link href="/asset-inventory/new" className="inline-flex h-10 rounded-full bg-[#0052FF] px-4 text-[13px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-1.5 transition-transform active:scale-95">
+              <Plus size={16} />
+              Add
+            </Link>
+          </div>
+        </div>
+        <div className="p-0 sm:p-6">
+          <DataTable
+            columns={columns}
+            data={filteredAssets}
+            showToolbar={true}
+            showDeleteAction={role === "Admin"}
+            onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
+            renderToolbarActions={(selectedRows) => {
+              if (selectedRows.length !== 1) return null;
+              const row = selectedRows[0];
+              return (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => router.push("/asset-inventory/" + row.id)}>
+                    <Eye size={15} className="mr-1.5" /> View
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => router.push("/asset-inventory/new?edit=" + row.id)}>
+                    <Edit size={15} className="mr-1.5" /> Edit
+                  </Button>
+                </>
+              );
+            }}
+          />
+        </div>
       </div>
 
       <Dialog open={deleteId !== null || bulkDeleteIds !== null} onOpenChange={(open) => {

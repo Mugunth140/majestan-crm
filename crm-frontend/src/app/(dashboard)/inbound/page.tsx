@@ -244,6 +244,7 @@ export default function InboundPage() {
     { 
       id: "sno", 
       header: "#",
+      meta: { hideOnMobile: true },
       cell: ({ row }) => <span>{row.index + 1}</span>
     },
     {
@@ -258,6 +259,7 @@ export default function InboundPage() {
     { 
       accessorKey: "date", 
       header: "Date",
+      meta: { hideOnMobile: true },
       cell: ({ row }) => {
         const d = row.original.createdAt || row.original.created_at || row.original.date;
         return <span>{d ? new Date(d).toLocaleDateString() : "-"}</span>;
@@ -276,11 +278,13 @@ export default function InboundPage() {
     {
       id: "mobile",
       header: "Mobile Number",
+      meta: { hideOnMobile: true },
       cell: ({ row }) => <span>{row.original.mobile_number || row.original.owner_mobile || "-"}</span>,
     },
     {
       id: "address",
       header: "Address",
+      meta: { hideOnMobile: true },
       cell: ({ row }) => {
         const addr = row.original.address || row.original.location || "";
         if (!addr) return <span>-</span>;
@@ -339,24 +343,38 @@ export default function InboundPage() {
       </div>
 
       <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
-        <div className="flex flex-col xl:flex-row xl:items-end justify-between px-4 sm:px-6 border-b bg-muted/10 pt-4 gap-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pb-3 xl:pb-4 w-full xl:w-auto">
-            {/* Search Input */}
-            <div className="relative w-full sm:flex-1 sm:w-64 xl:w-72">
+        <div className="flex flex-col sm:flex-row sm:items-end px-4 sm:px-6 border-b bg-muted/10 pt-4 gap-3 sm:gap-6">
+          {/* Tabs */}
+          <div className="flex items-center justify-start gap-6 sm:gap-8 overflow-x-auto scrollbar-hide relative shrink-0">
+            {tabs.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={"relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " + (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")}
+              >
+                {tab}
+                {activeTab === tab && (
+                  <motion.div layoutId="activeTabUnderline" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full" initial={false} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Search & Filters — pushed to the right */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 pb-3 sm:pb-4 ml-auto w-full sm:w-auto">
+            <div className="relative w-full sm:w-64 xl:w-72">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Search Property ID, Type..." 
+              <Input
+                placeholder="Search Property ID, Type..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className="pl-9 w-full h-10 bg-background rounded-full border-border/60 shadow-sm text-[13.5px]"
               />
             </div>
-            
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              {/* Filters Popover */}
+            <div className="flex items-center gap-2">
               <Popover>
                 <PopoverTrigger render={
-                  <Button variant="outline" className="h-10 flex-1 sm:flex-none rounded-full bg-background border-border/60 shadow-sm px-4 flex items-center justify-center gap-2">
+                  <Button variant="outline" className="h-10 rounded-full bg-background border-border/60 shadow-sm px-4 flex items-center gap-2">
                     <Filter className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium text-[13.5px]">Filters</span>
                     {activeFiltersCount > 0 && (
@@ -364,7 +382,7 @@ export default function InboundPage() {
                     )}
                   </Button>
                 } />
-                <PopoverContent align="start" className="w-[calc(100vw-32px)] sm:w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60 mx-4 sm:mx-0">
+                <PopoverContent align="end" className="w-[calc(100vw-32px)] sm:w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60 mx-4 sm:mx-0">
                   <div className="flex items-center justify-between p-4 border-b bg-muted/10">
                     <h4 className="font-semibold text-foreground text-sm">Filter Inbound</h4>
                     {activeFiltersCount > 0 && (
@@ -397,28 +415,12 @@ export default function InboundPage() {
                   </div>
                 </PopoverContent>
               </Popover>
-              
               {(searchQuery || activeFiltersCount > 0) && (
                 <Button variant="ghost" size="icon" onClick={() => { setSearchQuery(""); clearFilters(); }} className="h-10 w-10 shrink-0 rounded-full text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors" title="Clear Search & Filters">
                   <X className="h-4 w-4" />
                 </Button>
               )}
             </div>
-          </div>
-
-          <div className="flex items-center gap-6 sm:gap-8 overflow-x-auto scrollbar-hide relative xl:pr-6 pb-2 w-full">
-            {tabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={"relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " + (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")}
-            >
-              {tab}
-              {activeTab === tab && (
-                <motion.div layoutId="activeTabUnderline" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full" initial={false} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
-              )}
-            </button>
-          ))}
           </div>
         </div>
 
