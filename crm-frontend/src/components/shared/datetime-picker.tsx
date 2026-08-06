@@ -6,6 +6,7 @@ import { Calendar as CalendarIcon, Globe, ChevronUp, ChevronDown } from "lucide-
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-device";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -21,6 +22,7 @@ interface DateTimePickerProps {
 }
 
 export function DateTimePicker({ value, onChange, placeholder = "Pick date & time", className }: DateTimePickerProps) {
+  const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = React.useState(false);
   const [internalDate, setInternalDate] = React.useState<Date | undefined>(value);
 
@@ -151,6 +153,36 @@ export function DateTimePicker({ value, onChange, placeholder = "Pick date & tim
     setTime(hour12, minute, ampm === "AM" ? "PM" : "AM");
   };
 
+  if (isMobile) {
+    return       <div className="relative w-full">
+        <Button
+          type="button"
+          variant="outline"
+          className={cn(
+            "w-full justify-start text-left font-medium bg-background hover:bg-muted/40 rounded-xl h-11 border-border/60 shadow-sm transition-all duration-200",
+            !value && "text-muted-foreground font-normal",
+            className
+          )}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground shrink-0" />
+          {value ? format(value, "MMM do, yyyy - hh:mm a") : <span>{placeholder}</span>}
+        </Button>
+        <input 
+          type="datetime-local" 
+          value={value ? format(value, "yyyy-MM-dd'T'HH:mm") : ""}
+          onChange={(e) => {
+            if (e.target.value) {
+              const d = new Date(e.target.value);
+              onChange?.(d);
+            } else {
+              onChange?.(undefined);
+            }
+          }}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        />
+      </div>;
+  }
+
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger render={
@@ -162,7 +194,7 @@ export function DateTimePicker({ value, onChange, placeholder = "Pick date & tim
             className
           )}
         >
-          <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+          <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground shrink-0" />
           {value ? format(value, "MMM do, yyyy - hh:mm a") : <span>{placeholder}</span>}
         </Button>
       } />

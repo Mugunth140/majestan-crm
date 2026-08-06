@@ -5,6 +5,7 @@ import { Clock, ChevronUp, ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-device";
 import {
   Popover,
   PopoverContent,
@@ -19,6 +20,7 @@ interface TimePickerProps {
 }
 
 export function TimePicker({ value, onChange, placeholder = "Pick time", className }: TimePickerProps) {
+  const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = React.useState(false);
 
   // Parse initial value or default to 12:00 PM
@@ -116,6 +118,36 @@ export function TimePicker({ value, onChange, placeholder = "Pick time", classNa
      return `${h}:${m} ${ap}`;
   })() : "";
 
+  if (isMobile) {
+    return       <div className="relative w-full">
+        <Button
+          type="button"
+          variant="outline"
+          className={cn(
+            "w-full justify-start text-left font-medium bg-background hover:bg-muted/40 rounded-xl h-12 border-border/60 shadow-sm transition-all duration-200",
+            !value && "text-muted-foreground font-normal",
+            className
+          )}
+        >
+          <Clock className="mr-2 h-4 w-4 text-muted-foreground shrink-0" />
+          {value ? <span>{displayString}</span> : <span>{placeholder}</span>}
+        </Button>
+        <input 
+          type="time" 
+          value={value ? (value.split(":").length >= 2 ? value.substring(0, 5) : "") : ""}
+          onChange={(e) => {
+            if (e.target.value) {
+              // input type="time" returns "HH:mm"
+              onChange?.(e.target.value + ":00");
+            } else {
+              onChange?.(undefined);
+            }
+          }}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        />
+      </div>;
+  }
+
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger render={
@@ -127,7 +159,7 @@ export function TimePicker({ value, onChange, placeholder = "Pick time", classNa
             className
           )}
         >
-          <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
+          <Clock className="mr-2 h-4 w-4 text-muted-foreground shrink-0" />
           {value ? <span>{displayString}</span> : <span>{placeholder}</span>}
         </Button>
       } />

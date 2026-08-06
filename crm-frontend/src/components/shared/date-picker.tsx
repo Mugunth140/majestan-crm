@@ -6,6 +6,7 @@ import { Calendar as CalendarIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-device";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -21,6 +22,7 @@ interface DatePickerProps {
 }
 
 export function DatePicker({ value, onChange, placeholder = "Pick a date", className }: DatePickerProps) {
+  const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = React.useState(false);
   const [internalDate, setInternalDate] = React.useState<Date | undefined>(value);
 
@@ -52,6 +54,39 @@ export function DatePicker({ value, onChange, placeholder = "Pick a date", class
   const handleClear = () => {
     setInternalDate(undefined);
   };
+
+  if (isMobile) {
+    return       <div className="relative w-full">
+        <Button
+          type="button"
+          variant="outline"
+          className={cn(
+            "w-full justify-start text-left font-medium bg-background hover:bg-muted/40 rounded-xl h-9 border-border/60 shadow-sm transition-all duration-200",
+            !value && "text-muted-foreground font-normal",
+            className
+          )}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground shrink-0" />
+          {value ? format(value, "MMM d, yyyy") : <span>{placeholder}</span>}
+        </Button>
+        <input 
+          type="date" 
+          value={value ? format(value, "yyyy-MM-dd") : ""}
+          onChange={(e) => {
+            if (e.target.value) {
+              const parts = e.target.value.split("-");
+              if (parts.length === 3) {
+                const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                onChange?.(d);
+              }
+            } else {
+              onChange?.(undefined);
+            }
+          }}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        />
+      </div>;
+  }
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
