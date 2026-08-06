@@ -34,6 +34,8 @@ interface DataTableProps<TData, TValue> {
   onDeleteSelected?: (selectedRows: TData[]) => void;
   renderToolbarActions?: (selectedRows: TData[], clearSelection: () => void) => React.ReactNode;
   flush?: boolean;
+  hidePagination?: boolean;
+  pageSize?: number;
 }
 
 export function DataTable<TData, TValue>({
@@ -45,6 +47,8 @@ export function DataTable<TData, TValue>({
   onDeleteSelected,
   renderToolbarActions,
   flush = false,
+  hidePagination = false,
+  pageSize = 10,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -64,6 +68,9 @@ export function DataTable<TData, TValue>({
       sorting,
       columnFilters,
       rowSelection,
+    },
+    initialState: {
+      pagination: { pageSize },
     },
   });
 
@@ -149,7 +156,7 @@ export function DataTable<TData, TValue>({
                     ))}
                   </TableRow>
                 ))}
-                {Array.from({ length: Math.max(0, table.getState().pagination.pageSize - table.getRowModel().rows.length) }).map((_, i) => (
+                {Array.from({ length: hidePagination ? 0 : Math.max(0, table.getState().pagination.pageSize - table.getRowModel().rows.length) }).map((_, i) => (
                   <TableRow key={`empty-${i}`} className="hover:bg-transparent border-b border-border/40">
                     {columns.map((col, colIdx) => (
                       <TableCell 
@@ -175,9 +182,10 @@ export function DataTable<TData, TValue>({
         </table>
       </div>
 
+      {!hidePagination && (
       <div className={cn(
-        "flex items-center justify-between md:mt-auto",
-        flush ? "px-6 py-4 border-t border-border/40" : "pt-1"
+        "flex items-center justify-between md:mt-auto sticky bottom-0 bg-card z-30 pb-24 pt-4 md:pb-4 md:pt-4 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none",
+        flush ? "px-6 border-t border-border/40" : ""
       )}>
         <div className="text-sm text-muted-foreground">
           Showing{" "}
@@ -210,6 +218,7 @@ export function DataTable<TData, TValue>({
           </Button>
         </div>
       </div>
+      )}
     </div>
   );
 }

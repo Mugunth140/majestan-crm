@@ -17,6 +17,8 @@ import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { AssignLeadModal } from "@/components/shared/assign-lead-modal";
 import { FormSelect } from "@/components/shared/form-select";
 import { DatePicker } from "@/components/shared/date-picker";
+import { MobileHeader } from "@/components/layout/mobile-header";
+import { Device } from "@/components/shared/device";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -82,7 +84,7 @@ export default function LeadRoutingPage() {
   const [queueLoading, setQueueLoading] = useState(false);
   const [queuePage, setQueuePage] = useState(1);
   const [queueTotal, setQueueTotal] = useState(0);
-  const LIMIT = 25;
+  const LIMIT = 10;
 
   // History state
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -446,28 +448,33 @@ export default function LeadRoutingPage() {
     ? deptTabs.filter((d) => d.value === (userDept === "sales" ? "sales" : "telecalling"))
     : deptTabs;
 
-  const totalQueuePages = Math.ceil(queueTotal / LIMIT);
-  const totalHistoryPages = Math.ceil(historyTotal / LIMIT);
+  const totalQueuePages = Math.max(1, Math.ceil(queueTotal / LIMIT));
+  const totalHistoryPages = Math.max(1, Math.ceil(historyTotal / LIMIT));
 
   return (
-    <div className="flex flex-col space-y-6 animate-in fade-in duration-500">
-      {/* Header */}
-      <div className="flex h-[48px] items-center justify-between pr-[150px]">
-        <h1 className="text-[28px] font-bold tracking-tight">Lead Routing</h1>
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-10 w-10 rounded-full border-border/60"
-          onClick={() => mainTab === "queue" ? fetchQueue() : fetchHistory()}
-          title="Refresh"
-        >
-          <RefreshCw size={16} className={(queueLoading || historyLoading) ? "animate-spin" : ""} />
-        </Button>
-      </div>
+    <>
+      <MobileHeader title="Lead Routing" />
+      <div className="w-full flex flex-col space-y-4 md:space-y-6 pt-4 lg:p-0 md:h-full">
+        <Device
+          mobile={null}
+          desktop={
+            <div className="flex h-[48px] items-center justify-between pr-[150px]">
+              <h1 className="text-[28px] font-bold tracking-tight">Lead Routing</h1>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-10 w-10 rounded-full border-border/60"
+                onClick={() => mainTab === "queue" ? fetchQueue() : fetchHistory()}
+                title="Refresh"
+              >
+                <RefreshCw size={16} className={(queueLoading || historyLoading) ? "animate-spin" : ""} />
+              </Button>
+            </div>
+          }
+        />
 
-      {/* Main Tabs */}
-      <div className="bg-card border rounded-2xl shadow-sm overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-6 border-b bg-muted/10 pt-4 gap-4">
+        <div className="bg-card border-y md:border md:rounded-xl overflow-hidden shadow-sm md:flex md:flex-col md:flex-1 md:min-h-0">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between px-4 md:px-6 border-b bg-muted/10 pt-4 gap-4">
           <div className="flex items-center gap-8">
             {(["queue", "history"] as MainTab[]).map((tab) => {
               const labels = { queue: "Routing Queue", history: "Routing History" };
@@ -516,12 +523,16 @@ export default function LeadRoutingPage() {
 
         {/* Queue Tab */}
         {mainTab === "queue" && (
-          <div className="p-6 space-y-4">
+          <div className="w-full md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col p-4 md:p-0">
             {queueLoading ? (
               <TableSkeleton />
             ) : (
               <>
+                <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col pt-2">
                 <DataTable 
+                  flush={true}
+                  hidePagination={true}
+                  pageSize={100}
                   columns={queueColumns} 
                   data={queue} 
                   showToolbar={true}
@@ -574,10 +585,10 @@ export default function LeadRoutingPage() {
                   }}
                 />
                 {/* Server-side pagination */}
-                {totalQueuePages > 1 && (
-                  <div className="flex items-center justify-between pt-2">
+                {true && (
+                  <div className="flex items-center justify-between px-6 pb-24 pt-4 md:py-4 border-t border-border/40 mt-auto sticky bottom-0 bg-card z-30 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none">
                     <span className="text-sm text-muted-foreground">
-                      Page {queuePage} of {totalQueuePages} ({queueTotal} total)
+                      Showing {queueTotal > 0 ? Math.min((queuePage - 1) * LIMIT + 1, queueTotal) : 0} to {Math.min(queuePage * LIMIT, queueTotal)} of {queueTotal} entries
                     </span>
                     <div className="flex items-center gap-2">
                       <Button
@@ -599,6 +610,7 @@ export default function LeadRoutingPage() {
                     </div>
                   </div>
                 )}
+              </div>
               </>
             )}
           </div>
@@ -606,9 +618,9 @@ export default function LeadRoutingPage() {
 
         {/* History Tab */}
         {mainTab === "history" && (
-          <div className="p-6 space-y-4">
+          <div className="w-full md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col p-4 md:p-0">
             {/* Filters */}
-            <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide pb-2 md:pb-0 md:flex-wrap md:px-6 md:pt-4">
               <div className="flex items-center gap-2">
                 <DatePicker
                   value={historyDateFrom}
@@ -657,12 +669,13 @@ export default function LeadRoutingPage() {
               <TableSkeleton />
             ) : (
               <>
-                <DataTable columns={historyColumns} data={history} />
+                <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col pt-2">
+                  <DataTable flush={true} hidePagination={true} pageSize={100} columns={historyColumns} data={history} />
                 {/* Server-side pagination */}
-                {totalHistoryPages > 1 && (
-                  <div className="flex items-center justify-between pt-2">
+                {true && (
+                  <div className="flex items-center justify-between px-6 pb-24 pt-4 md:py-4 border-t border-border/40 mt-auto sticky bottom-0 bg-card z-30 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none">
                     <span className="text-sm text-muted-foreground">
-                      Page {historyPage} of {totalHistoryPages} ({historyTotal} total)
+                      Showing {historyTotal > 0 ? Math.min((historyPage - 1) * LIMIT + 1, historyTotal) : 0} to {Math.min(historyPage * LIMIT, historyTotal)} of {historyTotal} entries
                     </span>
                     <div className="flex items-center gap-2">
                       <Button
@@ -684,6 +697,7 @@ export default function LeadRoutingPage() {
                     </div>
                   </div>
                 )}
+              </div>
               </>
             )}
           </div>
@@ -723,5 +737,6 @@ export default function LeadRoutingPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </>
   );
 }
