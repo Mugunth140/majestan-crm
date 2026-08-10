@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 import {
   ArrowLeft, Loader2, User, Phone, MapPin, Building2,
   Briefcase, Mail, MessageSquare, Plus, ArrowUpRight,
-  Clock, Send, RefreshCw, History, TrendingUp, SlidersHorizontal, Sparkles, Edit, ChevronLeft, ChevronRight
+  Clock, Send, RefreshCw, History, TrendingUp, SlidersHorizontal, Sparkles, Edit, ChevronLeft, ChevronRight, PhoneIncoming
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -53,17 +53,17 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 const CONTACT_TYPE_STYLES: Record<string, string> = {
-  email:    "bg-blue-100 text-blue-700 border-blue-200",
-  sms:      "bg-green-100 text-green-700 border-green-200",
-  whatsapp: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  call:     "bg-purple-100 text-purple-700 border-purple-200",
+  email:    "bg-muted/30 text-muted-foreground border-border/60",
+  sms:      "bg-muted/30 text-muted-foreground border-border/60",
+  whatsapp: "bg-muted/30 text-emerald-600 dark:text-emerald-400 border-border/60",
+  call:     "bg-muted/30 text-blue-600 dark:text-blue-400 border-border/60",
 };
 
 const CONTACT_TYPE_ICONS: Record<string, React.ReactNode> = {
   email:    <Mail className="h-3.5 w-3.5" />,
   sms:      <MessageSquare className="h-3.5 w-3.5" />,
   whatsapp: <Phone className="h-3.5 w-3.5" />,
-  call:     <Phone className="h-3.5 w-3.5" />,
+  call:     <PhoneIncoming className="h-3.5 w-3.5" />,
 };
 
 const PRIORITIES = [
@@ -208,6 +208,7 @@ export default function LeadViewPage() {
   // Modals / Sliders
   const [contactModal, setContactModal] = useState<{ open: boolean; type: string; to: string }>({ open: false, type: "", to: "" });
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isContactLogsOpen, setIsContactLogsOpen] = useState(false);
   const [isAutoMatchOpen, setIsAutoMatchOpen] = useState(false);
   const [autoMatchResults, setAutoMatchResults] = useState<any[]>([]);
   const [isMatching, setIsMatching] = useState(false);
@@ -407,6 +408,13 @@ export default function LeadViewPage() {
   const badgeCls = STATUS_STYLES[statusName] ?? "bg-gray-100 text-gray-800 border-gray-200";
   const followUps: any[] = lead.follow_ups || [];
   const contactLogs: any[] = lead.contact_logs || [];
+  const callDirectionCounts = contactLogs.reduce((counts: Record<string, number>, log: any) => {
+    if (log.contact_type === "call") {
+      const direction = (log.call_direction || "Unknown").toLowerCase();
+      counts[direction] = (counts[direction] || 0) + 1;
+    }
+    return counts;
+  }, {});
 
   // RNR Calculation
   let highestRnr = 0;
@@ -769,48 +777,53 @@ export default function LeadViewPage() {
         </div>
         )}
 
-        {/* ── Row 3: Contact Log (2/3) + Assignment/Requirement (1/3) ── */}
+        {/* ── Row 3: Contact Summary (2/3) + Assignment/Requirement (1/3) ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-card border rounded-2xl p-6 shadow-sm">
             <div className="flex items-center justify-between border-b pb-3 mb-5">
               <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" /> Contact Log
+                <Clock className="h-4 w-4 text-muted-foreground" /> Contact activity
               </h3>
-              <div className="flex items-center gap-2 flex-wrap">
-                {(["call", "whatsapp", "sms", "email"] as const).map(type => (
-                  <div key={type} className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold ${CONTACT_TYPE_STYLES[type]}`}>
-                    {CONTACT_TYPE_ICONS[type]}
-                    <span className="capitalize">{type}</span>
-                    <span className="ml-0.5 font-bold">{contactCounts[type] || 0}</span>
-                  </div>
-                ))}
-              </div>
+              <button 
+                onClick={() => setIsContactLogsOpen(true)}
+                className="text-[11px] font-bold uppercase tracking-wider text-[#0052FF] hover:underline flex items-center gap-1.5 bg-[#0052FF]/10 px-3 py-1.5 rounded-lg transition-colors hover:bg-[#0052FF]/20"
+              >
+                <History className="h-3.5 w-3.5" /> View logs ({contactLogs.length})
+              </button>
             </div>
 
-            {contactLogs.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic text-center py-6">No contact attempts recorded yet. Use the buttons on the contact details above to log one.</p>
-            ) : (
-              <div className="relative space-y-0">
-                <div className="absolute left-[19px] top-0 bottom-0 w-px bg-border/50" />
-                {contactLogs.map((log: any) => (
-                  <div key={log.id} className="flex gap-4 pb-4 relative">
-                    <div className={`relative z-10 h-10 w-10 shrink-0 rounded-full border-2 border-background flex items-center justify-center ${CONTACT_TYPE_STYLES[log.contact_type] || "bg-gray-100"}`}>
-                      {CONTACT_TYPE_ICONS[log.contact_type] || <MessageSquare className="h-3.5 w-3.5" />}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-y-6 lg:gap-0 lg:divide-x divide-border/60">
+              
+              {/* Calls Primary Stat */}
+              <div className="flex flex-col gap-1.5 lg:pr-6">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                  <PhoneIncoming className="h-3 w-3" /> Calls
+                </div>
+                <div className="flex items-baseline gap-3">
+                  <span className="text-3xl font-light text-foreground tracking-tighter leading-none">{contactCounts.call || 0}</span>
+                  {contactCounts.call > 0 && (
+                    <div className="flex gap-2 text-[10px] font-medium text-muted-foreground/80 uppercase tracking-wide">
+                      <span><strong className="text-foreground">{callDirectionCounts.incoming || 0}</strong> IN</span>
+                      <span><strong className="text-foreground">{callDirectionCounts.outgoing || 0}</strong> OUT</span>
+                      <span><strong className="text-foreground">{callDirectionCounts.missed || 0}</strong> MISS</span>
                     </div>
-                    <div className="flex-1 pt-1.5">
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <p className="text-[13.5px] font-semibold text-foreground">
-                          <span className="capitalize">{log.contact_type}</span> by{" "}
-                          <span className="text-[#0052FF]">{log.sent_by?.name || "Staff"}</span>
-                        </p>
-                        <span className="text-xs text-muted-foreground">{formatTimestamp(log.created_at)}</span>
-                      </div>
-                      {log.subject && <p className="text-xs text-muted-foreground mt-0.5">Subject: {log.subject}</p>}
-                      {log.message && <p className="text-[13px] text-foreground/70 mt-1 bg-muted/30 rounded-lg px-3 py-2">{log.message}</p>}
-                    </div>
-                  </div>
-                ))}
+                  )}
+                </div>
               </div>
+
+              {/* Secondary Stats */}
+              {(["whatsapp", "sms", "email"] as const).map((type) => (
+                <div key={type} className="flex flex-col gap-1.5 lg:pl-6">
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                    {CONTACT_TYPE_ICONS[type]} {type}
+                  </div>
+                  <span className="text-3xl font-light text-foreground tracking-tighter leading-none">{contactCounts[type] || 0}</span>
+                </div>
+              ))}
+            </div>
+
+            {contactLogs.length === 0 && (
+              <p className="mt-5 text-center text-xs text-muted-foreground">No contact attempts recorded yet.</p>
             )}
           </div>
 
@@ -957,6 +970,68 @@ export default function LeadViewPage() {
               followUps={followUps}
               onRefresh={() => fetchLead(true)}
             />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* ── Contact Logs Slider (Sheet) ── */}
+      <Sheet open={isContactLogsOpen} onOpenChange={setIsContactLogsOpen}>
+        <SheetContent side="right" className="!w-full sm:!w-[450px] sm:!max-w-[450px] p-0 flex flex-col border-l [&>button[data-slot='sheet-close']]:hidden sm:[&>button[data-slot='sheet-close']]:flex">
+          <div className="md:hidden flex flex-col shrink-0 bg-background/90 backdrop-blur-xl border-b z-10">
+            <div className="h-[env(safe-area-inset-top)] w-full" />
+            <div className="flex items-center justify-between px-4 h-14">
+              <button
+                onClick={() => setIsContactLogsOpen(false)}
+                className="flex items-center text-[#007AFF] dark:text-[#0A84FF] active:opacity-70 -ml-2 shrink-0"
+              >
+                <ChevronLeft className="w-[28px] h-[28px]" strokeWidth={2.5} />
+                <span className="text-[17px] font-medium tracking-tight">Back</span>
+              </button>
+              <span className="absolute inset-x-0 text-center pointer-events-none text-[17px] font-semibold tracking-tight text-foreground truncate px-20">Contact logs</span>
+              <div className="w-10 shrink-0" />
+            </div>
+          </div>
+
+          <SheetHeader className="hidden md:block p-6 border-b shrink-0">
+            <SheetTitle className="text-lg">Contact logs {contactLogs.length > 0 && `(${contactLogs.length})`}</SheetTitle>
+            <SheetDescription>Calls, messages, and emails recorded for this lead.</SheetDescription>
+          </SheetHeader>
+
+          <div className="flex-1 overflow-y-auto p-5">
+            {contactLogs.length === 0 ? (
+              <div className="py-16 text-center">
+                <Clock className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
+                <p className="text-sm font-medium text-foreground">No contact logs yet</p>
+                <p className="mt-1 text-xs text-muted-foreground">New calls and communication will appear here.</p>
+              </div>
+            ) : (
+              <div className="relative space-y-0">
+                <div className="absolute left-[19px] top-2 bottom-2 w-px bg-border" />
+                {contactLogs.map((log: any) => (
+                  <div key={log.id} className="relative flex gap-4 pb-5 last:pb-0">
+                    <div className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-background ${CONTACT_TYPE_STYLES[log.contact_type] || "bg-muted text-muted-foreground"}`}>
+                      {CONTACT_TYPE_ICONS[log.contact_type] || <MessageSquare className="h-3.5 w-3.5" />}
+                    </div>
+                    <div className="min-w-0 flex-1 rounded-xl border bg-card px-3.5 py-3 shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-[13px] font-semibold text-foreground">
+                          <span className="text-[#0052FF]">{log.sent_by?.name || "Staff"}</span>
+                          <span className="mx-1.5 text-muted-foreground/60">•</span>
+                          {log.contact_type === "call" ? (
+                            <>{log.call_direction || "Voice"} call <span className="font-normal text-muted-foreground">({log.call_duration ? `${Math.floor(log.call_duration / 60)}m ${log.call_duration % 60}s` : "0s"})</span></>
+                          ) : (
+                            <span className="capitalize">{log.contact_type}</span>
+                          )}
+                        </p>
+                        <span className="shrink-0 text-[10px] leading-4 text-muted-foreground">{formatTimestamp(log.created_at)}</span>
+                      </div>
+                      {log.subject && <p className="mt-2 text-xs font-medium text-muted-foreground">Subject: {log.subject}</p>}
+                      {log.message && <p className="mt-2 rounded-lg bg-muted/50 px-2.5 py-2 text-[12px] leading-relaxed text-foreground/75">{log.message}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </SheetContent>
       </Sheet>

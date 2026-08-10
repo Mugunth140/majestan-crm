@@ -22,7 +22,8 @@ import {
   Package,
   TrendingUp,
   Target,
-  UserPen
+  UserPen,
+  PhoneIncoming
 } from "lucide-react";
 import Image from "next/image";
 
@@ -37,6 +38,7 @@ const navigation = [
   { name: "Asset Inventory", href: "/asset-inventory", icon: Package },
   { name: "HR Panel", href: "/hr", icon: UserPen },
   { name: "Tasks", href: "/tasks", icon: Target },
+  { name: "Logger", href: "/logger", icon: PhoneIncoming, adminOrManager: true },
   { name: "Activity Logs", adminOnly: true, href: "/activity-logs", icon: Activity },
     { 
     name: "Users", 
@@ -67,7 +69,7 @@ export function Sidebar() {
       const userStr = localStorage.getItem("crm_user");
       if (userStr) {
         const user = JSON.parse(userStr);
-        setUserRole(user.role);
+        setUserRole(user?.role?.name || user?.role || "");
       }
     } catch (err) {
       console.error("FailLocationed to parse user from local storage");
@@ -79,7 +81,7 @@ export function Sidebar() {
     setExpandedItems(prev => {
       const next = { ...prev };
       navigation.forEach(item => {
-        if (item.subItems && item.subItems.some(sub => pathname.startsWith(sub.href))) {
+        if (item.subItems && item.subItems.some((sub: any) => pathname.startsWith(sub.href))) {
           next[item.name] = true;
         }
       });
@@ -92,6 +94,7 @@ export function Sidebar() {
   };
 
   const isAdmin = userRole === "Admin" || userRole === "Super Admin";
+  const canViewLogger = isAdmin || userRole === "Manager";
 
   return (
     <aside
@@ -126,11 +129,12 @@ export function Sidebar() {
 
       <div className="flex-1 overflow-x-hidden overflow-y-auto py-3 scrollbar-none">
         <nav className="grid items-start px-2 gap-1 text-[14px] font-medium">
-          {navigation.map((item) => {
+          {navigation.map((item: any) => {
             if (item.adminOnly && !isAdmin) return null;
+            if (item.adminOrManager && !canViewLogger) return null;
 
             const hasSub = item.subItems && item.subItems.length > 0;
-            const isActive = item.href ? (pathname === item.href || pathname.startsWith(item.href + "/")) : (hasSub && item.subItems?.some(sub => pathname.startsWith(sub.href)));
+            const isActive = item.href ? (pathname === item.href || pathname.startsWith(item.href + "/")) : (hasSub && item.subItems?.some((sub: any) => pathname.startsWith(sub.href)));
             const isExpanded = expandedItems[item.name] || false;
 
             const ItemContent = (
@@ -183,7 +187,7 @@ export function Sidebar() {
                   )}>
                     <div className="overflow-hidden">
                       <div className="ml-9 mt-1 flex flex-col gap-1 border-l-2 border-muted/50 pl-3">
-                        {item.subItems?.map((sub) => {
+                        {item.subItems?.map((sub: any) => {
                           let isSubActive = false;
                           if (sub.href.includes("?")) {
                             const paramString = sub.href.split("?")[1];

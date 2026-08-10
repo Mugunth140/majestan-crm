@@ -51,7 +51,7 @@ export function FormSelect({
           {(val: string | null) => (val && val !== "" ? (labelMap[val] ?? val) : placeholder)}
         </SelectValue>
       </SelectTrigger>
-      <SelectContent className="max-h-75" alignItemWithTrigger={false} side="bottom" align="start">
+      <SelectContent className="max-h-[300px]" alignItemWithTrigger={false} side="bottom" align="start">
         {options.map((opt) => (
           <SelectItem key={opt.value} value={opt.value} className="text-[14.5px] py-2.5 px-5 cursor-pointer">
             {opt.label}

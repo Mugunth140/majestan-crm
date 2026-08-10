@@ -54,6 +54,9 @@ export class User {
   @Column({ type: 'timestamp', nullable: true })
   last_login_at: Date;
 
+  @Column({ type: 'timestamp', nullable: true })
+  device_last_sync_at: Date;
+
   @CreateDateColumn()
   created_at: Date;
 

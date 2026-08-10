@@ -17,7 +17,7 @@ const MobileHeaderContext = createContext<MobileHeaderState | null>(null);
 
 const LIST_TITLES: [string, string][] = [
   ["/tasks", "Tasks"],
-  ["/logs", "Logs"],
+  ["/inbox", "Inbox"],
   ["/settings", "Settings"],
   ["/leads", "Leads Dashboard"],
   ["/inbound", "Inbound"],

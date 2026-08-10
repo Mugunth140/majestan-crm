@@ -3,7 +3,7 @@ WORKDIR /app
 
 FROM base AS builder
 COPY package.json bun.lock ./
-RUN bun install
+RUN bun install --no-cache
 COPY . .
 RUN bun run build
 

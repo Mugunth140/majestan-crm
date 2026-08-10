@@ -20,6 +20,7 @@ import { HrModule } from './modules/hr/hr.module';
 import { AssetsModule } from './modules/assets/assets.module';
 import { LeadRoutingModule } from './modules/lead-routing/lead-routing.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ContactLogsModule } from './modules/contact-logs/contact-logs.module';
 
 import { ActivityLog } from './database/entities/activity-log.entity';
 import { Department } from './database/entities/department.entity';
@@ -106,6 +107,7 @@ import { Notification } from './database/entities/notification.entity';
     AssetsModule,
     LeadRoutingModule,
     NotificationsModule,
+    ContactLogsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

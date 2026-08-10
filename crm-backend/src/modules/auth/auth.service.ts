@@ -55,4 +55,28 @@ export class AuthService {
       }
     };
   }
+
+  async getMe(userId: number) {
+    const user = await this.userRepository.findOne({ 
+      where: { id: userId },
+      relations: { role: true, department: true } 
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return {
+      success: true,
+      data: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role?.name,
+        department_id: user.department_id,
+        department: user.department?.name,
+        device_last_sync_at: user.device_last_sync_at
+      }
+    };
+  }
 }

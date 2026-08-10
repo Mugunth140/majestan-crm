@@ -32,6 +32,12 @@ export class AgentContactLog {
   @JoinColumn({ name: 'sent_by_id' })
   sent_by: User;
 
+  @Column({ nullable: true })
+  call_duration: number;
+
+  @Column({ nullable: true })
+  call_direction: string;
+
   @CreateDateColumn()
   created_at: Date;
 }

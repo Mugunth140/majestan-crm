@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   LayoutGrid, 
-  MessageSquareText, 
+  ArrowBigDownDash,
   Settings, 
   CheckCircle2, 
   Plus, 
@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { href: "/", icon: LayoutGrid, label: "Overview" },
   { href: "/tasks", icon: CheckCircle2, label: "Tasks" },
-  { href: "/logs", icon: MessageSquareText, label: "Logs" },
+  { href: "/inbox", icon: ArrowBigDownDash, label: "Inbox" },
   { href: "/settings", icon: Settings, label: "Settings" },
 ];
 

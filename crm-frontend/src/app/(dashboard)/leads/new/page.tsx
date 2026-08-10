@@ -581,11 +581,25 @@ function LeadForm() {
 
                 <div className="space-y-2 lg:col-span-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Decision Maker</label>
-                  <Input
+                  <FormSelect
                     name="decisionMaker"
-                    defaultValue={leadData?.inquiries?.[0]?.decision_maker || ""}
-                    placeholder="e.g. Self, Spouse, Father"
-                    className="h-12 rounded-xl bg-muted/30"
+                    defaultValue={leadData?.inquiries?.[0]?.decision_maker || null}
+                    placeholder="Select Decision Maker"
+                    options={[
+                      { label: "Self", value: "Self" },
+                      { label: "Spouse", value: "Spouse" },
+                      { label: "Father", value: "Father" },
+                      { label: "Mother", value: "Mother" },
+                      { label: "Son", value: "Son" },
+                      { label: "Daughter", value: "Daughter" },
+                      { label: "Brother", value: "Brother" },
+                      { label: "Sister", value: "Sister" },
+                      { label: "Father-in-law", value: "Father-in-law" },
+                      { label: "Mother-in-law", value: "Mother-in-law" },
+                      { label: "Business Partner", value: "Business Partner" },
+                      { label: "Joint Family", value: "Joint Family" },
+                      { label: "Other Relative", value: "Other Relative" },
+                    ]}
                   />
                 </div>
               </div>
@@ -636,7 +650,23 @@ function LeadForm() {
                       </div>
                       <div className="space-y-2">
                         <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Facing</label>
-                        <FormSelect name="_facing" placeholder="Select Facing" options={[{label: "North", value: "north"}, {label: "East", value: "east"}, {label: "South", value: "south"}, {label: "West", value: "west"}, {label: "North-East", value: "north_east"}]} value={preferences?.facing || null} onValueChange={v => setPreferences({...preferences, facing: v})} />
+                        <FormSelect 
+                          name="_facing" 
+                          placeholder="Select Facing" 
+                          options={[
+                            {label: "North", value: "North"}, 
+                            {label: "East", value: "East"}, 
+                            {label: "South", value: "South"}, 
+                            {label: "West", value: "West"}, 
+                            {label: "North-East (NE)", value: "North-East"},
+                            {label: "North-West (NW)", value: "North-West"},
+                            {label: "South-East (SE)", value: "South-East"},
+                            {label: "South-West (SW)", value: "South-West"},
+                            {label: "Any", value: "Any"}
+                          ]} 
+                          value={preferences?.facing || null} 
+                          onValueChange={v => setPreferences({...preferences, facing: v})} 
+                        />
                       </div>
                     </>
                   )}

@@ -54,6 +54,8 @@ export function MobileGlassHeader() {
             )}
           </div>
 
+          <div className="z-10 flex items-center justify-end" />
+
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-24 overflow-hidden">
             <AnimatePresence initial={false}>
               {isScrolled && (
