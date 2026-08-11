@@ -68,7 +68,7 @@ export class ContactLogsService {
       email: user.email,
       role: user.role?.name || 'Staff',
       last_sync_at: user.device_last_sync_at,
-      is_active: new Date(user.device_last_sync_at).getTime() >= activeCutoff,
+      is_active: user.device_last_sync_at ? new Date(user.device_last_sync_at).getTime() >= activeCutoff : false,
     }));
   }
 
