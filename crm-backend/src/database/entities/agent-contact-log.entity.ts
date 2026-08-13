@@ -38,7 +38,7 @@ export class AgentContactLog {
   @Column({ type: 'varchar', length: 20, nullable: true })
   call_direction: string | null;
 
-  @Column({ name: 'source_call_id', nullable: true })
+  @Column({ name: 'source_call_id', type: 'varchar', length: 255, nullable: true })
   source_call_id: string | null;
 
   @CreateDateColumn()
