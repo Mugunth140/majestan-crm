@@ -40,6 +40,9 @@ export class ContactLog {
   @Column({ type: 'varchar', length: 20, nullable: true })
   call_direction: string | null;
 
+  @Column({ name: 'source_call_id', nullable: true })
+  source_call_id: string | null;
+
   @CreateDateColumn()
   created_at: Date;
 }

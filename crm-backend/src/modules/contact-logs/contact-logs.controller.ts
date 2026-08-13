@@ -21,7 +21,9 @@ export class ContactLogsController {
 
   @Post('device/heartbeat')
   async recordDeviceHeartbeat(@Request() req: any, @Body() body: any) {
-    const data = await this.contactLogsService.recordDeviceHeartbeat(req.user.id, body.deviceId);
+    // The service validates and records the complete device report. Passing
+    // only deviceId silently drops every heartbeat as an invalid payload.
+    const data = await this.contactLogsService.recordDeviceHeartbeat(req.user.id, body);
     return { success: true, data };
   }
 
