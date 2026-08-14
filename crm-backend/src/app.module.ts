@@ -21,6 +21,7 @@ import { AssetsModule } from './modules/assets/assets.module';
 import { LeadRoutingModule } from './modules/lead-routing/lead-routing.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ContactLogsModule } from './modules/contact-logs/contact-logs.module';
+import { TasksModule } from './modules/tasks/tasks.module';
 
 import { ActivityLog } from './database/entities/activity-log.entity';
 import { Department } from './database/entities/department.entity';
@@ -113,6 +114,7 @@ import { TaskReceipt } from './database/entities/task-receipt.entity';
     LeadRoutingModule,
     NotificationsModule,
     ContactLogsModule,
+    TasksModule,
   ],
   controllers: [AppController],
   providers: [AppService],

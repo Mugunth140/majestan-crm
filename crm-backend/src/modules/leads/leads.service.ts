@@ -8,6 +8,7 @@ import { ContactLog } from '../../database/entities/contact-log.entity';
 import { User } from '../../database/entities/user.entity';
 import { LeadDocument } from '../../database/entities/lead-document.entity';
 import { NotificationsService } from '../notifications/notifications.service';
+import { TasksService } from '../tasks/tasks.service';
 import { S3Client } from 'bun';
 import { extname } from 'path';
 
@@ -25,6 +26,7 @@ export class LeadsService {
     @InjectDataSource() private dataSource: DataSource,
     @InjectDataSource('siteConnection') private siteDataSource: DataSource,
     private readonly notificationsService: NotificationsService,
+    private readonly tasksService: TasksService,
   ) {}
 
   private get s3Client(): S3Client {
@@ -202,7 +204,16 @@ export class LeadsService {
       existingLead.drop_reason = body.drop_reason || null;
     }
 
-    return leadRepo.save(existingLead);
+    const saved = await leadRepo.save(existingLead);
+
+    // Auto-increment task metrics based on new lead status
+    if (body.status_name && existingLead.assigned_staff_id) {
+      this.tasksService.autoIncrementFromLeadStatus(saved, body.status_name).catch(err => {
+        console.error('Task auto-increment error (non-fatal):', err?.message);
+      });
+    }
+
+    return saved;
   }
 
   async updateLead(id: number, body: any) {
@@ -359,6 +370,13 @@ export class LeadsService {
         referred_by_contact: body.referredByContact || null,
       });
       const savedLead: Lead = await manager.save(lead);
+
+      // Auto-increment sourcing metric if assigned to sales staff
+      if (savedLead.department === 'sales' && savedLead.assigned_staff_id) {
+        this.tasksService.autoIncrementSourcing(savedLead.assigned_staff_id).catch(err => {
+          console.error('Task sourcing auto-increment error (non-fatal):', err?.message);
+        });
+      }
 
       if (body.purchaseType || body.propertyType || body.funder || body.project || body.propertyCategory) {
         const inquiry = manager.getRepository(LeadInquiry).create({
