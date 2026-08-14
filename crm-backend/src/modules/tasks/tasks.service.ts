@@ -133,47 +133,29 @@ const LEAD_STATUS_METRIC_MAP: Record<string, Array<{ dept: string; metricKey: st
  */
 function getWeeksInMonth(yearMonth: string): { totalWeeks: number; currentWeek: number } {
   const [year, month] = yearMonth.split('-').map(Number);
-  const firstDay = new Date(year, month - 1, 1);
-  const lastDay = new Date(year, month, 0);
-
-  // Find first Monday >= firstDay
-  let weekStart = new Date(firstDay);
-  const dow = weekStart.getDay(); // 0=Sun, 1=Mon ...
-  if (dow !== 1) {
-    // Go back to the Monday of the week that contains firstDay
-    const diff = (dow === 0) ? -6 : 1 - dow;
-    weekStart.setDate(weekStart.getDate() + diff);
-  }
-
-  let totalWeeks = 0;
-  const temp = new Date(weekStart);
-  while (temp <= lastDay) {
-    // Count this week only if it overlaps with the month
-    const weekEnd = new Date(temp);
-    weekEnd.setDate(weekEnd.getDate() + 6);
-    if (weekEnd >= firstDay && temp <= lastDay) {
-      totalWeeks++;
-    }
-    temp.setDate(temp.getDate() + 7);
-  }
-  if (totalWeeks === 0) totalWeeks = 4; // safety
-
-  // Determine which week number today falls in
   const today = new Date();
+
+  // We use a fixed 4-week split to match business targets (1-7, 8-14, 15-21, 22-end)
+  // This groups the "extra 2-3 days" of the month into Week 4 automatically.
   let currentWeek = 1;
-  const cur = new Date(weekStart);
-  for (let w = 1; w <= totalWeeks; w++) {
-    const wEnd = new Date(cur);
-    wEnd.setDate(wEnd.getDate() + 6);
-    if (today >= cur && today <= wEnd) {
-      currentWeek = w;
-      break;
+  
+  if (today.getFullYear() === year && (today.getMonth() + 1) === month) {
+    const d = today.getDate();
+    if (d <= 7) currentWeek = 1;
+    else if (d <= 14) currentWeek = 2;
+    else if (d <= 21) currentWeek = 3;
+    else currentWeek = 4;
+  } else {
+    // If checking a past month, default to its last week. If future, week 1.
+    const monthDate = new Date(year, month - 1, 1);
+    if (monthDate < today) {
+      currentWeek = 4;
+    } else {
+      currentWeek = 1;
     }
-    cur.setDate(cur.getDate() + 7);
-    if (w === totalWeeks) currentWeek = totalWeeks;
   }
 
-  return { totalWeeks, currentWeek };
+  return { totalWeeks: 4, currentWeek };
 }
 
 /**
@@ -385,7 +367,7 @@ export class TasksService {
   async getTaskProgress(id: number, user: any) {
     const template = await this.dataSource.getRepository(TaskTemplate).findOne({
       where: { id },
-      relations: { metricTargets: true },
+      relations: { metricTargets: true, assignedTo: true, department: true },
     });
     if (!template) throw new NotFoundException('Task not found');
 

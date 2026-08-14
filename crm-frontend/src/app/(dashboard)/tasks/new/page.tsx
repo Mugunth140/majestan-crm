@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { Device } from "@/components/shared/device";
 import { TaskCreateForm } from "@/components/tasks/task-create-form";
 
 export default function NewTaskPage() {
@@ -17,7 +18,8 @@ export default function NewTaskPage() {
     } catch {}
   }, []);
 
-  const canCreate = user?.role === "Admin" || user?.role === "Manager" || user?.role === "Team Lead";
+  const canCreate =
+    user?.role === "Admin" || user?.role === "Manager" || user?.role === "Team Lead";
 
   if (user && !canCreate) {
     router.replace("/tasks");
@@ -25,30 +27,40 @@ export default function NewTaskPage() {
   }
 
   return (
-    <div className="flex flex-col space-y-6 animate-in fade-in duration-500">
-      <MobileHeader title="Create Task" />
-      <div className="px-4 md:px-0">
+    <>
+      <MobileHeader title="Create Task" showBack />
+      <div className="flex flex-col space-y-4 md:space-y-6 md:h-full">
+        {/* Desktop page header */}
+        <Device
+          mobile={null}
+          desktop={
+            <div className="flex h-[48px] items-center pr-[150px] gap-4">
+              <button
+                onClick={() => router.back()}
+                className="p-2 rounded-full hover:bg-muted active:scale-95 transition-transform"
+                title="Back to Tasks"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div>
+                <h1 className="text-[28px] font-bold tracking-tight">Create Task</h1>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Set monthly targets for a staff member
+                </p>
+              </div>
+            </div>
+          }
+        />
 
-        {/* Desktop header */}
-        <div className="hidden md:block mb-6">
-          <h1 className="text-[28px] font-bold tracking-tight">Create Task</h1>
-          <p className="text-sm text-muted-foreground mt-1">Set monthly targets for a staff member</p>
-        </div>
-
-        {/* Mobile back */}
-        <div className="md:hidden flex items-center gap-2 mb-4">
-          <button onClick={() => router.back()} className="p-2 rounded-xl bg-muted active:scale-95">
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-          <span className="text-sm text-muted-foreground">Back to Tasks</span>
-        </div>
-
-        <div className="max-w-2xl">
-          {user && canCreate && (
-            <TaskCreateForm userRole={user.role} userDeptId={user.department_id} />
-          )}
+        {/* Content area - Full width without max-width wrapper */}
+        <div className="px-4 md:px-0 pb-8">
+          <div className="w-full">
+            {user && canCreate && (
+              <TaskCreateForm userRole={user.role} userDeptId={user.department_id} />
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

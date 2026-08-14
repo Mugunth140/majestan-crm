@@ -1,5 +1,8 @@
 "use client";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { PenLine } from "lucide-react";
 
 interface TaskMetricRowProps {
   metric_key: string;
@@ -14,7 +17,7 @@ interface TaskMetricRowProps {
   overdue_amount: number;
   month_completion_pct: number;
   carry_forward_amount?: number;
-  onLogManual?: () => void; // only shown for manual metrics
+  onLogManual?: () => void;
 }
 
 export function TaskMetricRow({
@@ -36,38 +39,65 @@ export function TaskMetricRow({
       ? `₹${v.toLocaleString("en-IN")}`
       : v.toLocaleString("en-IN");
 
-  const weekPct = effective_week_target > 0
-    ? Math.min(100, Math.round((current_week_achieved / effective_week_target) * 100))
-    : 0;
+  const barColor =
+    month_completion_pct >= 100
+      ? "bg-emerald-500"
+      : month_completion_pct >= 60
+      ? "bg-[#0052FF]"
+      : month_completion_pct >= 30
+      ? "bg-amber-500"
+      : "bg-red-500";
+
+  const pctColor =
+    month_completion_pct >= 100
+      ? "text-emerald-600"
+      : month_completion_pct >= 60
+      ? "text-[#0052FF]"
+      : month_completion_pct >= 30
+      ? "text-amber-600"
+      : "text-red-500";
 
   return (
-    <div className="flex flex-col gap-2 py-3 border-b border-border/50 last:border-0">
+    <div className="flex flex-col gap-2.5 py-4 border-b border-border/50 last:border-0">
+      {/* Label row */}
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="text-sm font-medium text-foreground truncate">{metric_label}</span>
+        <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap">
+          <span className="text-[13.5px] font-semibold text-foreground truncate">{metric_label}</span>
           {tracking_type === "auto" && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-medium shrink-0 dark:bg-blue-900/20">auto</span>
+            <Badge className="bg-blue-50 text-blue-600 border-blue-200/60 text-[10px] font-semibold dark:bg-blue-900/20 dark:border-blue-700/30">
+              auto
+            </Badge>
+          )}
+          {metric_value_type === "amount" && (
+            <Badge className="bg-purple-50 text-purple-600 border-purple-200/60 text-[10px] font-semibold dark:bg-purple-900/20 dark:border-purple-700/30">
+              ₹ amount
+            </Badge>
           )}
           {overdue_amount > 0 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600 font-semibold shrink-0 dark:bg-red-900/20">
+            <Badge className="bg-red-50 text-red-600 border-red-200/60 text-[10px] font-semibold dark:bg-red-900/20 dark:border-red-700/30">
               +{fmt(overdue_amount)} overdue
-            </span>
+            </Badge>
           )}
           {carry_forward_amount > 0 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 font-medium shrink-0 dark:bg-amber-900/20">
+            <Badge className="bg-amber-50 text-amber-600 border-amber-200/60 text-[10px] font-semibold dark:bg-amber-900/20 dark:border-amber-700/30">
               +{fmt(carry_forward_amount)} carried fwd
-            </span>
+            </Badge>
           )}
         </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <span className="text-xs text-muted-foreground">{fmt(total_achieved)} / {fmt(monthly_target)}</span>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs text-muted-foreground font-medium">
+            {fmt(total_achieved)}&nbsp;/&nbsp;{fmt(monthly_target)}
+          </span>
           {tracking_type === "manual" && onLogManual && (
-            <button
+            <Button
+              size="sm"
+              variant="outline"
               onClick={onLogManual}
-              className="text-[11px] px-2 py-1 rounded-lg bg-[#0052FF]/10 text-[#0052FF] font-semibold active:scale-95 transition-transform hover:bg-[#0052FF]/20"
+              className="h-7 px-2.5 rounded-lg border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10 text-xs font-semibold"
             >
+              <PenLine className="w-3 h-3 mr-1" />
               Log
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -76,28 +106,27 @@ export function TaskMetricRow({
       <div className="flex items-center gap-2">
         <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
           <div
-            className={cn(
-              "h-full rounded-full transition-all",
-              month_completion_pct >= 100 ? "bg-emerald-500" : month_completion_pct >= 60 ? "bg-[#0052FF]" : month_completion_pct >= 30 ? "bg-amber-500" : "bg-red-500"
-            )}
-            style={{ width: `${month_completion_pct}%` }}
+            className={cn("h-full rounded-full transition-all duration-500", barColor)}
+            style={{ width: `${Math.min(100, month_completion_pct)}%` }}
           />
         </div>
-        <span className={cn(
-          "text-[11px] font-semibold w-8 text-right",
-          month_completion_pct >= 100 ? "text-emerald-600" : month_completion_pct >= 60 ? "text-[#0052FF]" : "text-muted-foreground"
-        )}>
+        <span className={cn("text-[11px] font-bold w-8 text-right tabular-nums", pctColor)}>
           {month_completion_pct}%
         </span>
       </div>
 
-      {/* Current week mini stats */}
+      {/* Week mini stats */}
       <div className="text-[11px] text-muted-foreground">
-        This week: <span className="font-semibold text-foreground">{fmt(current_week_achieved)}</span>
+        This week:{" "}
+        <span className="font-semibold text-foreground">{fmt(current_week_achieved)}</span>
         {" / "}
-        <span className={overdue_amount > 0 ? "text-red-600 font-semibold" : ""}>{fmt(effective_week_target)}</span>
+        <span className={overdue_amount > 0 ? "text-red-600 font-semibold" : ""}>
+          {fmt(effective_week_target)}
+        </span>
         {overdue_amount > 0 && (
-          <span className="text-muted-foreground"> ({fmt(current_week_target)} + {fmt(overdue_amount)} overdue)</span>
+          <span className="text-muted-foreground/70">
+            {" "}({fmt(current_week_target)} + {fmt(overdue_amount)} overdue)
+          </span>
         )}
       </div>
     </div>
