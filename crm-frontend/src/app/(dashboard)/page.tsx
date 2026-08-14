@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { 
   User, Building2, Layers, Users, TrendingUp, Route, 
@@ -8,6 +8,7 @@ import {
   Activity, Settings, Database, Contact, Home
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api-fetch";
 
 import { MobileHeader } from "@/components/layout/mobile-header";
 
@@ -24,6 +25,24 @@ export default function DashboardPage() {
 
   const isAdmin = user?.role === "Admin" || user?.role === "Super Admin";
   const isStaff = user?.role === "Staff";
+  const isManager = user?.role === "Manager";
+  const isTeamLead = user?.role === "Team Lead";
+
+  const [tasksDashboard, setTasksDashboard] = useState<any>(null);
+
+  const loadTasksDashboard = useCallback(async () => {
+    if (!user) return;
+    try {
+      const API = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
+      const res = await apiFetch(`${API}/tasks/dashboard`);
+      const d = await res.json();
+      if (d.success) setTasksDashboard(d.data);
+    } catch {}
+  }, [user]);
+
+  useEffect(() => {
+    if (user) loadTasksDashboard();
+  }, [user, loadTasksDashboard]);
 
   return (
     <>
@@ -70,6 +89,9 @@ export default function DashboardPage() {
             </>
           )}
         </MenuSection>
+        {tasksDashboard && (
+          <TasksOverviewSection data={tasksDashboard} isStaff={isStaff} />
+        )}
       </div>
 
       {/* DESKTOP ONLY: Analytics Dashboard */}
@@ -103,6 +125,11 @@ export default function DashboardPage() {
           <div className="text-2xl font-bold mt-2">--</div>
         </div>
       </div>
+      {tasksDashboard && (
+        <div className="hidden md:block mt-6">
+          <TasksOverviewSection data={tasksDashboard} isStaff={isStaff} />
+        </div>
+      )}
       </div>
     </>
   );
@@ -131,4 +158,48 @@ function MenuCard({ icon: Icon, label, onClick, color, bg }: any) {
       <span className="font-semibold text-[13px] text-foreground text-left leading-tight">{label}</span>
     </button>
   )
+}
+
+function TasksOverviewSection({ data, isStaff }: { data: any; isStaff: boolean }) {
+  if (!data || !data.departments || data.departments.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-bold text-foreground">Tasks Overview</h3>
+        <span className="text-xs text-muted-foreground">{data.month}</span>
+      </div>
+      <div className="space-y-2">
+        {data.departments.map((dept: any) => {
+          const pct = dept.completion_pct || 0;
+          const barColor =
+            pct >= 100 ? "bg-emerald-500" :
+            pct >= 60 ? "bg-[#0052FF]" :
+            pct >= 30 ? "bg-amber-500" : "bg-red-500";
+          const pctColor =
+            pct >= 100 ? "text-emerald-600" :
+            pct >= 60 ? "text-[#0052FF]" :
+            pct >= 30 ? "text-amber-600" : "text-red-600";
+
+          return (
+            <div key={dept.dept_id} className="bg-card border rounded-xl p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold">{dept.dept_name}</span>
+                <span className={`text-xs font-bold ${pctColor}`}>{pct}%</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+              </div>
+              <div className="flex items-center justify-between mt-1.5">
+                <span className="text-[10px] text-muted-foreground">{dept.staff?.length || 0} staff</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {(dept.total_achieved || 0).toLocaleString("en-IN")} / {(dept.total_target || 0).toLocaleString("en-IN")}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }

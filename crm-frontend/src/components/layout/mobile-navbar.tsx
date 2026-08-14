@@ -38,6 +38,7 @@ export function MobileNavbar() {
     if (pathname.startsWith("/agent-network")) return "/agent-network/new";
     if (pathname.startsWith("/hr")) return "/hr/new";
     if (pathname.startsWith("/users")) return "/users/new";
+    if (pathname.startsWith("/tasks")) return "/tasks/new";
     return null; 
   };
 
