@@ -29,15 +29,10 @@ export default function NewTaskPage() {
       <MobileHeader title="Create Task" />
       <div className="px-4 md:px-0">
 
-        {/* Desktop back + header */}
-        <div className="hidden md:flex items-center gap-3 mb-6">
-          <button onClick={() => router.back()} className="p-2 rounded-xl bg-muted hover:bg-muted/80 active:scale-95 transition-transform">
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-          <div>
-            <h1 className="text-[28px] font-bold tracking-tight">Create Task</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Set monthly targets for a staff member</p>
-          </div>
+        {/* Desktop header */}
+        <div className="hidden md:block mb-6">
+          <h1 className="text-[28px] font-bold tracking-tight">Create Task</h1>
+          <p className="text-sm text-muted-foreground mt-1">Set monthly targets for a staff member</p>
         </div>
 
         {/* Mobile back */}

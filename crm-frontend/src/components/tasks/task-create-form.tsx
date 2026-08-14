@@ -86,7 +86,9 @@ export function TaskCreateForm({ userRole, userDeptId }: { userRole: string; use
 
     // Load metrics for this department
     try {
-      const norm = name.toLowerCase().includes("digital") ? "digital" : name.toLowerCase().trim();
+      // Normalize dept name: lowercase, strip trailing " department"/"dept", handle digital variants
+      const lower = name.toLowerCase().trim().replace(/\s+department$/i, '').replace(/\s+dept$/i, '').trim();
+      const norm = lower.includes('digital') ? 'digital' : lower === 'human resources' || lower === 'human resource' ? 'hr' : lower;
       const r = await apiFetch(`${API}/tasks/metrics/${encodeURIComponent(norm)}`);
       const d = await r.json();
       const metricDefs: MetricDef[] = d.data || [];

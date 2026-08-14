@@ -212,11 +212,16 @@ export class TasksService {
   // ── Helpers ──────────────────────────────────────────────────────────────
 
   getDepartmentMetrics(deptName: string) {
-    // Normalize: lowercase, trim
-    const key = deptName.toLowerCase().trim();
+    // Normalize: lowercase, trim, strip trailing " department" / " dept"
+    const key = deptName.toLowerCase().trim()
+      .replace(/\s+department$/i, '')
+      .replace(/\s+dept$/i, '')
+      .trim();
     // Handle "digital marketing" → 'digital'
-    const normalized = key.includes('digital') ? 'digital' : key;
-    return DEPARTMENT_METRICS[normalized] || null;
+    if (key.includes('digital')) return DEPARTMENT_METRICS['digital'] || null;
+    // Handle "hr" variants
+    if (key === 'human resources' || key === 'human resource') return DEPARTMENT_METRICS['hr'] || null;
+    return DEPARTMENT_METRICS[key] || null;
   }
 
   getCurrentMonth(): string {
