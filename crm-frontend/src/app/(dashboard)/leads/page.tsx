@@ -7,7 +7,7 @@ import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Plus, FileSpreadsheet, UploadCloud, RefreshCw, Eye, Search, Filter, X, Loader2 } from "lucide-react";
+import { Edit, Trash2, Plus, FileSpreadsheet, UploadCloud, RefreshCw, Eye, Search, Filter, X, Loader2, Download } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -949,6 +949,25 @@ export default function LeadsPage() {
     </div>
   );
 
+  const downloadTemplate = () => {
+    // Define the headers based on what handleFileUpload expects
+    const headers = [
+      {
+        "Name": "John Doe",
+        "Mobile": "9876543210",
+        "Email": "john@example.com",
+        "Property Type": "apartment",
+        "Source": "Website"
+      }
+    ];
+    
+    const ws = XLSX.utils.json_to_sheet(headers);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    
+    XLSX.writeFile(wb, "Lead_Import_Template.xlsx");
+  };
+
   return (
     <>
       <MobileHeader title="Leads Dashboard" />
@@ -970,9 +989,20 @@ export default function LeadsPage() {
               Bulk Import
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Import Leads</DialogTitle>
-                <DialogDescription>Upload your Excel file to bulk import leads.</DialogDescription>
+              <DialogHeader className="flex flex-row items-start justify-between">
+                <div>
+                  <DialogTitle>Import Leads</DialogTitle>
+                  <DialogDescription className="mt-1.5">Upload your Excel file to bulk import leads.</DialogDescription>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={downloadTemplate}
+                  className="h-8 text-xs shrink-0"
+                >
+                  <Download className="h-3.5 w-3.5 mr-1.5" />
+                  Sample Template
+                </Button>
               </DialogHeader>
               <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-xl bg-muted/20 border-border/60">
                 {isImporting ? (
