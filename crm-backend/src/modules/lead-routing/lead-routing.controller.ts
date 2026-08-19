@@ -50,8 +50,16 @@ export class LeadRoutingController {
 
   // ── GET /staff-list ────────────────────────────────────────────────────────
   @Get('staff-list')
-  async getStaffList(@Query('department') department: string = 'all') {
-    const data = await this.leadRoutingService.getStaffList(department);
+  async getStaffList(
+    @Query('department') department: string = 'all',
+    @Req() req: any,
+  ) {
+    const requestingUser = req.user;
+    const data = await this.leadRoutingService.getStaffList(
+      department,
+      requestingUser?.role,
+      requestingUser?.department_id,
+    );
     return { success: true, data };
   }
 

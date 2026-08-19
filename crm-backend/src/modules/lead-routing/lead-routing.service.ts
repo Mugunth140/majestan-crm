@@ -405,7 +405,7 @@ export class LeadRoutingService {
   }
 
   // ── Staff List ─────────────────────────────────────────────────────────────
-  async getStaffList(department: string) {
+  async getStaffList(department: string, requestingUserRole?: string, requestingUserDeptId?: number) {
     const qb = this.dataSource
       .getRepository(User)
       .createQueryBuilder('u')
@@ -413,14 +413,31 @@ export class LeadRoutingService {
       .leftJoinAndSelect('u.department', 'dept')
       .where('u.is_active = 1');
 
-    if (department && department.toLowerCase() !== 'all') {
-      const searchTerm = department.toLowerCase().replace(' department', '').trim();
-      qb.andWhere('LOWER(dept.name) LIKE :searchTerm', { searchTerm: `%${searchTerm}%` });
+    // Only show assignable roles: Manager, Team Lead, Staff
+    qb.andWhere('role.name IN (:...assignableRoles)', { assignableRoles: ['Manager', 'Team Lead', 'Staff'] });
+
+    if (requestingUserRole === 'Team Lead') {
+      // Team Lead: only Staff in their own department
+      qb.andWhere('role.name = :roleName', { roleName: 'Staff' });
+      if (requestingUserDeptId) {
+        qb.andWhere('u.department_id = :deptId', { deptId: requestingUserDeptId });
+      }
+    } else if (requestingUserRole === 'Manager') {
+      // Manager: Team Leads + Staff in their own department
+      qb.andWhere('role.name IN (:...roles)', { roles: ['Team Lead', 'Staff'] });
+      if (requestingUserDeptId) {
+        qb.andWhere('u.department_id = :deptId', { deptId: requestingUserDeptId });
+      }
+    } else {
+      // Admin: everyone (Manager + Team Lead + Staff), optionally filtered by department param
+      if (department && department.toLowerCase() !== 'all') {
+        const searchTerm = department.toLowerCase().replace(' department', '').trim();
+        qb.andWhere('LOWER(dept.name) LIKE :searchTerm', { searchTerm: `%${searchTerm}%` });
+      }
     }
 
     const users = await qb.getMany();
 
-    // For each user, count their current assigned leads
     const enriched = await Promise.all(
       users.map(async (u) => {
         const leadCount = await this.dataSource

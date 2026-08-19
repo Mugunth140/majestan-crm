@@ -193,14 +193,12 @@ function LeadForm() {
       setPendingFormData(new FormData(e.currentTarget));
       setIsAssignModalOpen(true);
       
-      // If user is Admin/TL, fetch staff list for the dropdown
+      // If user is not Staff, fetch the role-aware staff list for the dropdown
       if (currentUser?.role?.name !== "Staff") {
         setIsFetchingStaff(true);
         try {
-          // If Admin/Manager, pass 'all', else pass TL's department
-          const isCrossDept = currentUser?.role?.name === "Admin" || currentUser?.role?.name === "Manager";
-          const deptQuery = isCrossDept ? "all" : (currentUser?.department?.name || "");
-          const res = await apiFetch(`${API_URL}/lead-routing/staff-list?department=${encodeURIComponent(deptQuery.toLowerCase())}`);
+          // Backend filters by the requesting user's role/department via JWT; pass 'all' as dept param
+          const res = await apiFetch(`${API_URL}/lead-routing/staff-list?department=all`);
           const data = await res.json();
           if (data.success) {
             setStaffList(data.data);
@@ -780,7 +778,7 @@ function LeadForm() {
           ) : (
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Select Staff Member</label>
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Assign To</label>
                 <FormSelect 
                   name="assignee"
                   options={staffList.map(s => ({ label: `${s.name} (${s.department?.name || 'No Dept'})`, value: s.id.toString() }))}

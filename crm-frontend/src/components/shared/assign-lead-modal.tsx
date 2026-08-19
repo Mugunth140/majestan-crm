@@ -67,7 +67,7 @@ export function AssignLeadModal({ open, onClose, onConfirm, department, isLoadin
         <DialogHeader>
           <DialogTitle>Assign Lead</DialogTitle>
           <DialogDescription>
-            Select a staff member to assign this lead to.
+            Select a team member to assign this lead to.
           </DialogDescription>
         </DialogHeader>
 
