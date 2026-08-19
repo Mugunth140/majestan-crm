@@ -78,6 +78,7 @@ function LeadForm() {
   const [subLocations, setSubLocations] = useState<{ id: number; locality_name: string }[]>([]);
   const [selectedCityId, setSelectedCityId] = useState<number | null>(null);
   const [selectedSubLocations, setSelectedSubLocations] = useState<string[]>([]);
+  const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   
   const [leadData, setLeadData] = useState<any>(null);
   const [isLoadingLead, setIsLoadingLead] = useState(!!editId);
@@ -163,6 +164,9 @@ function LeadForm() {
               setPreferences(inq.preferences || {});
               if (inq.city_id) setSelectedCityId(inq.city_id);
               if (inq.sub_locations) setSelectedSubLocations(inq.sub_locations);
+              const projectListStr = inq.project_list || "";
+              const projectsArr = projectListStr ? projectListStr.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
+              setSelectedProjects(projectsArr);
             }
           } else {
             toast.error("Lead not found");
@@ -258,7 +262,7 @@ function LeadForm() {
         city: formData.get("city") as string,
         address: formData.get("address") as string,
         source: sourceValue,
-        project: formData.get("project") as string,
+        project: selectedProjects.length > 0 ? selectedProjects.join(", ") : null,
         purchaseType: formData.get("purchaseType") as string,
         propertyType: selectedType || formData.get("propertyType") as string,
         funder: formData.get("funder") as string,
@@ -508,10 +512,6 @@ function LeadForm() {
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Funding</label>
                   <FormSelect name="funder" defaultValue={leadData?.inquiries?.[0]?.funder || null} placeholder="Select Funding" options={FUNDERS} required />
                 </div>
-                <div className="space-y-2 lg:col-span-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Project List</label>
-                  <FormSelect name="project" defaultValue={leadData?.inquiries?.[0]?.project_list || null} placeholder="Select Project" options={PROJECTS} />
-                </div>
               </div>
             </div>
 
@@ -566,6 +566,35 @@ function LeadForm() {
                         );
                       })
                     )}
+                  </div>
+                </div>
+
+                <div className="space-y-2 lg:col-span-4">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">Project List</label>
+                  <div className="flex flex-wrap gap-2.5 pt-1">
+                    {PROJECTS.map((proj) => {
+                      const isSelected = selectedProjects.includes(proj.value);
+                      return (
+                        <button
+                          type="button"
+                          key={proj.value}
+                          onClick={() => {
+                            if (isSelected) {
+                              setSelectedProjects(selectedProjects.filter((s) => s !== proj.value));
+                            } else {
+                              setSelectedProjects([...selectedProjects, proj.value]);
+                            }
+                          }}
+                          className={`px-4 py-2 text-[13px] font-medium rounded-xl border transition-all ${
+                            isSelected
+                              ? "bg-[#0052FF] text-white border-[#0052FF] shadow-sm shadow-blue-500/20"
+                              : "bg-muted/40 text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground"
+                          }`}
+                        >
+                          {proj.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
