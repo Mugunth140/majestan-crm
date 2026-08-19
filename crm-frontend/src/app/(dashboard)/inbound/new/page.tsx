@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, CheckCircle2, Loader2, Save, UploadCloud } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, MapPin, Save, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 import { FormSelect } from "@/components/shared/form-select";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
@@ -178,6 +178,10 @@ function InboundForm() {
   // File
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
+  // GPS location state
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [googleMapLocation, setGoogleMapLocation] = useState<string>("");
+
   useEffect(() => {
     const fetchMasterData = async () => {
       try {
@@ -237,6 +241,7 @@ function InboundForm() {
             setIsExclusive(!!data.is_exclusive);
             setIsPrimeLocation(!!data.is_prime_location);
             setDocumentsCollected(!!data.documents_collected);
+            setGoogleMapLocation(data.google_map_location || "");
           } else {
             toast.error("Inbound not found");
             router.push("/inbound");
@@ -364,6 +369,40 @@ function InboundForm() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation is not supported by this browser.");
+      return;
+    }
+    setIsGettingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const mapsUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
+        setGoogleMapLocation(mapsUrl);
+        setIsGettingLocation(false);
+        toast.success("Location captured successfully!");
+      },
+      (error) => {
+        setIsGettingLocation(false);
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            toast.error("Location permission denied. Please allow location access and try again.");
+            break;
+          case error.POSITION_UNAVAILABLE:
+            toast.error("Location unavailable. Please try again.");
+            break;
+          case error.TIMEOUT:
+            toast.error("Location request timed out. Please try again.");
+            break;
+          default:
+            toast.error("Failed to get location.");
+        }
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
   };
 
   const skeletonField = (
@@ -595,7 +634,28 @@ function InboundForm() {
 
             <div className="space-y-2 lg:col-span-3">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Google Map Location</label>
-              <Input name="google_map_location" defaultValue={inboundData?.google_map_location || ""} placeholder="Paste Google Maps Link" className="h-12 rounded-xl bg-muted/30" />
+              <div className="flex items-center gap-2">
+                <Input
+                  name="google_map_location"
+                  value={googleMapLocation}
+                  onChange={(e) => setGoogleMapLocation(e.target.value)}
+                  placeholder="Paste Google Maps Link or use button →"
+                  className="h-12 rounded-xl bg-muted/30 flex-1"
+                />
+                <button
+                  type="button"
+                  onClick={handleGetLocation}
+                  disabled={isGettingLocation}
+                  className="flex-shrink-0 h-12 px-4 rounded-xl border border-border/60 bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground transition-all flex items-center gap-2 text-[13px] font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGettingLocation ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <MapPin className="h-4 w-4" />
+                  )}
+                  {isGettingLocation ? "Getting..." : "Use Location"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
