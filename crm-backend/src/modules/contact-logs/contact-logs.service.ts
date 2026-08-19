@@ -87,8 +87,8 @@ export class ContactLogsService {
 
   async getLoggerDevices(requesterId: number) {
     const requester = await this.userRepo.findOne({ where: { id: requesterId }, relations: { role: true } });
-    if (!['Admin', 'Super Admin', 'Manager'].includes(requester?.role?.name || '')) {
-      throw new ForbiddenException('Only admins and managers can view logger devices');
+    if (!['Admin', 'Super Admin', 'Manager', 'Team Lead'].includes(requester?.role?.name || '')) {
+      throw new ForbiddenException('Only admins, managers and team leads can view logger devices');
     }
 
     const rows = await this.dataSource.query(`
