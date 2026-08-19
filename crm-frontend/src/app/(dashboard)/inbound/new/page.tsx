@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, CheckCircle2, Loader2, MapPin, Save, UploadCloud } from "lucide-react";
+import { ArrowLeft, Camera, CheckCircle2, Loader2, MapPin, Save, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 import { FormSelect } from "@/components/shared/form-select";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
@@ -135,6 +135,7 @@ function InboundForm() {
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const [cities, setCities] = useState<{ label: string; value: string }[]>([]);
   const [isFetchingData, setIsFetchingData] = useState(true);
@@ -177,6 +178,9 @@ function InboundForm() {
 
   // File
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<"idle" | "uploading" | "done" | "error">("idle");
 
   // GPS location state
   const [isGettingLocation, setIsGettingLocation] = useState(false);
@@ -281,6 +285,10 @@ function InboundForm() {
         return;
       }
       setSelectedFile(file);
+      // Generate preview
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+      setUploadProgress("idle");
     }
   };
 
@@ -348,18 +356,28 @@ function InboundForm() {
 
       // Handle Image Upload
       if (selectedFile) {
-         const fileData = new FormData();
-         fileData.append('file', selectedFile);
-         const uploadId = editId ? editId : result.id;
-         
-         const uploadRes = await apiFetch(`${API_URL}/inbounds/${uploadId}/image`, {
+        setIsUploadingImage(true);
+        setUploadProgress("uploading");
+        try {
+          const fileData = new FormData();
+          fileData.append('file', selectedFile);
+          const uploadId = editId ? editId : result.id;
+          const uploadRes = await apiFetch(`${API_URL}/inbounds/${uploadId}/image`, {
             method: 'POST',
-            body: fileData
-         });
-         
-         if (!uploadRes.ok) {
-            toast.error("InBound saved, but image upload failed.");
-         }
+            body: fileData,
+          });
+          if (!uploadRes.ok) {
+            setUploadProgress("error");
+            toast.error("Property saved, but photo upload failed.");
+          } else {
+            setUploadProgress("done");
+          }
+        } catch {
+          setUploadProgress("error");
+          toast.error("Property saved, but photo upload failed.");
+        } finally {
+          setIsUploadingImage(false);
+        }
       }
 
       toast.success(editId ? "Inbound updated successfully!" : "Inbound created successfully!");
@@ -858,26 +876,99 @@ function InboundForm() {
         <div className="bg-card border rounded-2xl p-5 sm:p-8 shadow-sm">
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Media & Inventory Flags</h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 border-b pb-8">
-            <div>
-               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-2">Property Photo (Max 5MB)</label>
-               {inboundData?.image_url && !selectedFile && (
-                  <div className="mb-3">
-                     <img src={inboundData.image_url} alt="Property" className="w-full max-w-[250px] h-32 object-cover rounded-xl border border-border/60" />
-                     <p className="text-xs text-muted-foreground mt-1">Current Image. Upload new to replace.</p>
-                  </div>
-               )}
-               <div className="flex items-center gap-4">
-                  <Input 
-                     ref={fileInputRef}
-                     type="file" 
-                     accept="image/*"
-                     onChange={handleFileChange}
-                     className="max-w-[300px] cursor-pointer"
-                  />
-                  {selectedFile && <span className="text-sm font-medium text-blue-600">{selectedFile.name}</span>}
-               </div>
+          <div className="mb-8 border-b pb-8">
+            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-3">Property Photo</label>
+            
+            {/* Preview area */}
+            {(previewUrl || (inboundData?.image_url && !selectedFile)) && (
+              <div className="mb-4 relative inline-block">
+                <img
+                  src={previewUrl || inboundData.image_url}
+                  alt="Property preview"
+                  className="w-full max-w-[280px] h-40 object-cover rounded-2xl border border-border/60 shadow-sm"
+                />
+                {previewUrl && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedFile(null);
+                      setPreviewUrl(null);
+                      setUploadProgress("idle");
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                      if (cameraInputRef.current) cameraInputRef.current.value = "";
+                    }}
+                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-xs font-bold shadow-md hover:bg-destructive/80"
+                  >
+                    ✕
+                  </button>
+                )}
+                {!previewUrl && inboundData?.image_url && (
+                  <p className="text-xs text-muted-foreground mt-1.5">Current photo. Select new to replace.</p>
+                )}
+              </div>
+            )}
+
+            {/* Upload progress */}
+            {isUploadingImage && (
+              <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin text-[#0052FF]" />
+                <span>Uploading photo & processing...</span>
+              </div>
+            )}
+            {uploadProgress === "done" && !isUploadingImage && (
+              <div className="flex items-center gap-2 mb-3 text-sm text-green-600 dark:text-green-400">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>Photo uploaded successfully</span>
+              </div>
+            )}
+            {uploadProgress === "error" && !isUploadingImage && (
+              <div className="flex items-center gap-2 mb-3 text-sm text-destructive">
+                <span>⚠ Upload failed — photo was not saved</span>
+              </div>
+            )}
+
+            {/* Hidden file inputs */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+              capture="environment"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+
+            {/* Action buttons */}
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => cameraInputRef.current?.click()}
+                className="flex items-center gap-2 h-11 px-5 rounded-xl border border-border/60 bg-muted/40 hover:bg-muted text-foreground transition-all text-[13px] font-medium"
+              >
+                <Camera className="h-4 w-4" />
+                Take Photo
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 h-11 px-5 rounded-xl border border-border/60 bg-muted/40 hover:bg-muted text-foreground transition-all text-[13px] font-medium"
+              >
+                <UploadCloud className="h-4 w-4" />
+                Choose from Gallery
+              </button>
             </div>
+
+            {selectedFile && (
+              <p className="text-xs text-muted-foreground mt-2">
+                {selectedFile.name} · {(selectedFile.size / 1024 / 1024).toFixed(1)} MB
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
