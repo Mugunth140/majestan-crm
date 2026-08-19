@@ -28,6 +28,36 @@ import { MobileLeadList } from "@/components/leads/mobile-lead-list";
 import { Device } from "@/components/shared/device";
 import { LEAD_STATUS_STYLES as STATUS_STYLES } from "@/lib/lead-constants";
 
+interface PendingImport {
+  id: string;
+  rawId?: string;
+  date?: string;
+  name: string;
+  mobile: string;
+  email?: string;
+  whatsapp?: string;
+  city?: string;
+  address?: string;
+  source?: string;
+  commission?: number;
+  isReferral?: boolean;
+  referredByName?: string;
+  referredByContact?: string;
+  propertyCategory?: string;
+  propertyType?: string;
+  purchaseType?: string;
+  funder?: string;
+  project?: string;
+  purchaseTimeline?: string;
+  qualificationPurpose?: string;
+  decisionMaker?: string;
+  notes?: string;
+  staff?: string;
+  status?: string;
+  isPendingImport?: boolean;
+  rawData?: any;
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 export default function LeadsPage() {
@@ -43,7 +73,7 @@ export default function LeadsPage() {
   
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
-  const [pendingImports, setPendingImports] = useState<any[]>([]);
+  const [pendingImports, setPendingImports] = useState<PendingImport[]>([]);
   const [isInserting, setIsInserting] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -455,11 +485,26 @@ export default function LeadsPage() {
                     id: `IMPORT-${i+1}`,
                     date: new Date().toLocaleDateString(),
                     name: row.Name || row.name || row["Customer Name"] || "Unknown",
-                    mobile: row.Mobile || row.mobile || row["Mobile Number"] || "",
+                    mobile: String(row.Mobile || row.mobile || row["Mobile Number"] || ""),
+                    whatsapp: row.Whatsapp ? String(row.Whatsapp) : undefined,
                     email: row.Email || row.email || "",
-                    propertyType: row["Property Type"] || row.propertyType || "apartment",
-                    staff: "Unassigned",
+                    city: row.City || row.city,
+                    address: row.Address || row.address,
                     source: row.Source || row.source || "Bulk Import",
+                    commission: row.Commission ? parseFloat(row.Commission) : undefined,
+                    isReferral: row["Is Referral"]?.toString().toLowerCase() === "yes" || row.isReferral === true,
+                    referredByName: row["Referred By Name"] || row.referredByName,
+                    referredByContact: row["Referred By Contact"] ? String(row["Referred By Contact"]) : undefined,
+                    propertyCategory: row["Property Category"] || row.propertyCategory,
+                    propertyType: row["Property Type"] || row.propertyType || "apartment",
+                    purchaseType: row["Purchase Type"] || row.purchaseType,
+                    funder: row.Funder || row.funder,
+                    project: row["Project List"] || row.project,
+                    purchaseTimeline: row["Purchase Timeline"] || row.purchaseTimeline,
+                    qualificationPurpose: row["Qualification Purpose"] || row.qualificationPurpose,
+                    decisionMaker: row["Decision Maker"] || row.decisionMaker,
+                    notes: row.Notes || row.notes,
+                    staff: "Unassigned",
                     status: "NEW",
                     isPendingImport: true,
                     rawData: row
@@ -499,8 +544,23 @@ export default function LeadsPage() {
          name: p.name,
          mobile: String(p.mobile),
          email: p.email,
+         whatsapp: p.whatsapp,
+         city: p.city,
+         address: p.address,
          source: p.source,
+         commission: p.commission,
+         isReferral: p.isReferral,
+         referredByName: p.referredByName,
+         referredByContact: p.referredByContact,
+         propertyCategory: p.propertyCategory,
          propertyType: p.propertyType,
+         purchaseType: p.purchaseType,
+         funder: p.funder,
+         project: p.project,
+         purchaseTimeline: p.purchaseTimeline,
+         qualificationPurpose: p.qualificationPurpose,
+         decisionMaker: p.decisionMaker,
+         notes: p.notes,
       }));
       
       const res = await apiFetch(API_URL + "/leads/bulk", {
@@ -955,9 +1015,24 @@ export default function LeadsPage() {
       {
         "Name": "John Doe",
         "Mobile": "9876543210",
+        "Whatsapp": "9876543210",
         "Email": "john@example.com",
+        "City": "Chennai",
+        "Address": "123 Main St",
+        "Source": "Website",
+        "Commission": "1.5",
+        "Is Referral": "No",
+        "Referred By Name": "",
+        "Referred By Contact": "",
+        "Property Category": "residential",
         "Property Type": "apartment",
-        "Source": "Website"
+        "Purchase Type": "buy",
+        "Funder": "bank",
+        "Project List": "majestan_prestige",
+        "Purchase Timeline": "immediate",
+        "Qualification Purpose": "investment",
+        "Decision Maker": "Self",
+        "Notes": "Looking for 3BHK"
       }
     ];
     
