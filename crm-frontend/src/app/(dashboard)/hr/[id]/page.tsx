@@ -12,10 +12,11 @@ import { FormSelect } from "@/components/shared/form-select";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { ArrowLeft, User, Phone, Mail, MapPin, Plus, FileText, Briefcase, Clock, Calendar, RefreshCw, Save, History, Shield, Loader2, CheckCircle, Edit, ChevronLeft } from "lucide-react";
+import { ArrowLeft, User, Phone, MessageCircle, Mail, MapPin, Plus, FileText, Briefcase, Clock, Calendar, RefreshCw, Save, History, Shield, Loader2, CheckCircle, Edit, ChevronLeft } from "lucide-react";
 import dynamic from "next/dynamic";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { ContactModal } from "@/components/shared/contact-modal";
 
 const FollowUpPanel = dynamic(() => import("@/components/shared/follow-up-panel").then(mod => mod.FollowUpPanel), { ssr: false });
 
@@ -106,6 +107,7 @@ export default function HrDetail() {
   const [isSavingFu, setIsSavingFu] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState("");
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [contactModal, setContactModal] = useState<{ open: boolean; type: string; to: string } | null>(null);
 
   // Keyboard shortcut for history slider
   useEffect(() => {
@@ -265,6 +267,26 @@ export default function HrDetail() {
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Mobile</p>
                   <p className="text-[14px] font-medium text-foreground flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-muted-foreground" /> {candidate.mobile || "—"}</p>
+                  {(candidate?.mobile || candidate?.phone) && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => setContactModal({ open: true, type: "call", to: candidate.mobile || candidate.phone || "" })}
+                        className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-border/60 bg-muted/40 hover:bg-muted text-foreground transition-all text-xs font-medium"
+                      >
+                        <Phone className="h-3.5 w-3.5" />
+                        Log Call
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setContactModal({ open: true, type: "whatsapp", to: candidate.mobile || candidate.phone || "" })}
+                        className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-border/60 bg-muted/40 hover:bg-muted text-foreground transition-all text-xs font-medium"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        WhatsApp
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">WhatsApp</p>
@@ -529,6 +551,18 @@ export default function HrDetail() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {contactModal && (
+        <ContactModal
+          open={contactModal.open}
+          type={contactModal.type}
+          to={contactModal.to}
+          entityId={Number(id)}
+          entityType={"hr" as any}
+          onClose={() => setContactModal(null)}
+          onSent={() => setContactModal(null)}
+        />
+      )}
 
     </div>
   );
