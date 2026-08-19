@@ -9,7 +9,7 @@ const withPWA = withPWAInit({
 
 const nextConfig: NextConfig = {
   turbopack: {},
-  allowedDevOrigins: ['192.168.144.167', 'localhost'],
+  allowedDevOrigins: ['192.168.13.167', 'localhost'],
   async rewrites() {
     return [
       {
