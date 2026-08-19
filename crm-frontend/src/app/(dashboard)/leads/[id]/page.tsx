@@ -21,12 +21,13 @@ const FollowUpPanel = dynamic(() => import("@/components/shared/follow-up-panel"
 const ContactModal = dynamic(() => import("@/components/shared/contact-modal").then(mod => mod.ContactModal), { ssr: false });
 const LeadAttachments = dynamic(() => import("@/components/shared/lead-attachments").then(mod => mod.LeadAttachments), { ssr: false });
 const EditRequirementModal = dynamic(() => import("@/components/shared/edit-requirement-modal").then(mod => mod.EditRequirementModal), { ssr: false });
+import { AssignLeadModal } from "@/components/shared/assign-lead-modal";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft, Loader2, User, Phone, MapPin, Building2,
   Briefcase, Mail, MessageSquare, Plus, ArrowUpRight,
-  Clock, Send, RefreshCw, History, TrendingUp, SlidersHorizontal, Sparkles, Edit, ChevronLeft, ChevronRight, PhoneIncoming
+  Clock, Send, RefreshCw, History, TrendingUp, SlidersHorizontal, Sparkles, Edit, ChevronLeft, ChevronRight, PhoneIncoming, UserPlus
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -222,6 +223,10 @@ export default function LeadViewPage() {
   const [convertFeedback, setConvertFeedback] = useState("");
   const [isConverting, setIsConverting] = useState(false);
 
+  // Assign Lead state
+  const [isAssignOpen, setIsAssignOpen] = useState(false);
+  const [isAssigning, setIsAssigning] = useState(false);
+
   // Dropped Reason Modal
   const [isDroppedOpen, setIsDroppedOpen] = useState(false);
   const [dropReason, setDropReason] = useState("");
@@ -283,6 +288,25 @@ export default function LeadViewPage() {
       toast.error("Failed to convert lead");
     } finally {
       setIsConverting(false);
+    }
+  };
+
+  const handleAssignLead = async (toUserId: number) => {
+    setIsAssigning(true);
+    try {
+      const res = await apiFetch(`${API_URL}/lead-routing/assign/${id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to_user_id: toUserId }),
+      });
+      if (!res.ok) throw new Error("Failed to assign lead");
+      toast.success("Lead reassigned successfully");
+      setIsAssignOpen(false);
+      fetchLead(true);
+    } catch (err) {
+      toast.error("Failed to assign lead");
+    } finally {
+      setIsAssigning(false);
     }
   };
 
@@ -473,6 +497,16 @@ export default function LeadViewPage() {
           </Button>
           {canEdit && (
             <>
+              {(role === "Admin" || role === "Manager" || role === "Team Lead") && !lead.is_converted && (
+                <Button
+                  onClick={() => setIsAssignOpen(true)}
+                  variant="outline"
+                  className="rounded-full px-6 py-5 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-900/50 dark:bg-blue-900/20 dark:text-blue-300 dark:hover:bg-blue-900/40 shadow-sm gap-2"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Reassign
+                </Button>
+              )}
               {(role === "Admin" || role === "Manager" || ((role === "Staff" || role === "Team Lead") && userDept === "telecalling")) && !lead.is_converted && (
                 <Button
                   onClick={() => { setConvertTo(""); setConvertFeedback(""); setIsConvertOpen(true); }}
@@ -506,6 +540,11 @@ export default function LeadViewPage() {
           {canEdit && (
             <Button variant="outline" onClick={() => router.push(`/leads/new?edit=${lead.id}`)} className="h-11 rounded-xl text-foreground font-semibold border-border/60">
               <Edit className="w-4 h-4 mr-2 text-muted-foreground" /> Edit
+            </Button>
+          )}
+          {canEdit && (role === "Admin" || role === "Manager" || role === "Team Lead") && !lead.is_converted && (
+            <Button onClick={() => setIsAssignOpen(true)} variant="outline" className="h-11 rounded-xl border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/50 dark:bg-blue-900/20 dark:text-blue-300">
+              <UserPlus className="w-4 h-4 mr-2" /> Reassign
             </Button>
           )}
           {canEdit && (!lead.is_converted && (role === "Admin" || role === "Manager" || ((role === "Staff" || role === "Team Lead") && userDept === "telecalling"))) ? (
@@ -1226,6 +1265,15 @@ export default function LeadViewPage() {
         inquiry={editInquiry}
         leadId={Number(id)}
         onSuccess={() => fetchLead(true)}
+      />
+
+      {/* ── Assign Lead Modal ── */}
+      <AssignLeadModal
+        open={isAssignOpen}
+        onClose={() => setIsAssignOpen(false)}
+        onConfirm={handleAssignLead}
+        department={role === "Team Lead" || role === "Manager" ? userDept : "all"}
+        isLoading={isAssigning}
       />
     </div>
   );
