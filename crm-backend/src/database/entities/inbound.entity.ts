@@ -40,6 +40,9 @@ export class Inbound {
   purpose: string;
 
   @Column({ type: 'varchar', nullable: true })
+  bhk: string;
+
+  @Column({ type: 'varchar', nullable: true })
   special_purpose: string;
 
   @Column({ type: 'text', nullable: true })
