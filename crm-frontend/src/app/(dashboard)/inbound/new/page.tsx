@@ -119,6 +119,17 @@ const FLOOR_APPLICABLE_TYPES = [
   "hotel", "restaurant", "school", "college", "hospital", "clinic", "training_centre"
 ];
 
+const BHK_OPTIONS = [
+  { label: "1 BHK", value: "1" },
+  { label: "2 BHK", value: "2" },
+  { label: "3 BHK", value: "3" },
+  { label: "4 BHK", value: "4" },
+  { label: "5 BHK", value: "5" },
+  { label: "6 BHK", value: "6" },
+];
+
+const BHK_APPLICABLE_TYPES = ["apartment", "villa", "independent_house"];
+
 function InboundForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -144,6 +155,15 @@ function InboundForm() {
   const [brokerageAccepted, setBrokerageAccepted] = useState<string | null>(null);
   const [brokeragePaidBy, setBrokeragePaidBy] = useState<string[]>([]);
   const [brokerageType, setBrokerageType] = useState<string | null>(null);
+
+  // Locality / City states
+  const [selectedCity, setSelectedCity] = useState<string | null>(null);
+  const [sublocations, setSublocations] = useState<{ label: string; value: string }[]>([]);
+  const [selectedLocality, setSelectedLocality] = useState<string | null>(null);
+  const [isFetchingSublocations, setIsFetchingSublocations] = useState(false);
+
+  // BHK state
+  const [selectedBhk, setSelectedBhk] = useState<string | null>(null);
 
   const [preferredContactTime, setPreferredContactTime] = useState<string | undefined>(undefined);
 
@@ -189,6 +209,10 @@ function InboundForm() {
             const specialPurposes = data.special_purpose ? data.special_purpose.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
             setSelectedSpecialPurposes(specialPurposes);
 
+            setSelectedCity(data.city || null);
+            setSelectedLocality(data.locality || null);
+            setSelectedBhk(data.bhk || null);
+
             setPrimaryContact(data.primary_contact || null);
             setKeyAvailableWith(data.key_available_with || null);
             
@@ -225,6 +249,21 @@ function InboundForm() {
     }
   }, [editId, router]);
 
+  useEffect(() => {
+    if (!selectedCity) {
+      setSublocations([]);
+      return;
+    }
+    setIsFetchingSublocations(true);
+    apiFetch(API_URL + "/master/sublocations?city_name=" + encodeURIComponent(selectedCity))
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) setSublocations(data.data);
+      })
+      .catch(() => {})
+      .finally(() => setIsFetchingSublocations(false));
+  }, [selectedCity]);
+
   const toggleBrokeragePaidBy = (val: string) => {
     setBrokeragePaidBy(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]);
   };
@@ -258,6 +297,8 @@ function InboundForm() {
       payload.property_type = selectedType;
       payload.purpose = selectedPurpose;
       payload.special_purpose = selectedSpecialPurposes.length > 0 ? selectedSpecialPurposes.join(", ") : null;
+      payload.locality = selectedLocality;
+      payload.bhk = selectedBhk;
       
       payload.advance = formData.get("advance") || null;
 
@@ -378,6 +419,8 @@ function InboundForm() {
                 onValueChange={(val) => {
                   setSelectedCategory(val);
                   setSelectedType(null);
+                  setSelectedBhk(null);
+                  if (val !== "commercial") setSelectedSpecialPurposes([]);
                 }}
                 placeholder="Select Category" 
                 options={PROPERTY_CATEGORIES} 
@@ -390,13 +433,25 @@ function InboundForm() {
                 name="_property_type" 
                 defaultValue={inboundData?.property_type || null} 
                 value={selectedType}
-                onValueChange={setSelectedType}
+                onValueChange={(val) => { setSelectedType(val); setSelectedBhk(null); }}
                 placeholder={selectedCategory ? "Select Type" : "Select Category First"} 
                 options={selectedCategory ? PROPERTY_TYPES_MAP[selectedCategory] || [] : []} 
                 disabled={!selectedCategory}
                 required 
               />
             </div>
+            {selectedCategory === "residential" && selectedType && BHK_APPLICABLE_TYPES.includes(selectedType) && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">BHK</label>
+                <FormSelect
+                  name="_bhk"
+                  value={selectedBhk}
+                  onValueChange={setSelectedBhk}
+                  placeholder="Select BHK"
+                  options={BHK_OPTIONS}
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Purpose</label>
               <FormSelect 
@@ -409,6 +464,7 @@ function InboundForm() {
               />
             </div>
             
+            {selectedCategory === "commercial" && (
             <div className="space-y-2 lg:col-span-3">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">Special Purpose (Optional)</label>
               <div className="flex flex-wrap gap-2.5 pt-1">
@@ -437,6 +493,7 @@ function InboundForm() {
                 })}
               </div>
             </div>
+            )}
 
             {selectedPurpose === "Rent" && (
               <div className="space-y-2">
@@ -460,6 +517,12 @@ function InboundForm() {
                       { label: "4 Months", value: "4" },
                       { label: "5 Months", value: "5" },
                       { label: "6 Months", value: "6" },
+                      { label: "7 Months", value: "7" },
+                      { label: "8 Months", value: "8" },
+                      { label: "9 Months", value: "9" },
+                      { label: "10 Months", value: "10" },
+                      { label: "11 Months", value: "11" },
+                      { label: "12 Months", value: "12" },
                     ]}
                   />
                 ) : (
@@ -492,7 +555,19 @@ function InboundForm() {
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">City</label>
-              {isFetchingData ? skeletonField : <FormSelect name="city" defaultValue={inboundData?.city || null} placeholder="Select City" options={cities} required />}
+              {isFetchingData ? skeletonField : <FormSelect 
+                name="city" 
+                value={selectedCity}
+                defaultValue={inboundData?.city || null} 
+                onValueChange={(val) => {
+                  setSelectedCity(val);
+                  setSelectedLocality(null);
+                  setSublocations([]);
+                }}
+                placeholder="Select City" 
+                options={cities} 
+                required 
+              />}
             </div>
 
             <div className="space-y-2">
@@ -501,7 +576,17 @@ function InboundForm() {
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Locality</label>
-              <Input name="locality" defaultValue={inboundData?.locality || ""} placeholder="Enter Locality" required className="h-12 rounded-xl bg-muted/30" />
+              {isFetchingSublocations ? skeletonField : (
+                <FormSelect
+                  name="_locality"
+                  value={selectedLocality}
+                  onValueChange={setSelectedLocality}
+                  placeholder={selectedCity ? "Select Locality" : "Select City First"}
+                  options={sublocations}
+                  disabled={!selectedCity || sublocations.length === 0}
+                  required
+                />
+              )}
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Landmark</label>
