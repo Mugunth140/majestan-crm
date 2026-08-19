@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Put, Delete, Param } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, Delete, Param, Query } from '@nestjs/common';
 import { MasterService } from './master.service';
 
 @Controller('api/v1/master')
@@ -8,6 +8,12 @@ export class MasterController {
   @Get('cities')
   async getCities() {
     const data = await this.masterService.getCities();
+    return { success: true, data };
+  }
+
+  @Get('sublocations')
+  async getSublocations(@Query('city_name') cityName: string) {
+    const data = await this.masterService.getSublocations(cityName || '');
     return { success: true, data };
   }
 

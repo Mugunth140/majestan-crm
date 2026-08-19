@@ -24,6 +24,26 @@ export class MasterService {
     }
   }
 
+  async getSublocations(cityName: string) {
+    if (!cityName) return [];
+    try {
+      const rows = await this.siteDataSource.query(
+        `SELECT s.id, s.locality_name
+         FROM sublocations s
+         JOIN cities c ON s.city_id = c.id
+         WHERE c.city_name = ? AND s.is_active = 1
+         ORDER BY s.locality_name ASC`,
+        [cityName],
+      );
+      return rows.map((r: { id: number; locality_name: string }) => ({
+        label: r.locality_name,
+        value: r.locality_name,
+      }));
+    } catch (e) {
+      throw new InternalServerErrorException('Failed to load sublocations');
+    }
+  }
+
   async getProjects() {
     try {
       const rows = await this.siteDataSource.query(
