@@ -276,6 +276,7 @@ function LeadForm() {
         priority: formData.get("priority") as string,
         notes: formData.get("notes") as string,
         commission: formData.get("commission") ? parseFloat(formData.get("commission") as string) : null,
+        commissionRemarks: formData.get("commission_remarks") as string,
         isReferral: isReferral,
         referredByName: formData.get("referredByName") as string,
         referredByContact: formData.get("referredByContact") as string,
@@ -414,7 +415,18 @@ function LeadForm() {
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Commission (%)</label>
               <Input type="number" step="0.1" name="commission" defaultValue={leadData?.commission || ""} placeholder="e.g. 1.5" className="h-12 rounded-xl bg-muted/30" />
             </div>
-            
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Commission Remarks</label>
+              <Textarea
+                name="commission_remarks"
+                defaultValue={leadData?.commission_remarks || ""}
+                placeholder="e.g. Negotiable upon closing, split with co-broker..."
+                className="bg-muted/30 rounded-xl resize-none text-[15px] p-4"
+                rows={2}
+              />
+            </div>
+
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Referral</label>
               <FormSelect

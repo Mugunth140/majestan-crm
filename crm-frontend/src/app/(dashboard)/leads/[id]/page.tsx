@@ -576,6 +576,13 @@ export default function LeadViewPage() {
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Commission</p>
                 <p className="text-[14px] font-medium text-foreground">{lead.commission ? `${lead.commission}%` : "\u2014"}</p>
               </div>
+
+              {lead.commission_remarks && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Commission Remarks</p>
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{lead.commission_remarks}</p>
+                </div>
+              )}
               
               {lead.is_referral ? (
                 <div className="col-span-2">

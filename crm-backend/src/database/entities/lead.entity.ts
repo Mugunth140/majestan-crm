@@ -61,6 +61,9 @@ export class Lead {
   @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
   commission: number;
 
+  @Column({ type: 'text', nullable: true })
+  commission_remarks: string;
+
   @Column({ type: 'boolean', default: false })
   is_referral: boolean;
 
