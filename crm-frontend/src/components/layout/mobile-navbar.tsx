@@ -18,6 +18,7 @@ import {
   Layers
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useNotifications } from "@/context/notification-context";
 
 const navItems = [
   { href: "/", icon: LayoutGrid, label: "Overview" },
@@ -30,6 +31,7 @@ export function MobileNavbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+  const { unreadCount } = useNotifications();
 
   const getDynamicAddRoute = () => {
     if (pathname.startsWith("/leads")) return "/leads/new";
@@ -62,6 +64,8 @@ export function MobileNavbar() {
         <div className="flex-1 max-w-[320px] bg-white/90 dark:bg-[#1C1C1E]/95 backdrop-blur-xl border border-border/60 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.15)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.4)] rounded-[2.5rem] p-1.5 flex items-center justify-around pointer-events-auto relative overflow-hidden">
           {navItems.map((item) => {
             const isActive = item.href === "/" ? pathname === "/" : pathname?.startsWith(item.href);
+            const isInbox = item.href === "/inbox";
+            
             return (
               <button
                 key={item.label}
@@ -76,6 +80,13 @@ export function MobileNavbar() {
                     transition={{ type: "spring", stiffness: 450, damping: 30 }}
                   />
                 )}
+                
+                {isInbox && unreadCount > 0 && (
+                  <span className="absolute top-1 right-2 h-4 min-w-[1rem] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none z-30 shadow-sm border border-background">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+
                 <item.icon 
                   className={cn(
                     "w-[22px] h-[22px] mb-1 transition-colors relative z-20", 
