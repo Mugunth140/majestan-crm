@@ -14,5 +14,14 @@ export function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Prom
     headers.set('Authorization', `Bearer ${token}`);
   }
   // Preserve Content-Type if already set, otherwise don't override (important for file uploads)
-  return fetch(input, { ...init, headers });
+  return fetch(input, { ...init, headers }).then(res => {
+    if (res.status === 401) {
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        localStorage.removeItem('crm_token');
+        localStorage.removeItem('crm_user');
+        window.location.href = '/login';
+      }
+    }
+    return res;
+  });
 }

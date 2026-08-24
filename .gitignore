@@ -141,3 +141,5 @@ prod-config
 
 # Mimosa security-scanner state (hook baselines, .source snapshots)
 .mimosa/
+.env
+.env.*
