@@ -2,6 +2,7 @@ import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
+import { DataSource } from 'typeorm';
 
 /**
  * JWT authentication guard.
@@ -13,9 +14,10 @@ export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
+    private readonly dataSource: DataSource,
   ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<Request>();
     let token = '';
     const authHeader = req.headers['authorization'];
@@ -40,6 +42,12 @@ export class JwtAuthGuard implements CanActivate {
 
     if (!payload?.sub) {
       throw new UnauthorizedException('Invalid token payload');
+    }
+
+    // Fast active check
+    const rows = await this.dataSource.query('SELECT is_active, role_id FROM users WHERE id = ?', [payload.sub]);
+    if (!rows || rows.length === 0 || rows[0].is_active !== 1) {
+      throw new UnauthorizedException('User account is deactivated');
     }
 
     // Attach to request so controllers can read req.user

@@ -70,67 +70,64 @@ export class LeadRoutingService {
 
   // ── Claim ──────────────────────────────────────────────────────────────────
   async claimLead(leadId: number, requestingUserId: number) {
-    const leadRepo = this.dataSource.getRepository(Lead);
-    const lead = await leadRepo.findOne({ where: { id: leadId } });
-    if (!lead) throw new NotFoundException('Lead not found');
-
-    const prevAssignedId = lead.assigned_staff_id;
-
-    lead.assigned_staff_id = requestingUserId;
-    const updated = await leadRepo.save(lead);
-
-    // Insert routing history
-    const rh = this.dataSource.getRepository(RoutingHistory).create({
-      lead_id: leadId,
-      event_type: 'Claimed',
-      to_user_id: requestingUserId,
-      from_user_id: prevAssignedId ?? null,
-      department: lead.department,
-    });
-    await this.dataSource.getRepository(RoutingHistory).save(rh);
-
-    // Fetch claiming user + their team lead
-    const claimingUser = await this.dataSource
-      .getRepository(User)
-      .findOne({ where: { id: requestingUserId }, relations: { department: true } });
-
-    // Notify claiming staff
-    await this.notificationsService.createNotification(
-      requestingUserId,
-      'Lead Claimed',
-      `You claimed Lead #${leadId}`,
-      'lead_claimed',
-      leadId,
-      'lead',
-    );
-
-    // Notify their team lead(s) — users in same department with Team Lead role
-    if (claimingUser?.department_id) {
-      const teamLeads = await this.dataSource
-        .getRepository(User)
-        .createQueryBuilder('u')
-        .leftJoinAndSelect('u.role', 'role')
-        .where('u.department_id = :deptId', { deptId: claimingUser.department_id })
-        .andWhere('role.name = :roleName', { roleName: 'Team Lead' })
-        .andWhere('u.is_active = 1')
-        .getMany();
-
-      for (const tl of teamLeads) {
-        await this.notificationsService.createNotification(
-          tl.id,
-          'Lead Claimed by Staff',
-          `Staff ${claimingUser.name} claimed Lead #${leadId}`,
-          'lead_claimed',
-          leadId,
-          'lead',
-        );
+    await this.dataSource.transaction(async (manager) => {
+      const result = await manager.query(
+        'UPDATE leads SET assigned_staff_id = ? WHERE id = ? AND assigned_staff_id IS NULL',
+        [requestingUserId, leadId]
+      );
+      if (result.affectedRows === 0) {
+        throw new BadRequestException('Lead already claimed or not found');
       }
-    }
 
-    return updated;
+      const lead = await manager.getRepository(Lead).findOne({ where: { id: leadId } });
+
+      const rh = manager.getRepository(RoutingHistory).create({
+        lead_id: leadId,
+        event_type: 'Claimed',
+        to_user_id: requestingUserId,
+        from_user_id: null,
+        department: lead?.department,
+      });
+      await manager.save(rh);
+
+      const claimingUser = await manager.getRepository(User).findOne({ 
+        where: { id: requestingUserId }, 
+        relations: { department: true } 
+      });
+
+      await this.notificationsService.createNotification(
+        requestingUserId,
+        'Lead Claimed',
+        `You claimed Lead #${leadId}`,
+        'lead_claimed',
+        leadId,
+        'lead',
+      );
+
+      if (claimingUser?.department_id) {
+        const teamLeads = await manager.createQueryBuilder(User, 'u')
+          .leftJoin('u.role', 'r')
+          .where('u.department_id = :deptId', { deptId: claimingUser.department_id })
+          .andWhere('r.name = :role', { role: 'Team Lead' })
+          .andWhere('u.is_active = 1')
+          .getMany();
+
+        for (const tl of teamLeads) {
+          await this.notificationsService.createNotification(
+            tl.id,
+            'Lead Claimed',
+            `${claimingUser.name} claimed Lead #${leadId}`,
+            'lead_claimed_team',
+            leadId,
+            'lead',
+          );
+        }
+      }
+    });
+
+    return { success: true };
   }
 
-  // ── Assign ─────────────────────────────────────────────────────────────────
   async assignLead(leadId: number, toUserId: number, actionedById: number | null, feedback?: string) {
     const leadRepo = this.dataSource.getRepository(Lead);
     const lead = await leadRepo.findOne({ where: { id: leadId } });

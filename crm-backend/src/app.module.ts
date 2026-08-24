@@ -1,4 +1,8 @@
 import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, NestModule } from '@nestjs/common';
+import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
+import pinoHttp from 'pino-http';
+
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EventEmitterModule } from '@nestjs/event-emitter';
@@ -131,4 +135,16 @@ import { TaskReceipt } from './database/entities/task-receipt.entity';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(CorrelationIdMiddleware).forRoutes('*');
+    consumer.apply(pinoHttp({
+      customProps: (req: any, res: any) => ({
+        reqId: (req as any).id,
+      }),
+      autoLogging: {
+        ignore: (req: any) => req.url?.includes('health') || false,
+      }
+    })).forRoutes('*');
+  }
+}

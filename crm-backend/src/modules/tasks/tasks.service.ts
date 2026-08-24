@@ -566,25 +566,14 @@ export class TasksService {
     increment: number,
     source: 'auto' | 'manual',
   ) {
-    const repo = this.dataSource.getRepository(TaskMetricProgress);
-    let row = await repo.findOne({
-      where: { task_template_id: templateId, metric_key: metricKey, week_number: weekNumber, month },
-    });
-    if (row) {
-      row.achieved_count = Number(row.achieved_count) + increment;
-      row.source = source;
-      await repo.save(row);
-    } else {
-      const newRow = repo.create({
-        task_template_id: templateId,
-        metric_key: metricKey,
-        week_number: weekNumber,
-        month,
-        achieved_count: increment,
-        source,
-      });
-      await repo.save(newRow);
-    }
+    await this.dataSource.query(
+      `INSERT INTO task_metric_progress (task_template_id, metric_key, week_number, month, achieved_count, source)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE 
+         achieved_count = achieved_count + VALUES(achieved_count),
+         source = VALUES(source)`,
+      [templateId, metricKey, weekNumber, month, increment, source]
+    );
   }
 
   // ── Receipt Upload ──────────────────────────────────────────────────────────

@@ -43,16 +43,24 @@ export class InboundsService {
     const fileExt = extname(file.originalname);
     const tempFileKey = `inbounds/${inbound.property_id}/temp_${Date.now()}${fileExt}`;
 
-    await this.s3Client.write(tempFileKey, file.buffer, {
+    const withTimeout = <T>(promise: Promise<T>, ms: number) => 
+      Promise.race([
+        promise,
+        new Promise<T>((_, reject) => setTimeout(() => reject(new Error('S3 Operation Timed Out')), ms))
+      ]);
+      
+    await withTimeout(this.s3Client.write(tempFileKey, file.buffer, {
       type: file.mimetype,
-    });
+    }), 5000);
 
     const tempFileUrl = `${process.env.R2_PUBLIC_URL}/${tempFileKey}`;
 
     // Process image via Imgproxy (WebP + Watermark)
     try {
       const imgproxyUrl = `http://imgproxy:8080/insecure/watermark:1:ce:0:0:0.3/format:webp/plain/${tempFileUrl}`;
-      const response = await fetch(imgproxyUrl);
+      const response = await fetch(imgproxyUrl, {
+        signal: AbortSignal.timeout(5000)
+      });
       
       if (!response.ok) {
         throw new Error(`Imgproxy failed with status ${response.status}`);
@@ -61,7 +69,7 @@ export class InboundsService {
       const processedBuffer = await response.arrayBuffer();
       const finalFileKey = `inbounds/${inbound.property_id}/image_${Date.now()}.webp`;
       
-      await this.s3Client.write(finalFileKey, Buffer.from(processedBuffer), { type: 'image/webp' });
+      await withTimeout(this.s3Client.write(finalFileKey, Buffer.from(processedBuffer), { type: 'image/webp' }), 5000);
       
       // Cleanup temp file
       this.s3Client.delete(tempFileKey).catch(() => {});
