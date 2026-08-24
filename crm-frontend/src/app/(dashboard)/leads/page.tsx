@@ -15,7 +15,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FormSelect } from "@/components/shared/form-select";
 import { Input } from "@/components/ui/input";
-import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -192,7 +191,7 @@ export default function LeadsPage() {
       const res = await apiFetch(API_URL + "/leads/" + deleteId, { method: "DELETE" });
       if (res.ok) {
         toast.success("Lead deleted successfully");
-        fetchLeads();
+        setLeads(prev => prev.filter(l => l.rawId !== deleteId));
       } else {
         toast.error("Failed to delete lead");
       }
@@ -208,9 +207,16 @@ export default function LeadsPage() {
     setIsDeletingBulk(true);
     try {
       const promises = bulkDeleteIds.map(id => apiFetch(API_URL + "/leads/" + id, { method: "DELETE" }));
-      await Promise.all(promises);
-      toast.success(`${bulkDeleteIds.length} lead(s) deleted successfully`);
-      fetchLeads();
+      const results = await Promise.all(promises);
+      const failedCount = results.filter(r => !r.ok).length;
+      if (failedCount > 0) {
+        toast.error(`Failed to delete ${failedCount} leads`);
+      }
+      const successCount = results.filter(r => r.ok).length;
+      if (successCount > 0) {
+        toast.success(`${successCount} lead(s) deleted successfully`);
+        setLeads(prev => prev.filter(l => !bulkDeleteIds.includes(l.rawId)));
+      }
     } catch {
       toast.error("Failed to delete some or all leads");
     } finally {
@@ -264,7 +270,7 @@ export default function LeadsPage() {
       const data = await res.json();
       if (data.success) {
         toast.success("Lead returned to routing queue");
-        fetchLeads();
+        setLeads(prev => prev.filter(l => l.rawId !== returnLeadId));
       } else {
         toast.error(data.message || "Failed to return lead");
       }
@@ -383,7 +389,8 @@ export default function LeadsPage() {
     setImportProgress(0);
     
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
+      const XLSX = await import("xlsx");
       try {
         const bstr = evt.target?.result;
         const wb = XLSX.read(bstr, { type: "binary" });
@@ -620,7 +627,7 @@ export default function LeadsPage() {
                   const data = await res.json();
                   if (data.success) {
                     toast.success("Lead reverted to qualified.");
-                    fetchLeads();
+                    setLeads(prev => prev.map(l => l.rawId === row.rawId ? { ...l, isUnqualified: false } : l));
                     clearSelection();
                   } else toast.error("Failed to revert lead.");
                 } catch {
@@ -923,7 +930,8 @@ export default function LeadsPage() {
     </div>
   );
 
-  const downloadTemplate = () => {
+  const downloadTemplate = async () => {
+    const XLSX = await import("xlsx");
     // Define the headers based on what handleFileUpload expects
     const headers = [
       {

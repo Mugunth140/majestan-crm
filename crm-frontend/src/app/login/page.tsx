@@ -5,7 +5,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LottieAnimation } from "@/components/shared/LottieAnimation";
+import dynamic from "next/dynamic";
+const LottieAnimation = dynamic(() => import("@/components/shared/LottieAnimation").then((mod) => mod.LottieAnimation), { ssr: false });
 import { Mail, Lock, Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
