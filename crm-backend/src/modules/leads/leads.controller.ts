@@ -2,6 +2,7 @@ import { Body, Controller, Get, Post, Put, Delete, Param, Query, UseInterceptors
 import { FileInterceptor } from '@nestjs/platform-express';
 import { LeadsService } from './leads.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { GetLeadsQueryDto } from './dto/get-leads-query.dto';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 import { BulkCreateLeadsDto } from './dto/bulk-create-leads.dto';
@@ -29,9 +30,9 @@ export class LeadsController {
   }
 
   @Get()
-  async getLeads(@Request() req: any) {
-    const data = await this.leadsService.getLeads(req.user);
-    return { success: true, data };
+  async getLeads(@Request() req: any, @Query() query: GetLeadsQueryDto) {
+    const result = await this.leadsService.getLeads(req.user, query);
+    return { success: true, ...result };
   }
 
   @Get(':id')

@@ -413,7 +413,11 @@ export class LeadsService {
     });
   }
 
-  async getLeads(user?: any): Promise<any[]> {
+  async getLeads(user?: any, query?: any): Promise<{ data: any[], meta: any }> {
+    const page = query?.page ? Number(query.page) : 1;
+    const limit = query?.limit ? Number(query.limit) : 10;
+    const offset = (page - 1) * limit;
+
     let roleFilter = '';
     if (user && user.role === 'Staff') {
       roleFilter = `AND l.assigned_staff_id = ${Number(user.id)}`;
@@ -421,24 +425,76 @@ export class LeadsService {
       roleFilter = `AND l.assigned_staff_id IN (SELECT id FROM users WHERE department_id = ${Number(user.department_id)})`;
     }
 
-    const rawLeads = await this.dataSource.query(`
-      SELECT 
-        l.id as rawId, 
-        l.assigned_staff_id as assignedStaffId,
-        l.name, 
-        l.mobile_number as mobile, 
-        l.email, 
-        l.status, 
-        l.department,
-        l.lead_source as source, 
-        l.is_unqualified as isUnqualified, 
-        l.created_at as createdAt,
-        s.name as staff,
-        i.property_type as propertyType, 
-        i.property_category as propertyCategory,
-        latest_f.next_follow_up_date as nextFollowUpDate,
-        latest_actual_f.follow_up_date as lastFollowedUpDate
-      FROM leads l
+    const params: any[] = [];
+    let filterConds = '';
+
+    if (query?.dept) {
+      filterConds += ' AND l.department = ?';
+      params.push(query.dept);
+    }
+
+    if (query?.search) {
+      const s = `%${query.search}%`;
+      filterConds += ' AND (l.name LIKE ? OR l.mobile_number LIKE ? OR l.email LIKE ? OR l.id LIKE ?)';
+      params.push(s, s, s, s);
+    }
+
+    if (query?.dateFrom) {
+      filterConds += ' AND DATE(l.created_at) >= ?';
+      params.push(query.dateFrom);
+    }
+    if (query?.dateTo) {
+      filterConds += ' AND DATE(l.created_at) <= ?';
+      params.push(query.dateTo);
+    }
+    if (query?.status) {
+      filterConds += ' AND l.status = ?';
+      params.push(query.status);
+    }
+    if (query?.source) {
+      filterConds += ' AND l.lead_source = ?';
+      params.push(query.source);
+    }
+    if (query?.category) {
+      filterConds += ' AND i.property_category = ?';
+      params.push(query.category);
+    }
+    if (query?.type) {
+      filterConds += ' AND i.property_type = ?';
+      params.push(query.type);
+    }
+    if (query?.staff) {
+      filterConds += ' AND s.name = ?';
+      params.push(query.staff);
+    }
+
+    if (query?.tab === 'Unqualified') {
+      filterConds += ' AND l.is_unqualified = 1';
+    } else {
+      filterConds += ' AND l.is_unqualified = 0';
+    }
+
+    // Action required filters
+    if (query?.tab === 'Action Required' && query?.actionFilter) {
+       if (query.actionFilter === 'Overdue') {
+         filterConds += ' AND latest_f.next_follow_up_date < CURDATE()';
+       } else if (query.actionFilter === 'Yesterday') {
+         filterConds += ' AND DATE(latest_actual_f.follow_up_date) = SUBDATE(CURDATE(), 1)';
+       } else if (query.actionFilter === 'Today') {
+         if (query.todayViewMode === 'completed') {
+           filterConds += ' AND DATE(latest_actual_f.follow_up_date) = CURDATE()';
+         } else {
+           filterConds += ' AND DATE(latest_f.next_follow_up_date) = CURDATE()';
+         }
+       } else if (query.actionFilter === 'Tomorrow') {
+         filterConds += ' AND DATE(latest_f.next_follow_up_date) = ADDDATE(CURDATE(), 1)';
+       } else if (query.actionFilter === 'All Scheduled') {
+         filterConds += ' AND DATE(latest_f.next_follow_up_date) > ADDDATE(CURDATE(), 1)';
+       }
+    }
+
+    // Because action required relies on follow_up subqueries, we need them in count query as well.
+    const joinClauses = `
       LEFT JOIN users s ON l.assigned_staff_id = s.id
       LEFT JOIN (
         SELECT lead_id, property_type, property_category,
@@ -456,12 +512,46 @@ export class LeadsService {
         FROM lead_follow_ups
         WHERE follow_up_date IS NOT NULL
       ) latest_actual_f ON latest_actual_f.lead_id = l.id AND latest_actual_f.rn = 1
-      WHERE l.assigned_staff_id IS NOT NULL ${roleFilter}
-      ORDER BY l.created_at DESC
-    `);
+    `;
 
-    return rawLeads.map((row: any, index: number) => ({
-      sno: index + 1,
+    const countSql = `
+      SELECT COUNT(*) as count 
+      FROM leads l 
+      ${joinClauses} 
+      WHERE l.assigned_staff_id IS NOT NULL ${roleFilter} ${filterConds}
+    `;
+
+    const countResult = await this.dataSource.query(countSql, params);
+    const total = Number(countResult[0]?.count || 0);
+
+    const dataSql = `
+      SELECT 
+        l.id as rawId, 
+        l.assigned_staff_id as assignedStaffId,
+        l.name, 
+        l.mobile_number as mobile, 
+        l.email, 
+        l.status, 
+        l.department,
+        l.lead_source as source, 
+        l.is_unqualified as isUnqualified, 
+        l.created_at as createdAt,
+        s.name as staff,
+        i.property_type as propertyType, 
+        i.property_category as propertyCategory,
+        latest_f.next_follow_up_date as nextFollowUpDate,
+        latest_actual_f.follow_up_date as lastFollowedUpDate
+      FROM leads l
+      ${joinClauses}
+      WHERE l.assigned_staff_id IS NOT NULL ${roleFilter} ${filterConds}
+      ORDER BY l.created_at DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const rawLeads = await this.dataSource.query(dataSql, [...params, limit, offset]);
+
+    const data = rawLeads.map((row: any, index: number) => ({
+      sno: offset + index + 1,
       id: 'L' + String(row.rawId).padStart(5, '0'),
       rawId: row.rawId,
       createdAt: row.createdAt,
@@ -485,6 +575,16 @@ export class LeadsService {
       lastFollowedUpDate: row.lastFollowedUpDate || null,
       isUnqualified: Boolean(row.isUnqualified),
     }));
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
   }
 
   async getCities(): Promise<{ id: number; city_name: string }[]> {
