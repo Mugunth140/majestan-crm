@@ -138,3 +138,6 @@ bun.lockb
 # Docker Compose — lives in the infra repo (majestan-infra), not here
 docker-compose.yml
 prod-config
+
+# Mimosa security-scanner state (hook baselines, .source snapshots)
+.mimosa/

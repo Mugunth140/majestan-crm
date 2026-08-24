@@ -1,7 +1,11 @@
-import { Controller, Get, Post, Put, Delete, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('api/v1/users')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
   constructor(private readonly service: UsersService) {}
 
@@ -18,18 +22,21 @@ export class UsersController {
   }
 
   @Post()
+  @Roles('Admin')
   async create(@Body() body: any) {
     const data = await this.service.create(body);
     return { success: true, data };
   }
 
   @Put(':id')
+  @Roles('Admin')
   async update(@Param('id') id: string, @Body() body: any) {
     const data = await this.service.update(Number(id), body);
     return { success: true, data };
   }
 
   @Delete(':id')
+  @Roles('Admin')
   async delete(@Param('id') id: string) {
     await this.service.delete(Number(id));
     return { success: true };

@@ -4,9 +4,10 @@ import { HrCandidate } from '../../database/entities/hr-candidate.entity';
 import { HrFollowUp } from '../../database/entities/hr-follow-up.entity';
 import { HrService } from './hr.service';
 import { HrController } from './hr.controller';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([HrCandidate, HrFollowUp])],
+  imports: [TypeOrmModule.forFeature([HrCandidate, HrFollowUp]), AuthModule],
   controllers: [HrController],
   providers: [HrService],
 })

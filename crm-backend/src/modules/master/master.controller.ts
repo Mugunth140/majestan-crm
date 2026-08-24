@@ -1,7 +1,11 @@
-import { Body, Controller, Get, Post, Put, Delete, Param, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, Delete, Param, Query, UseGuards } from '@nestjs/common';
 import { MasterService } from './master.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('api/v1/master')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class MasterController {
   constructor(private readonly masterService: MasterService) {}
 
@@ -36,18 +40,21 @@ export class MasterController {
   }
 
   @Post('lead-sources')
+  @Roles('Admin')
   async createLeadSource(@Body() body: { name: string }) {
     const data = await this.masterService.createLeadSource(body.name);
     return { success: true, data };
   }
 
   @Put('lead-sources/:id')
+  @Roles('Admin')
   async updateLeadSource(@Param('id') id: number, @Body() body: { name: string; is_active: boolean }) {
     const data = await this.masterService.updateLeadSource(id, body);
     return { success: true, data };
   }
 
   @Delete('lead-sources/:id')
+  @Roles('Admin')
   async deleteLeadSource(@Param('id') id: number) {
     const data = await this.masterService.deleteLeadSource(id);
     return { success: true, data };

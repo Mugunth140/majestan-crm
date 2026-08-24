@@ -16,7 +16,7 @@ import { User } from '../../database/entities/user.entity';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get('JWT_SECRET', 'secret'),
+        secret: config.get<string>('JWT_SECRET'),
         signOptions: { expiresIn: '1d' },
       }),
     }),

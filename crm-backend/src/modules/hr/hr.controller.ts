@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException, Put } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException, Put, UseGuards } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { HrService } from './hr.service';
 import { HrCandidate } from '../../database/entities/hr-candidate.entity';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('api/v1/hr')
+@UseGuards(JwtAuthGuard)
 export class HrController {
   @Post(':id/follow-ups')
   async addFollowUp(@Param('id') id: string, @Body() data: any) {
