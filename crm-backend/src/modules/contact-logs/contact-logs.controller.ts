@@ -1,6 +1,8 @@
 import { Controller, Get, Post, Body, UseGuards, Request } from '@nestjs/common';
 import { ContactLogsService } from './contact-logs.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RecordDeviceHeartbeatDto } from './dto/record-device-heartbeat.dto';
+import { SyncCallLogsDto } from './dto/sync-call-logs.dto';
 
 @Controller('api/v1/contact-logs')
 @UseGuards(JwtAuthGuard)
@@ -20,15 +22,13 @@ export class ContactLogsController {
   }
 
   @Post('device/heartbeat')
-  async recordDeviceHeartbeat(@Request() req: any, @Body() body: any) {
-    // The service validates and records the complete device report. Passing
-    // only deviceId silently drops every heartbeat as an invalid payload.
+  async recordDeviceHeartbeat(@Request() req: any, @Body() body: RecordDeviceHeartbeatDto) {
     const data = await this.contactLogsService.recordDeviceHeartbeat(req.user.id, body);
     return { success: true, data };
   }
 
   @Post('sync')
-  async syncCallLogs(@Request() req: any, @Body() body: any) {
+  async syncCallLogs(@Request() req: any, @Body() body: SyncCallLogsDto) {
     const data = await this.contactLogsService.syncCallLogs(req.user.id, body.logs || []);
     return { success: true, data };
   }

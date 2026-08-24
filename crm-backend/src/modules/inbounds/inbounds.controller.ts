@@ -1,10 +1,12 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException, UseGuards, Request } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { InboundsService } from './inbounds.service';
-import { Inbound } from '../../database/entities/inbound.entity';
-import { InboundFollowUp } from '../../database/entities/inbound-follow-up.entity';
-import { InboundContactLog } from '../../database/entities/inbound-contact-log.entity';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CreateInboundDto } from './dto/create-inbound.dto';
+import { UpdateInboundDto } from './dto/update-inbound.dto';
+import { CreateInboundFollowUpDto } from './dto/create-inbound-follow-up.dto';
+import { UpdateInboundFollowUpDto } from './dto/update-inbound-follow-up.dto';
+import { CreateInboundContactLogDto } from './dto/create-inbound-contact-log.dto';
 
 @Controller('api/v1/inbounds')
 @UseGuards(JwtAuthGuard)
@@ -34,7 +36,7 @@ export class InboundsController {
   }
 
   @Post()
-  create(@Body() createInboundDto: Partial<Inbound>, @Request() req: any) {
+  create(@Body() createInboundDto: CreateInboundDto, @Request() req: any) {
     if (req.user && req.user.role === 'Staff') {
       createInboundDto.assigned_staff_id = req.user.id;
     }
@@ -52,17 +54,15 @@ export class InboundsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateInboundDto: Partial<Inbound>) {
+  update(@Param('id') id: string, @Body() updateInboundDto: UpdateInboundDto) {
     return this.inboundsService.update(+id, updateInboundDto);
   }
-
 
   @Post(':id/follow-ups')
   async addFollowUp(
     @Param('id') id: string,
-    @Body() payload: Partial<InboundFollowUp>,
+    @Body() payload: CreateInboundFollowUpDto,
   ) {
-    // We default created_by_id to 1 here as in leads (if leads even uses it).
     const data = await this.inboundsService.addFollowUp(+id, payload, 1);
     return { success: true, data };
   }
@@ -70,9 +70,8 @@ export class InboundsController {
   @Post(':id/contact-log')
   async addContactLog(
     @Param('id') id: string,
-    @Body() payload: Partial<InboundContactLog>,
+    @Body() payload: CreateInboundContactLogDto,
   ) {
-    // Defaulting sent_by_id to 1 as dummy userId for now
     const data = await this.inboundsService.addContactLog(+id, payload, 1);
     return { success: true, data };
   }
@@ -81,7 +80,7 @@ export class InboundsController {
   async updateFollowUp(
     @Param('id') id: string,
     @Param('followUpId') followUpId: string,
-    @Body() payload: Partial<InboundFollowUp>,
+    @Body() payload: UpdateInboundFollowUpDto,
   ) {
     const data = await this.inboundsService.updateFollowUp(+id, +followUpId, payload);
     return { success: true, data };

@@ -2,6 +2,14 @@ import { Body, Controller, Get, Post, Put, Delete, Param, Query, UseInterceptors
 import { FileInterceptor } from '@nestjs/platform-express';
 import { LeadsService } from './leads.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CreateLeadDto } from './dto/create-lead.dto';
+import { UpdateLeadDto } from './dto/update-lead.dto';
+import { BulkCreateLeadsDto } from './dto/bulk-create-leads.dto';
+import { UpdateLeadStatusDto } from './dto/update-lead-status.dto';
+import { UpdateLeadInquiryDto } from './dto/update-lead-inquiry.dto';
+import { CreateLeadContactLogDto } from './dto/create-lead-contact-log.dto';
+import { CreateLeadFollowUpDto } from './dto/create-lead-follow-up.dto';
+import { UpdateLeadFollowUpDto } from './dto/update-lead-follow-up.dto';
 
 @Controller('api/v1/leads')
 @UseGuards(JwtAuthGuard)
@@ -33,13 +41,13 @@ export class LeadsController {
   }
 
   @Post('bulk')
-  async bulkCreateLeads(@Body() body: { leads: any[] }) {
+  async bulkCreateLeads(@Body() body: BulkCreateLeadsDto) {
     const result = await this.leadsService.bulkCreateLeads(body.leads);
     return { success: true, count: result.count };
   }
 
   @Post()
-  async createLead(@Body() body: any) {
+  async createLead(@Body() body: CreateLeadDto) {
     const result = await this.leadsService.createLead(body);
     return {
       success: true,
@@ -50,7 +58,7 @@ export class LeadsController {
   }
 
   @Put(':id/status')
-  async updateLeadStatus(@Param('id') id: string, @Body() body: any) {
+  async updateLeadStatus(@Param('id') id: string, @Body() body: UpdateLeadStatusDto) {
     const data = await this.leadsService.updateLeadStatus(Number(id), body);
     return { success: true, data };
   }
@@ -65,14 +73,14 @@ export class LeadsController {
   async updateInquiry(
     @Param('id') id: string,
     @Param('inquiryId') inquiryId: string,
-    @Body() body: any,
+    @Body() body: UpdateLeadInquiryDto,
   ) {
     const data = await this.leadsService.updateInquiry(Number(id), Number(inquiryId), body);
     return { success: true, data };
   }
 
   @Put(':id')
-  async updateLead(@Param('id') id: string, @Body() body: any) {
+  async updateLead(@Param('id') id: string, @Body() body: UpdateLeadDto) {
     const data = await this.leadsService.updateLead(Number(id), body);
     return { success: true, data };
   }
@@ -85,14 +93,14 @@ export class LeadsController {
 
   // ── Contact Logs ───────────────────────────────────────────────────────────
   @Post(':id/contact-log')
-  async addContactLog(@Param('id') id: string, @Body() body: any) {
+  async addContactLog(@Param('id') id: string, @Body() body: CreateLeadContactLogDto) {
     const data = await this.leadsService.addContactLog(Number(id), body);
     return { success: true, data };
   }
 
   // ── Follow-Up CRUD ─────────────────────────────────────────────────────────
   @Post(':id/follow-ups')
-  async addFollowUp(@Param('id') id: string, @Body() body: any) {
+  async addFollowUp(@Param('id') id: string, @Body() body: CreateLeadFollowUpDto) {
     const data = await this.leadsService.addFollowUp(Number(id), body);
     return { success: true, data };
   }
@@ -101,7 +109,7 @@ export class LeadsController {
   async updateFollowUp(
     @Param('id') id: string,
     @Param('followUpId') followUpId: string,
-    @Body() body: any,
+    @Body() body: UpdateLeadFollowUpDto,
   ) {
     const data = await this.leadsService.updateFollowUp(Number(id), Number(followUpId), body);
     return { success: true, data };
