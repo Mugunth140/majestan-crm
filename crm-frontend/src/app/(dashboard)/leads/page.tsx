@@ -131,18 +131,46 @@ export default function LeadsPage() {
   const tabs = ["All Leads", "Open Pipeline", "Action Required", "Unqualified"];
   const actionFilters = ["Overdue", "Yesterday", "Today", "Tomorrow", "All Scheduled"];
 
+    const [totalCount, setTotalCount] = useState(0);
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+
   const fetchLeads = useCallback(async () => {
     try {
+      if (activeTab === "Open Pipeline" && pendingImports.length > 0) {
+        return; // No need to fetch if showing imports
+      }
       setIsLoading(true);
-      const res = await apiFetch(API_URL + "/leads");
+      const params = new URLSearchParams({
+        page: (pagination.pageIndex + 1).toString(),
+        limit: pagination.pageSize.toString(),
+      });
+      if (debouncedSearchQuery.trim()) params.append('search', debouncedSearchQuery.trim());
+      if (activeTab && activeTab !== "Open Pipeline") params.append('tab', activeTab);
+      if (deptFilter) params.append('dept', deptFilter);
+      if (activeTab === "Action Required" && actionFilter) {
+        params.append('actionFilter', actionFilter);
+        params.append('todayViewMode', todayViewMode);
+      }
+      if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
+      if (filters.dateTo) params.append('dateTo', filters.dateTo);
+      if (filters.category) params.append('category', filters.category);
+      if (filters.type) params.append('type', filters.type);
+      if (filters.staff) params.append('staff', filters.staff);
+      if (filters.status) params.append('status', filters.status);
+      if (filters.source) params.append('source', filters.source);
+
+      const res = await apiFetch(API_URL + "/leads?" + params.toString());
       const data = await res.json();
-      if (data.success) setLeads(data.data);
+      if (data.success) {
+        setLeads(data.data);
+        setTotalCount(data.meta?.total || 0);
+      }
     } catch {
       toast.error("Failed to load leads.");
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [pagination, debouncedSearchQuery, activeTab, deptFilter, actionFilter, todayViewMode, filters, pendingImports.length]);
 
   useEffect(() => {
     fetchLeads();
@@ -152,117 +180,11 @@ export default function LeadsPage() {
   }, [fetchLeads]);
 
   const displayedLeads = useMemo(() => {
-    let filtered = leads;
-
-    // Role-based filtering
-    if (role === "Staff") {
-      // Staff only see their own assigned leads (no unassigned)
-      filtered = filtered.filter((l) => {
-        const staffId = l.assigned_staff?.id ?? l.assignedStaffId;
-        return staffId && staffId === userId;
-      });
-    }
-
-    // Department filter for TeamLead / Manager / Admin
-    if (role !== "Staff") {
-      filtered = filtered.filter((l) => {
-        const dept = (l.department ?? "").toLowerCase();
-        return !dept || dept === deptFilter;
-      });
-    }
-
-    // 1. Search Query
-    if (debouncedSearchQuery.trim()) {
-      const q = debouncedSearchQuery.toLowerCase();
-      filtered = filtered.filter(l => 
-        (l.id && l.id.toLowerCase().includes(q)) ||
-        (l.name && l.name.toLowerCase().includes(q)) ||
-        (l.mobile && l.mobile.toLowerCase().includes(q)) ||
-        (l.email && l.email.toLowerCase().includes(q))
-      );
-    }
-
-    // 2. Filters
-    if (filters.dateFrom) {
-      const from = new Date(filters.dateFrom);
-      from.setHours(0, 0, 0, 0);
-      filtered = filtered.filter(l => new Date(l.createdAt || l.date) >= from);
-    }
-    if (filters.dateTo) {
-      const to = new Date(filters.dateTo);
-      to.setHours(23, 59, 59, 999);
-      filtered = filtered.filter(l => new Date(l.createdAt || l.date) <= to);
-    }
-    if (filters.category) filtered = filtered.filter(l => l.propertyCategory === filters.category);
-    if (filters.type) filtered = filtered.filter(l => l.propertyType === filters.type);
-    if (filters.staff) filtered = filtered.filter(l => l.staff === filters.staff);
-    if (filters.status) filtered = filtered.filter(l => l.status === filters.status);
-    if (filters.source) filtered = filtered.filter(l => l.source === filters.source);
-
-    if (activeTab === "Open Pipeline") {
-      // Pending imports haven't been saved to DB yet, so they aren't unqualified
+    if (activeTab === "Open Pipeline" && pendingImports.length > 0) {
       return pendingImports;
     }
-
-    if (activeTab === "Unqualified") {
-      return filtered.filter(lead => lead.isUnqualified === true);
-    }
-
-    // For All Leads and Action Required, filter OUT unqualified leads
-    const qualifiedLeads = filtered.filter(lead => !lead.isUnqualified);
-
-    if (activeTab === "Action Required") {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-
-      return qualifiedLeads.filter(lead => {
-        const parseLocal = (dStr: string) => {
-          if (!dStr) return null;
-          const parts = dStr.split("T")[0].split("-");
-          if (parts.length !== 3) return null;
-          const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-          d.setHours(0, 0, 0, 0);
-          return d;
-        };
-
-        const fDate = parseLocal(lead.nextFollowUpDate);
-        const lDate = parseLocal(lead.lastFollowedUpDate);
-
-        if (actionFilter === "Overdue") {
-          return fDate && fDate < today;
-        }
-        if (actionFilter === "Yesterday") {
-          return lDate && lDate.getTime() === yesterday.getTime();
-        }
-        if (actionFilter === "Today") {
-          const isFollowedUpToday = lDate && lDate.getTime() === today.getTime();
-          
-          if (todayViewMode === "completed") {
-            return isFollowedUpToday;
-          } else {
-            // pending
-            return fDate && fDate.getTime() === today.getTime();
-          }
-        }
-        if (actionFilter === "Tomorrow") {
-          return fDate && fDate.getTime() === tomorrow.getTime();
-        }
-        if (actionFilter === "All Scheduled") {
-          return fDate && fDate > tomorrow;
-        }
-        return false;
-      });
-    }
-
-    // Default: All Leads (excluding unqualified)
-    return qualifiedLeads;
-  }, [leads, debouncedSearchQuery, filters, activeTab, actionFilter, todayViewMode, pendingImports, role, userId, deptFilter]);
+    return leads;
+  }, [activeTab, pendingImports, leads]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -726,30 +648,22 @@ export default function LeadsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
                 onClick={() => {
-                  setAssignLeadIds(selectedRows.map((r: any) => r.rawId));
-                  setAssignLeadId(selectedRows[0].rawId); 
+                  setAssignLeadIds(selectedRows.map(r => r.rawId));
+                  setAssignLeadId(null);
                 }}
               >
-                Assign Lead
+                Assign Selected
               </Button>
             )
           )}
-
-          {isSingle && !row.isPendingImport && (
-            <>
-              <Button variant="outline" size="sm" onClick={() => router.push("/leads/" + row.rawId)}>
-                <Eye size={15} className="mr-1.5" /> View
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => router.push("/leads/new?edit=" + row.rawId)}>
-                <Edit size={15} className="mr-1.5" /> Edit
-              </Button>
-            </>
-          )}
         </>
       );
-    }
+    },
+    manualPagination: true,
+    pageCount: Math.ceil(totalCount / pagination.pageSize),
+    pagination,
+    onPaginationChange: setPagination,
   };
 
   const desktopFilters = (

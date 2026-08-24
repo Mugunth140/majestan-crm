@@ -36,6 +36,13 @@ interface DataTableProps<TData, TValue> {
   flush?: boolean;
   hidePagination?: boolean;
   pageSize?: number;
+  manualPagination?: boolean;
+  pageCount?: number;
+  pagination?: {
+    pageIndex: number;
+    pageSize: number;
+  };
+  onPaginationChange?: (updater: any) => void;
 }
 
 export function DataTable<TData, TValue>({
@@ -49,6 +56,10 @@ export function DataTable<TData, TValue>({
   flush = false,
   hidePagination = false,
   pageSize = 10,
+  manualPagination,
+  pageCount,
+  pagination,
+  onPaginationChange,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -68,10 +79,16 @@ export function DataTable<TData, TValue>({
       sorting,
       columnFilters,
       rowSelection,
+      ...(manualPagination && pagination ? { pagination } : {})
     },
     initialState: {
       pagination: { pageSize },
     },
+    ...(manualPagination && {
+      manualPagination: true,
+      pageCount: pageCount ?? -1,
+      onPaginationChange,
+    })
   });
 
   return (
