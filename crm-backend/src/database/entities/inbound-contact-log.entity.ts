@@ -1,6 +1,6 @@
 // fallow-ignore-file circular-dependencies
 import type { Relation } from "typeorm";
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { Inbound } from './inbound.entity';
 import { User } from './user.entity';
 
@@ -38,6 +38,7 @@ export class InboundContactLog {
   @Column({ type: 'varchar', length: 20, nullable: true })
   call_direction: string | null;
 
+  @Index('IDX_inbound_contact_logs_source_call_id', { unique: true })
   @Column({ name: 'source_call_id', type: 'varchar', length: 255, nullable: true })
   source_call_id: string | null;
 
