@@ -79,6 +79,11 @@ import { TaskReceipt } from './database/entities/task-receipt.entity';
         database: configService.get<string>('CRM_DB_NAME', 'majestan_crm'),
         entities: [User, Role, Permission, RolePermission, Department, ActivityLog, LeadSource, Lead, LeadInquiry, LeadFollowUp, LeadDocument, ContactLog, Agent, AgentFollowUp, AgentContactLog, Inbound, InboundFollowUp, InboundContactLog, HrCandidate, HrFollowUp, AssetLayout, Asset, AssetLocation, AssetFinancials, AssetFeature, AssetDocument, RoutingHistory, Notification, TaskTemplate, TaskMetricTarget, TaskMetricProgress, TaskActivityLog, TaskReceipt],
         synchronize: false, // Migrations are used instead
+        extra: {
+          connectionLimit: configService.get<number>('DB_CONNECTION_LIMIT', 25),
+          connectTimeout: 10000,
+          acquireTimeout: 10000,
+        },
       }),
     }),
 
@@ -96,6 +101,11 @@ import { TaskReceipt } from './database/entities/task-receipt.entity';
         database: configService.get<string>('SITE_DB_NAME', 'majestan'),
         entities: [],
         synchronize: false,
+        extra: {
+          connectionLimit: configService.get<number>('DB_CONNECTION_LIMIT_SITE', 5),
+          connectTimeout: 10000,
+          acquireTimeout: 10000,
+        },
       }),
     }),
 

@@ -28,29 +28,42 @@ export class LeadRoutingService {
       .getManyAndCount();
 
     // Enrich each lead with previouslyHeldBy, releaseReason, daysInQueue
-    const enriched = await Promise.all(
-      items.map(async (lead) => {
-        const lastHistory = await this.dataSource
-          .getRepository(RoutingHistory)
-          .createQueryBuilder('rh')
-          .leftJoinAndSelect('rh.from_user', 'fromUser')
-          .where('rh.lead_id = :leadId', { leadId: lead.id })
-          .orderBy('rh.created_at', 'DESC')
-          .getOne();
+    if (items.length === 0) return { items: [], total, page, limit };
 
-        const referenceDate = lastHistory ? lastHistory.created_at : lead.created_at;
-        const daysInQueue = Math.floor(
-          (Date.now() - new Date(referenceDate).getTime()) / (1000 * 60 * 60 * 24),
-        );
+    const leadIds = items.map(i => i.id);
+    
+    // We want the latest history per lead
+    // A quick way in MySQL is to get all history for these leads sorted, then pick first in JS
+    const historyList = await this.dataSource
+      .getRepository(RoutingHistory)
+      .createQueryBuilder('rh')
+      .leftJoinAndSelect('rh.from_user', 'fromUser')
+      .where('rh.lead_id IN (:...leadIds)', { leadIds })
+      .orderBy('rh.created_at', 'DESC')
+      .getMany();
 
-        return {
-          ...lead,
-          previously_held_by: lastHistory?.from_user?.name ?? null,
-          release_reason: lastHistory?.event_type ?? null,
-          days_in_queue: daysInQueue,
-        };
-      }),
-    );
+    const historyMap = new Map();
+    historyList.forEach(h => {
+      if (!historyMap.has(h.lead_id)) {
+        historyMap.set(h.lead_id, h);
+      }
+    });
+
+    const enriched = items.map((lead) => {
+      const lastHistory = historyMap.get(lead.id);
+
+      const referenceDate = lastHistory ? lastHistory.created_at : lead.created_at;
+      const daysInQueue = Math.floor(
+        (Date.now() - new Date(referenceDate).getTime()) / (1000 * 60 * 60 * 24),
+      );
+
+      return {
+        ...lead,
+        previously_held_by: lastHistory?.from_user?.name ?? null,
+        release_reason: lastHistory?.event_type ?? null,
+        days_in_queue: daysInQueue,
+      };
+    });
 
     return { items: enriched, total, page, limit };
   }
@@ -438,15 +451,24 @@ export class LeadRoutingService {
 
     const users = await qb.getMany();
 
-    const enriched = await Promise.all(
-      users.map(async (u) => {
-        const leadCount = await this.dataSource
-          .getRepository(Lead)
-          .count({ where: { assigned_staff_id: u.id } });
-        return { ...u, current_lead_count: leadCount };
-      }),
-    );
+    if (users.length === 0) return [];
 
-    return enriched;
+    const userIds = users.map(u => u.id);
+    const counts = await this.dataSource
+      .getRepository(Lead)
+      .createQueryBuilder('lead')
+      .select('lead.assigned_staff_id', 'staffId')
+      .addSelect('COUNT(lead.id)', 'count')
+      .where('lead.assigned_staff_id IN (:...userIds)', { userIds })
+      .groupBy('lead.assigned_staff_id')
+      .getRawMany();
+
+    const countMap = new Map();
+    counts.forEach(c => countMap.set(c.staffId, Number(c.count)));
+
+    return users.map(u => ({
+      ...u,
+      current_lead_count: countMap.get(u.id) || 0,
+    }));
   }
 }

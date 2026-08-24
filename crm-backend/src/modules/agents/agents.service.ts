@@ -99,20 +99,87 @@ export class AgentsService {
   }
 
   async bulkCreateAgents(agents: any[]) {
-    let count = 0;
-    for (const body of agents) {
-      const normalized = {
+    if (!agents || agents.length === 0) return { count: 0 };
+
+    return this.dataSource.transaction(async (manager: EntityManager) => {
+      const normalizedAgents = agents.map(body => ({
         ...body,
         mobile: body.mobile ?? body.mobile_number ?? null,
-      };
-      try {
-        await this.createAgent(normalized);
-        count++;
-      } catch (err: any) {
-        console.error('Bulk import error for agent', normalized.mobile, err?.message ?? err);
+      })).filter(a => a.mobile);
+
+      if (normalizedAgents.length === 0) return { count: 0 };
+
+      const mobiles = [...new Set(normalizedAgents.map(a => String(a.mobile)))];
+      const existingAgents = await manager.getRepository(Agent)
+        .createQueryBuilder('agent')
+        .where('agent.mobile_number IN (:...mobiles)', { mobiles })
+        .getMany();
+      
+      const existingMap = new Map();
+      existingAgents.forEach(a => existingMap.set(a.mobile_number, a));
+
+      const agentsToCreate = [];
+      const rowToAgentMap = new Map();
+
+      for (const row of normalizedAgents) {
+        const mobile = String(row.mobile);
+        if (existingMap.has(mobile)) {
+          rowToAgentMap.set(row, existingMap.get(mobile));
+        } else {
+          const agent = manager.getRepository(Agent).create({
+            name: row.name,
+            company_name: row.company_name || null,
+            mobile_number: mobile,
+            whatsapp_number: row.whatsapp || null,
+            email: row.email || null,
+            city: row.city || null,
+            state: row.state || null,
+            partner_type: row.partner_type || null,
+            property_category: row.property_category || null,
+            commission_accepted: row.commission_accepted || false,
+            commission_type: row.commission_type || null,
+            commission_value: row.commission_value || null,
+            remarks: row.remarks || null,
+            status: 'New',
+            assigned_staff_id: row.userId || null,
+          });
+          agentsToCreate.push({ agent, row });
+        }
       }
-    }
-    return { count };
+
+      if (agentsToCreate.length > 0) {
+        const entitiesToSave = agentsToCreate.map(item => item.agent);
+        const savedEntities = await manager.save(Agent, entitiesToSave, { chunk: 1000 });
+        for (let i = 0; i < agentsToCreate.length; i++) {
+          rowToAgentMap.set(agentsToCreate[i].row, savedEntities[i]);
+        }
+      }
+
+      const followUps = [];
+      for (const row of normalizedAgents) {
+        const agent = rowToAgentMap.get(row);
+        if (!agent) continue;
+
+        if (row.followUpDate || row.priority || row.notes || row.rnr) {
+          followUps.push(
+            manager.getRepository(AgentFollowUp).create({
+              agent_id: agent.id,
+              follow_up_date: row.followUpDate || null,
+              follow_up_time: row.followUpTime || null,
+              priority: row.priority || null,
+              rnr: row.rnr || null,
+              notes: row.notes || null,
+            })
+          );
+        }
+      }
+
+      if (followUps.length > 0) {
+        await manager.save(AgentFollowUp, followUps, { chunk: 1000 });
+      }
+
+      return { count: normalizedAgents.length };
+    });
   }
 
   async createAgent(body: any): Promise<CreateAgentResult> {

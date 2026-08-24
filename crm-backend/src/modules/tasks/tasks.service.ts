@@ -382,9 +382,12 @@ export class TasksService {
   }
 
   private async enrichWithProgress(template: TaskTemplate, month: string) {
-    const progressRows = await this.dataSource.getRepository(TaskMetricProgress).find({
-      where: { task_template_id: template.id, month },
-    });
+    let progressRows = template.metricProgress;
+    if (!progressRows) {
+      progressRows = await this.dataSource.getRepository(TaskMetricProgress).find({
+        where: { task_template_id: template.id, month },
+      });
+    }
 
     const { totalWeeks, currentWeek } = getWeeksInMonth(month);
 

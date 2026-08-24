@@ -283,22 +283,127 @@ export class LeadsService {
   }
 
   async bulkCreateLeads(leads: any[]) {
-    let count = 0;
-    for (const body of leads) {
-      // Normalize field names from bulk import payload to createLead's expected shape
-      const normalized = {
+    if (!leads || leads.length === 0) return { count: 0 };
+
+    return this.dataSource.transaction(async (manager: EntityManager) => {
+      // Normalize all leads first
+      const normalizedLeads = leads.map(body => ({
         ...body,
         mobile: body.mobile ?? body.mobile_number ?? null,
         source: body.source ?? body.lead_source ?? null,
-      };
-      try {
-        await this.createLead(normalized);
-        count++;
-      } catch (err) {
-        console.error('Bulk import error for lead', normalized.mobile, err?.message ?? err);
+      })).filter(l => l.mobile);
+
+      if (normalizedLeads.length === 0) return { count: 0 };
+
+      // Get existing leads in one go
+      const mobiles = [...new Set(normalizedLeads.map(l => String(l.mobile)))];
+      const existingLeads = await manager.getRepository(Lead)
+        .createQueryBuilder('lead')
+        .where('lead.mobile_number IN (:...mobiles)', { mobiles })
+        .getMany();
+      
+      const existingMap = new Map();
+      existingLeads.forEach(l => existingMap.set(l.mobile_number, l));
+
+      const leadsToCreate = [];
+      const rowToLeadMap = new Map();
+
+      // Separate into existing and new
+      for (const row of normalizedLeads) {
+        const mobile = String(row.mobile);
+        if (existingMap.has(mobile)) {
+          // Existing lead - just add it to map to generate inquiries later
+          rowToLeadMap.set(row, existingMap.get(mobile));
+        } else {
+          // New lead
+          const lead = manager.getRepository(Lead).create({
+            name: row.name,
+            mobile_number: mobile,
+            email: row.email || null,
+            whatsapp_number: row.whatsapp || null,
+            city: row.city || null,
+            address: row.address || null,
+            lead_source: row.source || null,
+            status: 'New Lead',
+            assigned_staff_id: row.userId || null, // Assuming userId maps to assigned_staff_id
+            commission: row.commission || null,
+            is_referral: row.isReferral || false,
+            referred_by_name: row.referredByName || null,
+            referred_by_contact: row.referredByContact || null,
+          });
+          leadsToCreate.push({ lead, row });
+        }
       }
-    }
-    return { count };
+
+      // Batch insert new leads
+      if (leadsToCreate.length > 0) {
+        const entitiesToSave = leadsToCreate.map(item => item.lead);
+        // Save in chunks to prevent memory issues for extremely large files
+        const savedEntities = await manager.save(Lead, entitiesToSave, { chunk: 1000 });
+        
+        for (let i = 0; i < leadsToCreate.length; i++) {
+          rowToLeadMap.set(leadsToCreate[i].row, savedEntities[i]);
+          
+          if (savedEntities[i].department === 'sales' && savedEntities[i].assigned_staff_id) {
+            this.tasksService.autoIncrementSourcing(savedEntities[i].assigned_staff_id).catch(err => {
+              console.error('Task sourcing auto-increment error:', err?.message);
+            });
+          }
+        }
+      }
+
+      // Prepare child entities
+      const inquiries = [];
+      const followUps = [];
+
+      for (const row of normalizedLeads) {
+        const lead = rowToLeadMap.get(row);
+        if (!lead) continue;
+
+        if (row.purchaseType || row.propertyType || row.funder || row.project || row.propertyCategory) {
+          inquiries.push(
+            manager.getRepository(LeadInquiry).create({
+              lead_id: lead.id,
+              project_list: row.project || null,
+              purchase_type: row.purchaseType || null,
+              property_type: row.propertyType || null,
+              property_category: row.propertyCategory || null,
+              funder: row.funder || null,
+              preferences: row.preferences || null,
+              city_id: row.cityId || null,
+              sub_locations: row.subLocations || null,
+              purchase_timeline: row.purchaseTimeline || null,
+              qualification_purpose: row.qualificationPurpose || null,
+              decision_maker: row.decisionMaker || null,
+            })
+          );
+        }
+
+        if (row.followUpDate || row.purpose || row.priority || row.notes || row.rnr) {
+          followUps.push(
+            manager.getRepository(LeadFollowUp).create({
+              lead_id: lead.id,
+              follow_up_date: row.followUpDate || null,
+              follow_up_time: row.followUpTime || null,
+              purpose: row.purpose || null,
+              priority: row.priority || null,
+              rnr: row.rnr || null,
+              notes: row.notes || null,
+            })
+          );
+        }
+      }
+
+      // Batch insert child records
+      if (inquiries.length > 0) {
+        await manager.save(LeadInquiry, inquiries, { chunk: 1000 });
+      }
+      if (followUps.length > 0) {
+        await manager.save(LeadFollowUp, followUps, { chunk: 1000 });
+      }
+
+      return { count: normalizedLeads.length };
+    });
   }
 
   async createLead(body: any): Promise<CreateLeadResult> {
