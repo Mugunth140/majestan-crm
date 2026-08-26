@@ -283,114 +283,118 @@ export class LeadsService {
   }
 
   async bulkCreateLeads(leads: any[]) {
-    if (!leads || leads.length === 0) return { count: 0 };
+    if (!leads || leads.length === 0) return { count: 0, created: 0, existing: 0 };
 
-    return this.dataSource.transaction(async (manager: EntityManager) => {
-      // Normalize all leads first
-      const normalizedLeads = leads.map(body => ({
-        ...body,
-        mobile: body.mobile ?? body.mobile_number ?? null,
-        source: body.source ?? body.lead_source ?? null,
-      })).filter(l => l.mobile);
+    // Normalize and drop rows without a usable mobile number
+    const normalizedLeads = leads.map(body => ({
+      ...body,
+      mobile: body.mobile ?? body.mobile_number ?? null,
+      source: body.source ?? body.lead_source ?? null,
+    })).filter(l => l.mobile !== null && String(l.mobile).trim() !== '');
 
-      if (normalizedLeads.length === 0) return { count: 0 };
+    if (normalizedLeads.length === 0) return { count: 0, created: 0, existing: 0 };
+
+    const summary = await this.dataSource.transaction(async (manager: EntityManager) => {
+      // Group rows by normalized mobile so duplicates within the same file
+      // share a single lead instead of violating the unique constraint.
+      const rowsByMobile = new Map<string, any[]>();
+      for (const row of normalizedLeads) {
+        const mobile = String(row.mobile).trim();
+        row.mobile = mobile;
+        const bucket = rowsByMobile.get(mobile);
+        if (bucket) bucket.push(row);
+        else rowsByMobile.set(mobile, [row]);
+      }
 
       // Get existing leads in one go
-      const mobiles = [...new Set(normalizedLeads.map(l => String(l.mobile)))];
+      const mobiles = [...rowsByMobile.keys()];
       const existingLeads = await manager.getRepository(Lead)
         .createQueryBuilder('lead')
         .where('lead.mobile_number IN (:...mobiles)', { mobiles })
         .getMany();
-      
-      const existingMap = new Map();
+
+      const existingMap = new Map<string, Lead>();
       existingLeads.forEach(l => existingMap.set(l.mobile_number, l));
 
-      const leadsToCreate = [];
-      const rowToLeadMap = new Map();
-
-      // Separate into existing and new
-      for (const row of normalizedLeads) {
-        const mobile = String(row.mobile);
-        if (existingMap.has(mobile)) {
-          // Existing lead - just add it to map to generate inquiries later
-          rowToLeadMap.set(row, existingMap.get(mobile));
-        } else {
-          // New lead
-          const lead = manager.getRepository(Lead).create({
-            name: row.name,
-            mobile_number: mobile,
-            email: row.email || null,
-            whatsapp_number: row.whatsapp || null,
-            city: row.city || null,
-            address: row.address || null,
-            lead_source: row.source || null,
-            status: 'New Lead',
-            assigned_staff_id: row.userId || null, // Assuming userId maps to assigned_staff_id
-            commission: row.commission || null,
-            is_referral: row.isReferral || false,
-            referred_by_name: row.referredByName || null,
-            referred_by_contact: row.referredByContact || null,
-          });
-          leadsToCreate.push({ lead, row });
-        }
+      // Build one lead entity per new mobile (first row provides base data)
+      const leadsToCreate: { mobile: string; lead: Lead }[] = [];
+      for (const [mobile, rows] of rowsByMobile) {
+        if (existingMap.has(mobile)) continue;
+        const row = rows[0];
+        const lead = manager.getRepository(Lead).create({
+          name: row.name,
+          mobile_number: mobile,
+          email: row.email || null,
+          whatsapp_number: row.whatsapp || null,
+          city: row.city || null,
+          address: row.address || null,
+          lead_source: row.source || null,
+          status: 'New Lead',
+          // Imported leads always enter the unassigned telecalling routing queue —
+          // assignment happens exclusively through lead routing by admins/managers/team leads.
+          department: 'telecalling',
+          assigned_staff_id: null as unknown as number,
+          commission: row.commission || null,
+          is_referral: row.isReferral || false,
+          referred_by_name: row.referredByName || null,
+          referred_by_contact: row.referredByContact || null,
+        });
+        leadsToCreate.push({ mobile, lead });
       }
 
       // Batch insert new leads
+      const savedByMobile = new Map<string, Lead>();
       if (leadsToCreate.length > 0) {
-        const entitiesToSave = leadsToCreate.map(item => item.lead);
-        // Save in chunks to prevent memory issues for extremely large files
-        const savedEntities = await manager.save(Lead, entitiesToSave, { chunk: 1000 });
-        
-        for (let i = 0; i < leadsToCreate.length; i++) {
-          rowToLeadMap.set(leadsToCreate[i].row, savedEntities[i]);
-          
-          if (savedEntities[i].department === 'sales' && savedEntities[i].assigned_staff_id) {
-            this.tasksService.autoIncrementSourcing(savedEntities[i].assigned_staff_id).catch(err => {
-              console.error('Task sourcing auto-increment error:', err?.message);
-            });
-          }
-        }
+        const savedEntities = await manager.save(Lead, leadsToCreate.map(item => item.lead), { chunk: 1000 });
+        leadsToCreate.forEach(({ mobile }, i) => savedByMobile.set(mobile, savedEntities[i]));
       }
 
-      // Prepare child entities
+      // Prepare child entities — every row gets its own inquiry/follow-up
       const inquiries = [];
       const followUps = [];
+      let created = 0;
+      let existing = 0;
 
-      for (const row of normalizedLeads) {
-        const lead = rowToLeadMap.get(row);
+      for (const [mobile, rows] of rowsByMobile) {
+        const lead = savedByMobile.get(mobile) ?? existingMap.get(mobile);
         if (!lead) continue;
 
-        if (row.purchaseType || row.propertyType || row.funder || row.project || row.propertyCategory) {
-          inquiries.push(
-            manager.getRepository(LeadInquiry).create({
-              lead_id: lead.id,
-              project_list: row.project || null,
-              purchase_type: row.purchaseType || null,
-              property_type: row.propertyType || null,
-              property_category: row.propertyCategory || null,
-              funder: row.funder || null,
-              preferences: row.preferences || null,
-              city_id: row.cityId || null,
-              sub_locations: row.subLocations || null,
-              purchase_timeline: row.purchaseTimeline || null,
-              qualification_purpose: row.qualificationPurpose || null,
-              decision_maker: row.decisionMaker || null,
-            })
-          );
-        }
+        if (savedByMobile.has(mobile)) created++;
+        else existing++;
 
-        if (row.followUpDate || row.purpose || row.priority || row.notes || row.rnr) {
-          followUps.push(
-            manager.getRepository(LeadFollowUp).create({
-              lead_id: lead.id,
-              follow_up_date: row.followUpDate || null,
-              follow_up_time: row.followUpTime || null,
-              purpose: row.purpose || null,
-              priority: row.priority || null,
-              rnr: row.rnr || null,
-              notes: row.notes || null,
-            })
-          );
+        for (const row of rows) {
+          if (row.purchaseType || row.propertyType || row.funder || row.project || row.propertyCategory) {
+            inquiries.push(
+              manager.getRepository(LeadInquiry).create({
+                lead_id: lead.id,
+                project_list: row.project || null,
+                purchase_type: row.purchaseType || null,
+                property_type: row.propertyType || null,
+                property_category: row.propertyCategory || null,
+                funder: row.funder || null,
+                preferences: row.preferences || null,
+                city_id: row.cityId || null,
+                sub_locations: row.subLocations || null,
+                purchase_timeline: row.purchaseTimeline || null,
+                qualification_purpose: row.qualificationPurpose || null,
+                decision_maker: row.decisionMaker || null,
+              })
+            );
+          }
+
+          if (row.followUpDate || row.purpose || row.priority || row.notes || row.rnr) {
+            followUps.push(
+              manager.getRepository(LeadFollowUp).create({
+                lead_id: lead.id,
+                follow_up_date: row.followUpDate || null,
+                follow_up_time: row.followUpTime || null,
+                purpose: row.purpose || null,
+                priority: row.priority || null,
+                rnr: row.rnr || null,
+                notes: row.notes || null,
+              })
+            );
+          }
         }
       }
 
@@ -402,7 +406,7 @@ export class LeadsService {
         await manager.save(LeadFollowUp, followUps, { chunk: 1000 });
       }
 
-      return { count: normalizedLeads.length };
+      return { count: created, created, existing };
     });
   }
 

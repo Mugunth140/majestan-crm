@@ -317,7 +317,9 @@ export default function LeadsPage() {
     {
       accessorKey: "id",
       header: "Id",
-      cell: ({ row }) => (
+      cell: ({ row }) => row.original.isPendingImport ? (
+        <span className="text-muted-foreground">—</span>
+      ) : (
         <Link href={`/leads/${row.original.rawId}`} className="text-[#0052FF] hover:underline font-medium">
           {row.getValue("id")}
         </Link>
@@ -469,28 +471,36 @@ export default function LeadsPage() {
   const handleBulkInsert = async () => {
     try {
       setIsInserting(true);
-      const payload = pendingImports.map(p => ({
-         name: p.name,
-         mobile: String(p.mobile),
-         email: p.email,
-         whatsapp: p.whatsapp,
-         city: p.city,
-         address: p.address,
-         source: p.source,
-         commission: p.commission,
-         isReferral: p.isReferral,
-         referredByName: p.referredByName,
-         referredByContact: p.referredByContact,
-         propertyCategory: p.propertyCategory,
-         propertyType: p.propertyType,
-         purchaseType: p.purchaseType,
-         funder: p.funder,
-         project: p.project,
-         purchaseTimeline: p.purchaseTimeline,
-         qualificationPurpose: p.qualificationPurpose,
-         decisionMaker: p.decisionMaker,
-         notes: p.notes,
-      }));
+      const payload = pendingImports
+        .filter(p => String(p.mobile).trim() !== "")
+        .map(p => ({
+          name: p.name,
+          mobile: String(p.mobile).trim(),
+          email: p.email || undefined,
+          whatsapp: p.whatsapp,
+          city: p.city,
+          address: p.address,
+          source: p.source,
+          commission: p.commission != null && !Number.isNaN(p.commission) ? p.commission : undefined,
+          isReferral: p.isReferral,
+          referredByName: p.referredByName,
+          referredByContact: p.referredByContact,
+          propertyCategory: p.propertyCategory,
+          propertyType: p.propertyType,
+          purchaseType: p.purchaseType,
+          funder: p.funder,
+          project: p.project,
+          purchaseTimeline: p.purchaseTimeline,
+          qualificationPurpose: p.qualificationPurpose,
+          decisionMaker: p.decisionMaker,
+          notes: p.notes,
+        }));
+
+      if (payload.length === 0) {
+        toast.error("No valid rows to import. Every row needs a mobile number.");
+        setIsInserting(false);
+        return;
+      }
       
       const res = await apiFetch(API_URL + "/leads/bulk", {
          method: "POST",
@@ -498,15 +508,24 @@ export default function LeadsPage() {
          body: JSON.stringify({ leads: payload })
       });
       const data = await res.json();
-      if (data.success) {
-         toast.success(`Successfully inserted ${data.count} leads.`);
+      if (res.ok && data.success) {
+         const created = data.created ?? data.count ?? 0;
+         const existing = data.existing ?? 0;
+         toast.success(
+           `Imported ${created} new lead${created === 1 ? "" : "s"}` +
+           (existing > 0 ? `, ${existing} already existed — new requirements attached` : "") +
+           "."
+         );
          setPendingImports([]);
-         fetchLeads();
+         setPagination(prev => ({ ...prev, pageIndex: 0 }));
          setActiveTab("All Leads");
       } else {
-         toast.error(data.message || "Bulk insert failed");
+         const msg = Array.isArray(data.error) ? data.error.join(", ") : data.error || data.message || "Bulk insert failed";
+         console.error("Bulk import failed:", data);
+         toast.error(msg);
       }
-    } catch {
+    } catch (e) {
+      console.error("Bulk import error:", e);
       toast.error("An error occurred during bulk insert.");
     } finally {
       setIsInserting(false);
@@ -786,15 +805,20 @@ export default function LeadsPage() {
       {/* Table Content */}
       <div className="w-full md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col">
         {pendingImports.length > 0 && activeTab === "Open Pipeline" && (
-             <div className="mb-6 mx-6 mt-4 p-5 bg-blue-50/50 border border-blue-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
-                <div>
-                   <h3 className="text-blue-900 font-bold text-[15px]">Review Pending Imports</h3>
-                   <p className="text-blue-700/80 text-sm mt-0.5">Please review the <strong>{pendingImports.length}</strong> imported leads below. They have not been saved yet.</p>
+             <div className="mb-6 mx-6 mt-4 p-4 sm:p-5 bg-card border border-border rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+                <div className="flex items-start gap-3">
+                   <div className="hidden sm:flex h-9 w-9 rounded-full bg-[#0052FF]/10 dark:bg-[#0052FF]/20 items-center justify-center shrink-0">
+                      <FileSpreadsheet className="h-4 w-4 text-[#0052FF]" />
+                   </div>
+                   <div>
+                      <h3 className="text-foreground font-semibold text-[15px]">Review Pending Imports</h3>
+                      <p className="text-muted-foreground text-sm mt-0.5">Please review <span className="font-semibold text-foreground">{pendingImports.length}</span> imported leads below. They have not been saved yet.</p>
+                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                   <Button variant="outline" className="border-blue-200 text-blue-800 hover:bg-blue-100" onClick={() => setPendingImports([])}>Cancel Import</Button>
-                   <Button onClick={handleBulkInsert} disabled={isInserting} className="bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md px-6">
-                     {isInserting ? "Inserting Leads..." : "Confirm & Insert All"}
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                   <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => setPendingImports([])}>Cancel Import</Button>
+                   <Button onClick={handleBulkInsert} disabled={isInserting} className="flex-1 sm:flex-none bg-[#0052FF] text-white hover:bg-[#0052FF]/90 shadow-md px-6">
+                     {isInserting ? "Inserting…" : "Confirm & Insert All"}
                    </Button>
                 </div>
              </div>
@@ -986,21 +1010,21 @@ export default function LeadsPage() {
               Bulk Import
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
-              <DialogHeader className="flex flex-row items-start justify-between">
-                <div>
-                  <DialogTitle>Import Leads</DialogTitle>
-                  <DialogDescription className="mt-1.5">Upload your Excel file to bulk import leads.</DialogDescription>
-                </div>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+              <DialogHeader className="pr-8">
+                <div className="flex items-center justify-between gap-2">
+                <DialogTitle className="block">Import Leads</DialogTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={downloadTemplate}
-                  className="h-8 text-xs shrink-0"
+                  className="h-8 text-xs"
                 >
                   <Download className="h-3.5 w-3.5 mr-1.5" />
                   Sample Template
                 </Button>
+              </div>
               </DialogHeader>
+              
               <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-xl bg-muted/20 border-border/60">
                 {isImporting ? (
                   <div className="w-full space-y-4">
@@ -1039,13 +1063,20 @@ export default function LeadsPage() {
           mobile={
             <div className="w-full px-4 md:px-0">
               {pendingImports.length > 0 && activeTab === "Open Pipeline" && (
-                 <div className="mb-6 p-5 bg-blue-50/50 border border-blue-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
-                    <div>
-                       <h3 className="text-blue-900 font-bold text-[15px]">Review Pending Imports</h3>
+                 <div className="mb-6 p-4 bg-card border border-border rounded-xl flex flex-col gap-3 shadow-sm">
+                    <div className="flex items-start gap-3">
+                       <div className="h-8 w-8 rounded-full bg-[#0052FF]/10 dark:bg-[#0052FF]/20 flex items-center justify-center shrink-0">
+                          <FileSpreadsheet className="h-4 w-4 text-[#0052FF]" />
+                       </div>
+                       <div className="flex-1 min-w-0">
+                          <h3 className="text-foreground font-semibold text-[14px]">Review Pending Imports</h3>
+                          <p className="text-muted-foreground text-xs mt-0.5">Please review <span className="font-semibold text-foreground">{pendingImports.length}</span> leads below. Not saved yet.</p>
+                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                       <Button onClick={handleBulkInsert} disabled={isInserting} className="bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md px-6">
-                         Insert All
+                    <div className="flex items-center gap-2">
+                       <Button variant="outline" size="sm" className="flex-1" onClick={() => setPendingImports([])}>Cancel</Button>
+                       <Button size="sm" onClick={handleBulkInsert} disabled={isInserting} className="flex-1 bg-[#0052FF] text-white hover:bg-[#0052FF]/90 shadow-md">
+                         {isInserting ? "Inserting…" : "Confirm & Insert All"}
                        </Button>
                     </div>
                  </div>

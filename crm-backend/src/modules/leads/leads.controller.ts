@@ -44,7 +44,7 @@ export class LeadsController {
   @Post('bulk')
   async bulkCreateLeads(@Body() body: BulkCreateLeadsDto) {
     const result = await this.leadsService.bulkCreateLeads(body.leads);
-    return { success: true, count: result.count };
+    return { success: true, ...result };
   }
 
   @Post()
