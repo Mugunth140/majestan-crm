@@ -19,9 +19,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
         ? exception.getResponse()
         : 'Internal server error';
 
-    // Log the error
     if (status === HttpStatus.INTERNAL_SERVER_ERROR) {
       console.error(`[ReqID: ${reqId}] Unhandled Exception:`, exception);
+    } else if (status >= 400 && status < 500) {
+      console.warn(`[ReqID: ${reqId}] ${request.method} ${request.url} -> ${status}`, typeof message === 'string' ? message : JSON.stringify(message));
     }
 
     response.status(status).json({
