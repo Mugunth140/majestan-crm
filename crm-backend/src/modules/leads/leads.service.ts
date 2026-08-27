@@ -411,40 +411,47 @@ export class LeadsService {
   }
 
   async createLead(body: any): Promise<CreateLeadResult> {
+    // Normalise: frontend sends 'mobile', legacy DTO used 'mobile_number'
+    const mobile = (body.mobile ?? body.mobile_number ?? '').toString().trim();
+    if (!mobile) {
+      throw new BadRequestException('mobile is required');
+    }
+    const normalised = { ...body, mobile };
+
     return this.dataSource.transaction(async (manager: EntityManager) => {
       const existingLead = await manager.getRepository(Lead).findOne({
-        where: { mobile_number: body.mobile },
+        where: { mobile_number: mobile },
         relations: { assigned_staff: true },
       });
 
       if (existingLead) {
-        if (body.purchaseType || body.propertyType || body.funder || body.project || body.propertyCategory) {
+        if (normalised.purchaseType || normalised.propertyType || normalised.funder || normalised.project || normalised.propertyCategory) {
           const inquiry = manager.getRepository(LeadInquiry).create({
             lead_id: existingLead.id,
-            project_list: body.project || null,
-            purchase_type: body.purchaseType || null,
-            property_type: body.propertyType || null,
-            property_category: body.propertyCategory || null,
-            funder: body.funder || null,
-            preferences: body.preferences || null,
-            city_id: body.cityId || null,
-            sub_locations: body.subLocations || null,
-            purchase_timeline: body.purchaseTimeline || null,
-            qualification_purpose: body.qualificationPurpose || null,
-            decision_maker: body.decisionMaker || null,
+            project_list: normalised.project || null,
+            purchase_type: normalised.purchaseType || null,
+            property_type: normalised.propertyType || null,
+            property_category: normalised.propertyCategory || null,
+            funder: normalised.funder || null,
+            preferences: normalised.preferences || null,
+            city_id: normalised.cityId || null,
+            sub_locations: normalised.subLocations || null,
+            purchase_timeline: normalised.purchaseTimeline || null,
+            qualification_purpose: normalised.qualificationPurpose || null,
+            decision_maker: normalised.decisionMaker || null,
           });
           await manager.save(inquiry);
         }
 
-        if (body.followUpDate || body.purpose || body.priority || body.notes || body.rnr) {
+        if (normalised.followUpDate || normalised.purpose || normalised.priority || normalised.notes || normalised.rnr) {
           const followUp = manager.getRepository(LeadFollowUp).create({
             lead_id: existingLead.id,
-            follow_up_date: body.followUpDate || null,
-            follow_up_time: body.followUpTime || null,
-            purpose: body.purpose || null,
-            priority: body.priority || null,
-            rnr: body.rnr || null,
-            notes: body.notes || null,
+            follow_up_date: normalised.followUpDate || null,
+            follow_up_time: normalised.followUpTime || null,
+            purpose: normalised.purpose || null,
+            priority: normalised.priority || null,
+            rnr: normalised.rnr || null,
+            notes: normalised.notes || null,
           });
           await manager.save(followUp);
         }
@@ -457,26 +464,26 @@ export class LeadsService {
       }
 
       let assignedStaffId: number | undefined;
-      if (body.userId) {
-        const user = await manager.getRepository(User).findOne({ where: { id: body.userId } });
+      if (normalised.userId) {
+        const user = await manager.getRepository(User).findOne({ where: { id: normalised.userId } });
         if (user) assignedStaffId = user.id;
       }
 
       const leadRepo = manager.getRepository(Lead);
       const lead = leadRepo.create({
-        name: body.name,
-        mobile_number: body.mobile,
-        email: body.email || null,
-        whatsapp_number: body.whatsapp || null,
-        city: body.city || null,
-        address: body.address || null,
-        lead_source: body.source || null,
+        name: normalised.name,
+        mobile_number: mobile,
+        email: normalised.email || null,
+        whatsapp_number: normalised.whatsapp || null,
+        city: normalised.city || null,
+        address: normalised.address || null,
+        lead_source: normalised.source || null,
         status: 'New Lead',
         assigned_staff_id: assignedStaffId,
-        commission: body.commission || null,
-        is_referral: body.isReferral || false,
-        referred_by_name: body.referredByName || null,
-        referred_by_contact: body.referredByContact || null,
+        commission: normalised.commission || null,
+        is_referral: normalised.isReferral || false,
+        referred_by_name: normalised.referredByName || null,
+        referred_by_contact: normalised.referredByContact || null,
       });
       const savedLead: Lead = await manager.save(lead);
 
@@ -487,33 +494,33 @@ export class LeadsService {
         });
       }
 
-      if (body.purchaseType || body.propertyType || body.funder || body.project || body.propertyCategory) {
+      if (normalised.purchaseType || normalised.propertyType || normalised.funder || normalised.project || normalised.propertyCategory) {
         const inquiry = manager.getRepository(LeadInquiry).create({
           lead_id: savedLead.id,
-          project_list: body.project || null,
-          purchase_type: body.purchaseType || null,
-          property_type: body.propertyType || null,
-          property_category: body.propertyCategory || null,
-          funder: body.funder || null,
-          preferences: body.preferences || null,
-          city_id: body.cityId || null,
-          sub_locations: body.subLocations || null,
-          purchase_timeline: body.purchaseTimeline || null,
-          qualification_purpose: body.qualificationPurpose || null,
-          decision_maker: body.decisionMaker || null,
+          project_list: normalised.project || null,
+          purchase_type: normalised.purchaseType || null,
+          property_type: normalised.propertyType || null,
+          property_category: normalised.propertyCategory || null,
+          funder: normalised.funder || null,
+          preferences: normalised.preferences || null,
+          city_id: normalised.cityId || null,
+          sub_locations: normalised.subLocations || null,
+          purchase_timeline: normalised.purchaseTimeline || null,
+          qualification_purpose: normalised.qualificationPurpose || null,
+          decision_maker: normalised.decisionMaker || null,
         });
         await manager.save(inquiry);
       }
 
-      if (body.followUpDate || body.purpose || body.priority || body.notes || body.rnr) {
+      if (normalised.followUpDate || normalised.purpose || normalised.priority || normalised.notes || normalised.rnr) {
         const followUp = manager.getRepository(LeadFollowUp).create({
           lead_id: savedLead.id,
-          follow_up_date: body.followUpDate || null,
-          follow_up_time: body.followUpTime || null,
-          purpose: body.purpose || null,
-          priority: body.priority || null,
-          rnr: body.rnr || null,
-          notes: body.notes || null,
+          follow_up_date: normalised.followUpDate || null,
+          follow_up_time: normalised.followUpTime || null,
+          purpose: normalised.purpose || null,
+          priority: normalised.priority || null,
+          rnr: normalised.rnr || null,
+          notes: normalised.notes || null,
         });
         await manager.save(followUp);
       }
@@ -627,7 +634,7 @@ export class LeadsService {
       SELECT COUNT(*) as count 
       FROM leads l 
       ${joinClauses} 
-      WHERE l.assigned_staff_id IS NOT NULL ${roleFilter} ${filterConds}
+      WHERE 1=1 ${roleFilter} ${filterConds}
     `;
 
     const countResult = await this.dataSource.query(countSql, params);
@@ -652,7 +659,7 @@ export class LeadsService {
         latest_actual_f.follow_up_date as lastFollowedUpDate
       FROM leads l
       ${joinClauses}
-      WHERE l.assigned_staff_id IS NOT NULL ${roleFilter} ${filterConds}
+      WHERE 1=1 ${roleFilter} ${filterConds}
       ORDER BY l.created_at DESC
       LIMIT ? OFFSET ?
     `;
