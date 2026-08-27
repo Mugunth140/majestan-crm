@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { S3Client } from 'bun';
 import { Asset } from '../../database/entities/asset.entity';
@@ -176,6 +176,30 @@ export class AssetsService {
   async uploadMedia(assetId: number, files: { document?: Express.Multer.File[], images?: Express.Multer.File[], fmb?: Express.Multer.File[], barcode?: Express.Multer.File[] }) {
     const asset = await this.dataSource.getRepository(Asset).findOne({ where: { id: assetId } });
     if (!asset) throw new NotFoundException('Asset not found');
+
+    const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const ALLOWED_DOC_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
+    const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
+    const MAX_DOC_SIZE = 20 * 1024 * 1024;   // 20 MB
+
+    const validateFile = (file: Express.Multer.File, allowedTypes: string[], maxSize: number, label: string) => {
+      if (!allowedTypes.includes(file.mimetype)) {
+        throw new BadRequestException(`Invalid file type for ${label}: ${file.mimetype}. Allowed: ${allowedTypes.join(', ')}`);
+      }
+      if (file.size > maxSize) {
+        throw new BadRequestException(`File too large for ${label}: ${file.size} bytes. Max: ${maxSize} bytes`);
+      }
+    };
+
+    // Validate all files before uploading any
+    if (files.document?.length) validateFile(files.document[0], ALLOWED_DOC_TYPES, MAX_DOC_SIZE, 'document');
+    if (files.fmb?.length) validateFile(files.fmb[0], ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE, 'fmb');
+    if (files.barcode?.length) validateFile(files.barcode[0], ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE, 'barcode');
+    if (files.images?.length) {
+      for (const img of files.images.slice(0, 4)) {
+        validateFile(img, ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE, 'image');
+      }
+    }
 
     const repo = this.dataSource.getRepository(AssetDocument);
     const uploadedDocs: any[] = [];

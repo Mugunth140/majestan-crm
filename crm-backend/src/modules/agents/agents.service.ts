@@ -17,11 +17,19 @@ export class AgentsService {
   constructor(@InjectDataSource() private dataSource: DataSource) {}
 
   async getAgents(user?: any): Promise<any[]> {
-    let roleFilter = '';
+    let roleWhere = '1=1';
+    const params: any[] = [];
+
     if (user && user.role === 'Staff') {
-      roleFilter = `WHERE a.assigned_staff_id = ${Number(user.id)}`;
+      const staffId = Number(user.id);
+      if (!isFinite(staffId)) return [];
+      roleWhere = 'a.assigned_staff_id = ?';
+      params.push(staffId);
     } else if (user && user.role === 'Team Lead') {
-      roleFilter = `WHERE a.assigned_staff_id IN (SELECT id FROM users WHERE department_id = ${Number(user.department_id)})`;
+      const deptId = Number(user.department_id);
+      if (!isFinite(deptId)) return [];
+      roleWhere = 'a.assigned_staff_id IN (SELECT id FROM users WHERE department_id = ?)';
+      params.push(deptId);
     }
 
     const rawAgents = await this.dataSource.query(`
@@ -51,9 +59,9 @@ export class AgentsService {
         FROM agent_follow_ups
         WHERE follow_up_date IS NOT NULL
       ) latest_actual_f ON latest_actual_f.agent_id = a.id AND latest_actual_f.rn = 1
-      ${roleFilter}
+      WHERE ${roleWhere}
       ORDER BY a.created_at DESC
-    `);
+    `, params);
 
     return rawAgents.map((row: any) => ({
       id: row.rawId,

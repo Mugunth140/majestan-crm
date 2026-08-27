@@ -28,7 +28,7 @@ export class TasksController {
   // GET /api/v1/tasks/metrics/:deptName
   @Get('metrics/:deptName')
   async getMetrics(@Param('deptName') deptName: string) {
-    const data = this.tasksService.getMetricsForDepartment(deptName);
+    const data = await this.tasksService.getMetricsForDepartment(deptName);
     return { success: true, data };
   }
 
