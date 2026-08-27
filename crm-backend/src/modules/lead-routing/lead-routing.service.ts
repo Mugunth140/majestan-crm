@@ -163,7 +163,7 @@ export class LeadRoutingService {
   }
 
   // ── Site Visit Complete → Transfer to Sales ────────────────────────────────
-  async siteVisitComplete(leadId: number, requestingUserId: number, feedback: string) {
+  async siteVisitComplete(leadId: number, requestingUserId: number, feedback?: string) {
     const leadRepo = this.dataSource.getRepository(Lead);
     const lead = await leadRepo.findOne({ where: { id: leadId } });
     if (!lead) throw new NotFoundException('Lead not found');
@@ -218,7 +218,7 @@ export class LeadRoutingService {
   }
 
   // ── RNR5 Release ───────────────────────────────────────────────────────────
-  async rnr5Release(leadId: number, requestingUserId: number, feedback: string) {
+  async rnr5Release(leadId: number, requestingUserId: number, feedback?: string) {
     const leadRepo = this.dataSource.getRepository(Lead);
     const lead = await leadRepo.findOne({ where: { id: leadId } });
     if (!lead) throw new NotFoundException('Lead not found');
@@ -284,7 +284,7 @@ export class LeadRoutingService {
   }
 
   // ── Convert ────────────────────────────────────────────────────────────────
-  async convertLead(leadId: number, convertTo: 'inbound' | 'agent', feedback: string, requestingUserId: number) {
+  async convertLead(leadId: number, convertTo: 'inbound' | 'agent', feedback: string | undefined, requestingUserId: number) {
     const leadRepo = this.dataSource.getRepository(Lead);
     const lead = await leadRepo.findOne({ where: { id: leadId } });
     if (!lead) throw new NotFoundException('Lead not found');
@@ -390,7 +390,7 @@ export class LeadRoutingService {
   }
 
   // ── Return to Queue ────────────────────────────────────────────────────────
-  async returnToQueue(leadId: number, requestingUserId: number, feedback: string) {
+  async returnToQueue(leadId: number, requestingUserId: number, feedback?: string) {
     const leadRepo = this.dataSource.getRepository(Lead);
     const lead = await leadRepo.findOne({ where: { id: leadId } });
     if (!lead) throw new NotFoundException('Lead not found');
