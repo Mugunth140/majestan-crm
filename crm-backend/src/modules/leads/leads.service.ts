@@ -285,12 +285,24 @@ export class LeadsService {
   async bulkCreateLeads(leads: any[]) {
     if (!leads || leads.length === 0) return { count: 0, created: 0, existing: 0 };
 
+    // Strip +91 / 91 prefix so numbers are stored as consistent 10-digit strings.
+    // India-only system — +91 is the only country code in use.
+    const normalizeIndianMobile = (raw: string): string => {
+      const digits = raw.replace(/\D/g, '');
+      if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+      if (digits.length === 13 && digits.startsWith('091')) return digits.slice(3);
+      return digits;
+    };
+
     // Normalize and drop rows without a usable mobile number
     const normalizedLeads = leads.map(body => ({
       ...body,
       mobile: body.mobile ?? body.mobile_number ?? null,
       source: body.source ?? body.lead_source ?? null,
-    })).filter(l => l.mobile !== null && String(l.mobile).trim() !== '');
+    }))
+    .filter(l => l.mobile !== null && String(l.mobile).trim() !== '')
+    .map(l => ({ ...l, mobile: normalizeIndianMobile(String(l.mobile).trim()) }))
+    .filter(l => l.mobile !== '');
 
     if (normalizedLeads.length === 0) return { count: 0, created: 0, existing: 0 };
 

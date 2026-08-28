@@ -387,6 +387,15 @@ export default function LeadsPage() {
     },
   ];
 
+  // Strips +91 / 91 prefix so numbers are stored as consistent 10-digit format.
+  // India-only system — the only country code in use is +91.
+  const normalizeIndianMobile = (raw: string): string => {
+    const digits = raw.replace(/\D/g, ''); // drop spaces, dashes, parens, etc.
+    if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+    if (digits.length === 13 && digits.startsWith('091')) return digits.slice(3);
+    return digits; // already 10-digit or unknown format — pass through
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -416,11 +425,13 @@ export default function LeadsPage() {
             return;
           }
 
-          // 2. Row Data Validation (Fail-Fast)
+          // 2. Row Data Validation (Fail-Fast) + Duplicate Check
+          const seenMobiles = new Map<string, number>(); // normalized mobile -> first row number
           for (let i = 0; i < data.length; i++) {
             const row = data[i];
             const name = String(row["Customer Name"] || "").trim();
-            const mobile = String(row["Customer Number"] || "").trim();
+            const rawMobile = String(row["Customer Number"] || "").trim();
+            const mobile = normalizeIndianMobile(rawMobile);
             const email = String(row["Email Id"] || "").trim();
             const source = String(row["Lead source"] || "").trim();
 
@@ -428,6 +439,14 @@ export default function LeadsPage() {
             if (!mobile) { toast.error(`Row ${i + 2} is missing Customer Number. Import aborted.`); setIsImporting(false); return; }
             if (!email) { toast.error(`Row ${i + 2} is missing Email Id. Import aborted.`); setIsImporting(false); return; }
             if (!source) { toast.error(`Row ${i + 2} is missing Lead source. Import aborted.`); setIsImporting(false); return; }
+
+            // Duplicate detection within the file (after normalization)
+            if (seenMobiles.has(mobile)) {
+              toast.error(`Duplicate entry: Customer Number ${rawMobile} appears on Row ${seenMobiles.get(mobile)! + 1} and Row ${i + 2}. Import aborted.`);
+              setIsImporting(false);
+              return;
+            }
+            seenMobiles.set(mobile, i + 1);
           }
 
           const total = data.length;
@@ -445,7 +464,7 @@ export default function LeadsPage() {
                     id: `IMPORT-${i+1}`,
                     date: new Date().toLocaleDateString(),
                     name: String(row["Customer Name"]).trim(),
-                    mobile: String(row["Customer Number"]).trim(),
+                    mobile: normalizeIndianMobile(String(row["Customer Number"]).trim()),
                     email: String(row["Email Id"]).trim(),
                     source: String(row["Lead source"]).trim(),
                     commissionRemarks: String(row["Remarks"] || "").trim(),
@@ -1072,7 +1091,7 @@ export default function LeadsPage() {
                 <MobileLeadList
                   leads={displayedLeads}
                   isLoading={isLoading}
-                  onCardClick={(lead) => router.push("/leads/" + lead.rawId)}
+                  onCardClick={(lead) => { if (!lead.isPendingImport) router.push("/leads/" + lead.rawId); }}
                   onCall={(lead) => openMobileContact("call", lead)}
                   onWhatsApp={(lead) => openMobileContact("whatsapp", lead)}
                 />
