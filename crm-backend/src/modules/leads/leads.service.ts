@@ -402,6 +402,8 @@ export class LeadsService {
 
       return { count: created, created, existing };
     });
+
+    return summary;
   }
 
   async createLead(body: any): Promise<CreateLeadResult> {
