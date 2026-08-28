@@ -539,6 +539,8 @@ export class LeadsService {
       roleFilter = `AND l.assigned_staff_id = ${Number(user.id)}`;
     } else if (user && user.role === 'Team Lead') {
       roleFilter = `AND l.assigned_staff_id IN (SELECT id FROM users WHERE department_id = ${Number(user.department_id)})`;
+    } else {
+      roleFilter = `AND l.assigned_staff_id IS NOT NULL`;
     }
 
     const params: any[] = [];
