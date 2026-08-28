@@ -61,6 +61,11 @@ export class BulkLeadDto {
   source?: string;
 
   @IsOptional()
+  @Transform(toTrimmedString)
+  @IsString()
+  commissionRemarks?: string;
+
+  @IsOptional()
   @Transform(toNumber)
   @IsNumber()
   commission?: number;

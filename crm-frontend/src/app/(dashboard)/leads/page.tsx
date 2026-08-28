@@ -34,10 +34,13 @@ interface PendingImport {
   name: string;
   mobile: string;
   email?: string;
+  source?: string;
+  commissionRemarks?: string;
+  
+  // Legacy fields (optional)
   whatsapp?: string;
   city?: string;
   address?: string;
-  source?: string;
   commission?: number;
   isReferral?: boolean;
   referredByName?: string;
@@ -51,6 +54,7 @@ interface PendingImport {
   qualificationPurpose?: string;
   decisionMaker?: string;
   notes?: string;
+  
   staff?: string;
   status?: string;
   isPendingImport?: boolean;
@@ -401,6 +405,31 @@ export default function LeadsPage() {
         const data = XLSX.utils.sheet_to_json(ws) as any[];
         
         if (data.length > 0) {
+          // 1. Header Validation
+          const headers = Object.keys(data[0] || {});
+          const requiredHeaders = ["Customer Name", "Customer Number", "Email Id", "Lead source"];
+          const hasAllHeaders = requiredHeaders.every(h => headers.includes(h));
+          
+          if (!hasAllHeaders) {
+            toast.error(`Missing required columns. Please use the exact template.`);
+            setIsImporting(false);
+            return;
+          }
+
+          // 2. Row Data Validation (Fail-Fast)
+          for (let i = 0; i < data.length; i++) {
+            const row = data[i];
+            const name = String(row["Customer Name"] || "").trim();
+            const mobile = String(row["Customer Number"] || "").trim();
+            const email = String(row["Email Id"] || "").trim();
+            const source = String(row["Lead source"] || "").trim();
+
+            if (!name) { toast.error(`Row ${i + 2} is missing Customer Name. Import aborted.`); setIsImporting(false); return; }
+            if (!mobile) { toast.error(`Row ${i + 2} is missing Customer Number. Import aborted.`); setIsImporting(false); return; }
+            if (!email) { toast.error(`Row ${i + 2} is missing Email Id. Import aborted.`); setIsImporting(false); return; }
+            if (!source) { toast.error(`Row ${i + 2} is missing Lead source. Import aborted.`); setIsImporting(false); return; }
+          }
+
           const total = data.length;
           let processed = 0;
           const chunkSize = Math.max(10, Math.floor(total / 20));
@@ -415,26 +444,11 @@ export default function LeadsPage() {
                     rawId: `import-${i}`,
                     id: `IMPORT-${i+1}`,
                     date: new Date().toLocaleDateString(),
-                    name: row.Name || row.name || row["Customer Name"] || "Unknown",
-                    mobile: String(row.Mobile || row.mobile || row["Mobile Number"] || ""),
-                    whatsapp: row.Whatsapp ? String(row.Whatsapp) : undefined,
-                    email: row.Email || row.email || "",
-                    city: row.City || row.city,
-                    address: row.Address || row.address,
-                    source: row.Source || row.source || "Bulk Import",
-                    commission: row.Commission ? parseFloat(row.Commission) : undefined,
-                    isReferral: row["Is Referral"]?.toString().toLowerCase() === "yes" || row.isReferral === true,
-                    referredByName: row["Referred By Name"] || row.referredByName,
-                    referredByContact: row["Referred By Contact"] ? String(row["Referred By Contact"]) : undefined,
-                    propertyCategory: row["Property Category"] || row.propertyCategory,
-                    propertyType: row["Property Type"] || row.propertyType || "apartment",
-                    purchaseType: row["Purchase Type"] || row.purchaseType,
-                    funder: row.Funder || row.funder,
-                    project: row["Project List"] || row.project,
-                    purchaseTimeline: row["Purchase Timeline"] || row.purchaseTimeline,
-                    qualificationPurpose: row["Qualification Purpose"] || row.qualificationPurpose,
-                    decisionMaker: row["Decision Maker"] || row.decisionMaker,
-                    notes: row.Notes || row.notes,
+                    name: String(row["Customer Name"]).trim(),
+                    mobile: String(row["Customer Number"]).trim(),
+                    email: String(row["Email Id"]).trim(),
+                    source: String(row["Lead source"]).trim(),
+                    commissionRemarks: String(row["Remarks"] || "").trim(),
                     staff: "Unassigned",
                     status: "NEW",
                     isPendingImport: true,
@@ -472,32 +486,16 @@ export default function LeadsPage() {
     try {
       setIsInserting(true);
       const payload = pendingImports
-        .filter(p => String(p.mobile).trim() !== "")
         .map(p => ({
           name: p.name,
-          mobile: String(p.mobile).trim(),
-          email: p.email || undefined,
-          whatsapp: p.whatsapp,
-          city: p.city,
-          address: p.address,
+          mobile: p.mobile,
+          email: p.email,
           source: p.source,
-          commission: p.commission != null && !Number.isNaN(p.commission) ? p.commission : undefined,
-          isReferral: p.isReferral,
-          referredByName: p.referredByName,
-          referredByContact: p.referredByContact,
-          propertyCategory: p.propertyCategory,
-          propertyType: p.propertyType,
-          purchaseType: p.purchaseType,
-          funder: p.funder,
-          project: p.project,
-          purchaseTimeline: p.purchaseTimeline,
-          qualificationPurpose: p.qualificationPurpose,
-          decisionMaker: p.decisionMaker,
-          notes: p.notes,
+          commissionRemarks: p.commissionRemarks || undefined,
         }));
 
       if (payload.length === 0) {
-        toast.error("No valid rows to import. Every row needs a mobile number.");
+        toast.error("No valid rows to import.");
         setIsInserting(false);
         return;
       }
@@ -956,29 +954,14 @@ export default function LeadsPage() {
 
   const downloadTemplate = async () => {
     const XLSX = await import("xlsx");
-    // Define the headers based on what handleFileUpload expects
+    // Strictly 5 columns as requested
     const headers = [
       {
-        "Name": "John Doe",
-        "Mobile": "9876543210",
-        "Whatsapp": "9876543210",
-        "Email": "john@example.com",
-        "City": "Chennai",
-        "Address": "123 Main St",
-        "Source": "Website",
-        "Commission": "1.5",
-        "Is Referral": "No",
-        "Referred By Name": "",
-        "Referred By Contact": "",
-        "Property Category": "residential",
-        "Property Type": "apartment",
-        "Purchase Type": "buy",
-        "Funder": "bank",
-        "Project List": "majestan_prestige",
-        "Purchase Timeline": "immediate",
-        "Qualification Purpose": "investment",
-        "Decision Maker": "Self",
-        "Notes": "Looking for 3BHK"
+        "Customer Name": "John Doe",
+        "Customer Number": "9876543210",
+        "Email Id": "john@example.com",
+        "Lead source": "Website",
+        "Remarks": "Looking for 3BHK"
       }
     ];
     

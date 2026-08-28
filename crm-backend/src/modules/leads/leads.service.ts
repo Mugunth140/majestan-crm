@@ -325,19 +325,13 @@ export class LeadsService {
           name: row.name,
           mobile_number: mobile,
           email: row.email || null,
-          whatsapp_number: row.whatsapp || null,
-          city: row.city || null,
-          address: row.address || null,
           lead_source: row.source || null,
           status: 'New Lead',
           // Imported leads always enter the unassigned telecalling routing queue —
           // assignment happens exclusively through lead routing by admins/managers/team leads.
           department: 'telecalling',
           assigned_staff_id: null as unknown as number,
-          commission: row.commission || null,
-          is_referral: row.isReferral || false,
-          referred_by_name: row.referredByName || null,
-          referred_by_contact: row.referredByContact || null,
+          commission_remarks: row.commissionRemarks || null,
         });
         leadsToCreate.push({ mobile, lead });
       }
