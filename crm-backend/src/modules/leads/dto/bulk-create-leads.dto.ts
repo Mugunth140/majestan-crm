@@ -30,10 +30,16 @@ export class BulkLeadDto {
   @IsString()
   name?: string;
 
+  // Frontend sends 'mobile'; accept legacy 'mobile_number' too for safety
   @IsOptional()
   @Transform(toTrimmedString)
   @IsString()
   mobile?: string;
+
+  @IsOptional()
+  @Transform(toTrimmedString)
+  @IsString()
+  mobile_number?: string;
 
   @IsOptional()
   @Transform(toTrimmedString)
