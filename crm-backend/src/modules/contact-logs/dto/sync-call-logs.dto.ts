@@ -1,12 +1,15 @@
-import { IsArray, ValidateNested, IsString, IsNumber } from 'class-validator';
+import { IsArray, ValidateNested, IsString, IsNumber, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class CallLogDto {
   @IsString()
-  number: string;
+  sourceCallId: string;
 
   @IsString()
-  type: string;
+  phoneNumber: string;
+
+  @IsIn(['Incoming', 'Outgoing', 'Missed'])
+  direction: string;
 
   @IsNumber()
   duration: number;
