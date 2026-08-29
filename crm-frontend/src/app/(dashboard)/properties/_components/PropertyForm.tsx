@@ -68,7 +68,7 @@ interface UploadedImage {
   previewUrl: string;
 }
 
-interface PropertyFormProps {
+export interface PropertyFormProps {
   mode: "create" | "edit";
   initialData?: Property;
   onSuccess?: () => void;
