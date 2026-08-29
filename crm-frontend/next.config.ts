@@ -16,6 +16,10 @@ const nextConfig: NextConfig = {
         source: '/api/v1/:path*',
         destination: process.env.BACKEND_URL || 'http://localhost:8000/api/v1/:path*',
       },
+      {
+        source: '/site-api/:path*',
+        destination: (process.env.SITE_BACKEND_URL || 'http://localhost:5000') + '/api/v1/:path*',
+      },
     ];
   },
 };
