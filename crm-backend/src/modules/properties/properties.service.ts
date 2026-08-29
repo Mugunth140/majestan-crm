@@ -122,10 +122,8 @@ export class PropertiesService {
       qb.andWhere('c.id = :cityId', { cityId: Number(query.cityId) });
     }
 
-    const [data, total] = await Promise.all([
-      qb.limit(limit).offset(offset).getRawMany(),
-      qb.getCount(),
-    ]);
+    const total = await qb.getCount();
+    const data = await qb.limit(limit).offset(offset).getRawMany();
 
     return {
       data,
