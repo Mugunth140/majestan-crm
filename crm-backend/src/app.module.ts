@@ -27,6 +27,7 @@ import { LeadRoutingModule } from './modules/lead-routing/lead-routing.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ContactLogsModule } from './modules/contact-logs/contact-logs.module';
 import { TasksModule } from './modules/tasks/tasks.module';
+import { PropertiesModule } from './modules/properties/properties.module';
 
 import { ActivityLog } from './database/entities/activity-log.entity';
 import { Department } from './database/entities/department.entity';
@@ -62,6 +63,14 @@ import { TaskMetricProgress } from './database/entities/task-metric-progress.ent
 import { TaskActivityLog } from './database/entities/task-activity-log.entity';
 import { TaskReceipt } from './database/entities/task-receipt.entity';
 
+// Site entities
+import { Property } from './database/entities/site/property.entity';
+import { PropertyDetails } from './database/entities/site/property-details.entity';
+import { PropertyImage } from './database/entities/site/property-image.entity';
+import { PropertyLocation } from './database/entities/site/property-location.entity';
+import { City } from './database/entities/site/city.entity';
+import { Sublocation } from './database/entities/site/sublocation.entity';
+
 @Module({
   imports: [
     EventEmitterModule.forRoot(),
@@ -91,20 +100,21 @@ import { TaskReceipt } from './database/entities/task-receipt.entity';
       }),
     }),
 
-    // Connection 2: Majestan Site Database (Read-Only)
+    // Connection 2: Majestan Site Database (Read-Write for Properties)
     TypeOrmModule.forRootAsync({
-      name: 'siteConnection',
+      name: 'site',
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         type: 'mysql',
-        host: configService.get<string>('DB_HOST', 'mysql'),
-        port: configService.get<number>('DB_PORT', 3306),
-        username: configService.get<string>('DB_USERNAME'),
-        password: configService.get<string>('DB_PASSWORD'),
+        host: configService.get<string>('SITE_DB_HOST', configService.get<string>('DB_HOST', 'mysql')!),
+        port: configService.get<number>('SITE_DB_PORT', configService.get<number>('DB_PORT', 3306)!),
+        username: configService.get<string>('SITE_DB_USER', configService.get<string>('DB_USERNAME', '')!),
+        password: configService.get<string>('SITE_DB_PASS', configService.get<string>('DB_PASSWORD', '')!),
         database: configService.get<string>('SITE_DB_NAME', 'majestan'),
-        entities: [],
+        entities: [Property, PropertyDetails, PropertyImage, PropertyLocation, City, Sublocation],
         synchronize: false,
+        logging: false,
         extra: {
           connectionLimit: configService.get<number>('DB_CONNECTION_LIMIT_SITE', 5),
           connectTimeout: 10000,
@@ -131,6 +141,7 @@ import { TaskReceipt } from './database/entities/task-receipt.entity';
     NotificationsModule,
     ContactLogsModule,
     TasksModule,
+    PropertiesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

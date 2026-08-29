@@ -24,7 +24,7 @@ export class LeadsService {
 
   constructor(
     @InjectDataSource() private dataSource: DataSource,
-    @InjectDataSource('siteConnection') private siteDataSource: DataSource,
+    @InjectDataSource('site') private siteDataSource: DataSource,
     private readonly notificationsService: NotificationsService,
     private readonly tasksService: TasksService,
   ) {}

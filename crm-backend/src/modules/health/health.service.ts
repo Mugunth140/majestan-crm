@@ -14,7 +14,7 @@ export interface HealthCheckResult {
 export class HealthService {
   constructor(
     @InjectDataSource() private readonly crmDb: DataSource,
-    @InjectDataSource('siteConnection') private readonly siteDb: DataSource,
+    @InjectDataSource('site') private readonly siteDb: DataSource,
   ) {}
 
   private async check(db: DataSource, name: string): Promise<HealthCheckResult> {

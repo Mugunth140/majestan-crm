@@ -25,7 +25,7 @@ describe('LeadsService', () => {
           useValue: { query: queryMock, getRepository: jest.fn() }
         },
         {
-          provide: getDataSourceToken('siteConnection'),
+          provide: getDataSourceToken('site'),
           useValue: {}
         },
         {

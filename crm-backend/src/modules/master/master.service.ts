@@ -7,7 +7,7 @@ import { LeadSource } from '../../database/entities/lead-source.entity';
 export class MasterService {
   constructor(
     @InjectDataSource() private crmDataSource: DataSource,
-    @InjectDataSource('siteConnection') private siteDataSource: DataSource,
+    @InjectDataSource('site') private siteDataSource: DataSource,
   ) {}
 
   async getCities() {
