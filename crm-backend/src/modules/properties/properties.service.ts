@@ -178,18 +178,122 @@ export class PropertiesService {
         negotiable: dto.negotiable ?? false,
         verificationStatus: 'Pending',
         approvalStatus: 'Pending',
+        alternateName: dto.alternateName ?? null,
+        alternatePhone: dto.alternatePhone ?? null,
+        alternateEmail: dto.alternateEmail ?? null,
+        transactionType: dto.transactionType ?? null,
+        handoverDate: dto.handoverDate ?? null,
+        roadName: dto.roadName ?? null,
+        roadAccess: dto.roadAccess ?? null,
+        tenantOccupied: dto.tenantOccupied ?? null,
+        saleType: dto.saleType ?? null,
+        agentName: dto.agentName ?? null,
+        agencyName: dto.agencyName ?? null,
+        commissionTerms: dto.commissionTerms ?? null,
+        expectedSalePrice: dto.expectedSalePrice != null ? String(dto.expectedSalePrice) : null,
+        monthlyRent: dto.monthlyRent != null ? String(dto.monthlyRent) : null,
+        lockInPeriod: dto.lockInPeriod ?? null,
+        taxes: dto.taxes ?? null,
+        registrationCharge: dto.registrationCharge ?? null,
+        modeOfPayment: dto.modeOfPayment ?? null,
+        timeForRegistration: dto.timeForRegistration ?? null,
+        remark: dto.remark ?? null,
+        demandArea: dto.demandArea ?? null,
+        rentalYield: dto.rentalYield ?? null,
+        comparativePrice: dto.comparativePrice ?? null,
+        marketPrice: dto.marketPrice ?? null,
+        ownershipTitleVerified: dto.ownershipTitleVerified ?? null,
+        encumbranceCertificate: dto.encumbranceCertificate ?? null,
+        rentalAgreementDraft: dto.rentalAgreementDraft ?? null,
+        tslrFmb: dto.tslrFmb ?? null,
+        taxReceipt: dto.taxReceipt ?? null,
+        ebReceipt: dto.ebReceipt ?? null,
+        pattaChitta: dto.pattaChitta ?? null,
+        approvals: dto.approvals ?? null,
+        financeFacing: dto.financeFacing ?? null,
+        hypothecation: dto.hypothecation ?? null,
+        deviation: dto.deviation ?? null,
+        attachment1: dto.attachment1 ?? null,
+        attachment2: dto.attachment2 ?? null,
+        attachment3: dto.attachment3 ?? null,
+        attachment4: dto.attachment4 ?? null,
+        attachment5: dto.attachment5 ?? null,
+        attachment6: dto.attachment6 ?? null,
       });
       const saved = await em.save(Property, property);
       createdId = saved.id;
 
       // Create PropertyDetails
       const details = em.create(PropertyDetails, {
-        propertyId: saved.id,
+        propertyId: saved.id as any,
         bedrooms: dto.bedrooms ?? 0,
         bathrooms: dto.bathrooms ?? 0,
         areaSqft: dto.areaSqft !== undefined ? String(dto.areaSqft) : '0',
         parking: 0,
         furnished: false,
+        udsArea: dto.udsArea != null ? String(dto.udsArea) : null,
+        unitNumber: dto.unitNumber ?? null,
+        unitType: dto.unitType ?? null,
+        numberOfFlats: dto.numberOfFlats ?? null,
+        towerNos: dto.towerNos ?? null,
+        poojaRoom: dto.poojaRoom ?? null,
+        studyRoom: dto.studyRoom ?? null,
+        architecturalStyle: dto.architecturalStyle ?? null,
+        availablePortion: dto.availablePortion ?? null,
+        amenities: dto.amenities ?? null,
+        plotNos: dto.plotNos ?? null,
+        zoning: dto.zoning ?? null,
+        plotType: dto.plotType ?? null,
+        landType: dto.landType ?? null,
+        topography: dto.topography ?? null,
+        soilType: dto.soilType ?? null,
+        irrigation: dto.irrigation ?? null,
+        fencing: dto.fencing ?? null,
+        cropSuitability: dto.cropSuitability ?? null,
+        existingPlantation: dto.existingPlantation ?? null,
+        boreWell: dto.boreWell ?? null,
+        storageTank: dto.storageTank ?? null,
+        waterSources: dto.waterSources ?? null,
+        sfNumber: dto.sfNumber ?? null,
+        propertyUse: dto.propertyUse ?? null,
+        noOfLifts: dto.noOfLifts ?? null,
+        dimension: dto.dimension ?? null,
+        frontage: dto.frontage ?? null,
+        outsideParking: dto.outsideParking ?? null,
+        visitorsParking: dto.visitorsParking ?? null,
+        fireSafety: dto.fireSafety ?? null,
+        electricityConnection: dto.electricityConnection ?? null,
+        conferenceRoom: dto.conferenceRoom ?? null,
+        seater: dto.seater ?? null,
+        tenantMix: dto.tenantMix ?? null,
+        buildingType: dto.buildingType ?? null,
+        numberOfBays: dto.numberOfBays ?? null,
+        numberOfCabins: dto.numberOfCabins ?? null,
+        loadingBays: dto.loadingBays ?? null,
+        warehouseRacks: dto.warehouseRacks ?? null,
+        truckTrailerAccess: dto.truckTrailerAccess ?? null,
+        craneAvailable: dto.craneAvailable ?? null,
+        workerFacilities: dto.workerFacilities ?? null,
+        nearestHighway: dto.nearestHighway ?? null,
+        nearestRailway: dto.nearestRailway ?? null,
+        nearestPort: dto.nearestPort ?? null,
+        nearestAirport: dto.nearestAirport ?? null,
+        labourAvailability: dto.labourAvailability ?? null,
+        advanceRent: dto.advanceRent != null ? String(dto.advanceRent) : null,
+        leaseTerm: dto.leaseTerm ?? null,
+        incrementalRent: dto.incrementalRent ?? null,
+        electricityCharges: dto.electricityCharges ?? null,
+        highSpeedWifi: dto.highSpeedWifi ?? null,
+        airConditioning: dto.airConditioning ?? null,
+        cctvSurveillance: dto.cctvSurveillance ?? null,
+        elevatorAccess: dto.elevatorAccess ?? null,
+        securityStaff: dto.securityStaff ?? null,
+        furnitureProvided: dto.furnitureProvided ?? null,
+        outdoorSpaces: dto.outdoorSpaces ?? null,
+        utilitiesProvided: dto.utilitiesProvided ?? null,
+        neighborhoodHighlights: dto.neighborhoodHighlights ?? null,
+        communityFacilities: dto.communityFacilities ?? null,
+        accessibility: dto.accessibility ?? null,
       });
       await em.save(PropertyDetails, details);
 
@@ -254,6 +358,47 @@ export class PropertiesService {
       if (dto.ownerPhone !== undefined) updateData.ownerPhone = dto.ownerPhone;
       if (dto.negotiable !== undefined) updateData.negotiable = dto.negotiable;
       if (dto.cityId) { updateData.city = cityName; updateData.state = stateName; updateData.country = countryName; }
+      if (dto.alternateName !== undefined) updateData.alternateName = dto.alternateName ?? null;
+      if (dto.alternatePhone !== undefined) updateData.alternatePhone = dto.alternatePhone ?? null;
+      if (dto.alternateEmail !== undefined) updateData.alternateEmail = dto.alternateEmail ?? null;
+      if (dto.transactionType !== undefined) updateData.transactionType = dto.transactionType ?? null;
+      if (dto.handoverDate !== undefined) updateData.handoverDate = dto.handoverDate ?? null;
+      if (dto.roadName !== undefined) updateData.roadName = dto.roadName ?? null;
+      if (dto.roadAccess !== undefined) updateData.roadAccess = dto.roadAccess ?? null;
+      if (dto.tenantOccupied !== undefined) updateData.tenantOccupied = dto.tenantOccupied ?? null;
+      if (dto.saleType !== undefined) updateData.saleType = dto.saleType ?? null;
+      if (dto.agentName !== undefined) updateData.agentName = dto.agentName ?? null;
+      if (dto.agencyName !== undefined) updateData.agencyName = dto.agencyName ?? null;
+      if (dto.commissionTerms !== undefined) updateData.commissionTerms = dto.commissionTerms ?? null;
+      if (dto.expectedSalePrice !== undefined) updateData.expectedSalePrice = dto.expectedSalePrice != null ? String(dto.expectedSalePrice) : null;
+      if (dto.monthlyRent !== undefined) updateData.monthlyRent = dto.monthlyRent != null ? String(dto.monthlyRent) : null;
+      if (dto.lockInPeriod !== undefined) updateData.lockInPeriod = dto.lockInPeriod ?? null;
+      if (dto.taxes !== undefined) updateData.taxes = dto.taxes ?? null;
+      if (dto.registrationCharge !== undefined) updateData.registrationCharge = dto.registrationCharge ?? null;
+      if (dto.modeOfPayment !== undefined) updateData.modeOfPayment = dto.modeOfPayment ?? null;
+      if (dto.timeForRegistration !== undefined) updateData.timeForRegistration = dto.timeForRegistration ?? null;
+      if (dto.remark !== undefined) updateData.remark = dto.remark ?? null;
+      if (dto.demandArea !== undefined) updateData.demandArea = dto.demandArea ?? null;
+      if (dto.rentalYield !== undefined) updateData.rentalYield = dto.rentalYield ?? null;
+      if (dto.comparativePrice !== undefined) updateData.comparativePrice = dto.comparativePrice ?? null;
+      if (dto.marketPrice !== undefined) updateData.marketPrice = dto.marketPrice ?? null;
+      if (dto.ownershipTitleVerified !== undefined) updateData.ownershipTitleVerified = dto.ownershipTitleVerified ?? null;
+      if (dto.encumbranceCertificate !== undefined) updateData.encumbranceCertificate = dto.encumbranceCertificate ?? null;
+      if (dto.rentalAgreementDraft !== undefined) updateData.rentalAgreementDraft = dto.rentalAgreementDraft ?? null;
+      if (dto.tslrFmb !== undefined) updateData.tslrFmb = dto.tslrFmb ?? null;
+      if (dto.taxReceipt !== undefined) updateData.taxReceipt = dto.taxReceipt ?? null;
+      if (dto.ebReceipt !== undefined) updateData.ebReceipt = dto.ebReceipt ?? null;
+      if (dto.pattaChitta !== undefined) updateData.pattaChitta = dto.pattaChitta ?? null;
+      if (dto.approvals !== undefined) updateData.approvals = dto.approvals ?? null;
+      if (dto.financeFacing !== undefined) updateData.financeFacing = dto.financeFacing ?? null;
+      if (dto.hypothecation !== undefined) updateData.hypothecation = dto.hypothecation ?? null;
+      if (dto.deviation !== undefined) updateData.deviation = dto.deviation ?? null;
+      if (dto.attachment1 !== undefined) updateData.attachment1 = dto.attachment1 ?? null;
+      if (dto.attachment2 !== undefined) updateData.attachment2 = dto.attachment2 ?? null;
+      if (dto.attachment3 !== undefined) updateData.attachment3 = dto.attachment3 ?? null;
+      if (dto.attachment4 !== undefined) updateData.attachment4 = dto.attachment4 ?? null;
+      if (dto.attachment5 !== undefined) updateData.attachment5 = dto.attachment5 ?? null;
+      if (dto.attachment6 !== undefined) updateData.attachment6 = dto.attachment6 ?? null;
 
       await em.update(Property, { id }, updateData);
 
@@ -262,6 +407,69 @@ export class PropertiesService {
       if (dto.bedrooms !== undefined) detailsUpdate.bedrooms = dto.bedrooms;
       if (dto.bathrooms !== undefined) detailsUpdate.bathrooms = dto.bathrooms;
       if (dto.areaSqft !== undefined) detailsUpdate.areaSqft = String(dto.areaSqft);
+      if (dto.udsArea !== undefined) detailsUpdate.udsArea = dto.udsArea != null ? String(dto.udsArea) : null;
+      if (dto.unitNumber !== undefined) detailsUpdate.unitNumber = dto.unitNumber ?? null;
+      if (dto.unitType !== undefined) detailsUpdate.unitType = dto.unitType ?? null;
+      if (dto.numberOfFlats !== undefined) detailsUpdate.numberOfFlats = dto.numberOfFlats ?? null;
+      if (dto.towerNos !== undefined) detailsUpdate.towerNos = dto.towerNos ?? null;
+      if (dto.poojaRoom !== undefined) detailsUpdate.poojaRoom = dto.poojaRoom ?? null;
+      if (dto.studyRoom !== undefined) detailsUpdate.studyRoom = dto.studyRoom ?? null;
+      if (dto.architecturalStyle !== undefined) detailsUpdate.architecturalStyle = dto.architecturalStyle ?? null;
+      if (dto.availablePortion !== undefined) detailsUpdate.availablePortion = dto.availablePortion ?? null;
+      if (dto.amenities !== undefined) detailsUpdate.amenities = dto.amenities ?? null;
+      if (dto.plotNos !== undefined) detailsUpdate.plotNos = dto.plotNos ?? null;
+      if (dto.zoning !== undefined) detailsUpdate.zoning = dto.zoning ?? null;
+      if (dto.plotType !== undefined) detailsUpdate.plotType = dto.plotType ?? null;
+      if (dto.landType !== undefined) detailsUpdate.landType = dto.landType ?? null;
+      if (dto.topography !== undefined) detailsUpdate.topography = dto.topography ?? null;
+      if (dto.soilType !== undefined) detailsUpdate.soilType = dto.soilType ?? null;
+      if (dto.irrigation !== undefined) detailsUpdate.irrigation = dto.irrigation ?? null;
+      if (dto.fencing !== undefined) detailsUpdate.fencing = dto.fencing ?? null;
+      if (dto.cropSuitability !== undefined) detailsUpdate.cropSuitability = dto.cropSuitability ?? null;
+      if (dto.existingPlantation !== undefined) detailsUpdate.existingPlantation = dto.existingPlantation ?? null;
+      if (dto.boreWell !== undefined) detailsUpdate.boreWell = dto.boreWell ?? null;
+      if (dto.storageTank !== undefined) detailsUpdate.storageTank = dto.storageTank ?? null;
+      if (dto.waterSources !== undefined) detailsUpdate.waterSources = dto.waterSources ?? null;
+      if (dto.sfNumber !== undefined) detailsUpdate.sfNumber = dto.sfNumber ?? null;
+      if (dto.propertyUse !== undefined) detailsUpdate.propertyUse = dto.propertyUse ?? null;
+      if (dto.noOfLifts !== undefined) detailsUpdate.noOfLifts = dto.noOfLifts ?? null;
+      if (dto.dimension !== undefined) detailsUpdate.dimension = dto.dimension ?? null;
+      if (dto.frontage !== undefined) detailsUpdate.frontage = dto.frontage ?? null;
+      if (dto.outsideParking !== undefined) detailsUpdate.outsideParking = dto.outsideParking ?? null;
+      if (dto.visitorsParking !== undefined) detailsUpdate.visitorsParking = dto.visitorsParking ?? null;
+      if (dto.fireSafety !== undefined) detailsUpdate.fireSafety = dto.fireSafety ?? null;
+      if (dto.electricityConnection !== undefined) detailsUpdate.electricityConnection = dto.electricityConnection ?? null;
+      if (dto.conferenceRoom !== undefined) detailsUpdate.conferenceRoom = dto.conferenceRoom ?? null;
+      if (dto.seater !== undefined) detailsUpdate.seater = dto.seater ?? null;
+      if (dto.tenantMix !== undefined) detailsUpdate.tenantMix = dto.tenantMix ?? null;
+      if (dto.buildingType !== undefined) detailsUpdate.buildingType = dto.buildingType ?? null;
+      if (dto.numberOfBays !== undefined) detailsUpdate.numberOfBays = dto.numberOfBays ?? null;
+      if (dto.numberOfCabins !== undefined) detailsUpdate.numberOfCabins = dto.numberOfCabins ?? null;
+      if (dto.loadingBays !== undefined) detailsUpdate.loadingBays = dto.loadingBays ?? null;
+      if (dto.warehouseRacks !== undefined) detailsUpdate.warehouseRacks = dto.warehouseRacks ?? null;
+      if (dto.truckTrailerAccess !== undefined) detailsUpdate.truckTrailerAccess = dto.truckTrailerAccess ?? null;
+      if (dto.craneAvailable !== undefined) detailsUpdate.craneAvailable = dto.craneAvailable ?? null;
+      if (dto.workerFacilities !== undefined) detailsUpdate.workerFacilities = dto.workerFacilities ?? null;
+      if (dto.nearestHighway !== undefined) detailsUpdate.nearestHighway = dto.nearestHighway ?? null;
+      if (dto.nearestRailway !== undefined) detailsUpdate.nearestRailway = dto.nearestRailway ?? null;
+      if (dto.nearestPort !== undefined) detailsUpdate.nearestPort = dto.nearestPort ?? null;
+      if (dto.nearestAirport !== undefined) detailsUpdate.nearestAirport = dto.nearestAirport ?? null;
+      if (dto.labourAvailability !== undefined) detailsUpdate.labourAvailability = dto.labourAvailability ?? null;
+      if (dto.advanceRent !== undefined) detailsUpdate.advanceRent = dto.advanceRent != null ? String(dto.advanceRent) : null;
+      if (dto.leaseTerm !== undefined) detailsUpdate.leaseTerm = dto.leaseTerm ?? null;
+      if (dto.incrementalRent !== undefined) detailsUpdate.incrementalRent = dto.incrementalRent ?? null;
+      if (dto.electricityCharges !== undefined) detailsUpdate.electricityCharges = dto.electricityCharges ?? null;
+      if (dto.highSpeedWifi !== undefined) detailsUpdate.highSpeedWifi = dto.highSpeedWifi ?? null;
+      if (dto.airConditioning !== undefined) detailsUpdate.airConditioning = dto.airConditioning ?? null;
+      if (dto.cctvSurveillance !== undefined) detailsUpdate.cctvSurveillance = dto.cctvSurveillance ?? null;
+      if (dto.elevatorAccess !== undefined) detailsUpdate.elevatorAccess = dto.elevatorAccess ?? null;
+      if (dto.securityStaff !== undefined) detailsUpdate.securityStaff = dto.securityStaff ?? null;
+      if (dto.furnitureProvided !== undefined) detailsUpdate.furnitureProvided = dto.furnitureProvided ?? null;
+      if (dto.outdoorSpaces !== undefined) detailsUpdate.outdoorSpaces = dto.outdoorSpaces ?? null;
+      if (dto.utilitiesProvided !== undefined) detailsUpdate.utilitiesProvided = dto.utilitiesProvided ?? null;
+      if (dto.neighborhoodHighlights !== undefined) detailsUpdate.neighborhoodHighlights = dto.neighborhoodHighlights ?? null;
+      if (dto.communityFacilities !== undefined) detailsUpdate.communityFacilities = dto.communityFacilities ?? null;
+      if (dto.accessibility !== undefined) detailsUpdate.accessibility = dto.accessibility ?? null;
 
       if (Object.keys(detailsUpdate).length > 0) {
         await em.update(PropertyDetails, { propertyId: id }, detailsUpdate);

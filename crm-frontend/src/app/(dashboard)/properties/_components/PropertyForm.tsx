@@ -42,6 +42,13 @@ const STATUS_OPTIONS = [
   { value: "unavailable", label: "Unavailable" },
 ];
 
+const FURNISHING_STATUS_OPTIONS = [
+  { value: "BARESHELL", label: "Bareshell" },
+  { value: "SEMI FURNISHED", label: "Semi Furnished" },
+  { value: "FULLY FURNISHED", label: "Fully Furnished" },
+  { value: "UNFURNISHED", label: "Unfurnished" },
+];
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -75,6 +82,14 @@ export interface PropertyFormProps {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const labelClass = "text-xs font-bold uppercase tracking-wider text-muted-foreground";
+const inputClass = "h-12 rounded-xl bg-muted/30";
+const checkboxRowClass = "flex items-center space-x-3 bg-muted/10 border border-border/40 p-4 h-12 rounded-xl transition-colors hover:bg-muted/30";
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -86,29 +101,203 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   const [isLoadingFormData, setIsLoadingFormData] = useState(true);
   const [formData, setFormData] = useState<FormDataShape>({ cities: [], sublocations: [] });
 
-  // ---- Field state ----
+  // ---- Basic Info ----
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [listingType, setListingType] = useState<"Buy" | "Rent">(
     initialData?.listingType === "Rent" ? "Rent" : "Buy"
   );
   const [propertyType, setPropertyType] = useState(initialData?.propertyType ?? "");
   const [status, setStatus] = useState(initialData?.status ?? "available");
+  const [transactionType, setTransactionType] = useState("");
+  const [handoverDate, setHandoverDate] = useState("");
+  const [saleType, setSaleType] = useState("");
+  const [roadAccess, setRoadAccess] = useState("");
+  const [roadName, setRoadName] = useState("");
+  const [tenantOccupied, setTenantOccupied] = useState("");
 
+  // ---- Pricing ----
   const [price, setPrice] = useState(initialData?.price ? String(initialData.price) : "");
   const [negotiable, setNegotiable] = useState(false);
+  const [expectedSalePrice, setExpectedSalePrice] = useState("");
+  const [monthlyRent, setMonthlyRent] = useState("");
+  const [maintenanceCharges, setMaintenanceCharges] = useState("");
+  const [securityDeposit, setSecurityDeposit] = useState("");
+  const [lockInPeriod, setLockInPeriod] = useState("");
+  const [taxes, setTaxes] = useState("");
+  const [registrationCharge, setRegistrationCharge] = useState("");
+  const [modeOfPayment, setModeOfPayment] = useState("");
+  const [timeForRegistration, setTimeForRegistration] = useState("");
 
+  // ---- Location ----
   const [cityId, setCityId] = useState<string>("");
   const [sublocationId, setSublocationId] = useState<string>("");
+  const [address, setAddress] = useState("");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
 
+  // ---- Details ----
   const [bedrooms, setBedrooms] = useState(initialData?.bedrooms ? String(initialData.bedrooms) : "");
   const [bathrooms, setBathrooms] = useState(initialData?.bathrooms ? String(initialData.bathrooms) : "");
   const [areaSqft, setAreaSqft] = useState(initialData?.areaSqft ? String(initialData.areaSqft) : "");
+  const [furnished, setFurnished] = useState(false);
+  const [furnishingStatus, setFurnishingStatus] = useState("");
+  const [propertyFacing, setPropertyFacing] = useState("");
+  const [propertyAge, setPropertyAge] = useState("");
+  const [floorNumber, setFloorNumber] = useState("");
+  const [totalFloors, setTotalFloors] = useState("");
 
+  // ---- Apartment / Villa / Individual House ----
+  const [unitType, setUnitType] = useState("");
+  const [unitNumber, setUnitNumber] = useState("");
+  const [numberOfFlats, setNumberOfFlats] = useState("");
+  const [towerNos, setTowerNos] = useState("");
+  const [builtUpArea, setBuiltUpArea] = useState("");
+  const [carpetArea, setCarpetArea] = useState("");
+  const [superBuiltUpArea, setSuperBuiltUpArea] = useState("");
+  const [udsArea, setUdsArea] = useState("");
+  const [plotArea, setPlotArea] = useState("");
+  const [balconies, setBalconies] = useState("");
+  const [poojaRoom, setPoojaRoom] = useState(false);
+  const [studyRoom, setStudyRoom] = useState(false);
+  const [architecturalStyle, setArchitecturalStyle] = useState("");
+  const [availablePortion, setAvailablePortion] = useState("");
+  const [amenities, setAmenities] = useState("");
+  const [outdoorSpaces, setOutdoorSpaces] = useState("");
+  const [utilitiesProvided, setUtilitiesProvided] = useState("");
+  const [neighborhoodHighlights, setNeighborhoodHighlights] = useState("");
+  const [communityFacilities, setCommunityFacilities] = useState("");
+
+  // ---- Plot / Farmland ----
+  const [plotSizeCents, setPlotSizeCents] = useState("");
+  const [plotNos, setPlotNos] = useState("");
+  const [zoning, setZoning] = useState("");
+  const [plotType, setPlotType] = useState("");
+  const [sfNumber, setSfNumber] = useState("");
+  const [landType, setLandType] = useState("");
+  const [topography, setTopography] = useState("");
+  const [soilType, setSoilType] = useState("");
+  const [irrigation, setIrrigation] = useState("");
+  const [fencing, setFencing] = useState("");
+  const [cropSuitability, setCropSuitability] = useState("");
+  const [existingPlantation, setExistingPlantation] = useState("");
+  const [boreWell, setBoreWell] = useState(false);
+  const [storageTank, setStorageTank] = useState(false);
+  const [waterSources, setWaterSources] = useState("");
+  const [boundaryWall, setBoundaryWall] = useState(false);
+  const [plotLength, setPlotLength] = useState("");
+  const [plotWidth, setPlotWidth] = useState("");
+
+  // ---- Commercial ----
+  const [propertyUse, setPropertyUse] = useState("");
+  const [noOfLifts, setNoOfLifts] = useState("");
+  const [dimension, setDimension] = useState("");
+  const [frontage, setFrontage] = useState("");
+  const [carParking, setCarParking] = useState("");
+  const [bikeParking, setBikeParking] = useState("");
+  const [outsideParking, setOutsideParking] = useState(false);
+  const [visitorsParking, setVisitorsParking] = useState("");
+  const [fireSafety, setFireSafety] = useState(false);
+  const [ceilingHeightFt, setCeilingHeightFt] = useState("");
+  const [electricityConnection, setElectricityConnection] = useState("");
+  const [powerBackup, setPowerBackup] = useState(false);
+  const [hasCentralAc, setHasCentralAc] = useState(false);
+  const [hasPantry, setHasPantry] = useState(false);
+  const [conferenceRoom, setConferenceRoom] = useState("");
+  const [seater, setSeater] = useState("");
+  const [tenantMix, setTenantMix] = useState("");
+  const [commercialAmenities, setCommercialAmenities] = useState("");
+
+  // ---- Coworking ----
+  const [availableWorkstations, setAvailableWorkstations] = useState("");
+  const [privateCabins, setPrivateCabins] = useState("");
+  const [meetingRooms, setMeetingRooms] = useState("");
+  const [minSeats, setMinSeats] = useState("");
+  const [rentPerSeat, setRentPerSeat] = useState("");
+  const [advanceRent, setAdvanceRent] = useState("");
+  const [leaseTerm, setLeaseTerm] = useState("");
+  const [incrementalRent, setIncrementalRent] = useState("");
+  const [electricityCharges, setElectricityCharges] = useState("");
+  const [highSpeedWifi, setHighSpeedWifi] = useState(false);
+  const [airConditioning, setAirConditioning] = useState(false);
+  const [cctvSurveillance, setCctvSurveillance] = useState(false);
+  const [coworkingPowerBackup, setCoworkingPowerBackup] = useState(false);
+  const [elevatorAccess, setElevatorAccess] = useState(false);
+  const [coworkingHasPantry, setCoworkingHasPantry] = useState(false);
+  const [securityStaff, setSecurityStaff] = useState(false);
+  const [furnitureProvided, setFurnitureProvided] = useState("");
+  const [accessibility, setAccessibility] = useState("");
+
+  // ---- Industrial ----
+  const [buildingType, setBuildingType] = useState("");
+  const [industrialPropertyUse, setIndustrialPropertyUse] = useState("");
+  const [coveredArea, setCoveredArea] = useState("");
+  const [openArea, setOpenArea] = useState("");
+  const [industrialCeilingHeight, setIndustrialCeilingHeight] = useState("");
+  const [floorType, setFloorType] = useState("");
+  const [numberOfBays, setNumberOfBays] = useState("");
+  const [numberOfCabins, setNumberOfCabins] = useState("");
+  const [powerSupplyHp, setPowerSupplyHp] = useState("");
+  const [waterSupply, setWaterSupply] = useState("");
+  const [truckParking, setTruckParking] = useState("");
+  const [industrialCarParking, setIndustrialCarParking] = useState("");
+  const [industrialBikeParking, setIndustrialBikeParking] = useState("");
+  const [industrialFireSafety, setIndustrialFireSafety] = useState(false);
+  const [loadingBays, setLoadingBays] = useState("");
+  const [warehouseRacks, setWarehouseRacks] = useState("");
+  const [truckTrailerAccess, setTruckTrailerAccess] = useState(false);
+  const [craneAvailable, setCraneAvailable] = useState(false);
+  const [workerFacilities, setWorkerFacilities] = useState("");
+  const [nearestHighway, setNearestHighway] = useState("");
+  const [nearestRailway, setNearestRailway] = useState("");
+  const [nearestPort, setNearestPort] = useState("");
+  const [nearestAirport, setNearestAirport] = useState("");
+  const [labourAvailability, setLabourAvailability] = useState("");
+  const [industrialPowerBackup, setIndustrialPowerBackup] = useState(false);
+  const [heavyVehicleAccess, setHeavyVehicleAccess] = useState(false);
+
+  // ---- Owner ----
   const [ownerName, setOwnerName] = useState(initialData?.ownerName ?? "");
   const [ownerPhone, setOwnerPhone] = useState(initialData?.ownerPhone ?? "");
   const [ownerEmail, setOwnerEmail] = useState("");
 
+  // ---- Agent ----
+  const [agentName, setAgentName] = useState("");
+  const [agencyName, setAgencyName] = useState("");
+  const [commissionTerms, setCommissionTerms] = useState("");
+  const [alternateName, setAlternateName] = useState("");
+  const [alternatePhone, setAlternatePhone] = useState("");
+  const [alternateEmail, setAlternateEmail] = useState("");
+
+  // ---- Documents & Verification ----
+  const [ownershipTitleVerified, setOwnershipTitleVerified] = useState("");
+  const [encumbranceCertificate, setEncumbranceCertificate] = useState("");
+  const [rentalAgreementDraft, setRentalAgreementDraft] = useState("");
+  const [tslrFmb, setTslrFmb] = useState("");
+  const [taxReceipt, setTaxReceipt] = useState("");
+  const [ebReceipt, setEbReceipt] = useState("");
+  const [pattaChitta, setPattaChitta] = useState("");
+  const [approvals, setApprovals] = useState("");
+  const [financeFacing, setFinanceFacing] = useState("");
+  const [hypothecation, setHypothecation] = useState("");
+  const [deviation, setDeviation] = useState("");
+
+  // ---- Market Analysis ----
+  const [comparativePrice, setComparativePrice] = useState("");
+  const [rentalYield, setRentalYield] = useState("");
+  const [marketPrice, setMarketPrice] = useState("");
+  const [demandArea, setDemandArea] = useState("");
+  const [remark, setRemark] = useState("");
+
+  // ---- Description ----
   const [description, setDescription] = useState(initialData?.description ?? "");
+
+  // ---- Attachments ----
+  const [attachment1, setAttachment1] = useState("");
+  const [attachment2, setAttachment2] = useState("");
+  const [attachment3, setAttachment3] = useState("");
+  const [attachment4, setAttachment4] = useState("");
+  const [attachment5, setAttachment5] = useState("");
+  const [attachment6, setAttachment6] = useState("");
 
   // ---- Image upload state ----
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
@@ -233,19 +422,232 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         status,
         cityId: cityId ? Number(cityId) : undefined,
         sublocationId: sublocationId ? Number(sublocationId) : undefined,
+
+        // Basic Info extras
+        transactionType: transactionType.trim() || undefined,
+        handoverDate: handoverDate.trim() || undefined,
+        saleType: saleType.trim() || undefined,
+        roadAccess: roadAccess.trim() || undefined,
+        roadName: roadName.trim() || undefined,
+        tenantOccupied: tenantOccupied.trim() || undefined,
+
+        // Pricing
+        expectedSalePrice: expectedSalePrice ? Number(expectedSalePrice) : undefined,
+        monthlyRent: monthlyRent ? Number(monthlyRent) : undefined,
+        maintenanceCharges: maintenanceCharges.trim() || undefined,
+        securityDeposit: securityDeposit.trim() || undefined,
+        lockInPeriod: lockInPeriod.trim() || undefined,
+        taxes: taxes.trim() || undefined,
+        registrationCharge: registrationCharge.trim() || undefined,
+        modeOfPayment: modeOfPayment.trim() || undefined,
+        timeForRegistration: timeForRegistration.trim() || undefined,
+
+        // Location
+        locationData:
+          address.trim() || latitude.trim() || longitude.trim()
+            ? {
+                address: address.trim() || undefined,
+                latitude: latitude ? parseFloat(latitude) : undefined,
+                longitude: longitude ? parseFloat(longitude) : undefined,
+              }
+            : undefined,
+
+        // Details
         bedrooms: bedrooms ? Number(bedrooms) : undefined,
         bathrooms: bathrooms ? Number(bathrooms) : undefined,
         areaSqft: areaSqft ? Number(areaSqft) : undefined,
+        furnished,
+        furnishingStatus: furnishingStatus || undefined,
+        propertyFacing: propertyFacing.trim() || undefined,
+        propertyAge: propertyAge.trim() || undefined,
+        floorNumber: floorNumber.trim() || undefined,
+        totalFloors: totalFloors ? Number(totalFloors) : undefined,
+
+        // Owner
         ownerName: ownerName.trim() || undefined,
         ownerPhone: ownerPhone.trim() || undefined,
         ownerEmail: ownerEmail.trim() || undefined,
+
+        // Agent
+        agentName: agentName.trim() || undefined,
+        agencyName: agencyName.trim() || undefined,
+        commissionTerms: commissionTerms.trim() || undefined,
+        alternateName: alternateName.trim() || undefined,
+        alternatePhone: alternatePhone.trim() || undefined,
+        alternateEmail: alternateEmail.trim() || undefined,
+
+        // Documents
+        ownershipTitleVerified: ownershipTitleVerified.trim() || undefined,
+        encumbranceCertificate: encumbranceCertificate.trim() || undefined,
+        rentalAgreementDraft: rentalAgreementDraft.trim() || undefined,
+        tslrFmb: tslrFmb.trim() || undefined,
+        taxReceipt: taxReceipt.trim() || undefined,
+        ebReceipt: ebReceipt.trim() || undefined,
+        pattaChitta: pattaChitta.trim() || undefined,
+        approvals: approvals.trim() || undefined,
+        financeFacing: financeFacing.trim() || undefined,
+        hypothecation: hypothecation.trim() || undefined,
+        deviation: deviation.trim() || undefined,
+
+        // Market Analysis
+        comparativePrice: comparativePrice.trim() || undefined,
+        rentalYield: rentalYield.trim() || undefined,
+        marketPrice: marketPrice.trim() || undefined,
+        demandArea: demandArea.trim() || undefined,
+        remark: remark.trim() || undefined,
+
+        // Description
         description: description.trim() || undefined,
+
+        // Images
         imageUrls: uploadedImages.map((img, idx) => ({
           imageUrl: img.imageUrl,
           imageKey: "",
           isPrimary: idx === 0,
         })),
+
+        // Attachments
+        attachment1: attachment1.trim() || undefined,
+        attachment2: attachment2.trim() || undefined,
+        attachment3: attachment3.trim() || undefined,
+        attachment4: attachment4.trim() || undefined,
+        attachment5: attachment5.trim() || undefined,
+        attachment6: attachment6.trim() || undefined,
       };
+
+      // Apartment / Villa / Individual Portion fields
+      if (["apartment", "villa", "individual_portion"].includes(propertyType)) {
+        Object.assign(payload, {
+          unitType: unitType.trim() || undefined,
+          unitNumber: unitNumber.trim() || undefined,
+          numberOfFlats: numberOfFlats ? Number(numberOfFlats) : undefined,
+          towerNos: towerNos ? Number(towerNos) : undefined,
+          builtUpArea: builtUpArea ? Number(builtUpArea) : undefined,
+          carpetArea: carpetArea ? Number(carpetArea) : undefined,
+          superBuiltUpArea: superBuiltUpArea ? Number(superBuiltUpArea) : undefined,
+          udsArea: udsArea ? Number(udsArea) : undefined,
+          plotArea: plotArea.trim() || undefined,
+          balconies: balconies ? Number(balconies) : undefined,
+          poojaRoom,
+          studyRoom,
+          architecturalStyle: architecturalStyle.trim() || undefined,
+          availablePortion: availablePortion.trim() || undefined,
+          amenities: amenities.trim() || undefined,
+          outdoorSpaces: outdoorSpaces.trim() || undefined,
+          utilitiesProvided: utilitiesProvided.trim() || undefined,
+          neighborhoodHighlights: neighborhoodHighlights.trim() || undefined,
+          communityFacilities: communityFacilities.trim() || undefined,
+        });
+      }
+
+      // Plot / Farmland fields
+      if (["plot", "farmland"].includes(propertyType)) {
+        Object.assign(payload, {
+          plotSizeCents: plotSizeCents ? Number(plotSizeCents) : undefined,
+          plotNos: plotNos ? Number(plotNos) : undefined,
+          zoning: zoning.trim() || undefined,
+          plotType: plotType.trim() || undefined,
+          sfNumber: sfNumber.trim() || undefined,
+          landType: landType.trim() || undefined,
+          topography: topography.trim() || undefined,
+          soilType: soilType.trim() || undefined,
+          irrigation: irrigation.trim() || undefined,
+          fencing: fencing.trim() || undefined,
+          waterSources: waterSources.trim() || undefined,
+          boundaryWall,
+          plotLength: plotLength ? Number(plotLength) : undefined,
+          plotWidth: plotWidth ? Number(plotWidth) : undefined,
+        });
+
+        if (propertyType === "farmland") {
+          Object.assign(payload, {
+            cropSuitability: cropSuitability.trim() || undefined,
+            existingPlantation: existingPlantation.trim() || undefined,
+            boreWell,
+            storageTank,
+          });
+        }
+      }
+
+      // Commercial fields
+      if (propertyType === "commercial") {
+        Object.assign(payload, {
+          propertyUse: propertyUse.trim() || undefined,
+          noOfLifts: noOfLifts ? Number(noOfLifts) : undefined,
+          dimension: dimension.trim() || undefined,
+          frontage: frontage.trim() || undefined,
+          carParking: carParking ? Number(carParking) : undefined,
+          bikeParking: bikeParking ? Number(bikeParking) : undefined,
+          outsideParking,
+          visitorsParking: visitorsParking.trim() || undefined,
+          fireSafety,
+          ceilingHeightFt: ceilingHeightFt ? Number(ceilingHeightFt) : undefined,
+          electricityConnection: electricityConnection.trim() || undefined,
+          powerBackup,
+          hasCentralAc,
+          hasPantry,
+          conferenceRoom: conferenceRoom ? Number(conferenceRoom) : undefined,
+          seater: seater ? Number(seater) : undefined,
+          tenantMix: tenantMix.trim() || undefined,
+          amenities: commercialAmenities.trim() || undefined,
+        });
+      }
+
+      // Coworking fields
+      if (propertyType === "coworking") {
+        Object.assign(payload, {
+          availableWorkstations: availableWorkstations ? Number(availableWorkstations) : undefined,
+          privateCabins: privateCabins ? Number(privateCabins) : undefined,
+          meetingRooms: meetingRooms ? Number(meetingRooms) : undefined,
+          minSeats: minSeats ? Number(minSeats) : undefined,
+          rentPerSeat: rentPerSeat ? Number(rentPerSeat) : undefined,
+          advanceRent: advanceRent ? Number(advanceRent) : undefined,
+          leaseTerm: leaseTerm.trim() || undefined,
+          incrementalRent: incrementalRent.trim() || undefined,
+          electricityCharges: electricityCharges.trim() || undefined,
+          highSpeedWifi,
+          airConditioning,
+          cctvSurveillance,
+          powerBackup: coworkingPowerBackup,
+          elevatorAccess,
+          hasPantry: coworkingHasPantry,
+          securityStaff,
+          furnitureProvided: furnitureProvided.trim() || undefined,
+          accessibility: accessibility.trim() || undefined,
+        });
+      }
+
+      // Industrial fields
+      if (propertyType === "industrial") {
+        Object.assign(payload, {
+          buildingType: buildingType.trim() || undefined,
+          propertyUse: industrialPropertyUse.trim() || undefined,
+          coveredArea: coveredArea ? Number(coveredArea) : undefined,
+          openArea: openArea ? Number(openArea) : undefined,
+          ceilingHeightFt: industrialCeilingHeight ? Number(industrialCeilingHeight) : undefined,
+          floorType: floorType.trim() || undefined,
+          numberOfBays: numberOfBays ? Number(numberOfBays) : undefined,
+          numberOfCabins: numberOfCabins ? Number(numberOfCabins) : undefined,
+          powerSupplyHp: powerSupplyHp ? Number(powerSupplyHp) : undefined,
+          waterSupply: waterSupply.trim() || undefined,
+          truckParking: truckParking ? Number(truckParking) : undefined,
+          carParking: industrialCarParking ? Number(industrialCarParking) : undefined,
+          bikeParking: industrialBikeParking ? Number(industrialBikeParking) : undefined,
+          fireSafety: industrialFireSafety,
+          loadingBays: loadingBays ? Number(loadingBays) : undefined,
+          warehouseRacks: warehouseRacks ? Number(warehouseRacks) : undefined,
+          truckTrailerAccess,
+          craneAvailable,
+          workerFacilities: workerFacilities.trim() || undefined,
+          nearestHighway: nearestHighway.trim() || undefined,
+          nearestRailway: nearestRailway.trim() || undefined,
+          nearestPort: nearestPort.trim() || undefined,
+          nearestAirport: nearestAirport.trim() || undefined,
+          labourAvailability: labourAvailability.trim() || undefined,
+          powerBackup: industrialPowerBackup,
+          heavyVehicleAccess,
+        });
+      }
 
       // Remove undefined fields
       Object.keys(payload).forEach((k) => {
@@ -332,23 +734,19 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
             {/* Title */}
             <div className="space-y-2 lg:col-span-3">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Title *
-              </label>
+              <label className={labelClass}>Title *</label>
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. 3 BHK Apartment in Anna Nagar"
                 required
-                className="h-12 rounded-xl bg-muted/30"
+                className={inputClass}
               />
             </div>
 
             {/* Listing Type */}
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Listing Type *
-              </label>
+              <label className={labelClass}>Listing Type *</label>
               <div className="flex gap-2">
                 {(["Buy", "Rent"] as const).map((type) => (
                   <button
@@ -369,9 +767,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
             {/* Property Type */}
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Property Type *
-              </label>
+              <label className={labelClass}>Property Type *</label>
               <FormSelect
                 name="propertyType"
                 placeholder="Select Type"
@@ -384,9 +780,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
             {/* Status */}
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Status
-              </label>
+              <label className={labelClass}>Status</label>
               <FormSelect
                 name="status"
                 placeholder="Select Status"
@@ -395,19 +789,83 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 onValueChange={setStatus}
               />
             </div>
+
+            {/* Transaction Type */}
+            <div className="space-y-2">
+              <label className={labelClass}>Transaction Type</label>
+              <Input
+                value={transactionType}
+                onChange={(e) => setTransactionType(e.target.value)}
+                placeholder="e.g. RESALE TENANT OCCUPIED"
+                className={inputClass}
+              />
+            </div>
+
+            {/* Handover Date */}
+            <div className="space-y-2">
+              <label className={labelClass}>Handover Date</label>
+              <Input
+                value={handoverDate}
+                onChange={(e) => setHandoverDate(e.target.value)}
+                placeholder="e.g. Jan 2025"
+                className={inputClass}
+              />
+            </div>
+
+            {/* Sale Type */}
+            <div className="space-y-2">
+              <label className={labelClass}>Sale Type (Full/Partial)</label>
+              <Input
+                value={saleType}
+                onChange={(e) => setSaleType(e.target.value)}
+                placeholder="e.g. Full"
+                className={inputClass}
+              />
+            </div>
+
+            {/* Road Access */}
+            <div className="space-y-2">
+              <label className={labelClass}>Road Access</label>
+              <Input
+                value={roadAccess}
+                onChange={(e) => setRoadAccess(e.target.value)}
+                placeholder="e.g. 30 FT"
+                className={inputClass}
+              />
+            </div>
+
+            {/* Road Name */}
+            <div className="space-y-2">
+              <label className={labelClass}>Road Name</label>
+              <Input
+                value={roadName}
+                onChange={(e) => setRoadName(e.target.value)}
+                placeholder="Road Name"
+                className={inputClass}
+              />
+            </div>
+
+            {/* Tenant Occupied */}
+            <div className="space-y-2">
+              <label className={labelClass}>Tenant Occupied</label>
+              <Input
+                value={tenantOccupied}
+                onChange={(e) => setTenantOccupied(e.target.value)}
+                placeholder="e.g. Yes / No"
+                className={inputClass}
+              />
+            </div>
           </div>
         </div>
 
         {/* ---- Pricing ---- */}
         <div className="bg-card border rounded-2xl p-8 shadow-sm">
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Pricing</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
             {/* Price */}
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Price *
-              </label>
+              <label className={labelClass}>Price *</label>
               <Input
                 type="number"
                 value={price}
@@ -415,28 +873,126 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 placeholder="e.g. 5000000"
                 required
                 min={0}
-                className="h-12 rounded-xl bg-muted/30"
+                className={inputClass}
               />
             </div>
 
             {/* Negotiable */}
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Negotiable
-              </label>
-              <div className="flex items-center space-x-3 bg-muted/10 border border-border/40 p-4 h-12 rounded-xl transition-colors hover:bg-muted/30">
+              <label className={labelClass}>Negotiable</label>
+              <div className={checkboxRowClass}>
                 <Checkbox
                   id="negotiable"
                   checked={negotiable}
                   onCheckedChange={(checked) => setNegotiable(!!checked)}
                 />
-                <label
-                  htmlFor="negotiable"
-                  className="text-sm font-semibold cursor-pointer flex-1"
-                >
+                <label htmlFor="negotiable" className="text-sm font-semibold cursor-pointer flex-1">
                   Price is negotiable
                 </label>
               </div>
+            </div>
+
+            {/* Expected Sale Price */}
+            <div className="space-y-2">
+              <label className={labelClass}>Expected Sale Price</label>
+              <Input
+                type="number"
+                value={expectedSalePrice}
+                onChange={(e) => setExpectedSalePrice(e.target.value)}
+                placeholder="e.g. 5500000"
+                min={0}
+                className={inputClass}
+              />
+            </div>
+
+            {/* Monthly Rent */}
+            <div className="space-y-2">
+              <label className={labelClass}>Monthly Rent</label>
+              <Input
+                type="number"
+                value={monthlyRent}
+                onChange={(e) => setMonthlyRent(e.target.value)}
+                placeholder="e.g. 25000"
+                min={0}
+                className={inputClass}
+              />
+            </div>
+
+            {/* Maintenance Charges */}
+            <div className="space-y-2">
+              <label className={labelClass}>Maintenance Charges</label>
+              <Input
+                value={maintenanceCharges}
+                onChange={(e) => setMaintenanceCharges(e.target.value)}
+                placeholder="e.g. 2000/month"
+                className={inputClass}
+              />
+            </div>
+
+            {/* Security Deposit */}
+            <div className="space-y-2">
+              <label className={labelClass}>Security Deposit</label>
+              <Input
+                value={securityDeposit}
+                onChange={(e) => setSecurityDeposit(e.target.value)}
+                placeholder="e.g. 3 months"
+                className={inputClass}
+              />
+            </div>
+
+            {/* Lock In Period */}
+            <div className="space-y-2">
+              <label className={labelClass}>Lock In Period</label>
+              <Input
+                value={lockInPeriod}
+                onChange={(e) => setLockInPeriod(e.target.value)}
+                placeholder="e.g. 11 months"
+                className={inputClass}
+              />
+            </div>
+
+            {/* Taxes */}
+            <div className="space-y-2">
+              <label className={labelClass}>Taxes</label>
+              <Input
+                value={taxes}
+                onChange={(e) => setTaxes(e.target.value)}
+                placeholder="e.g. GST applicable"
+                className={inputClass}
+              />
+            </div>
+
+            {/* Registration Charge */}
+            <div className="space-y-2">
+              <label className={labelClass}>Registration Charge</label>
+              <Input
+                value={registrationCharge}
+                onChange={(e) => setRegistrationCharge(e.target.value)}
+                placeholder="e.g. 1%"
+                className={inputClass}
+              />
+            </div>
+
+            {/* Mode of Payment */}
+            <div className="space-y-2">
+              <label className={labelClass}>Mode of Payment</label>
+              <Input
+                value={modeOfPayment}
+                onChange={(e) => setModeOfPayment(e.target.value)}
+                placeholder="e.g. Bank Transfer"
+                className={inputClass}
+              />
+            </div>
+
+            {/* Time for Registration */}
+            <div className="space-y-2">
+              <label className={labelClass}>Time for Registration</label>
+              <Input
+                value={timeForRegistration}
+                onChange={(e) => setTimeForRegistration(e.target.value)}
+                placeholder="e.g. 30 days"
+                className={inputClass}
+              />
             </div>
           </div>
         </div>
@@ -444,13 +1000,11 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         {/* ---- Location ---- */}
         <div className="bg-card border rounded-2xl p-8 shadow-sm">
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Location</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
             {/* City */}
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                City
-              </label>
+              <label className={labelClass}>City</label>
               <FormSelect
                 name="cityId"
                 placeholder="Select City"
@@ -465,9 +1019,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
             {/* Locality */}
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Locality
-              </label>
+              <label className={labelClass}>Locality</label>
               <FormSelect
                 name="sublocationId"
                 placeholder={cityId ? "Select Locality" : "Select a city first"}
@@ -480,60 +1032,1372 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 disabled={!cityId || filteredSublocations.length === 0}
               />
             </div>
+
+            {/* Full Address */}
+            <div className="space-y-2 lg:col-span-3">
+              <label className={labelClass}>Full Address</label>
+              <Textarea
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Full property address"
+                rows={3}
+                className="rounded-xl bg-muted/30 resize-none"
+              />
+            </div>
+
+            {/* Latitude */}
+            <div className="space-y-2">
+              <label className={labelClass}>Latitude</label>
+              <Input
+                value={latitude}
+                onChange={(e) => setLatitude(e.target.value)}
+                placeholder="e.g. 13.0827"
+                className={inputClass}
+              />
+            </div>
+
+            {/* Longitude */}
+            <div className="space-y-2">
+              <label className={labelClass}>Longitude</label>
+              <Input
+                value={longitude}
+                onChange={(e) => setLongitude(e.target.value)}
+                placeholder="e.g. 80.2707"
+                className={inputClass}
+              />
+            </div>
           </div>
         </div>
 
         {/* ---- Details ---- */}
         <div className="bg-card border rounded-2xl p-8 shadow-sm">
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Details</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
             {/* Bedrooms */}
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Bedrooms
-              </label>
+              <label className={labelClass}>Bedrooms</label>
               <Input
                 type="number"
                 value={bedrooms}
                 onChange={(e) => setBedrooms(e.target.value)}
                 placeholder="e.g. 3"
                 min={0}
-                className="h-12 rounded-xl bg-muted/30"
+                className={inputClass}
               />
             </div>
 
             {/* Bathrooms */}
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Bathrooms
-              </label>
+              <label className={labelClass}>Bathrooms</label>
               <Input
                 type="number"
                 value={bathrooms}
                 onChange={(e) => setBathrooms(e.target.value)}
                 placeholder="e.g. 2"
                 min={0}
-                className="h-12 rounded-xl bg-muted/30"
+                className={inputClass}
               />
             </div>
 
             {/* Area */}
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Area (sq ft)
-              </label>
+              <label className={labelClass}>Area (sq ft)</label>
               <Input
                 type="number"
                 value={areaSqft}
                 onChange={(e) => setAreaSqft(e.target.value)}
                 placeholder="e.g. 1200"
                 min={0}
-                className="h-12 rounded-xl bg-muted/30"
+                className={inputClass}
+              />
+            </div>
+
+            {/* Furnishing Status */}
+            <div className="space-y-2">
+              <label className={labelClass}>Furnishing Status</label>
+              <FormSelect
+                name="furnishingStatus"
+                placeholder="Select Furnishing"
+                options={FURNISHING_STATUS_OPTIONS}
+                value={furnishingStatus || null}
+                onValueChange={setFurnishingStatus}
+              />
+            </div>
+
+            {/* Furnished (boolean kept for backward compat) */}
+            <div className="space-y-2">
+              <label className={labelClass}>Furnished</label>
+              <div className={checkboxRowClass}>
+                <Checkbox
+                  id="furnished"
+                  checked={furnished}
+                  onCheckedChange={(checked) => setFurnished(!!checked)}
+                />
+                <label htmlFor="furnished" className="text-sm font-semibold cursor-pointer flex-1">
+                  Property is furnished
+                </label>
+              </div>
+            </div>
+
+            {/* Facing Direction */}
+            <div className="space-y-2">
+              <label className={labelClass}>Facing Direction</label>
+              <Input
+                value={propertyFacing}
+                onChange={(e) => setPropertyFacing(e.target.value)}
+                placeholder="e.g. East"
+                className={inputClass}
+              />
+            </div>
+
+            {/* Age of Property */}
+            <div className="space-y-2">
+              <label className={labelClass}>Age of Property</label>
+              <Input
+                value={propertyAge}
+                onChange={(e) => setPropertyAge(e.target.value)}
+                placeholder="e.g. 5 years"
+                className={inputClass}
+              />
+            </div>
+
+            {/* Floor Number */}
+            <div className="space-y-2">
+              <label className={labelClass}>Floor Number</label>
+              <Input
+                value={floorNumber}
+                onChange={(e) => setFloorNumber(e.target.value)}
+                placeholder="e.g. 4"
+                className={inputClass}
+              />
+            </div>
+
+            {/* Total Floors */}
+            <div className="space-y-2">
+              <label className={labelClass}>Total Floors</label>
+              <Input
+                type="number"
+                value={totalFloors}
+                onChange={(e) => setTotalFloors(e.target.value)}
+                placeholder="e.g. 12"
+                min={0}
+                className={inputClass}
               />
             </div>
           </div>
         </div>
+
+        {/* ---- Apartment / Villa / Individual House Details ---- */}
+        {["apartment", "villa", "individual_portion"].includes(propertyType) && (
+          <div className="bg-card border rounded-2xl p-8 shadow-sm">
+            <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+              Apartment / Villa Details
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+              <div className="space-y-2">
+                <label className={labelClass}>Unit Type (2BHK, 3BHK...)</label>
+                <Input
+                  value={unitType}
+                  onChange={(e) => setUnitType(e.target.value)}
+                  placeholder="e.g. 3BHK"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Unit Number</label>
+                <Input
+                  value={unitNumber}
+                  onChange={(e) => setUnitNumber(e.target.value)}
+                  placeholder="e.g. A-403"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Number of Flats</label>
+                <Input
+                  type="number"
+                  value={numberOfFlats}
+                  onChange={(e) => setNumberOfFlats(e.target.value)}
+                  placeholder="e.g. 120"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Tower Nos</label>
+                <Input
+                  type="number"
+                  value={towerNos}
+                  onChange={(e) => setTowerNos(e.target.value)}
+                  placeholder="e.g. 4"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Built Up Area (sqft)</label>
+                <Input
+                  type="number"
+                  value={builtUpArea}
+                  onChange={(e) => setBuiltUpArea(e.target.value)}
+                  placeholder="e.g. 1350"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Carpet Area (sqft)</label>
+                <Input
+                  type="number"
+                  value={carpetArea}
+                  onChange={(e) => setCarpetArea(e.target.value)}
+                  placeholder="e.g. 1100"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Super Built Up Area (sqft)</label>
+                <Input
+                  type="number"
+                  value={superBuiltUpArea}
+                  onChange={(e) => setSuperBuiltUpArea(e.target.value)}
+                  placeholder="e.g. 1500"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>UDS Area (sqft)</label>
+                <Input
+                  type="number"
+                  value={udsArea}
+                  onChange={(e) => setUdsArea(e.target.value)}
+                  placeholder="e.g. 200"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Plot Area</label>
+                <Input
+                  value={plotArea}
+                  onChange={(e) => setPlotArea(e.target.value)}
+                  placeholder="e.g. 2400 sqft"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Balconies</label>
+                <Input
+                  type="number"
+                  value={balconies}
+                  onChange={(e) => setBalconies(e.target.value)}
+                  placeholder="e.g. 2"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Pooja Room</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="poojaRoom"
+                    checked={poojaRoom}
+                    onCheckedChange={(checked) => setPoojaRoom(!!checked)}
+                  />
+                  <label htmlFor="poojaRoom" className="text-sm font-semibold cursor-pointer flex-1">
+                    Has Pooja Room
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Study/Store Room</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="studyRoom"
+                    checked={studyRoom}
+                    onCheckedChange={(checked) => setStudyRoom(!!checked)}
+                  />
+                  <label htmlFor="studyRoom" className="text-sm font-semibold cursor-pointer flex-1">
+                    Has Study / Store Room
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Architectural Style</label>
+                <Input
+                  value={architecturalStyle}
+                  onChange={(e) => setArchitecturalStyle(e.target.value)}
+                  placeholder="e.g. Contemporary"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Available Portion</label>
+                <Input
+                  value={availablePortion}
+                  onChange={(e) => setAvailablePortion(e.target.value)}
+                  placeholder="e.g. Ground Floor"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Outdoor Spaces</label>
+                <Input
+                  value={outdoorSpaces}
+                  onChange={(e) => setOutdoorSpaces(e.target.value)}
+                  placeholder="e.g. Terrace, Garden"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Utilities Provided</label>
+                <Input
+                  value={utilitiesProvided}
+                  onChange={(e) => setUtilitiesProvided(e.target.value)}
+                  placeholder="e.g. Water, Electricity"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Neighborhood Highlights</label>
+                <Input
+                  value={neighborhoodHighlights}
+                  onChange={(e) => setNeighborhoodHighlights(e.target.value)}
+                  placeholder="e.g. Near metro station"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Community Facilities</label>
+                <Input
+                  value={communityFacilities}
+                  onChange={(e) => setCommunityFacilities(e.target.value)}
+                  placeholder="e.g. Gym, Pool"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2 lg:col-span-3">
+                <label className={labelClass}>Amenities (comma separated)</label>
+                <Textarea
+                  value={amenities}
+                  onChange={(e) => setAmenities(e.target.value)}
+                  placeholder="e.g. Swimming Pool, Gym, Clubhouse"
+                  rows={3}
+                  className="rounded-xl bg-muted/30 resize-none"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ---- Plot / Farmland Details ---- */}
+        {["plot", "farmland"].includes(propertyType) && (
+          <div className="bg-card border rounded-2xl p-8 shadow-sm">
+            <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+              Plot / Farmland Details
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+              <div className="space-y-2">
+                <label className={labelClass}>Plot Size (Cents)</label>
+                <Input
+                  type="number"
+                  value={plotSizeCents}
+                  onChange={(e) => setPlotSizeCents(e.target.value)}
+                  placeholder="e.g. 10"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Plot Nos</label>
+                <Input
+                  type="number"
+                  value={plotNos}
+                  onChange={(e) => setPlotNos(e.target.value)}
+                  placeholder="e.g. 3"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Zoning / Usage</label>
+                <Input
+                  value={zoning}
+                  onChange={(e) => setZoning(e.target.value)}
+                  placeholder="e.g. Residential"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Plot Type</label>
+                <Input
+                  value={plotType}
+                  onChange={(e) => setPlotType(e.target.value)}
+                  placeholder="e.g. Corner Plot"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>SF Number</label>
+                <Input
+                  value={sfNumber}
+                  onChange={(e) => setSfNumber(e.target.value)}
+                  placeholder="Survey / SF Number"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Land Type</label>
+                <Input
+                  value={landType}
+                  onChange={(e) => setLandType(e.target.value)}
+                  placeholder="e.g. Dry Land"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Topography</label>
+                <Input
+                  value={topography}
+                  onChange={(e) => setTopography(e.target.value)}
+                  placeholder="e.g. Flat"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Soil Type</label>
+                <Input
+                  value={soilType}
+                  onChange={(e) => setSoilType(e.target.value)}
+                  placeholder="e.g. Red Soil"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Irrigation Facilities</label>
+                <Input
+                  value={irrigation}
+                  onChange={(e) => setIrrigation(e.target.value)}
+                  placeholder="e.g. Canal"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Fencing</label>
+                <Input
+                  value={fencing}
+                  onChange={(e) => setFencing(e.target.value)}
+                  placeholder="e.g. Compound Wall"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Water Sources</label>
+                <Input
+                  value={waterSources}
+                  onChange={(e) => setWaterSources(e.target.value)}
+                  placeholder="e.g. Bore well, Canal"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Plot Length</label>
+                <Input
+                  type="number"
+                  value={plotLength}
+                  onChange={(e) => setPlotLength(e.target.value)}
+                  placeholder="e.g. 60"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Plot Width</label>
+                <Input
+                  type="number"
+                  value={plotWidth}
+                  onChange={(e) => setPlotWidth(e.target.value)}
+                  placeholder="e.g. 40"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Boundary Wall</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="boundaryWall"
+                    checked={boundaryWall}
+                    onCheckedChange={(checked) => setBoundaryWall(!!checked)}
+                  />
+                  <label htmlFor="boundaryWall" className="text-sm font-semibold cursor-pointer flex-1">
+                    Has Boundary Wall
+                  </label>
+                </div>
+              </div>
+
+              {/* Farmland-only fields */}
+              {propertyType === "farmland" && (
+                <>
+                  <div className="space-y-2">
+                    <label className={labelClass}>Crop Suitability</label>
+                    <Input
+                      value={cropSuitability}
+                      onChange={(e) => setCropSuitability(e.target.value)}
+                      placeholder="e.g. Paddy, Sugarcane"
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className={labelClass}>Existing Plantation</label>
+                    <Input
+                      value={existingPlantation}
+                      onChange={(e) => setExistingPlantation(e.target.value)}
+                      placeholder="e.g. Mango trees"
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className={labelClass}>Bore Well</label>
+                    <div className={checkboxRowClass}>
+                      <Checkbox
+                        id="boreWell"
+                        checked={boreWell}
+                        onCheckedChange={(checked) => setBoreWell(!!checked)}
+                      />
+                      <label htmlFor="boreWell" className="text-sm font-semibold cursor-pointer flex-1">
+                        Has Bore Well
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className={labelClass}>Storage Tank</label>
+                    <div className={checkboxRowClass}>
+                      <Checkbox
+                        id="storageTank"
+                        checked={storageTank}
+                        onCheckedChange={(checked) => setStorageTank(!!checked)}
+                      />
+                      <label htmlFor="storageTank" className="text-sm font-semibold cursor-pointer flex-1">
+                        Has Storage Tank
+                      </label>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ---- Commercial Space Details ---- */}
+        {propertyType === "commercial" && (
+          <div className="bg-card border rounded-2xl p-8 shadow-sm">
+            <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+              Commercial Space Details
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+              <div className="space-y-2">
+                <label className={labelClass}>Property Use (Office/Retail...)</label>
+                <Input
+                  value={propertyUse}
+                  onChange={(e) => setPropertyUse(e.target.value)}
+                  placeholder="e.g. Office"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>No of Lifts</label>
+                <Input
+                  type="number"
+                  value={noOfLifts}
+                  onChange={(e) => setNoOfLifts(e.target.value)}
+                  placeholder="e.g. 2"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Dimension</label>
+                <Input
+                  value={dimension}
+                  onChange={(e) => setDimension(e.target.value)}
+                  placeholder="e.g. 40x60"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Frontage</label>
+                <Input
+                  value={frontage}
+                  onChange={(e) => setFrontage(e.target.value)}
+                  placeholder="e.g. 30 ft"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Car Parking</label>
+                <Input
+                  type="number"
+                  value={carParking}
+                  onChange={(e) => setCarParking(e.target.value)}
+                  placeholder="e.g. 10"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Bike Parking</label>
+                <Input
+                  type="number"
+                  value={bikeParking}
+                  onChange={(e) => setBikeParking(e.target.value)}
+                  placeholder="e.g. 20"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Visitors Parking</label>
+                <Input
+                  value={visitorsParking}
+                  onChange={(e) => setVisitorsParking(e.target.value)}
+                  placeholder="e.g. Available"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Ceiling Height (ft)</label>
+                <Input
+                  type="number"
+                  value={ceilingHeightFt}
+                  onChange={(e) => setCeilingHeightFt(e.target.value)}
+                  placeholder="e.g. 12"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Electricity</label>
+                <Input
+                  value={electricityConnection}
+                  onChange={(e) => setElectricityConnection(e.target.value)}
+                  placeholder="e.g. 3 Phase"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Conference Room</label>
+                <Input
+                  type="number"
+                  value={conferenceRoom}
+                  onChange={(e) => setConferenceRoom(e.target.value)}
+                  placeholder="e.g. 2"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Seater</label>
+                <Input
+                  type="number"
+                  value={seater}
+                  onChange={(e) => setSeater(e.target.value)}
+                  placeholder="e.g. 50"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Tenant Mix</label>
+                <Input
+                  value={tenantMix}
+                  onChange={(e) => setTenantMix(e.target.value)}
+                  placeholder="e.g. IT, Retail"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Outside Parking</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="outsideParking"
+                    checked={outsideParking}
+                    onCheckedChange={(checked) => setOutsideParking(!!checked)}
+                  />
+                  <label htmlFor="outsideParking" className="text-sm font-semibold cursor-pointer flex-1">
+                    Outside Parking Available
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Fire Safety Compliance</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="fireSafety"
+                    checked={fireSafety}
+                    onCheckedChange={(checked) => setFireSafety(!!checked)}
+                  />
+                  <label htmlFor="fireSafety" className="text-sm font-semibold cursor-pointer flex-1">
+                    Fire Safety Compliant
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Power Backup</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="powerBackup"
+                    checked={powerBackup}
+                    onCheckedChange={(checked) => setPowerBackup(!!checked)}
+                  />
+                  <label htmlFor="powerBackup" className="text-sm font-semibold cursor-pointer flex-1">
+                    Power Backup Available
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Air Conditioning</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="hasCentralAc"
+                    checked={hasCentralAc}
+                    onCheckedChange={(checked) => setHasCentralAc(!!checked)}
+                  />
+                  <label htmlFor="hasCentralAc" className="text-sm font-semibold cursor-pointer flex-1">
+                    Has Air Conditioning
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Pantry</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="hasPantry"
+                    checked={hasPantry}
+                    onCheckedChange={(checked) => setHasPantry(!!checked)}
+                  />
+                  <label htmlFor="hasPantry" className="text-sm font-semibold cursor-pointer flex-1">
+                    Has Pantry
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2 lg:col-span-3">
+                <label className={labelClass}>Amenities</label>
+                <Textarea
+                  value={commercialAmenities}
+                  onChange={(e) => setCommercialAmenities(e.target.value)}
+                  placeholder="e.g. Reception, Cafeteria, Gym"
+                  rows={3}
+                  className="rounded-xl bg-muted/30 resize-none"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ---- Coworking Details ---- */}
+        {propertyType === "coworking" && (
+          <div className="bg-card border rounded-2xl p-8 shadow-sm">
+            <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+              Coworking Details
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+              <div className="space-y-2">
+                <label className={labelClass}>Available Workstations</label>
+                <Input
+                  type="number"
+                  value={availableWorkstations}
+                  onChange={(e) => setAvailableWorkstations(e.target.value)}
+                  placeholder="e.g. 50"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Private Cabins</label>
+                <Input
+                  type="number"
+                  value={privateCabins}
+                  onChange={(e) => setPrivateCabins(e.target.value)}
+                  placeholder="e.g. 5"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Available Meeting Rooms</label>
+                <Input
+                  type="number"
+                  value={meetingRooms}
+                  onChange={(e) => setMeetingRooms(e.target.value)}
+                  placeholder="e.g. 3"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Min Seats</label>
+                <Input
+                  type="number"
+                  value={minSeats}
+                  onChange={(e) => setMinSeats(e.target.value)}
+                  placeholder="e.g. 1"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Rent per Seat</label>
+                <Input
+                  type="number"
+                  value={rentPerSeat}
+                  onChange={(e) => setRentPerSeat(e.target.value)}
+                  placeholder="e.g. 8000"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Advance Rent</label>
+                <Input
+                  type="number"
+                  value={advanceRent}
+                  onChange={(e) => setAdvanceRent(e.target.value)}
+                  placeholder="e.g. 2 months"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Lease Term</label>
+                <Input
+                  value={leaseTerm}
+                  onChange={(e) => setLeaseTerm(e.target.value)}
+                  placeholder="e.g. Month-to-month"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Incremental Rent Clause</label>
+                <Input
+                  value={incrementalRent}
+                  onChange={(e) => setIncrementalRent(e.target.value)}
+                  placeholder="e.g. 5% per year"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Electricity Charges</label>
+                <Input
+                  value={electricityCharges}
+                  onChange={(e) => setElectricityCharges(e.target.value)}
+                  placeholder="e.g. Included"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>High Speed Wifi</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="highSpeedWifi"
+                    checked={highSpeedWifi}
+                    onCheckedChange={(checked) => setHighSpeedWifi(!!checked)}
+                  />
+                  <label htmlFor="highSpeedWifi" className="text-sm font-semibold cursor-pointer flex-1">
+                    High Speed Wifi
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Air Conditioning</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="airConditioning"
+                    checked={airConditioning}
+                    onCheckedChange={(checked) => setAirConditioning(!!checked)}
+                  />
+                  <label htmlFor="airConditioning" className="text-sm font-semibold cursor-pointer flex-1">
+                    Air Conditioning
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>CCTV Surveillance</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="cctvSurveillance"
+                    checked={cctvSurveillance}
+                    onCheckedChange={(checked) => setCctvSurveillance(!!checked)}
+                  />
+                  <label htmlFor="cctvSurveillance" className="text-sm font-semibold cursor-pointer flex-1">
+                    CCTV Surveillance
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Power Backup</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="coworkingPowerBackup"
+                    checked={coworkingPowerBackup}
+                    onCheckedChange={(checked) => setCoworkingPowerBackup(!!checked)}
+                  />
+                  <label htmlFor="coworkingPowerBackup" className="text-sm font-semibold cursor-pointer flex-1">
+                    Power Backup
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Elevator Access</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="elevatorAccess"
+                    checked={elevatorAccess}
+                    onCheckedChange={(checked) => setElevatorAccess(!!checked)}
+                  />
+                  <label htmlFor="elevatorAccess" className="text-sm font-semibold cursor-pointer flex-1">
+                    Elevator Access
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Pantry</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="coworkingHasPantry"
+                    checked={coworkingHasPantry}
+                    onCheckedChange={(checked) => setCoworkingHasPantry(!!checked)}
+                  />
+                  <label htmlFor="coworkingHasPantry" className="text-sm font-semibold cursor-pointer flex-1">
+                    Has Pantry
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Security Staff</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="securityStaff"
+                    checked={securityStaff}
+                    onCheckedChange={(checked) => setSecurityStaff(!!checked)}
+                  />
+                  <label htmlFor="securityStaff" className="text-sm font-semibold cursor-pointer flex-1">
+                    Security Staff Present
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2 lg:col-span-3">
+                <label className={labelClass}>Furniture Provided</label>
+                <Textarea
+                  value={furnitureProvided}
+                  onChange={(e) => setFurnitureProvided(e.target.value)}
+                  placeholder="e.g. Desks, Chairs, Lockers"
+                  rows={3}
+                  className="rounded-xl bg-muted/30 resize-none"
+                />
+              </div>
+
+              <div className="space-y-2 lg:col-span-3">
+                <label className={labelClass}>Accessibility</label>
+                <Textarea
+                  value={accessibility}
+                  onChange={(e) => setAccessibility(e.target.value)}
+                  placeholder="e.g. Wheelchair accessible, Near metro"
+                  rows={3}
+                  className="rounded-xl bg-muted/30 resize-none"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ---- Industrial Details ---- */}
+        {propertyType === "industrial" && (
+          <div className="bg-card border rounded-2xl p-8 shadow-sm">
+            <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+              Industrial Details
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+              <div className="space-y-2">
+                <label className={labelClass}>Building Type</label>
+                <Input
+                  value={buildingType}
+                  onChange={(e) => setBuildingType(e.target.value)}
+                  placeholder="e.g. Warehouse"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Property Use</label>
+                <Input
+                  value={industrialPropertyUse}
+                  onChange={(e) => setIndustrialPropertyUse(e.target.value)}
+                  placeholder="e.g. Manufacturing"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Covered Area (sqft)</label>
+                <Input
+                  type="number"
+                  value={coveredArea}
+                  onChange={(e) => setCoveredArea(e.target.value)}
+                  placeholder="e.g. 10000"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Open Area</label>
+                <Input
+                  type="number"
+                  value={openArea}
+                  onChange={(e) => setOpenArea(e.target.value)}
+                  placeholder="e.g. 5000"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Ceiling Height (ft)</label>
+                <Input
+                  type="number"
+                  value={industrialCeilingHeight}
+                  onChange={(e) => setIndustrialCeilingHeight(e.target.value)}
+                  placeholder="e.g. 20"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Floor Type</label>
+                <Input
+                  value={floorType}
+                  onChange={(e) => setFloorType(e.target.value)}
+                  placeholder="e.g. Epoxy Coated"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Number of Bays</label>
+                <Input
+                  type="number"
+                  value={numberOfBays}
+                  onChange={(e) => setNumberOfBays(e.target.value)}
+                  placeholder="e.g. 4"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Number of Cabins</label>
+                <Input
+                  type="number"
+                  value={numberOfCabins}
+                  onChange={(e) => setNumberOfCabins(e.target.value)}
+                  placeholder="e.g. 6"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Power Supply (HP)</label>
+                <Input
+                  type="number"
+                  value={powerSupplyHp}
+                  onChange={(e) => setPowerSupplyHp(e.target.value)}
+                  placeholder="e.g. 100"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Water Supply</label>
+                <Input
+                  value={waterSupply}
+                  onChange={(e) => setWaterSupply(e.target.value)}
+                  placeholder="e.g. Municipal + Bore Well"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Truck Parking</label>
+                <Input
+                  type="number"
+                  value={truckParking}
+                  onChange={(e) => setTruckParking(e.target.value)}
+                  placeholder="e.g. 5"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Car Parking</label>
+                <Input
+                  type="number"
+                  value={industrialCarParking}
+                  onChange={(e) => setIndustrialCarParking(e.target.value)}
+                  placeholder="e.g. 20"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Bike Parking</label>
+                <Input
+                  type="number"
+                  value={industrialBikeParking}
+                  onChange={(e) => setIndustrialBikeParking(e.target.value)}
+                  placeholder="e.g. 30"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Loading/Unloading Bays</label>
+                <Input
+                  type="number"
+                  value={loadingBays}
+                  onChange={(e) => setLoadingBays(e.target.value)}
+                  placeholder="e.g. 3"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Warehouse Racks</label>
+                <Input
+                  type="number"
+                  value={warehouseRacks}
+                  onChange={(e) => setWarehouseRacks(e.target.value)}
+                  placeholder="e.g. 20"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Nearest Highway</label>
+                <Input
+                  value={nearestHighway}
+                  onChange={(e) => setNearestHighway(e.target.value)}
+                  placeholder="e.g. NH 44"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Nearest Railway</label>
+                <Input
+                  value={nearestRailway}
+                  onChange={(e) => setNearestRailway(e.target.value)}
+                  placeholder="e.g. 5 km"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Nearest Port</label>
+                <Input
+                  value={nearestPort}
+                  onChange={(e) => setNearestPort(e.target.value)}
+                  placeholder="e.g. Chennai Port - 30 km"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Nearest Airport</label>
+                <Input
+                  value={nearestAirport}
+                  onChange={(e) => setNearestAirport(e.target.value)}
+                  placeholder="e.g. 20 km"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Labour Availability</label>
+                <Input
+                  value={labourAvailability}
+                  onChange={(e) => setLabourAvailability(e.target.value)}
+                  placeholder="e.g. Skilled / Unskilled"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Fire Safety Compliance</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="industrialFireSafety"
+                    checked={industrialFireSafety}
+                    onCheckedChange={(checked) => setIndustrialFireSafety(!!checked)}
+                  />
+                  <label htmlFor="industrialFireSafety" className="text-sm font-semibold cursor-pointer flex-1">
+                    Fire Safety Compliant
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Truck/Trailer Access</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="truckTrailerAccess"
+                    checked={truckTrailerAccess}
+                    onCheckedChange={(checked) => setTruckTrailerAccess(!!checked)}
+                  />
+                  <label htmlFor="truckTrailerAccess" className="text-sm font-semibold cursor-pointer flex-1">
+                    Truck / Trailer Access
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Crane Available</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="craneAvailable"
+                    checked={craneAvailable}
+                    onCheckedChange={(checked) => setCraneAvailable(!!checked)}
+                  />
+                  <label htmlFor="craneAvailable" className="text-sm font-semibold cursor-pointer flex-1">
+                    Crane Available
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Power Backup</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="industrialPowerBackup"
+                    checked={industrialPowerBackup}
+                    onCheckedChange={(checked) => setIndustrialPowerBackup(!!checked)}
+                  />
+                  <label htmlFor="industrialPowerBackup" className="text-sm font-semibold cursor-pointer flex-1">
+                    Power Backup Available
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Heavy Vehicle Access</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="heavyVehicleAccess"
+                    checked={heavyVehicleAccess}
+                    onCheckedChange={(checked) => setHeavyVehicleAccess(!!checked)}
+                  />
+                  <label htmlFor="heavyVehicleAccess" className="text-sm font-semibold cursor-pointer flex-1">
+                    Heavy Vehicle Access
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2 lg:col-span-3">
+                <label className={labelClass}>Worker Facilities</label>
+                <Textarea
+                  value={workerFacilities}
+                  onChange={(e) => setWorkerFacilities(e.target.value)}
+                  placeholder="e.g. Canteen, Restrooms, First Aid"
+                  rows={3}
+                  className="rounded-xl bg-muted/30 resize-none"
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ---- Owner ---- */}
         <div className="bg-card border rounded-2xl p-8 shadow-sm">
@@ -541,39 +2405,280 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Owner Name
-              </label>
+              <label className={labelClass}>Owner Name</label>
               <Input
                 value={ownerName}
                 onChange={(e) => setOwnerName(e.target.value)}
                 placeholder="John Doe"
-                className="h-12 rounded-xl bg-muted/30"
+                className={inputClass}
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Owner Phone
-              </label>
+              <label className={labelClass}>Owner Phone</label>
               <Input
                 value={ownerPhone}
                 onChange={(e) => setOwnerPhone(e.target.value)}
                 placeholder="+91 98765 43210"
-                className="h-12 rounded-xl bg-muted/30"
+                className={inputClass}
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Owner Email
-              </label>
+              <label className={labelClass}>Owner Email</label>
               <Input
                 type="email"
                 value={ownerEmail}
                 onChange={(e) => setOwnerEmail(e.target.value)}
                 placeholder="owner@email.com"
-                className="h-12 rounded-xl bg-muted/30"
+                className={inputClass}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* ---- Agent ---- */}
+        <div className="bg-card border rounded-2xl p-8 shadow-sm">
+          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Agent</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+            <div className="space-y-2">
+              <label className={labelClass}>Agent Name</label>
+              <Input
+                value={agentName}
+                onChange={(e) => setAgentName(e.target.value)}
+                placeholder="Agent Name"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className={labelClass}>Agency Name</label>
+              <Input
+                value={agencyName}
+                onChange={(e) => setAgencyName(e.target.value)}
+                placeholder="Agency Name"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className={labelClass}>Commission Terms</label>
+              <Input
+                value={commissionTerms}
+                onChange={(e) => setCommissionTerms(e.target.value)}
+                placeholder="e.g. 1% of sale value"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className={labelClass}>Alternate Contact Name</label>
+              <Input
+                value={alternateName}
+                onChange={(e) => setAlternateName(e.target.value)}
+                placeholder="Alternate Name"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className={labelClass}>Alternate Mobile</label>
+              <Input
+                value={alternatePhone}
+                onChange={(e) => setAlternatePhone(e.target.value)}
+                placeholder="+91 98765 00000"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className={labelClass}>Alternate Email</label>
+              <Input
+                type="email"
+                value={alternateEmail}
+                onChange={(e) => setAlternateEmail(e.target.value)}
+                placeholder="alternate@email.com"
+                className={inputClass}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* ---- Documents & Verification ---- */}
+        <div className="bg-card border rounded-2xl p-8 shadow-sm">
+          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+            Documents &amp; Verification
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+            <div className="space-y-2">
+              <label className={labelClass}>Ownership Title Verified</label>
+              <Input
+                value={ownershipTitleVerified}
+                onChange={(e) => setOwnershipTitleVerified(e.target.value)}
+                placeholder="N/A / Yes / No"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className={labelClass}>Encumbrance Certificate</label>
+              <Input
+                value={encumbranceCertificate}
+                onChange={(e) => setEncumbranceCertificate(e.target.value)}
+                placeholder="e.g. Available"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className={labelClass}>Rental Agreement Draft</label>
+              <Input
+                value={rentalAgreementDraft}
+                onChange={(e) => setRentalAgreementDraft(e.target.value)}
+                placeholder="e.g. Ready"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className={labelClass}>TSLR / FMB</label>
+              <Input
+                value={tslrFmb}
+                onChange={(e) => setTslrFmb(e.target.value)}
+                placeholder="e.g. Available"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className={labelClass}>Tax Receipt</label>
+              <Input
+                value={taxReceipt}
+                onChange={(e) => setTaxReceipt(e.target.value)}
+                placeholder="e.g. Up to date"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className={labelClass}>EB Receipt</label>
+              <Input
+                value={ebReceipt}
+                onChange={(e) => setEbReceipt(e.target.value)}
+                placeholder="e.g. Available"
+                className={inputClass}
+              />
+            </div>
+
+            {["plot", "farmland"].includes(propertyType) && (
+              <div className="space-y-2">
+                <label className={labelClass}>Patta / Chitta</label>
+                <Input
+                  value={pattaChitta}
+                  onChange={(e) => setPattaChitta(e.target.value)}
+                  placeholder="e.g. Available"
+                  className={inputClass}
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className={labelClass}>Approvals</label>
+              <Input
+                value={approvals}
+                onChange={(e) => setApprovals(e.target.value)}
+                placeholder="e.g. CMDA Approved"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className={labelClass}>Finance Facing</label>
+              <Input
+                value={financeFacing}
+                onChange={(e) => setFinanceFacing(e.target.value)}
+                placeholder="e.g. Bank Eligible"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className={labelClass}>Hypothecation</label>
+              <Input
+                value={hypothecation}
+                onChange={(e) => setHypothecation(e.target.value)}
+                placeholder="e.g. NIL"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className={labelClass}>Deviation</label>
+              <Input
+                value={deviation}
+                onChange={(e) => setDeviation(e.target.value)}
+                placeholder="e.g. No deviation"
+                className={inputClass}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* ---- Market Analysis ---- */}
+        <div className="bg-card border rounded-2xl p-8 shadow-sm">
+          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Market Analysis</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+            <div className="space-y-2">
+              <label className={labelClass}>Comparative Price</label>
+              <Input
+                value={comparativePrice}
+                onChange={(e) => setComparativePrice(e.target.value)}
+                placeholder="e.g. 4800/sqft"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className={labelClass}>Rental Yield</label>
+              <Input
+                value={rentalYield}
+                onChange={(e) => setRentalYield(e.target.value)}
+                placeholder="e.g. 4.5%"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className={labelClass}>Market Price</label>
+              <Input
+                value={marketPrice}
+                onChange={(e) => setMarketPrice(e.target.value)}
+                placeholder="e.g. 5200/sqft"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className={labelClass}>Demand Area</label>
+              <Input
+                value={demandArea}
+                onChange={(e) => setDemandArea(e.target.value)}
+                placeholder="e.g. High Demand"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="space-y-2 lg:col-span-2">
+              <label className={labelClass}>Remark</label>
+              <Textarea
+                value={remark}
+                onChange={(e) => setRemark(e.target.value)}
+                placeholder="Additional remarks or notes"
+                rows={3}
+                className="rounded-xl bg-muted/30 resize-none"
               />
             </div>
           </div>
@@ -649,6 +2754,32 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               ))}
             </div>
           )}
+        </div>
+
+        {/* ---- Attachments ---- */}
+        <div className="bg-card border rounded-2xl p-8 shadow-sm">
+          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Attachments</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+            {[
+              { label: "Attachment 1 URL", value: attachment1, set: setAttachment1 },
+              { label: "Attachment 2 URL", value: attachment2, set: setAttachment2 },
+              { label: "Attachment 3 URL", value: attachment3, set: setAttachment3 },
+              { label: "Attachment 4 URL", value: attachment4, set: setAttachment4 },
+              { label: "Attachment 5 URL", value: attachment5, set: setAttachment5 },
+              { label: "Attachment 6 URL", value: attachment6, set: setAttachment6 },
+            ].map(({ label, value, set }) => (
+              <div key={label} className="space-y-2">
+                <label className={labelClass}>{label}</label>
+                <Input
+                  value={value}
+                  onChange={(e) => set(e.target.value)}
+                  placeholder="https://..."
+                  className={inputClass}
+                />
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* ---- Description ---- */}

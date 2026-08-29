@@ -28,20 +28,8 @@ interface BulkImportDialogProps {
   onSuccess: () => void;
 }
 
-interface ParsedRow {
-  title: string;
-  listingType: string;
-  propertyType: string;
-  price: number;
-  city: string;
-  locality?: string;
-  bedrooms?: number;
-  bathrooms?: number;
-  areaSqft?: number;
-  ownerName?: string;
-  ownerPhone?: string;
-  description?: string;
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ParsedRow = Record<string, any>;
 
 const REQUIRED_HEADERS = ["Title", "Listing Type", "Property Type", "Price", "City"];
 const OPTIONAL_HEADERS = [
@@ -96,6 +84,339 @@ function normalizePropertyType(raw: string): string {
   return map[lower] ?? lower;
 }
 
+// ---------------------------------------------------------------------------
+// Row accessor helpers (all key lookups are case-insensitive + trimmed)
+// ---------------------------------------------------------------------------
+
+function buildLookup(row: Record<string, unknown>): (key: string) => string | undefined {
+  // Build a map from lowercased-trimmed key → original value once per row
+  const normalized: Record<string, unknown> = {};
+  for (const k of Object.keys(row)) {
+    normalized[k.trim().toLowerCase()] = row[k];
+  }
+  return (key: string) => {
+    const v = normalized[key.trim().toLowerCase()];
+    if (v == null) return undefined;
+    const s = String(v).trim();
+    return s === "" ? undefined : s;
+  };
+}
+
+function makeHelpers(row: Record<string, unknown>) {
+  const get = buildLookup(row);
+
+  /** Return string value or undefined */
+  const str = (key: string): string | undefined => get(key);
+
+  /** Multi-key: return first match */
+  const strAny = (...keys: string[]): string | undefined => {
+    for (const k of keys) {
+      const v = str(k);
+      if (v !== undefined) return v;
+    }
+    return undefined;
+  };
+
+  /** Parse boolean from "Yes"/"No"/"1"/"0" */
+  const bool = (...keys: string[]): boolean | undefined => {
+    const v = strAny(...keys)?.toLowerCase();
+    if (v === "yes" || v === "1" || v === "true") return true;
+    if (v === "no" || v === "0" || v === "false") return false;
+    return undefined;
+  };
+
+  /** Parse numeric value, stripping non-numeric chars (e.g. "150 HP" → 150) */
+  const num = (...keys: string[]): number | undefined => {
+    const v = strAny(...keys);
+    if (v === undefined) return undefined;
+    const n = parseFloat(v.replace(/[^0-9.]/g, ""));
+    return isNaN(n) ? undefined : n;
+  };
+
+  return { str, strAny, bool, num };
+}
+
+// ---------------------------------------------------------------------------
+// Main row → payload mapper
+// ---------------------------------------------------------------------------
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapRowToPayload(row: Record<string, unknown>): Record<string, any> {
+  const { str, strAny, bool, num } = makeHelpers(row);
+
+  // ------------------------------------------------------------------
+  // Core / required
+  // ------------------------------------------------------------------
+  const title = strAny("title", "property name") ?? "";
+  const rawListingType = strAny("listing type", "post type") ?? "";
+  const rawPropertyType = strAny("property type") ?? "";
+  const rawPrice = strAny("price") ?? "";
+  const city = strAny("city") ?? "";
+  const price = parseFloat(rawPrice.replace(/[^0-9.]/g, "")) || 0;
+
+  // ------------------------------------------------------------------
+  // Lat/Lng from "Latitude / Longitude" combined field
+  // ------------------------------------------------------------------
+  const latLngRaw = strAny("latitude / longitude", "latitude/longitude", "lat/lng");
+  let latitude: number | undefined;
+  let longitude: number | undefined;
+  if (latLngRaw) {
+    // Supports "11.0286362, 76.9068336" or "11.0286362 / 76.9068336"
+    const parts = latLngRaw.split(/[\/,]/).map((s) => parseFloat(s.trim()));
+    if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+      latitude = parts[0];
+      longitude = parts[1];
+    }
+  }
+  // Also support separate lat/lng columns
+  if (latitude === undefined) latitude = num("latitude");
+  if (longitude === undefined) longitude = num("longitude");
+
+  // ------------------------------------------------------------------
+  // Universal fields (all property types)
+  // ------------------------------------------------------------------
+  const payload: Record<string, unknown> = {
+    title: normalizeListingType(rawListingType) === "Sell" ? title : title,
+    listingType: normalizeListingType(rawListingType),
+    propertyType: normalizePropertyType(rawPropertyType),
+    price,
+    city,
+    locality: strAny("locality", "sublocation"),
+    bedrooms: num("bedrooms", "bedroom", "no. of bedrooms", "number of bedrooms"),
+    bathrooms: num("bathrooms", "bathroom", "no. of bathrooms", "number of bathrooms"),
+    areaSqft: num("area sqft", "area (sqft)", "area"),
+    ownerName: strAny("owner name"),
+    ownerPhone: strAny("owner phone", "owner mobile", "owner mobile no", "owner mobileno"),
+    ownerEmail: strAny("owner email"),
+    description: strAny("description"),
+    latitude,
+    longitude,
+
+    // Contact alternates
+    alternateName: strAny("alternate name"),
+    alternatePhone: strAny("alternate mobile number", "alternate mobileno"),
+    alternateEmail: str("alternate email"),
+
+    // Location / road
+    roadAccess: str("road access"),
+    roadName: str("road name"),
+
+    // Transaction details
+    transactionType: str("transaction type"),
+    handoverDate: str("handover date"),
+    tenantOccupied: bool("tenant occupied"),
+    saleType: strAny("sale", "sales"),
+
+    // Agent / agency
+    agentName: str("agent name"),
+    agencyName: str("agency name"),
+    commissionTerms: strAny("commission terms", "commmission terms"),
+
+    // Financials
+    expectedSalePrice: num("expected sale price"),
+    monthlyRent: num("monthly rent"),
+    lockInPeriod: str("lock in period"),
+    taxes: str("taxes"),
+    registrationCharge: strAny("registration charge", "registration charges"),
+    modeOfPayment: strAny("mode of payment", "payment mode"),
+    timeForRegistration: strAny("time for registration", "registration time"),
+
+    // Notes
+    remark: strAny("remark", "remarks"),
+
+    // Valuation
+    demandArea: str("demand area"),
+    rentalYield: str("rental yield"),
+    comparativePrice: strAny("compartive price", "comparative price"),
+    marketPrice: str("market price"),
+    negotiable: bool("negotiable"),
+
+    // Legal / verification
+    ownershipTitleVerified: strAny("ownership title verified", "ownership title"),
+    encumbranceCertificate: str("encumbrance certificate"),
+    rentalAgreementDraft: strAny(
+      "rental agreement draft",
+      "rental agreement",
+      "rental agreement (for rentals)",
+      "rental agreement drafted(for rentals)"
+    ),
+    tslrFmb: strAny("tslr / fmb", "tslr"),
+    taxReceipt: str("tax receipt"),
+    ebReceipt: strAny("eb receipt"),
+    pattaChitta: strAny("patta chitta verified", "patta / chitta certificate"),
+    approvals: strAny("approvals", "approval"),
+    financeFacing: str("finance facing"),
+    hypothecation: strAny("hyphotication", "hypothecation"),
+    deviation: str("deviation"),
+
+    // Photos (image URLs)
+    photos: [
+      strAny("photo1", "photo 1"),
+      strAny("photo2", "photo 2"),
+      strAny("photo3", "photo 3"),
+      strAny("photo4", "photo 4"),
+      strAny("photo5", "photo 5"),
+      strAny("photo6", "photo 6"),
+      strAny("photo7", "photo 7"),
+      strAny("photo8", "photo 8"),
+      strAny("photo9", "photo 9"),
+      strAny("photo10", "photo 10"),
+    ].filter(Boolean),
+
+    // Document attachments
+    attachment1: strAny("attachment1", "attachment 1"),
+    attachment2: strAny("attachment2", "attachment 2"),
+    attachment3: strAny("attachment3", "attachment 3"),
+    attachment4: strAny("attachment4", "attachment 4"),
+    attachment5: strAny("attachment5", "attachment 5"),
+    attachment6: strAny("attachment6", "attachment 6"),
+  };
+
+  // ------------------------------------------------------------------
+  // Apartment / Villa / Individual House specific
+  // ------------------------------------------------------------------
+  const pt = normalizePropertyType(rawPropertyType);
+  if (["apartment", "villa", "individual_portion"].includes(pt)) {
+    Object.assign(payload, {
+      unitType: str("unit type"),
+      unitNumber: str("unit number"),
+      numberOfFlats: num("number of flats"),
+      towerNos: num("tower nos"),
+      superBuiltUpArea: num("super built up area", "super built-up area"),
+      udsArea: num("uds area"),
+      builtUpArea: num("built up area", "built-up area"),
+      carpetArea: num("carpet area"),
+      plotArea: num("plot area"),
+      balconies: num("balcony nos", "balconies nos"),
+      poojaRoom: bool("pooja"),
+      studyRoom: bool("study / store"),
+      architecturalStyle: str("architectural style"),
+      availablePortion: str("available portion"),
+      amenities: strAny("amenities", "amentities"),
+      outdoorSpaces: str("outdoor spaces"),
+      utilitiesProvided: str("utilities provided"),
+      neighborhoodHighlights: str("neighborhood highlights"),
+      communityFacilities: str("community facilities"),
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // Plot / Farmland specific
+  // ------------------------------------------------------------------
+  if (["plot", "farmland"].includes(pt)) {
+    Object.assign(payload, {
+      areaSqft: num("total area of land / plot", "total area") ?? payload.areaSqft,
+      plotNos: num("plot nos"),
+      zoning: strAny("zoning / usage", "zoning"),
+      plotType: str("plot type"),
+      sfNumber: str("sf no"),
+      landType: str("land type"),
+      topography: str("topography"),
+      soilType: str("soil type"),
+      irrigation: str("irrigation facilities"),
+      fencing: strAny("fenching resource", "fencing"),
+      cropSuitability: str("crop suitability"),
+      existingPlantation: str("existing plantation"),
+      boreWell: bool("bore well"),
+      storageTank: bool("storage tank"),
+      waterSources: strAny("water sources", "water resource"),
+      neighborhoodHighlights: strAny("surrounding infrastructure", "neighborhood highlights"),
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // Commercial specific
+  // ------------------------------------------------------------------
+  if (pt === "commercial") {
+    Object.assign(payload, {
+      propertyUse: strAny("property use", "propertyuse"),
+      noOfLifts: num("no of lifts"),
+      dimension: str("dimension"),
+      frontage: str("frontage"),
+      carParking: num("no of car parking"),
+      bikeParking: num("no of bike parking"),
+      outsideParking: bool("outside parking"),
+      visitorsParking: str("visitors parking"),
+      fireSafety: strAny("fire safety compliance"),
+      ceilingHeightFt: num("ceiling height"),
+      electricityConnection: strAny("electricity", "electricity connection"),
+      powerBackup: strAny("power backup"),
+      airConditioning: str("air conditioning"),
+      conferenceRoom: num("conference room"),
+      seater: num("seater"),
+      tenantMix: str("tenant mix"),
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // Coworking specific
+  // ------------------------------------------------------------------
+  if (pt === "coworking") {
+    Object.assign(payload, {
+      builtUpArea: num("total built up area") ?? payload.builtUpArea,
+      availableWorkstations: num("available workstation"),
+      privateCabins: num("private cabins"),
+      meetingRooms: num("available meeting rooms"),
+      rentPerSeat: num("expected rent / seat"),
+      advanceRent: num("advance rent"),
+      leaseTerm: str("lease term"),
+      incrementalRent: str("incremental rent clause"),
+      electricityCharges: str("electricity charges"),
+      highSpeedWifi: bool("high speed of wifi"),
+      airConditioning: str("air conditioning"),
+      cctvSurveillance: str("cctv surveillance"),
+      securityStaff: str("security staff"),
+      elevatorAccess: str("elevator access"),
+      furnitureProvided: str("provided furniture"),
+      accessibility: str("accessibility"),
+      furnishingStatus: str("condition of space"),
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // Industrial specific
+  // ------------------------------------------------------------------
+  if (pt === "industrial") {
+    Object.assign(payload, {
+      buildingType: str("building type"),
+      propertyUse: strAny("property use", "propertyuse"),
+      builtUpArea: num("built up area", "built-up area") ?? payload.builtUpArea,
+      coveredArea: num("covered area"),
+      openArea: num("open area"),
+      ceilingHeightFt: num("ceiling height"),
+      floorType: str("floor type"),
+      numberOfBays: num("number of bays"),
+      numberOfCabins: num("number of cabins"),
+      powerSupplyHp: num("power supply1"),
+      waterSupply: str("water supply"),
+      truckParking: num("truck parking nos"),
+      carParking: num("car parking nos"),
+      bikeParking: num("bike parking nos"),
+      fireSafety: strAny("fire safety compilance", "fire safety compliance"),
+      loadingBays: num("loading / unloading bays"),
+      warehouseRacks: num("warehouse racks / storage"),
+      truckTrailerAccess: str("truck / trailer access"),
+      craneAvailable: str("crane or lift available"),
+      workerFacilities: str("facilties for workers"),
+      nearestHighway: str("proximity to highway / transport hub"),
+      nearestRailway: str("nearest railway station"),
+      nearestPort: str("nearest port"),
+      nearestAirport: str("nearest airport"),
+      labourAvailability: str("labour force availability"),
+      powerBackup: str("power backup"),
+    });
+  }
+
+  // Remove undefined values to keep payload clean
+  for (const key of Object.keys(payload)) {
+    if (payload[key] === undefined || (Array.isArray(payload[key]) && (payload[key] as unknown[]).length === 0)) {
+      delete payload[key];
+    }
+  }
+
+  return payload;
+}
+
 export function BulkImportDialog({
   open,
   onOpenChange,
@@ -132,14 +453,14 @@ export function BulkImportDialog({
     setParsedRows([]);
 
     const reader = new FileReader();
-    reader.onload = async evt => {
+    reader.onload = async (evt) => {
       const XLSX = await import("xlsx");
       try {
         const bstr = evt.target?.result;
         const wb = XLSX.read(bstr, { type: "binary" });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws) as any[];
+        const data = XLSX.utils.sheet_to_json(ws) as Record<string, unknown>[];
 
         if (data.length === 0) {
           setParseError("The uploaded file appears to be empty.");
@@ -147,9 +468,11 @@ export function BulkImportDialog({
           return;
         }
 
-        // Validate headers
-        const headers = Object.keys(data[0] || {});
-        const missingHeaders = REQUIRED_HEADERS.filter(h => !headers.includes(h));
+        // Validate required headers (case-insensitive)
+        const headers = Object.keys(data[0] || {}).map((h) => h.trim().toLowerCase());
+        const missingHeaders = REQUIRED_HEADERS.filter(
+          (h) => !headers.includes(h.toLowerCase())
+        );
         if (missingHeaders.length > 0) {
           setParseError(
             `Missing required columns: ${missingHeaders.join(", ")}. Please use the template.`
@@ -158,17 +481,18 @@ export function BulkImportDialog({
           return;
         }
 
-        // Validate and parse rows
+        // Parse rows
         const rows: ParsedRow[] = [];
         for (let i = 0; i < data.length; i++) {
-          const row = data[i];
+          const raw = data[i];
           const rowNum = i + 2; // row 1 = header
 
-          const title = String(row["Title"] ?? "").trim();
-          const rawListingType = String(row["Listing Type"] ?? "").trim();
-          const rawPropertyType = String(row["Property Type"] ?? "").trim();
-          const rawPrice = row["Price"];
-          const city = String(row["City"] ?? "").trim();
+          const { strAny } = makeHelpers(raw);
+          const title = strAny("title", "property name") ?? "";
+          const rawListingType = strAny("listing type", "post type") ?? "";
+          const rawPropertyType = strAny("property type") ?? "";
+          const rawPrice = strAny("price") ?? "";
+          const city = strAny("city") ?? "";
 
           if (!title) {
             setParseError(`Row ${rowNum}: Title is required.`);
@@ -185,7 +509,7 @@ export function BulkImportDialog({
             setIsProcessing(false);
             return;
           }
-          if (!rawPrice && rawPrice !== 0) {
+          if (!rawPrice && rawPrice !== "0") {
             setParseError(`Row ${rowNum}: Price is required.`);
             setIsProcessing(false);
             return;
@@ -196,27 +520,14 @@ export function BulkImportDialog({
             return;
           }
 
-          const price = Number(rawPrice);
+          const price = parseFloat(rawPrice.replace(/[^0-9.]/g, ""));
           if (isNaN(price)) {
             setParseError(`Row ${rowNum}: Price must be a number.`);
             setIsProcessing(false);
             return;
           }
 
-          rows.push({
-            title,
-            listingType: normalizeListingType(rawListingType),
-            propertyType: normalizePropertyType(rawPropertyType),
-            price,
-            city,
-            locality: row["Locality"] ? String(row["Locality"]).trim() : undefined,
-            bedrooms: row["Bedrooms"] != null ? Number(row["Bedrooms"]) : undefined,
-            bathrooms: row["Bathrooms"] != null ? Number(row["Bathrooms"]) : undefined,
-            areaSqft: row["Area Sqft"] != null ? Number(row["Area Sqft"]) : undefined,
-            ownerName: row["Owner Name"] ? String(row["Owner Name"]).trim() : undefined,
-            ownerPhone: row["Owner Phone"] ? String(row["Owner Phone"]).trim() : undefined,
-            description: row["Description"] ? String(row["Description"]).trim() : undefined,
-          });
+          rows.push(mapRowToPayload(raw));
         }
 
         setParsedRows(rows);
@@ -359,15 +670,15 @@ export function BulkImportDialog({
                           </TableCell>
                           <TableCell className="text-sm font-medium max-w-[150px]">
                             <span title={row.title}>
-                              {row.title.length > 30
-                                ? row.title.slice(0, 30) + "…"
-                                : row.title}
+                              {String(row.title ?? "").length > 30
+                                ? String(row.title).slice(0, 30) + "…"
+                                : String(row.title ?? "")}
                             </span>
                           </TableCell>
                           <TableCell className="text-sm">{row.listingType}</TableCell>
                           <TableCell className="text-sm">{row.propertyType}</TableCell>
                           <TableCell className="text-sm">
-                            ₹{row.price.toLocaleString("en-IN")}
+                            ₹{Number(row.price ?? 0).toLocaleString("en-IN")}
                           </TableCell>
                           <TableCell className="text-sm">{row.city}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">

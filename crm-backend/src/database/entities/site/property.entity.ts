@@ -138,6 +138,129 @@ export class Property {
   @Column({ name: 'brokerage_value', type: 'varchar', length: 100, nullable: true })
   brokerageValue!: string | null;
 
+  @Column({ name: 'alternate_name', type: 'varchar', length: 255, nullable: true })
+  alternateName!: string | null;
+
+  @Column({ name: 'alternate_phone', type: 'varchar', length: 50, nullable: true })
+  alternatePhone!: string | null;
+
+  @Column({ name: 'alternate_email', type: 'varchar', length: 255, nullable: true })
+  alternateEmail!: string | null;
+
+  @Column({ name: 'transaction_type', type: 'varchar', length: 100, nullable: true })
+  transactionType!: string | null;
+
+  @Column({ name: 'handover_date', type: 'varchar', length: 100, nullable: true })
+  handoverDate!: string | null;
+
+  @Column({ name: 'road_name', type: 'varchar', length: 255, nullable: true })
+  roadName!: string | null;
+
+  @Column({ name: 'road_access', type: 'varchar', length: 100, nullable: true })
+  roadAccess!: string | null;
+
+  @Column({ name: 'tenant_occupied', type: 'varchar', length: 100, nullable: true })
+  tenantOccupied!: string | null;
+
+  @Column({ name: 'sale_type', type: 'varchar', length: 50, nullable: true })
+  saleType!: string | null;
+
+  @Column({ name: 'agent_name', type: 'varchar', length: 255, nullable: true })
+  agentName!: string | null;
+
+  @Column({ name: 'agency_name', type: 'varchar', length: 255, nullable: true })
+  agencyName!: string | null;
+
+  @Column({ name: 'commission_terms', type: 'varchar', length: 255, nullable: true })
+  commissionTerms!: string | null;
+
+  @Column({ name: 'expected_sale_price', type: 'decimal', precision: 12, scale: 2, nullable: true })
+  expectedSalePrice!: string | null;
+
+  @Column({ name: 'monthly_rent', type: 'decimal', precision: 12, scale: 2, nullable: true })
+  monthlyRent!: string | null;
+
+  @Column({ name: 'lock_in_period', type: 'varchar', length: 100, nullable: true })
+  lockInPeriod!: string | null;
+
+  @Column({ name: 'taxes', type: 'varchar', length: 255, nullable: true })
+  taxes!: string | null;
+
+  @Column({ name: 'registration_charge', type: 'varchar', length: 255, nullable: true })
+  registrationCharge!: string | null;
+
+  @Column({ name: 'mode_of_payment', type: 'varchar', length: 255, nullable: true })
+  modeOfPayment!: string | null;
+
+  @Column({ name: 'time_for_registration', type: 'varchar', length: 100, nullable: true })
+  timeForRegistration!: string | null;
+
+  @Column({ name: 'remark', type: 'text', nullable: true })
+  remark!: string | null;
+
+  @Column({ name: 'demand_area', type: 'varchar', length: 100, nullable: true })
+  demandArea!: string | null;
+
+  @Column({ name: 'rental_yield', type: 'varchar', length: 100, nullable: true })
+  rentalYield!: string | null;
+
+  @Column({ name: 'comparative_price', type: 'varchar', length: 100, nullable: true })
+  comparativePrice!: string | null;
+
+  @Column({ name: 'market_price', type: 'varchar', length: 100, nullable: true })
+  marketPrice!: string | null;
+
+  @Column({ name: 'ownership_title_verified', type: 'varchar', length: 50, nullable: true })
+  ownershipTitleVerified!: string | null;
+
+  @Column({ name: 'encumbrance_certificate', type: 'varchar', length: 50, nullable: true })
+  encumbranceCertificate!: string | null;
+
+  @Column({ name: 'rental_agreement_draft', type: 'varchar', length: 50, nullable: true })
+  rentalAgreementDraft!: string | null;
+
+  @Column({ name: 'tslr_fmb', type: 'varchar', length: 50, nullable: true })
+  tslrFmb!: string | null;
+
+  @Column({ name: 'tax_receipt', type: 'varchar', length: 50, nullable: true })
+  taxReceipt!: string | null;
+
+  @Column({ name: 'eb_receipt', type: 'varchar', length: 50, nullable: true })
+  ebReceipt!: string | null;
+
+  @Column({ name: 'patta_chitta', type: 'varchar', length: 50, nullable: true })
+  pattaChitta!: string | null;
+
+  @Column({ name: 'approvals', type: 'varchar', length: 255, nullable: true })
+  approvals!: string | null;
+
+  @Column({ name: 'finance_facing', type: 'varchar', length: 50, nullable: true })
+  financeFacing!: string | null;
+
+  @Column({ name: 'hypothecation', type: 'varchar', length: 50, nullable: true })
+  hypothecation!: string | null;
+
+  @Column({ name: 'deviation', type: 'varchar', length: 50, nullable: true })
+  deviation!: string | null;
+
+  @Column({ name: 'attachment1', type: 'varchar', length: 1024, nullable: true })
+  attachment1!: string | null;
+
+  @Column({ name: 'attachment2', type: 'varchar', length: 1024, nullable: true })
+  attachment2!: string | null;
+
+  @Column({ name: 'attachment3', type: 'varchar', length: 1024, nullable: true })
+  attachment3!: string | null;
+
+  @Column({ name: 'attachment4', type: 'varchar', length: 1024, nullable: true })
+  attachment4!: string | null;
+
+  @Column({ name: 'attachment5', type: 'varchar', length: 1024, nullable: true })
+  attachment5!: string | null;
+
+  @Column({ name: 'attachment6', type: 'varchar', length: 1024, nullable: true })
+  attachment6!: string | null;
+
   @Column({ name: 'available_from', type: 'date', nullable: true })
   availableFrom!: Date | null;
 
