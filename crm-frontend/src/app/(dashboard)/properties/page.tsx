@@ -50,7 +50,7 @@ export default function PropertiesPage() {
       });
       if (data && data.success !== false) {
         setProperties(data.data ?? data.properties ?? []);
-        setTotal(data.total ?? data.count ?? 0);
+        setTotal(data.meta?.total ?? data.total ?? data.count ?? 0);
       } else {
         setProperties([]);
         setTotal(0);

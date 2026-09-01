@@ -27,6 +27,6 @@ export const config = {
      * - logo/ (logo files)
      * - lottie/ (lottie animation files)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|logo|lottie|font).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|manifest.json|logo|lottie|font).*)',
   ],
 };
