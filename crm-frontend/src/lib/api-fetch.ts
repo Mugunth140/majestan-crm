@@ -19,6 +19,7 @@ export function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Prom
       if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
         localStorage.removeItem('crm_token');
         localStorage.removeItem('crm_user');
+        document.cookie = 'crm_token=; path=/; max-age=0';
         window.location.href = '/login';
       }
     }

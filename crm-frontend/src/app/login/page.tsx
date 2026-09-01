@@ -53,7 +53,7 @@ export default function LoginPage() {
       // Store token in localStorage and cookies for client/server-side access
       localStorage.setItem("crm_token", data.data.access_token);
       localStorage.setItem("crm_user", JSON.stringify(data.data.user));
-      document.cookie = `crm_token=${data.data.access_token}; path=/; max-age=86400`;
+      document.cookie = `crm_token=${data.data.access_token}; path=/; max-age=604800`;
 
       toast.success("Welcome back!", {
         description: "You have successfully signed in.",

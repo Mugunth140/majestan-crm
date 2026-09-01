@@ -23,10 +23,12 @@ export const config = {
      * - api (API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
-     * - favicon.ico, sitemap.xml, robots.txt (metadata files)
-     * - logo/ (logo files)
-     * - lottie/ (lottie animation files)
+     * - favicon.ico, favicon/ directory (browser icons)
+     * - manifest.json (PWA manifest)
+     * - logo/, lottie/, font/ (static assets)
+     * - icons/, images/ (static assets)
+     * - *.png, *.jpg, *.jpeg, *.svg, *.webp, *.ico (image files)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|manifest.json|logo|lottie|font).*)',
+    '/((?!api|_next/static|_next/image|favicon\\.ico|favicon/|manifest\\.json|logo|lottie|font|icons|images|.*\\.png$|.*\\.jpg$|.*\\.jpeg$|.*\\.svg$|.*\\.webp$|.*\\.ico$).*)',
   ],
 };
