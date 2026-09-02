@@ -70,6 +70,8 @@ import { PropertyImage } from './database/entities/site/property-image.entity';
 import { PropertyLocation } from './database/entities/site/property-location.entity';
 import { City } from './database/entities/site/city.entity';
 import { Sublocation } from './database/entities/site/sublocation.entity';
+import { MailModule } from './modules/mail/mail.module';
+import { CommunicationsModule } from './modules/communications/communications.module';
 
 @Module({
   imports: [
@@ -142,6 +144,8 @@ import { Sublocation } from './database/entities/site/sublocation.entity';
     ContactLogsModule,
     TasksModule,
     PropertiesModule,
+    MailModule,
+    CommunicationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
