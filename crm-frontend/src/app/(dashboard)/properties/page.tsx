@@ -26,7 +26,7 @@ export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const limit = 20;
+  const limit = 10;
   const [loading, setLoading] = useState(true);
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
 
