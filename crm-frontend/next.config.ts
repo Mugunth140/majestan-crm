@@ -11,14 +11,16 @@ const nextConfig: NextConfig = {
   turbopack: {},
   allowedDevOrigins: ['192.168.13.167', 'localhost'],
   async rewrites() {
+    const backendBase = process.env.BACKEND_URL || 'http://localhost:8000';
+    const siteBackendBase = process.env.SITE_BACKEND_URL || 'http://localhost:5000';
     return [
       {
         source: '/api/v1/:path*',
-        destination: process.env.BACKEND_URL || 'http://localhost:8000/api/v1/:path*',
+        destination: `${backendBase}/api/v1/:path*`,
       },
       {
         source: '/site-api/:path*',
-        destination: (process.env.SITE_BACKEND_URL || 'http://localhost:5000') + '/api/v1/:path*',
+        destination: `${siteBackendBase}/api/v1/:path*`,
       },
     ];
   },
