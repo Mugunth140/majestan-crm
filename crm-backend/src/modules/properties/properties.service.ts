@@ -147,7 +147,13 @@ export class PropertiesService {
       relations: { propertyDetails: true, propertyImages: true, propertyLocations: true },
     });
     if (!property) throw new NotFoundException(`Property #${id} not found`);
-    return property;
+    // Explicitly spread relations so they appear as clean keys (not __relation__)
+    return {
+      ...property,
+      propertyDetails: (property as any).propertyDetails ?? (property as any).__propertyDetails__ ?? null,
+      propertyImages: (property as any).propertyImages ?? (property as any).__propertyImages__ ?? [],
+      propertyLocations: (property as any).propertyLocations ?? (property as any).__propertyLocations__ ?? [],
+    };
   }
 
   // ── create ─────────────────────────────────────────────────────────────────

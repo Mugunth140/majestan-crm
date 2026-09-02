@@ -101,205 +101,213 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   const [isLoadingFormData, setIsLoadingFormData] = useState(true);
   const [formData, setFormData] = useState<FormDataShape>({ cities: [], sublocations: [] });
 
+  // Shorthand helpers for initialData
+  const d = initialData as any;
+  const det = d?.propertyDetails ?? d?.__propertyDetails__ ?? {};
+  const loc0 = (d?.propertyLocations ?? d?.__propertyLocations__ ?? [])[0] ?? {};
+  const imgs: Array<{ imageUrl: string; imageKey: string; isPrimary: boolean }> =
+    d?.propertyImages ?? d?.__propertyImages__ ?? [];
+
   // ---- Basic Info ----
-  const [title, setTitle] = useState(initialData?.title ?? "");
+  const [title, setTitle] = useState(d?.title ?? "");
   const [listingType, setListingType] = useState<"Buy" | "Rent">(
-    initialData?.listingType === "Rent" ? "Rent" : "Buy"
+    d?.listingType === "Rent" ? "Rent" : "Buy"
   );
-  const [propertyType, setPropertyType] = useState(initialData?.propertyType ?? "");
-  const [status, setStatus] = useState(initialData?.status ?? "available");
-  const [transactionType, setTransactionType] = useState("");
-  const [handoverDate, setHandoverDate] = useState("");
-  const [saleType, setSaleType] = useState("");
-  const [roadAccess, setRoadAccess] = useState("");
-  const [roadName, setRoadName] = useState("");
-  const [tenantOccupied, setTenantOccupied] = useState("");
+  const [propertyType, setPropertyType] = useState(d?.propertyType ?? "");
+  const [status, setStatus] = useState(d?.status ?? "available");
+  const [transactionType, setTransactionType] = useState(d?.transactionType ?? "");
+  const [handoverDate, setHandoverDate] = useState(d?.handoverDate ?? "");
+  const [saleType, setSaleType] = useState(d?.saleType ?? "");
+  const [roadAccess, setRoadAccess] = useState(d?.roadAccess ?? "");
+  const [roadName, setRoadName] = useState(d?.roadName ?? "");
+  const [tenantOccupied, setTenantOccupied] = useState(d?.tenantOccupied ?? "");
 
   // ---- Pricing ----
-  const [price, setPrice] = useState(initialData?.price ? String(initialData.price) : "");
-  const [negotiable, setNegotiable] = useState(false);
-  const [expectedSalePrice, setExpectedSalePrice] = useState("");
-  const [monthlyRent, setMonthlyRent] = useState("");
-  const [maintenanceCharges, setMaintenanceCharges] = useState("");
-  const [securityDeposit, setSecurityDeposit] = useState("");
-  const [lockInPeriod, setLockInPeriod] = useState("");
-  const [taxes, setTaxes] = useState("");
-  const [registrationCharge, setRegistrationCharge] = useState("");
-  const [modeOfPayment, setModeOfPayment] = useState("");
-  const [timeForRegistration, setTimeForRegistration] = useState("");
+  const [price, setPrice] = useState(d?.price ? String(d.price) : "");
+  const [negotiable, setNegotiable] = useState<boolean>(d?.negotiable ?? false);
+  const [expectedSalePrice, setExpectedSalePrice] = useState(d?.expectedSalePrice ? String(d.expectedSalePrice) : "");
+  const [monthlyRent, setMonthlyRent] = useState(d?.monthlyRent ? String(d.monthlyRent) : "");
+  const [maintenanceCharges, setMaintenanceCharges] = useState(d?.maintenanceCharges ?? "");
+  const [securityDeposit, setSecurityDeposit] = useState(d?.securityDeposit ?? "");
+  const [lockInPeriod, setLockInPeriod] = useState(d?.lockInPeriod ?? "");
+  const [taxes, setTaxes] = useState(d?.taxes ?? "");
+  const [registrationCharge, setRegistrationCharge] = useState(d?.registrationCharge ?? "");
+  const [modeOfPayment, setModeOfPayment] = useState(d?.modeOfPayment ?? "");
+  const [timeForRegistration, setTimeForRegistration] = useState(d?.timeForRegistration ?? "");
 
   // ---- Location ----
-  const [cityId, setCityId] = useState<string>("");
-  const [sublocationId, setSublocationId] = useState<string>("");
-  const [address, setAddress] = useState("");
-  const [latitude, setLatitude] = useState("");
-  const [longitude, setLongitude] = useState("");
+  const [cityId, setCityId] = useState<string>(d?.cityId ? String(d.cityId) : "");
+  const [sublocationId, setSublocationId] = useState<string>(d?.sublocationId ? String(d.sublocationId) : "");
+  const [address, setAddress] = useState(loc0?.address ?? "");
+  const [latitude, setLatitude] = useState(loc0?.latitude ? String(loc0.latitude) : "");
+  const [longitude, setLongitude] = useState(loc0?.longitude ? String(loc0.longitude) : "");
 
   // ---- Details ----
-  const [bedrooms, setBedrooms] = useState(initialData?.bedrooms ? String(initialData.bedrooms) : "");
-  const [bathrooms, setBathrooms] = useState(initialData?.bathrooms ? String(initialData.bathrooms) : "");
-  const [areaSqft, setAreaSqft] = useState(initialData?.areaSqft ? String(initialData.areaSqft) : "");
-  const [furnished, setFurnished] = useState(false);
-  const [furnishingStatus, setFurnishingStatus] = useState("");
-  const [propertyFacing, setPropertyFacing] = useState("");
-  const [propertyAge, setPropertyAge] = useState("");
-  const [floorNumber, setFloorNumber] = useState("");
-  const [totalFloors, setTotalFloors] = useState("");
+  const [bedrooms, setBedrooms] = useState(det?.bedrooms ? String(det.bedrooms) : "");
+  const [bathrooms, setBathrooms] = useState(det?.bathrooms ? String(det.bathrooms) : "");
+  const [areaSqft, setAreaSqft] = useState(det?.areaSqft ? String(det.areaSqft) : "");
+  const [furnished, setFurnished] = useState<boolean>(det?.furnished ?? false);
+  const [furnishingStatus, setFurnishingStatus] = useState(det?.furnishingStatus ?? "");
+  const [propertyFacing, setPropertyFacing] = useState(det?.propertyFacing ?? "");
+  const [propertyAge, setPropertyAge] = useState(det?.propertyAge ?? "");
+  const [floorNumber, setFloorNumber] = useState(det?.floorNumber ? String(det.floorNumber) : "");
+  const [totalFloors, setTotalFloors] = useState(det?.totalFloors ? String(det.totalFloors) : "");
 
   // ---- Apartment / Villa / Individual House ----
-  const [unitType, setUnitType] = useState("");
-  const [unitNumber, setUnitNumber] = useState("");
-  const [numberOfFlats, setNumberOfFlats] = useState("");
-  const [towerNos, setTowerNos] = useState("");
-  const [builtUpArea, setBuiltUpArea] = useState("");
-  const [carpetArea, setCarpetArea] = useState("");
-  const [superBuiltUpArea, setSuperBuiltUpArea] = useState("");
-  const [udsArea, setUdsArea] = useState("");
-  const [plotArea, setPlotArea] = useState("");
-  const [balconies, setBalconies] = useState("");
-  const [poojaRoom, setPoojaRoom] = useState(false);
-  const [studyRoom, setStudyRoom] = useState(false);
-  const [architecturalStyle, setArchitecturalStyle] = useState("");
-  const [availablePortion, setAvailablePortion] = useState("");
-  const [amenities, setAmenities] = useState("");
-  const [outdoorSpaces, setOutdoorSpaces] = useState("");
-  const [utilitiesProvided, setUtilitiesProvided] = useState("");
-  const [neighborhoodHighlights, setNeighborhoodHighlights] = useState("");
-  const [communityFacilities, setCommunityFacilities] = useState("");
+  const [unitType, setUnitType] = useState(det?.unitType ?? "");
+  const [unitNumber, setUnitNumber] = useState(det?.unitNumber ?? "");
+  const [numberOfFlats, setNumberOfFlats] = useState(det?.numberOfFlats ? String(det.numberOfFlats) : "");
+  const [towerNos, setTowerNos] = useState(det?.towerNos ? String(det.towerNos) : "");
+  const [builtUpArea, setBuiltUpArea] = useState(det?.builtUpArea ? String(det.builtUpArea) : "");
+  const [carpetArea, setCarpetArea] = useState(det?.carpetArea ? String(det.carpetArea) : "");
+  const [superBuiltUpArea, setSuperBuiltUpArea] = useState(det?.superBuiltUpArea ? String(det.superBuiltUpArea) : "");
+  const [udsArea, setUdsArea] = useState(det?.udsArea ? String(det.udsArea) : "");
+  const [plotArea, setPlotArea] = useState(det?.plotArea ? String(det.plotArea) : "");
+  const [balconies, setBalconies] = useState(det?.balconies ? String(det.balconies) : "");
+  const [poojaRoom, setPoojaRoom] = useState<boolean>(det?.poojaRoom ?? false);
+  const [studyRoom, setStudyRoom] = useState<boolean>(det?.studyRoom ?? false);
+  const [architecturalStyle, setArchitecturalStyle] = useState(det?.architecturalStyle ?? "");
+  const [availablePortion, setAvailablePortion] = useState(det?.availablePortion ?? "");
+  const [amenities, setAmenities] = useState(det?.amenities ?? "");
+  const [outdoorSpaces, setOutdoorSpaces] = useState(det?.outdoorSpaces ?? "");
+  const [utilitiesProvided, setUtilitiesProvided] = useState(det?.utilitiesProvided ?? "");
+  const [neighborhoodHighlights, setNeighborhoodHighlights] = useState(det?.neighborhoodHighlights ?? "");
+  const [communityFacilities, setCommunityFacilities] = useState(det?.communityFacilities ?? "");
 
   // ---- Plot / Farmland ----
-  const [plotSizeCents, setPlotSizeCents] = useState("");
-  const [plotNos, setPlotNos] = useState("");
-  const [zoning, setZoning] = useState("");
-  const [plotType, setPlotType] = useState("");
-  const [sfNumber, setSfNumber] = useState("");
-  const [landType, setLandType] = useState("");
-  const [topography, setTopography] = useState("");
-  const [soilType, setSoilType] = useState("");
-  const [irrigation, setIrrigation] = useState("");
-  const [fencing, setFencing] = useState("");
-  const [cropSuitability, setCropSuitability] = useState("");
-  const [existingPlantation, setExistingPlantation] = useState("");
-  const [boreWell, setBoreWell] = useState(false);
-  const [storageTank, setStorageTank] = useState(false);
-  const [waterSources, setWaterSources] = useState("");
-  const [boundaryWall, setBoundaryWall] = useState(false);
-  const [plotLength, setPlotLength] = useState("");
-  const [plotWidth, setPlotWidth] = useState("");
+  const [plotSizeCents, setPlotSizeCents] = useState(det?.plotSizeCents ? String(det.plotSizeCents) : "");
+  const [plotNos, setPlotNos] = useState(det?.plotNos ? String(det.plotNos) : "");
+  const [zoning, setZoning] = useState(det?.zoning ?? "");
+  const [plotType, setPlotType] = useState(det?.plotType ?? "");
+  const [sfNumber, setSfNumber] = useState(det?.sfNumber ?? "");
+  const [landType, setLandType] = useState(det?.landType ?? "");
+  const [topography, setTopography] = useState(det?.topography ?? "");
+  const [soilType, setSoilType] = useState(det?.soilType ?? "");
+  const [irrigation, setIrrigation] = useState(det?.irrigation ?? "");
+  const [fencing, setFencing] = useState(det?.fencing ?? "");
+  const [cropSuitability, setCropSuitability] = useState(det?.cropSuitability ?? "");
+  const [existingPlantation, setExistingPlantation] = useState(det?.existingPlantation ?? "");
+  const [boreWell, setBoreWell] = useState<boolean>(det?.boreWell ?? false);
+  const [storageTank, setStorageTank] = useState<boolean>(det?.storageTank ?? false);
+  const [waterSources, setWaterSources] = useState(det?.waterSources ?? "");
+  const [boundaryWall, setBoundaryWall] = useState<boolean>(det?.boundaryWall ?? false);
+  const [plotLength, setPlotLength] = useState(det?.plotLength ? String(det.plotLength) : "");
+  const [plotWidth, setPlotWidth] = useState(det?.plotWidth ? String(det.plotWidth) : "");
 
   // ---- Commercial ----
-  const [propertyUse, setPropertyUse] = useState("");
-  const [noOfLifts, setNoOfLifts] = useState("");
-  const [dimension, setDimension] = useState("");
-  const [frontage, setFrontage] = useState("");
-  const [carParking, setCarParking] = useState("");
-  const [bikeParking, setBikeParking] = useState("");
-  const [outsideParking, setOutsideParking] = useState(false);
-  const [visitorsParking, setVisitorsParking] = useState("");
-  const [fireSafety, setFireSafety] = useState(false);
-  const [ceilingHeightFt, setCeilingHeightFt] = useState("");
-  const [electricityConnection, setElectricityConnection] = useState("");
-  const [powerBackup, setPowerBackup] = useState(false);
-  const [hasCentralAc, setHasCentralAc] = useState(false);
-  const [hasPantry, setHasPantry] = useState(false);
-  const [conferenceRoom, setConferenceRoom] = useState("");
-  const [seater, setSeater] = useState("");
-  const [tenantMix, setTenantMix] = useState("");
-  const [commercialAmenities, setCommercialAmenities] = useState("");
+  const [propertyUse, setPropertyUse] = useState(det?.propertyUse ?? "");
+  const [noOfLifts, setNoOfLifts] = useState(det?.noOfLifts ? String(det.noOfLifts) : "");
+  const [dimension, setDimension] = useState(det?.dimension ?? "");
+  const [frontage, setFrontage] = useState(det?.frontage ?? "");
+  const [carParking, setCarParking] = useState(det?.carParking ? String(det.carParking) : "");
+  const [bikeParking, setBikeParking] = useState(det?.bikeParking ? String(det.bikeParking) : "");
+  const [outsideParking, setOutsideParking] = useState<boolean>(det?.outsideParking ?? false);
+  const [visitorsParking, setVisitorsParking] = useState(det?.visitorsParking ?? "");
+  const [fireSafety, setFireSafety] = useState<boolean>(det?.fireSafety ?? false);
+  const [ceilingHeightFt, setCeilingHeightFt] = useState(det?.ceilingHeightFt ? String(det.ceilingHeightFt) : "");
+  const [electricityConnection, setElectricityConnection] = useState(det?.electricityConnection ?? "");
+  const [powerBackup, setPowerBackup] = useState<boolean>(det?.powerBackup ?? false);
+  const [hasCentralAc, setHasCentralAc] = useState<boolean>(det?.hasCentralAc ?? false);
+  const [hasPantry, setHasPantry] = useState<boolean>(det?.hasPantry ?? false);
+  const [conferenceRoom, setConferenceRoom] = useState(det?.conferenceRoom ? String(det.conferenceRoom) : "");
+  const [seater, setSeater] = useState(det?.seater ? String(det.seater) : "");
+  const [tenantMix, setTenantMix] = useState(det?.tenantMix ?? "");
+  const [commercialAmenities, setCommercialAmenities] = useState(det?.amenities ?? "");
 
   // ---- Coworking ----
-  const [availableWorkstations, setAvailableWorkstations] = useState("");
-  const [privateCabins, setPrivateCabins] = useState("");
-  const [meetingRooms, setMeetingRooms] = useState("");
-  const [minSeats, setMinSeats] = useState("");
-  const [rentPerSeat, setRentPerSeat] = useState("");
-  const [advanceRent, setAdvanceRent] = useState("");
-  const [leaseTerm, setLeaseTerm] = useState("");
-  const [incrementalRent, setIncrementalRent] = useState("");
-  const [electricityCharges, setElectricityCharges] = useState("");
-  const [highSpeedWifi, setHighSpeedWifi] = useState(false);
-  const [airConditioning, setAirConditioning] = useState(false);
-  const [cctvSurveillance, setCctvSurveillance] = useState(false);
-  const [coworkingPowerBackup, setCoworkingPowerBackup] = useState(false);
-  const [elevatorAccess, setElevatorAccess] = useState(false);
-  const [coworkingHasPantry, setCoworkingHasPantry] = useState(false);
-  const [securityStaff, setSecurityStaff] = useState(false);
-  const [furnitureProvided, setFurnitureProvided] = useState("");
-  const [accessibility, setAccessibility] = useState("");
+  const [availableWorkstations, setAvailableWorkstations] = useState(det?.availableWorkstations ? String(det.availableWorkstations) : "");
+  const [privateCabins, setPrivateCabins] = useState(det?.privateCabins ? String(det.privateCabins) : "");
+  const [meetingRooms, setMeetingRooms] = useState(det?.meetingRooms ? String(det.meetingRooms) : "");
+  const [minSeats, setMinSeats] = useState(det?.minSeats ? String(det.minSeats) : "");
+  const [rentPerSeat, setRentPerSeat] = useState(det?.rentPerSeat ? String(det.rentPerSeat) : "");
+  const [advanceRent, setAdvanceRent] = useState(det?.advanceRent ? String(det.advanceRent) : "");
+  const [leaseTerm, setLeaseTerm] = useState(det?.leaseTerm ?? "");
+  const [incrementalRent, setIncrementalRent] = useState(det?.incrementalRent ?? "");
+  const [electricityCharges, setElectricityCharges] = useState(det?.electricityCharges ?? "");
+  const [highSpeedWifi, setHighSpeedWifi] = useState<boolean>(det?.highSpeedWifi ?? false);
+  const [airConditioning, setAirConditioning] = useState<boolean>(det?.airConditioning ?? false);
+  const [cctvSurveillance, setCctvSurveillance] = useState<boolean>(det?.cctvSurveillance ?? false);
+  const [coworkingPowerBackup, setCoworkingPowerBackup] = useState<boolean>(det?.powerBackup ?? false);
+  const [elevatorAccess, setElevatorAccess] = useState<boolean>(det?.elevatorAccess ?? false);
+  const [coworkingHasPantry, setCoworkingHasPantry] = useState<boolean>(det?.hasPantry ?? false);
+  const [securityStaff, setSecurityStaff] = useState<boolean>(det?.securityStaff ?? false);
+  const [furnitureProvided, setFurnitureProvided] = useState(det?.furnitureProvided ?? "");
+  const [accessibility, setAccessibility] = useState(det?.accessibility ?? "");
 
   // ---- Industrial ----
-  const [buildingType, setBuildingType] = useState("");
-  const [industrialPropertyUse, setIndustrialPropertyUse] = useState("");
-  const [coveredArea, setCoveredArea] = useState("");
-  const [openArea, setOpenArea] = useState("");
-  const [industrialCeilingHeight, setIndustrialCeilingHeight] = useState("");
-  const [floorType, setFloorType] = useState("");
-  const [numberOfBays, setNumberOfBays] = useState("");
-  const [numberOfCabins, setNumberOfCabins] = useState("");
-  const [powerSupplyHp, setPowerSupplyHp] = useState("");
-  const [waterSupply, setWaterSupply] = useState("");
-  const [truckParking, setTruckParking] = useState("");
-  const [industrialCarParking, setIndustrialCarParking] = useState("");
-  const [industrialBikeParking, setIndustrialBikeParking] = useState("");
-  const [industrialFireSafety, setIndustrialFireSafety] = useState(false);
-  const [loadingBays, setLoadingBays] = useState("");
-  const [warehouseRacks, setWarehouseRacks] = useState("");
-  const [truckTrailerAccess, setTruckTrailerAccess] = useState(false);
-  const [craneAvailable, setCraneAvailable] = useState(false);
-  const [workerFacilities, setWorkerFacilities] = useState("");
-  const [nearestHighway, setNearestHighway] = useState("");
-  const [nearestRailway, setNearestRailway] = useState("");
-  const [nearestPort, setNearestPort] = useState("");
-  const [nearestAirport, setNearestAirport] = useState("");
-  const [labourAvailability, setLabourAvailability] = useState("");
-  const [industrialPowerBackup, setIndustrialPowerBackup] = useState(false);
-  const [heavyVehicleAccess, setHeavyVehicleAccess] = useState(false);
+  const [buildingType, setBuildingType] = useState(det?.buildingType ?? "");
+  const [industrialPropertyUse, setIndustrialPropertyUse] = useState(det?.propertyUse ?? "");
+  const [coveredArea, setCoveredArea] = useState(det?.coveredArea ? String(det.coveredArea) : "");
+  const [openArea, setOpenArea] = useState(det?.openArea ? String(det.openArea) : "");
+  const [industrialCeilingHeight, setIndustrialCeilingHeight] = useState(det?.ceilingHeightFt ? String(det.ceilingHeightFt) : "");
+  const [floorType, setFloorType] = useState(det?.floorType ?? "");
+  const [numberOfBays, setNumberOfBays] = useState(det?.numberOfBays ? String(det.numberOfBays) : "");
+  const [numberOfCabins, setNumberOfCabins] = useState(det?.numberOfCabins ? String(det.numberOfCabins) : "");
+  const [powerSupplyHp, setPowerSupplyHp] = useState(det?.powerSupplyHp ? String(det.powerSupplyHp) : "");
+  const [waterSupply, setWaterSupply] = useState(det?.waterSupply ?? "");
+  const [truckParking, setTruckParking] = useState(det?.truckParking ? String(det.truckParking) : "");
+  const [industrialCarParking, setIndustrialCarParking] = useState(det?.carParking ? String(det.carParking) : "");
+  const [industrialBikeParking, setIndustrialBikeParking] = useState(det?.bikeParking ? String(det.bikeParking) : "");
+  const [industrialFireSafety, setIndustrialFireSafety] = useState<boolean>(det?.fireSafety ?? false);
+  const [loadingBays, setLoadingBays] = useState(det?.loadingBays ? String(det.loadingBays) : "");
+  const [warehouseRacks, setWarehouseRacks] = useState(det?.warehouseRacks ? String(det.warehouseRacks) : "");
+  const [truckTrailerAccess, setTruckTrailerAccess] = useState<boolean>(det?.truckTrailerAccess ?? false);
+  const [craneAvailable, setCraneAvailable] = useState<boolean>(det?.craneAvailable ?? false);
+  const [workerFacilities, setWorkerFacilities] = useState(det?.workerFacilities ?? "");
+  const [nearestHighway, setNearestHighway] = useState(det?.nearestHighway ?? "");
+  const [nearestRailway, setNearestRailway] = useState(det?.nearestRailway ?? "");
+  const [nearestPort, setNearestPort] = useState(det?.nearestPort ?? "");
+  const [nearestAirport, setNearestAirport] = useState(det?.nearestAirport ?? "");
+  const [labourAvailability, setLabourAvailability] = useState(det?.labourAvailability ?? "");
+  const [industrialPowerBackup, setIndustrialPowerBackup] = useState<boolean>(det?.powerBackup ?? false);
+  const [heavyVehicleAccess, setHeavyVehicleAccess] = useState<boolean>(det?.heavyVehicleAccess ?? false);
 
   // ---- Owner ----
-  const [ownerName, setOwnerName] = useState(initialData?.ownerName ?? "");
-  const [ownerPhone, setOwnerPhone] = useState(initialData?.ownerPhone ?? "");
-  const [ownerEmail, setOwnerEmail] = useState("");
+  const [ownerName, setOwnerName] = useState(d?.ownerName ?? "");
+  const [ownerPhone, setOwnerPhone] = useState(d?.ownerPhone ?? "");
+  const [ownerEmail, setOwnerEmail] = useState(d?.ownerEmail ?? "");
 
   // ---- Agent ----
-  const [agentName, setAgentName] = useState("");
-  const [agencyName, setAgencyName] = useState("");
-  const [commissionTerms, setCommissionTerms] = useState("");
-  const [alternateName, setAlternateName] = useState("");
-  const [alternatePhone, setAlternatePhone] = useState("");
-  const [alternateEmail, setAlternateEmail] = useState("");
+  const [agentName, setAgentName] = useState(d?.agentName ?? "");
+  const [agencyName, setAgencyName] = useState(d?.agencyName ?? "");
+  const [commissionTerms, setCommissionTerms] = useState(d?.commissionTerms ?? "");
+  const [alternateName, setAlternateName] = useState(d?.alternateName ?? "");
+  const [alternatePhone, setAlternatePhone] = useState(d?.alternatePhone ?? "");
+  const [alternateEmail, setAlternateEmail] = useState(d?.alternateEmail ?? "");
 
   // ---- Documents & Verification ----
-  const [ownershipTitleVerified, setOwnershipTitleVerified] = useState("");
-  const [encumbranceCertificate, setEncumbranceCertificate] = useState("");
-  const [rentalAgreementDraft, setRentalAgreementDraft] = useState("");
-  const [tslrFmb, setTslrFmb] = useState("");
-  const [taxReceipt, setTaxReceipt] = useState("");
-  const [ebReceipt, setEbReceipt] = useState("");
-  const [pattaChitta, setPattaChitta] = useState("");
-  const [approvals, setApprovals] = useState("");
-  const [financeFacing, setFinanceFacing] = useState("");
-  const [hypothecation, setHypothecation] = useState("");
-  const [deviation, setDeviation] = useState("");
+  const [ownershipTitleVerified, setOwnershipTitleVerified] = useState(d?.ownershipTitleVerified ?? "");
+  const [encumbranceCertificate, setEncumbranceCertificate] = useState(d?.encumbranceCertificate ?? "");
+  const [rentalAgreementDraft, setRentalAgreementDraft] = useState(d?.rentalAgreementDraft ?? "");
+  const [tslrFmb, setTslrFmb] = useState(d?.tslrFmb ?? "");
+  const [taxReceipt, setTaxReceipt] = useState(d?.taxReceipt ?? "");
+  const [ebReceipt, setEbReceipt] = useState(d?.ebReceipt ?? "");
+  const [pattaChitta, setPattaChitta] = useState(d?.pattaChitta ?? "");
+  const [approvals, setApprovals] = useState(d?.approvals ?? "");
+  const [financeFacing, setFinanceFacing] = useState(d?.financeFacing ?? "");
+  const [hypothecation, setHypothecation] = useState(d?.hypothecation ?? "");
+  const [deviation, setDeviation] = useState(d?.deviation ?? "");
 
   // ---- Market Analysis ----
-  const [comparativePrice, setComparativePrice] = useState("");
-  const [rentalYield, setRentalYield] = useState("");
-  const [marketPrice, setMarketPrice] = useState("");
-  const [demandArea, setDemandArea] = useState("");
-  const [remark, setRemark] = useState("");
+  const [comparativePrice, setComparativePrice] = useState(d?.comparativePrice ?? "");
+  const [rentalYield, setRentalYield] = useState(d?.rentalYield ?? "");
+  const [marketPrice, setMarketPrice] = useState(d?.marketPrice ?? "");
+  const [demandArea, setDemandArea] = useState(d?.demandArea ?? "");
+  const [remark, setRemark] = useState(d?.remark ?? "");
 
   // ---- Description ----
-  const [description, setDescription] = useState(initialData?.description ?? "");
+  const [description, setDescription] = useState(d?.description ?? "");
 
   // ---- Attachments ----
-  const [attachment1, setAttachment1] = useState("");
-  const [attachment2, setAttachment2] = useState("");
-  const [attachment3, setAttachment3] = useState("");
-  const [attachment4, setAttachment4] = useState("");
-  const [attachment5, setAttachment5] = useState("");
-  const [attachment6, setAttachment6] = useState("");
+  const [attachment1, setAttachment1] = useState(d?.attachment1 ?? "");
+  const [attachment2, setAttachment2] = useState(d?.attachment2 ?? "");
+  const [attachment3, setAttachment3] = useState(d?.attachment3 ?? "");
+  const [attachment4, setAttachment4] = useState(d?.attachment4 ?? "");
+  const [attachment5, setAttachment5] = useState(d?.attachment5 ?? "");
+  const [attachment6, setAttachment6] = useState(d?.attachment6 ?? "");
 
-  // ---- Image upload state ----
+  // ---- Image state: existing (from DB) + newly uploaded ----
+  const [existingImages, setExistingImages] = useState<Array<{ imageUrl: string; imageKey: string; isPrimary: boolean }>>(imgs);
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [uploadingCount, setUploadingCount] = useState(0);
   const [uploadTotalCount, setUploadTotalCount] = useState(0);
@@ -499,12 +507,19 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         // Description
         description: description.trim() || undefined,
 
-        // Images
-        imageUrls: uploadedImages.map((img, idx) => ({
-          imageUrl: img.imageUrl,
-          imageKey: "",
-          isPrimary: idx === 0,
-        })),
+        // Images — merge kept existing images with newly uploaded ones
+        imageUrls: [
+          ...existingImages.map((img, idx) => ({
+            imageUrl: img.imageUrl,
+            imageKey: img.imageKey ?? "",
+            isPrimary: idx === 0 && uploadedImages.length === 0 ? img.isPrimary : false,
+          })),
+          ...uploadedImages.map((img, idx) => ({
+            imageUrl: img.imageUrl,
+            imageKey: "",
+            isPrimary: existingImages.length === 0 && idx === 0,
+          })),
+        ].map((img, idx) => ({ ...img, isPrimary: idx === 0 })),
 
         // Attachments
         attachment1: attachment1.trim() || undefined,
@@ -2710,6 +2725,44 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               First image will be set as primary
             </span>
           </div>
+
+          {/* Existing images (edit mode) */}
+          {existingImages.length > 0 && (
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                Saved Images
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {existingImages.map((img, idx) => (
+                  <div
+                    key={img.imageKey || img.imageUrl}
+                    className="relative border border-border rounded-xl overflow-hidden bg-muted/10 group"
+                  >
+                    <img
+                      src={img.imageUrl}
+                      alt={`Saved image ${idx + 1}`}
+                      className="w-full h-28 object-cover"
+                    />
+                    {img.isPrimary && (
+                      <span className="absolute top-1.5 left-1.5 bg-[#0052FF] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                        Primary
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExistingImages((prev) => prev.filter((_, i) => i !== idx))
+                      }
+                      className="absolute top-1.5 right-1.5 bg-black/60 hover:bg-red-600 text-white rounded-full h-6 w-6 flex items-center justify-center transition-colors"
+                      title="Remove"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Upload progress */}
           {uploadingCount > 0 && (
