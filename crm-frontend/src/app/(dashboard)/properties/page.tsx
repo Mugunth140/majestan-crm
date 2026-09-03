@@ -18,10 +18,11 @@ import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
 import { propertiesApi } from "@/lib/properties-api";
+import { canViewPropertyContacts } from "@/lib/permissions";
 import { BulkImportDialog } from "./_components/BulkImportDialog";
 import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
-import { Edit, Eye, Filter, Plus, RefreshCw, Search, Upload, X } from "lucide-react";
+import { Edit, Eye, Filter, Lock, Plus, RefreshCw, Search, Upload, X } from "lucide-react";
 
 const PROPERTY_TYPE_OPTIONS = [
   { value: "apartment", label: "Apartment" },
@@ -253,15 +254,23 @@ export default function PropertiesPage() {
     {
       id: "owner",
       header: "Owner",
-      cell: ({ row }) =>
-        row.original.ownerName || row.original.ownerPhone ? (
+      cell: ({ row }) => {
+        if (!canViewPropertyContacts()) {
+          return (
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+              <Lock className="h-3 w-3" /> Restricted
+            </span>
+          );
+        }
+        return row.original.ownerName || row.original.ownerPhone ? (
           <div className="min-w-0">
             {row.original.ownerName && <div className="font-medium text-foreground text-sm truncate">{row.original.ownerName}</div>}
             {row.original.ownerPhone && <div className="text-xs text-muted-foreground">{row.original.ownerPhone}</div>}
           </div>
         ) : (
           <span className="text-muted-foreground">-</span>
-        ),
+        );
+      },
     },
     {
       accessorKey: "status",

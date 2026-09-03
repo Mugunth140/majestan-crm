@@ -19,8 +19,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { UploadCloud, Download, Loader2 } from "lucide-react";
+import { UploadCloud, Download, Loader2, Lock } from "lucide-react";
 import { propertiesApi } from "@/lib/properties-api";
+import { canViewPropertyContacts } from "@/lib/permissions";
 
 interface BulkImportDialogProps {
   open: boolean;
@@ -682,7 +683,11 @@ export function BulkImportDialog({
                           </TableCell>
                           <TableCell className="text-sm">{row.city}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">
-                            {row.ownerName || "-"}
+                            {canViewPropertyContacts() ? (row.ownerName || "-") : (
+                              <span className="inline-flex items-center gap-1 text-xs">
+                                <Lock className="h-3 w-3" /> Restricted
+                              </span>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}

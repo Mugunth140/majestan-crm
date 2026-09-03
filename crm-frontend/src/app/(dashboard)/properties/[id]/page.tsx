@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { propertiesApi } from "@/lib/properties-api";
+import { canViewPropertyContacts } from "@/lib/permissions";
+import { LockedField } from "@/components/shared/locked-field";
 import {
   ArrowLeft,
   Edit,
@@ -256,16 +258,22 @@ export default function PropertyViewPage() {
           </Section>
 
           <Section title="Owner & Agent" icon={<User className="h-4 w-4 text-teal-500" />}>
-            <SectionField label="Owner Name" value={property.ownerName} />
-            <SectionField label="Owner Phone" value={property.ownerPhone} />
-            <SectionField label="Owner Email" value={property.ownerEmail} />
-            <SectionField label="Tenant Occupied" value={property.tenantOccupied} />
-            <SectionField label="Agent Name" value={property.agentName} />
-            <SectionField label="Agency" value={property.agencyName} />
-            <SectionField label="Commission Terms" value={property.commissionTerms} />
-            <SectionField label="Alternate Name" value={property.alternateName} />
-            <SectionField label="Alternate Phone" value={property.alternatePhone} />
-            <SectionField label="Alternate Email" value={property.alternateEmail} />
+            {!canViewPropertyContacts() ? (
+              <LockedField wide label="Contact details" />
+            ) : (
+              <>
+                <SectionField label="Owner Name" value={property.ownerName} />
+                <SectionField label="Owner Phone" value={property.ownerPhone} />
+                <SectionField label="Owner Email" value={property.ownerEmail} />
+                <SectionField label="Tenant Occupied" value={property.tenantOccupied} />
+                <SectionField label="Agent Name" value={property.agentName} />
+                <SectionField label="Agency" value={property.agencyName} />
+                <SectionField label="Commission Terms" value={property.commissionTerms} />
+                <SectionField label="Alternate Name" value={property.alternateName} />
+                <SectionField label="Alternate Phone" value={property.alternatePhone} />
+                <SectionField label="Alternate Email" value={property.alternateEmail} />
+              </>
+            )}
           </Section>
         </div>
 

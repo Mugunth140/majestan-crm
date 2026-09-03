@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { SiteApiService } from './site-api.service';
+import { PermissionsService, VIEW_PROPERTY_CONTACTS } from '../permissions/permissions.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { BulkImportPropertyDto } from './dto/bulk-import-property.dto';
@@ -94,7 +95,31 @@ function str(v: any): string | undefined {
 export class PropertiesService {
   private citiesCache: { at: number; cities: any[]; sublocations: any[]; amenities: any[] } | null = null;
 
-  constructor(private readonly siteApi: SiteApiService) {}
+  constructor(
+    private readonly siteApi: SiteApiService,
+    private readonly permissionsService: PermissionsService,
+  ) {}
+
+  // Owner/agent contact keys — omitted entirely for callers without the grant.
+  private static readonly CONTACT_KEYS = [
+    'ownerName', 'ownerPhone', 'ownerEmail',
+    'agentName', 'agencyName', 'commissionTerms',
+    'alternateName', 'alternatePhone', 'alternateEmail',
+  ];
+
+  private async canSeeContacts(reqUser: any): Promise<boolean> {
+    if (!reqUser?.sub && !reqUser?.id) return false;
+    return this.permissionsService.hasPermission(
+      Number(reqUser.sub ?? reqUser.id),
+      VIEW_PROPERTY_CONTACTS,
+    );
+  }
+
+  private stripContacts<T extends Record<string, any>>(record: T): T {
+    const copy: Record<string, any> = { ...record };
+    for (const k of PropertiesService.CONTACT_KEYS) delete copy[k];
+    return copy as T;
+  }
 
   private async formDataCached(): Promise<{ cities: any[]; sublocations: any[]; amenities: any[] }> {
     if (this.citiesCache && Date.now() - this.citiesCache.at < 5 * 60 * 1000) {
@@ -113,7 +138,7 @@ export class PropertiesService {
   }
 
   // ── findAll ────────────────────────────────────────────────────────────────
-  async findAll(query: PropertyQueryDto) {
+  async findAll(query: PropertyQueryDto, reqUser?: any) {
     const rawPage = Number(query.page) || 1;
     const rawLimit = Number(query.limit) || 10;
     const page = Math.max(1, rawPage);
@@ -135,8 +160,9 @@ export class PropertiesService {
     const res = await this.siteApi.get(`/admin/properties/all?${params.toString()}`);
     const items = res?.items ?? [];
     const total = Number(res?.total) || 0;
+    const canSee = await this.canSeeContacts(reqUser);
     return {
-      data: items,
+      data: canSee ? items : items.map((it: any) => this.stripContacts(it)),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
@@ -163,7 +189,7 @@ export class PropertiesService {
   }
 
   // ── findOne ────────────────────────────────────────────────────────────────
-  async findOne(id: number) {
+  async findOne(id: number, reqUser?: any) {
     let record: any;
     try {
       record = await this.siteApi.get(`/admin/properties/by-id/${id}`);
@@ -172,6 +198,8 @@ export class PropertiesService {
       throw e;
     }
     if (!record) throw new NotFoundException(`Property #${id} not found`);
+    const canSee = await this.canSeeContacts(reqUser);
+    if (!canSee) record = this.stripContacts(record);
     const loc = (record.propertyLocations ?? [])[0] ?? null;
     return {
       ...record,
@@ -443,21 +471,29 @@ export class PropertiesService {
   }
 
   // ── create ─────────────────────────────────────────────────────────────────
-  async create(dto: CreatePropertyDto) {
-    const payload = await this.buildSitePayload(dto as unknown as Record<string, any>);
+  async create(dto: CreatePropertyDto, reqUser?: any) {
+    const body = { ...(dto as unknown as Record<string, any>) };
+    if (!(await this.canSeeContacts(reqUser))) {
+      for (const k of PropertiesService.CONTACT_KEYS) delete body[k];
+    }
+    const payload = await this.buildSitePayload(body);
     const created = await this.siteApi.post(`/admin/properties/${payload.propertyType}`, payload);
-    return this.findOne(created.id);
+    return this.findOne(created.id, reqUser);
   }
 
   // ── update ─────────────────────────────────────────────────────────────────
-  async update(id: number, dto: UpdatePropertyDto) {
-    const existing = await this.findOne(id);
+  async update(id: number, dto: UpdatePropertyDto, reqUser?: any) {
+    const existing = await this.findOne(id, reqUser);
     // NOTE: property type changes are ignored — the site API keys routes,
     // slugs and detail lookups off the stored type.
-    const payload = await this.buildSitePayload(dto as unknown as Record<string, any>);
+    const body = { ...(dto as unknown as Record<string, any>) };
+    if (!(await this.canSeeContacts(reqUser))) {
+      for (const k of PropertiesService.CONTACT_KEYS) delete body[k];
+    }
+    const payload = await this.buildSitePayload(body);
     delete (payload as any).propertyType;
     await this.siteApi.patch(`/admin/properties/${existing.propertyType}/${id}`, payload);
-    return this.findOne(id);
+    return this.findOne(id, reqUser);
   }
 
   // ── toggleVisibility ───────────────────────────────────────────────────────
@@ -483,7 +519,8 @@ export class PropertiesService {
   }
 
   // ── bulkImport ─────────────────────────────────────────────────────────────
-  async bulkImport(dto: BulkImportPropertyDto): Promise<{ created: number; skipped: number; errors?: { row: number; reason: string }[] }> {
+  async bulkImport(dto: BulkImportPropertyDto, reqUser?: any): Promise<{ created: number; skipped: number; errors?: { row: number; reason: string }[] }> {
+    const canSeeContacts = await this.canSeeContacts(reqUser);
     let created = 0;
     let skipped = 0;
     const errors: { row: number; reason: string }[] = [];
@@ -531,8 +568,9 @@ export class PropertiesService {
           country: city.country_name ?? city.countryName ?? 'India',
           cityId: Number(city.id),
           ...(sub ? { sublocationId: Number(sub.id) } : {}),
-          ownerName: row.ownerName || undefined,
-          ownerPhone: row.ownerPhone || undefined,
+          ...(canSeeContacts
+            ? { ownerName: row.ownerName || undefined, ownerPhone: row.ownerPhone || undefined }
+            : {}),
           negotiable: false,
           details: {
             bedrooms: num(row.bedrooms) ?? 0,

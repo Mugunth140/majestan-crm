@@ -39,9 +39,18 @@ function UserFormContent() {
     join_date: "",
     qualification: "",
     is_active: true,
+    can_view_contacts: false,
   });
 
+  const [isAdminViewer, setIsAdminViewer] = useState(false);
+
   useEffect(() => {
+    try {
+      const me = JSON.parse(localStorage.getItem("crm_user") || "{}");
+      const r = me?.role?.name || me?.role || "";
+      setIsAdminViewer(r === "Admin" || r === "Super Admin");
+    } catch { /* ignore */ }
+
     const fetchMasterData = async () => {
       try {
         const [rolesRes, deptRes] = await Promise.all([
@@ -82,6 +91,7 @@ function UserFormContent() {
             join_date: data.data.join_date || "",
             qualification: data.data.qualification || "",
             is_active: data.data.is_active,
+            can_view_contacts: (data.data.permissions ?? []).includes("properties.view_contacts"),
           });
         }
       } catch {
@@ -119,8 +129,11 @@ function UserFormContent() {
       const url = editId ? `${API_URL}/users/${editId}` : `${API_URL}/users`;
       const method = editId ? "PUT" : "POST";
       
+      const { can_view_contacts, ...rest } = formData;
+      void can_view_contacts;
       const payload: Record<string, any> = {
-        ...formData,
+        ...rest,
+        permissionKeys: formData.can_view_contacts ? ["properties.view_contacts"] : [],
         role_id: roleIdNum,
         department_id: requiresDept && formData.department_id ? parseInt(formData.department_id) : null,
         dob: formData.dob || null,
@@ -253,9 +266,9 @@ function UserFormContent() {
             <div className="flex flex-col gap-2 justify-center">
               <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Account Status</label>
               <div className="flex items-center gap-3 h-12 px-2">
-                <Switch 
-                  checked={formData.is_active} 
-                  onCheckedChange={v => setFormData({...formData, is_active: v})} 
+                <Switch
+                  checked={formData.is_active}
+                  onCheckedChange={v => setFormData({...formData, is_active: v})}
                   className="shadow-sm scale-125 origin-left"
                 />
                 <span className="text-[14px] font-semibold text-foreground/90 ml-1">{formData.is_active ? "Active User" : "Inactive / Disabled"}</span>
@@ -263,6 +276,26 @@ function UserFormContent() {
             </div>
           </div>
         </div>
+
+        {isAdminViewer && (
+          <>
+            <div className="h-px bg-border/40 w-full my-10" />
+            <div className="mb-8">
+              <h3 className="text-lg font-bold text-foreground mb-8">Permissions</h3>
+              <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 px-4 py-4">
+                <Switch
+                  checked={formData.can_view_contacts}
+                  onCheckedChange={v => setFormData({...formData, can_view_contacts: v})}
+                  className="shadow-sm scale-125 origin-left"
+                />
+                <div>
+                  <p className="text-[14px] font-semibold text-foreground/90">Can view owner & agent contacts</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Grants access to property owner and agent phone/email in list, detail and edit views. Admins always have this.</p>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
 
         <div className="h-px bg-border/40 w-full my-10" />
 

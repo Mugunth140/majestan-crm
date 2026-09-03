@@ -11,6 +11,7 @@ import { FormSelect } from "@/components/shared/form-select";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { apiFetch } from "@/lib/api-fetch";
 import { propertiesApi } from "@/lib/properties-api";
+import { canViewPropertyContacts } from "@/lib/permissions";
 export interface Property {
   id: number;
   title: string;
@@ -2755,6 +2756,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         )}
 
         {/* ---- Owner ---- */}
+        {canViewPropertyContacts() && (
         <div className="bg-card border rounded-2xl p-8 shadow-sm">
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Owner</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -2791,8 +2793,10 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             </div>
           </div>
         </div>
+        )}
 
         {/* ---- Agent ---- */}
+        {canViewPropertyContacts() && (
         <div className="bg-card border rounded-2xl p-8 shadow-sm">
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Agent</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -2859,6 +2863,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             </div>
           </div>
         </div>
+        )}
 
         {/* ---- Documents & Verification ---- */}
         <div className="bg-card border rounded-2xl p-8 shadow-sm">

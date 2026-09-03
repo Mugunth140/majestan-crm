@@ -3,12 +3,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../../database/entities/user.entity';
 import * as bcrypt from 'bcrypt';
+import { PermissionsService } from '../permissions/permissions.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly permissionsService: PermissionsService,
   ) {}
 
   private validateRoleDepartment(roleId: number, departmentId: number | null): number | null {
@@ -24,10 +26,16 @@ export class UsersService {
   }
 
   async findAll() {
-    return this.userRepository.find({
+    const users = await this.userRepository.find({
       relations: { role: true, department: true },
       order: { created_at: 'DESC' },
     });
+    return Promise.all(
+      users.map(async (u) => ({
+        ...u,
+        permissions: await this.permissionsService.listUserPermissions(u.id),
+      })),
+    );
   }
 
   async findOne(id: number) {
@@ -36,7 +44,10 @@ export class UsersService {
       relations: { role: true, department: true },
     });
     if (!user) throw new NotFoundException('User not found');
-    return user;
+    return {
+      ...user,
+      permissions: await this.permissionsService.listUserPermissions(user.id),
+    };
   }
 
   async create(body: any) {
@@ -62,7 +73,11 @@ export class UsersService {
       qualification: body.qualification || null,
       is_active: body.is_active ?? true,
     });
-    return this.userRepository.save(user);
+    const saved = await this.userRepository.save(user);
+    if (Array.isArray(body.permissionKeys)) {
+      await this.permissionsService.setUserPermissions(saved.id, body.permissionKeys);
+    }
+    return saved;
   }
 
   async update(id: number, body: any) {
@@ -105,7 +120,11 @@ export class UsersService {
     user.qualification = body.qualification !== undefined ? (body.qualification || null) : user.qualification;
     user.is_active = body.is_active ?? user.is_active;
 
-    return this.userRepository.save(user);
+    const saved = await this.userRepository.save(user);
+    if (Array.isArray(body.permissionKeys)) {
+      await this.permissionsService.setUserPermissions(saved.id, body.permissionKeys);
+    }
+    return saved;
   }
 
   async delete(id: number) {

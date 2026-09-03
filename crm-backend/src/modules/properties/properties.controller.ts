@@ -12,6 +12,7 @@ import {
   UseInterceptors,
   BadRequestException,
   ParseIntPipe,
+  Req,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -28,8 +29,8 @@ export class PropertiesController {
   constructor(private readonly propertiesService: PropertiesService) {}
 
   @Get()
-  async findAll(@Query() query: PropertyQueryDto) {
-    const data = await this.propertiesService.findAll(query);
+  async findAll(@Query() query: PropertyQueryDto, @Req() req: any) {
+    const data = await this.propertiesService.findAll(query, req.user);
     return { success: true, ...data };
   }
 
@@ -77,26 +78,26 @@ export class PropertiesController {
   }
 
   @Post('bulk')
-  async bulkImport(@Body() dto: BulkImportPropertyDto) {
-    const result = await this.propertiesService.bulkImport(dto);
+  async bulkImport(@Body() dto: BulkImportPropertyDto, @Req() req: any) {
+    const result = await this.propertiesService.bulkImport(dto, req.user);
     return { success: true, ...result };
   }
 
   @Get(':id')
-  async findOne(@Param('id', ParseIntPipe) id: number) {
-    const data = await this.propertiesService.findOne(id);
+  async findOne(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    const data = await this.propertiesService.findOne(id, req.user);
     return { success: true, data };
   }
 
   @Post()
-  async create(@Body() dto: CreatePropertyDto) {
-    const data = await this.propertiesService.create(dto);
+  async create(@Body() dto: CreatePropertyDto, @Req() req: any) {
+    const data = await this.propertiesService.create(dto, req.user);
     return { success: true, data };
   }
 
   @Patch(':id')
-  async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdatePropertyDto) {
-    const data = await this.propertiesService.update(id, dto);
+  async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdatePropertyDto, @Req() req: any) {
+    const data = await this.propertiesService.update(id, dto, req.user);
     return { success: true, data };
   }
 

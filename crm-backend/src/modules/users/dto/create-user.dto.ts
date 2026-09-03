@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsOptional, IsBoolean, IsInt, IsDateString } from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsBoolean, IsInt, IsDateString, IsArray } from 'class-validator';
 
 export class CreateUserDto {
   @IsString()
@@ -52,4 +52,9 @@ export class CreateUserDto {
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  permissionKeys?: string[];
 }
