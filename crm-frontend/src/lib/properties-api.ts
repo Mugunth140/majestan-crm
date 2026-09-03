@@ -1,6 +1,7 @@
 import { apiFetch } from './api-fetch';
 
-const BASE = '/api/v1/properties';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+const BASE = `${API_URL}/properties`;
 
 export const propertiesApi = {
   list: (params: Record<string, any>) => {

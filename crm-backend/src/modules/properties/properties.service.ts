@@ -107,7 +107,10 @@ export class PropertiesService {
       ]);
 
     if (query.search) {
-      qb.andWhere('(p.title LIKE :search OR p.owner_name LIKE :search)', { search: `%${query.search}%` });
+      qb.andWhere(
+        '(p.title LIKE :search OR p.owner_name LIKE :search OR p.property_code LIKE :search OR p.city LIKE :search)',
+        { search: `%${query.search}%` },
+      );
     }
     if (query.propertyType) {
       qb.andWhere('p.property_type = :propertyType', { propertyType: query.propertyType });
@@ -115,15 +118,28 @@ export class PropertiesService {
     if (query.listingType) {
       qb.andWhere('p.listing_type = :listingType', { listingType: query.listingType });
     }
-    if (query.status) {
+    if (query.status === 'archived') {
+      qb.andWhere(`p.status != 'available'`);
+    } else if (query.status) {
       qb.andWhere('p.status = :status', { status: query.status });
     }
     if (query.cityId) {
       qb.andWhere('c.id = :cityId', { cityId: Number(query.cityId) });
     }
 
-    const total = await qb.getCount();
-    const data = await qb.limit(limit).offset(offset).getRawMany();
+    // COUNT(DISTINCT) — the location joins fan out one row per location,
+    // so a plain getCount() would inflate the total and break pagination.
+    const countRaw = await qb
+      .clone()
+      .select('COUNT(DISTINCT p.id)', 'total')
+      .getRawOne();
+    const total = Number(countRaw?.total) || 0;
+    const data = await qb
+      .orderBy('p.created_at', 'DESC')
+      .addOrderBy('p.id', 'DESC')
+      .limit(limit)
+      .offset(offset)
+      .getRawMany();
 
     return {
       data,

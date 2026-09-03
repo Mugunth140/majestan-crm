@@ -11,7 +11,23 @@ import { FormSelect } from "@/components/shared/form-select";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { apiFetch } from "@/lib/api-fetch";
 import { propertiesApi } from "@/lib/properties-api";
-import { Property } from "./PropertyTable";
+export interface Property {
+  id: number;
+  title: string;
+  propertyType: string;
+  listingType: string;
+  city?: string;
+  price?: number;
+  status?: string;
+  ownerName?: string;
+  ownerPhone?: string;
+  ownerEmail?: string;
+  description?: string;
+  propertyDetails?: any;
+  propertyImages?: any[];
+  propertyLocations?: any[];
+  [key: string]: any;
+}
 import {
   ArrowLeft,
   Loader2,
