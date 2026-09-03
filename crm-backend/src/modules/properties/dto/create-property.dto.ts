@@ -1,28 +1,94 @@
 import {
+  IsArray,
   IsBoolean,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreatePropertyDto {
+  @IsString()
   title!: string;
+
+  @IsString()
   listingType!: 'Sell' | 'Rent';
+
+  @IsString()
   propertyType!: 'apartment' | 'villa' | 'plot' | 'commercial' | 'coworking' | 'farmland' | 'industrial' | 'individual_portion';
+
+  @IsOptional() @Type(() => Number) @IsNumber()
   price!: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
   cityId!: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
   sublocationId?: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
   bedrooms?: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
   bathrooms?: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
   areaSqft?: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  parking?: number;
+
+  @IsOptional() @IsBoolean()
+  furnished?: boolean;
+
+  @IsOptional() @IsString()
+  furnishingStatus?: string;
+
+  @IsOptional() @IsString()
+  propertyFacing?: string;
+
+  @IsOptional() @IsString()
+  propertyAge?: string;
+
+  @IsOptional() @IsString()
+  floorNumber?: string;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  totalFloors?: number;
+
+  @IsOptional() @IsString()
   ownerName?: string;
+
+  @IsOptional() @IsString()
   ownerPhone?: string;
+
+  @IsOptional() @IsString()
   ownerEmail?: string;
+
+  @IsOptional() @IsString()
   description?: string;
+
+  @IsOptional() @IsString()
   status?: 'available' | 'sold' | 'rented' | 'unavailable';
+
+  @IsOptional() @IsBoolean()
   negotiable?: boolean;
+
+  @IsOptional() @IsArray()
   imageUrls?: { imageUrl: string; imageKey: string; isPrimary: boolean }[];
+
+  @IsOptional() @IsObject()
+  locationData?: { address?: string; latitude?: number; longitude?: number };
+
+  @IsOptional() @IsString()
+  maintenanceCharges?: string;
+
+  @IsOptional() @IsString()
+  securityDeposit?: string;
+
+  @IsOptional() @IsString()
+  reraNumber?: string;
 
   // ── Property table: alternate contact ──────────────────────────────────────
   @IsOptional() @IsString()
@@ -351,4 +417,114 @@ export class CreatePropertyDto {
 
   @IsOptional() @IsString()
   accessibility?: string;
+
+  // ── Type-specific spec fields (all optional; only the block matching
+  // ── propertyType is forwarded by the service) ──────────────────────────
+  @IsOptional() @Type(() => Number) @IsNumber()
+  builtUpArea?: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  carpetArea?: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  superBuiltUpArea?: number;
+
+  @IsOptional() @IsString()
+  plotArea?: string;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  balconies?: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  plotSizeCents?: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  plotLength?: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  plotWidth?: number;
+
+  @IsOptional() @IsBoolean()
+  boundaryWall?: boolean;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  carParking?: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  bikeParking?: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  ceilingHeightFt?: number;
+
+  @IsOptional() @IsBoolean()
+  powerBackup?: boolean;
+
+  @IsOptional() @IsBoolean()
+  hasCentralAc?: boolean;
+
+  @IsOptional() @IsBoolean()
+  hasPantry?: boolean;
+
+  @IsOptional() @IsString()
+  commercialAmenities?: string;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  availableWorkstations?: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  privateCabins?: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  meetingRooms?: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  minSeats?: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  rentPerSeat?: number;
+
+  @IsOptional() @IsBoolean()
+  coworkingPowerBackup?: boolean;
+
+  @IsOptional() @IsBoolean()
+  coworkingHasPantry?: boolean;
+
+  @IsOptional() @IsString()
+  industrialPropertyUse?: string;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  coveredArea?: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  openArea?: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  industrialCeilingHeight?: number;
+
+  @IsOptional() @IsString()
+  floorType?: string;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  powerSupplyHp?: number;
+
+  @IsOptional() @IsString()
+  waterSupply?: string;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  truckParking?: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  industrialCarParking?: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  industrialBikeParking?: number;
+
+  @IsOptional() @IsBoolean()
+  industrialFireSafety?: boolean;
+
+  @IsOptional() @IsBoolean()
+  industrialPowerBackup?: boolean;
+
+  @IsOptional() @IsBoolean()
+  heavyVehicleAccess?: boolean;
 }

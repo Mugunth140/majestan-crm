@@ -27,7 +27,13 @@ export class PropertiesController {
     return { success: true, ...data };
   }
 
-  // NOTE: /form-data and /bulk declared BEFORE /:id to avoid param conflict
+  // NOTE: /form-data, /bulk and /presigned-url declared BEFORE /:id to avoid param conflict
+  @Get('presigned-url')
+  async presignedUrl(@Query('fileName') fileName: string, @Query('fileType') fileType: string) {
+    const data = await this.propertiesService.presignedUrl(fileName, fileType);
+    return { success: true, data };
+  }
+
   @Get('form-data')
   async findFormData() {
     const data = await this.propertiesService.findFormData();

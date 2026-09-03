@@ -13,6 +13,10 @@ export const propertiesApi = {
     return apiFetch(`${BASE}?${q}`).then(r => r.json());
   },
   formData: () => apiFetch(`${BASE}/form-data`).then(r => r.json()),
+  presignedUrl: (fileName: string, fileType: string) => {
+    const q = new URLSearchParams({ fileName, fileType });
+    return apiFetch(`${BASE}/presigned-url?${q}`).then(r => r.json());
+  },
   getOne: (id: number) => apiFetch(`${BASE}/${id}`).then(r => r.json()),
   create: (body: any) =>
     apiFetch(BASE, {

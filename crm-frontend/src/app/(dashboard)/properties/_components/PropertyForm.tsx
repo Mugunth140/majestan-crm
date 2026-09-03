@@ -87,6 +87,7 @@ interface FormDataShape {
 
 interface UploadedImage {
   imageUrl: string;
+  imageKey: string;
   fileName: string;
   previewUrl: string;
 }
@@ -375,13 +376,11 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       try {
-        // 1. Get presigned URL from site backend (via /site-api rewrite)
-        const presignedRes = await apiFetch(
-          `/site-api/properties/presigned-url?fileName=${encodeURIComponent(file.name)}&fileType=${encodeURIComponent(file.type)}`
-        );
-        if (!presignedRes.ok) throw new Error("Failed to get presigned URL");
-        const presignedData = await presignedRes.json();
-        const { uploadUrl, imageUrl } = presignedData;
+        // 1. Get presigned URL via CRM backend (proxies site R2 issuance)
+        const presigned = await propertiesApi.presignedUrl(file.name, file.type);
+        const uploadUrl = presigned?.data?.url ?? presigned?.url;
+        const imageKey = presigned?.data?.key ?? presigned?.key;
+        if (!uploadUrl || !imageKey) throw new Error("Failed to get presigned URL");
 
         // 2. PUT file directly to R2 (no auth header)
         const uploadRes = await fetch(uploadUrl, {
@@ -391,9 +390,10 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         });
         if (!uploadRes.ok) throw new Error("Failed to upload image");
 
-        // 3. Store result
+        // 3. Store result (site processes the temp key at save time)
         newImages.push({
-          imageUrl,
+          imageUrl: imageKey,
+          imageKey,
           fileName: file.name,
           previewUrl: URL.createObjectURL(file),
         });
@@ -423,6 +423,8 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
     if (!listingType) return "Listing type is required.";
     if (!propertyType) return "Property type is required.";
     if (!price || isNaN(Number(price))) return "A valid price is required.";
+    if (!cityId) return "City is required.";
+    if (!sublocationId) return "Locality is required.";
     return null;
   };
 
@@ -531,8 +533,8 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             isPrimary: idx === 0 && uploadedImages.length === 0 ? img.isPrimary : false,
           })),
           ...uploadedImages.map((img, idx) => ({
-            imageUrl: img.imageUrl,
-            imageKey: "",
+            imageUrl: img.imageKey || img.imageUrl,
+            imageKey: img.imageKey || "",
             isPrimary: existingImages.length === 0 && idx === 0,
           })),
         ].map((img, idx) => ({ ...img, isPrimary: idx === 0 })),

@@ -35,6 +35,9 @@ services:
     env_file: .env
     environment:
       - PORT=8000
+      - SITE_API_BASE_URL=${SITE_API_BASE_URL:-http://site-backend:5000/api/v1}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - majestan_network
     restart: unless-stopped
