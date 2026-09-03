@@ -204,6 +204,12 @@ export class PropertiesService {
       })),
       faqs: record.faqs ?? [],
       amenityIds: (record.propertyAmenities ?? []).map((pa: any) => pa.amenityId),
+      amenitiesList: (record.propertyAmenities ?? []).map((pa: any) => ({
+        id: pa.amenityId ?? null,
+        name: pa.amenity?.name ?? null,
+        category: pa.amenity?.category ?? null,
+      })),
+      propertyUnits: record.propertyUnits ?? [],
     };
   }
 
@@ -289,6 +295,7 @@ export class PropertiesService {
 
   private buildDetails(dto: Record<string, any>): Record<string, any> {
     const details: Record<string, any> = {};
+    const renamedSources = new Set(Object.keys(RENAMED_DETAILS_KEYS));
     for (const [from, to] of Object.entries(RENAMED_DETAILS_KEYS)) {
       if (dto[from] === undefined) continue;
       if (NUMERIC_DETAILS_KEYS.has(to)) {
@@ -301,7 +308,7 @@ export class PropertiesService {
       }
     }
     for (const key of NUMERIC_DETAILS_KEYS) {
-      if (dto[key] === undefined || key in details) continue;
+      if (dto[key] === undefined || key in details || renamedSources.has(key)) continue;
       const v = num(dto[key]);
       if (v !== undefined) details[key] = v;
     }
@@ -325,16 +332,16 @@ export class PropertiesService {
       if (v !== undefined) details['amenities'] = v;
     }
     for (const key of PASSTHROUGH_DETAILS_KEYS) {
-      if (dto[key] === undefined) continue;
+      if (dto[key] === undefined || renamedSources.has(key)) continue;
       const v = str(dto[key]);
       if (v !== undefined) details[key] = v;
     }
     for (const key of BOOLEAN_DETAILS_KEYS) {
-      if (dto[key] === undefined || key in details) continue;
+      if (dto[key] === undefined || key in details || renamedSources.has(key)) continue;
       details[key] = coerceBool(dto[key]);
     }
     for (const key of ARRAY_DETAILS_KEYS) {
-      if (dto[key] === undefined || key in details) continue;
+      if (dto[key] === undefined || key in details || renamedSources.has(key)) continue;
       if (Array.isArray(dto[key])) details[key] = dto[key];
       else if (dto[key] != null && String(dto[key]).trim() !== '') details[key] = [String(dto[key]).trim()];
       // empty / non-array → drop (avoid sending {floorsOccupied: null})

@@ -6,7 +6,7 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 
 export class CreatePropertyDto {
   @IsString()
@@ -465,7 +465,7 @@ export class CreatePropertyDto {
   @IsOptional() @Type(() => Number) @IsNumber()
   superBuiltUpArea?: number;
 
-  @IsOptional() @IsString()
+  @IsOptional() @Transform(({ value }) => (value === undefined || value === null ? value : String(value))) @IsString()
   plotArea?: string;
 
   @IsOptional() @Type(() => Number) @IsNumber()
@@ -571,4 +571,7 @@ export class CreatePropertyDto {
   @IsOptional() @IsArray() floorsOccupied?: string[];
   @IsOptional() @IsBoolean() hasRestroom?: boolean;
   @IsOptional() @IsArray() roomDimensions?: { name: string; dimensions: string }[];
+
+  @IsOptional() @IsString() suitableFor?: string;
+  @IsOptional() @IsString() roadWidth?: string;
 }
