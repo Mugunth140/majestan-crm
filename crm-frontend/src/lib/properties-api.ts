@@ -17,6 +17,16 @@ export const propertiesApi = {
     const q = new URLSearchParams({ fileName, fileType });
     return apiFetch(`${BASE}/presigned-url?${q}`).then(r => r.json());
   },
+  uploadImages: (files: File[]) => {
+    const form = new FormData();
+    files.forEach((f) => form.append('images', f));
+    return apiFetch(`${BASE}/upload`, { method: 'POST', body: form }).then(r => r.json());
+  },
+  uploadDocs: (files: File[]) => {
+    const form = new FormData();
+    files.forEach((f) => form.append('documents', f));
+    return apiFetch(`${BASE}/upload-docs`, { method: 'POST', body: form }).then(r => r.json());
+  },
   getOne: (id: number) => apiFetch(`${BASE}/${id}`).then(r => r.json()),
   create: (body: any) =>
     apiFetch(BASE, {

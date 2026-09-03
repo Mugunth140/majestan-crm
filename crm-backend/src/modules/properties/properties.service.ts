@@ -169,6 +169,15 @@ export class PropertiesService {
       bathrooms: record.propertyDetails?.bathrooms ?? null,
       areaSqft: record.propertyDetails?.areaSqft ?? null,
       images: record.propertyImages ?? [],
+      documents: (record.propertyFiles ?? []).map((pf: any) => ({
+        id: pf.id ?? null,
+        fileKey: pf.file?.fileKey ?? null,
+        fileUrl: pf.file?.fileUrl ?? null,
+        fileName: pf.file?.fileName ?? pf.title ?? null,
+        mimeType: pf.file?.mimeType ?? null,
+        documentType: pf.documentType ?? 'other',
+        title: pf.title ?? null,
+      })),
     };
   }
 
@@ -176,6 +185,62 @@ export class PropertiesService {
   async presignedUrl(fileName: string, fileType: string) {
     const q = new URLSearchParams({ fileName, fileType });
     return this.siteApi.get(`/properties/presigned-url?${q.toString()}`);
+  }
+
+  private async putToR2(file: Express.Multer.File): Promise<string> {
+    const q = new URLSearchParams({ fileName: file.originalname, fileType: file.mimetype });
+    const presigned = await this.siteApi.get(`/properties/presigned-url?${q.toString()}`);
+    const uploadUrl = presigned?.url;
+    const fileKey = presigned?.key;
+    if (!uploadUrl || !fileKey) {
+      throw new Error(`Failed to prepare upload for ${file.originalname}`);
+    }
+    const put = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': file.mimetype },
+      body: file.buffer as unknown as BodyInit,
+      signal: AbortSignal.timeout(60000),
+    });
+    if (!put.ok) {
+      throw new Error(`Failed to upload ${file.originalname}`);
+    }
+    return fileKey;
+  }
+
+  // ── direct upload: files in → R2 keys out (no URLs for callers to handle) ──
+  async uploadImages(files: Express.Multer.File[]): Promise<{ imageKey: string; fileName: string }[]> {
+    const allowed = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+    const results: { imageKey: string; fileName: string }[] = [];
+    for (const file of files) {
+      if (!allowed.has(file.mimetype)) {
+        throw new Error(`Unsupported image type: ${file.originalname}`);
+      }
+      results.push({ imageKey: await this.putToR2(file), fileName: file.originalname });
+    }
+    return results;
+  }
+
+  async uploadDocuments(files: Express.Multer.File[]): Promise<{ fileKey: string; fileName: string; mimeType: string; fileSize: number }[]> {
+    const allowed = new Set([
+      'application/pdf', 'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain', 'image/jpeg', 'image/png', 'image/webp',
+    ]);
+    const results: { fileKey: string; fileName: string; mimeType: string; fileSize: number }[] = [];
+    for (const file of files) {
+      if (!allowed.has(file.mimetype)) {
+        throw new Error(`Unsupported document type: ${file.originalname}`);
+      }
+      results.push({
+        fileKey: await this.putToR2(file),
+        fileName: file.originalname,
+        mimeType: file.mimetype,
+        fileSize: file.size,
+      });
+    }
+    return results;
   }
 
   private buildDetails(dto: Record<string, any>): Record<string, any> {
@@ -250,6 +315,18 @@ export class PropertiesService {
         fileType: 'IMAGE',
         fileUrl: img.imageKey || img.imageUrl,
         fileKey: img.imageKey || img.imageUrl,
+      }));
+    }
+
+    if ((dto as any).documents !== undefined) {
+      payload.documents = ((dto as any).documents as any[]).map((doc) => ({
+        fileKey: doc.fileKey,
+        fileName: doc.fileName,
+        mimeType: doc.mimeType,
+        fileSizeBytes: doc.fileSize,
+        documentType: doc.documentType || 'other',
+        title: doc.title || doc.fileName,
+        isPublic: true,
       }));
     }
 

@@ -104,6 +104,7 @@ export default function PropertyViewPage() {
   const statusKey = (property.status || "").toLowerCase();
   const det = property.propertyDetails ?? {};
   const images: any[] = property.propertyImages ?? [];
+  const documents: any[] = property.documents ?? [];
   const loc = (property.propertyLocations ?? [])[0] ?? {};
   const mapsUrl = loc.latitude && loc.longitude
     ? `https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`
@@ -284,6 +285,35 @@ export default function PropertyViewPage() {
             </div>
           )}
         </div>
+
+        {/* Documents */}
+        {documents.length > 0 && (
+          <div className="bg-card border rounded-2xl p-6 shadow-sm">
+            <h3 className="text-base font-bold text-foreground border-b pb-3 mb-4 flex items-center gap-2">
+              <FileText className="h-4 w-4 text-emerald-500" /> Documents
+            </h3>
+            <div className="space-y-2">
+              {documents.map((doc: any, idx: number) => (
+                <a
+                  key={doc.id ?? idx}
+                  href={doc.fileUrl || "#"}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-between gap-3 p-3 border rounded-xl bg-muted/10 hover:bg-muted/30 transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{doc.fileName || doc.title || "Document"}</p>
+                      <p className="text-xs text-muted-foreground capitalize">{(doc.documentType || "other").replace(/_/g, " ")}</p>
+                    </div>
+                  </div>
+                  <span className="text-sm font-medium text-[#0052FF] shrink-0">View</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Meta */}
         <div className="bg-card border rounded-2xl p-6 shadow-sm">

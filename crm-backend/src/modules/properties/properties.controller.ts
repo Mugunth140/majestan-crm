@@ -8,7 +8,12 @@ import {
   Param,
   Query,
   UseGuards,
+  UploadedFiles,
+  UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { PropertiesService } from './properties.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
@@ -27,10 +32,40 @@ export class PropertiesController {
     return { success: true, ...data };
   }
 
-  // NOTE: /form-data, /bulk and /presigned-url declared BEFORE /:id to avoid param conflict
+  // NOTE: /form-data, /bulk, /presigned-url and /upload declared BEFORE /:id to avoid param conflict
   @Get('presigned-url')
   async presignedUrl(@Query('fileName') fileName: string, @Query('fileType') fileType: string) {
     const data = await this.propertiesService.presignedUrl(fileName, fileType);
+    return { success: true, data };
+  }
+
+  @Post('upload')
+  @UseInterceptors(
+    FilesInterceptor('images', 10, {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024, files: 10 },
+    }),
+  )
+  async uploadImages(@UploadedFiles() files: Express.Multer.File[]) {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('No image files received');
+    }
+    const data = await this.propertiesService.uploadImages(files);
+    return { success: true, data };
+  }
+
+  @Post('upload-docs')
+  @UseInterceptors(
+    FilesInterceptor('documents', 10, {
+      storage: memoryStorage(),
+      limits: { fileSize: 10 * 1024 * 1024, files: 10 },
+    }),
+  )
+  async uploadDocuments(@UploadedFiles() files: Express.Multer.File[]) {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('No document files received');
+    }
+    const data = await this.propertiesService.uploadDocuments(files);
     return { success: true, data };
   }
 

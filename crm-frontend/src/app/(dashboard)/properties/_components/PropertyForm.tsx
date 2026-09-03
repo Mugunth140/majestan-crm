@@ -315,13 +315,47 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   // ---- Description ----
   const [description, setDescription] = useState(d?.description ?? "");
 
-  // ---- Attachments ----
-  const [attachment1, setAttachment1] = useState(d?.attachment1 ?? "");
-  const [attachment2, setAttachment2] = useState(d?.attachment2 ?? "");
-  const [attachment3, setAttachment3] = useState(d?.attachment3 ?? "");
-  const [attachment4, setAttachment4] = useState(d?.attachment4 ?? "");
-  const [attachment5, setAttachment5] = useState(d?.attachment5 ?? "");
-  const [attachment6, setAttachment6] = useState(d?.attachment6 ?? "");
+  // ---- Documents (direct file upload, typed slots) ----
+  interface DocSlot {
+    fileKey: string;
+    fileName: string;
+    fileUrl?: string;
+  }
+  const DOC_SLOTS = [
+    { key: "brochure", label: "Brochure" },
+    { key: "floor_plan", label: "Floor Plan" },
+    { key: "legal_document", label: "Legal Document" },
+    { key: "ownership_proof", label: "Ownership Proof" },
+    { key: "approval_certificate", label: "Approval Certificate" },
+    { key: "tax_receipt", label: "Tax Receipt" },
+  ];
+  const initialDocs: Record<string, DocSlot | null> = {};
+  for (const slot of DOC_SLOTS) {
+    const found = (d?.documents ?? []).find((x: any) => x.documentType === slot.key);
+    initialDocs[slot.key] = found
+      ? { fileKey: found.fileKey ?? "", fileName: found.fileName ?? "", fileUrl: found.fileUrl }
+      : null;
+  }
+  const [documents, setDocuments] = useState<Record<string, DocSlot | null>>(initialDocs);
+  const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
+  const docInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const handleDocFile = async (slotKey: string, file: File) => {
+    setUploadingDoc(slotKey);
+    try {
+      const result = await propertiesApi.uploadDocs([file]);
+      const item = result?.data?.[0];
+      if (!result?.success || !item?.fileKey) throw new Error("Upload failed");
+      setDocuments((prev) => ({
+        ...prev,
+        [slotKey]: { fileKey: item.fileKey, fileName: item.fileName },
+      }));
+    } catch {
+      toast.error(`Failed to upload ${file.name}`);
+    } finally {
+      setUploadingDoc(null);
+    }
+  };
 
   // ---- Image state: existing (from DB) + newly uploaded ----
   const [existingImages, setExistingImages] = useState<Array<{ imageUrl: string; imageKey: string; isPrimary: boolean }>>(imgs);
@@ -373,35 +407,24 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
     const newImages: UploadedImage[] = [];
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      try {
-        // 1. Get presigned URL via CRM backend (proxies site R2 issuance)
-        const presigned = await propertiesApi.presignedUrl(file.name, file.type);
-        const uploadUrl = presigned?.data?.url ?? presigned?.url;
-        const imageKey = presigned?.data?.key ?? presigned?.key;
-        if (!uploadUrl || !imageKey) throw new Error("Failed to get presigned URL");
-
-        // 2. PUT file directly to R2 (no auth header)
-        const uploadRes = await fetch(uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": file.type },
-          body: file,
-        });
-        if (!uploadRes.ok) throw new Error("Failed to upload image");
-
-        // 3. Store result (site processes the temp key at save time)
+    try {
+      // Single direct upload: files in, R2 keys out — no URLs involved
+      const result = await propertiesApi.uploadImages(files);
+      const uploaded = result?.data ?? [];
+      if (!result?.success || uploaded.length === 0) throw new Error("Upload failed");
+      const previews = new Map(files.map((f) => [f.name, URL.createObjectURL(f)]));
+      for (const item of uploaded) {
         newImages.push({
-          imageUrl: imageKey,
-          imageKey,
-          fileName: file.name,
-          previewUrl: URL.createObjectURL(file),
+          imageUrl: item.imageKey,
+          imageKey: item.imageKey,
+          fileName: item.fileName,
+          previewUrl: previews.get(item.fileName) ?? "",
         });
-      } catch {
-        toast.error(`Failed to upload ${file.name}`);
-      } finally {
-        setUploadingCount((prev) => prev - 1);
       }
+      setUploadingCount(0);
+    } catch {
+      toast.error("Failed to upload images. Please try again.");
+      setUploadingCount(0);
     }
 
     setUploadedImages((prev) => [...prev, ...newImages]);
@@ -539,13 +562,17 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           })),
         ].map((img, idx) => ({ ...img, isPrimary: idx === 0 })),
 
-        // Attachments
-        attachment1: attachment1.trim() || undefined,
-        attachment2: attachment2.trim() || undefined,
-        attachment3: attachment3.trim() || undefined,
-        attachment4: attachment4.trim() || undefined,
-        attachment5: attachment5.trim() || undefined,
-        attachment6: attachment6.trim() || undefined,
+        // Documents — typed slots, kept entries only
+        documents: DOC_SLOTS.flatMap(({ key, label }) => {
+          const doc = documents[key];
+          if (!doc?.fileKey) return [];
+          return [{
+            fileKey: doc.fileKey,
+            fileName: doc.fileName,
+            documentType: key,
+            title: label,
+          }];
+        }),
       };
 
       // Apartment / Villa / Individual Portion fields
@@ -2827,29 +2854,66 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           )}
         </div>
 
-        {/* ---- Attachments ---- */}
+        {/* ---- Documents ---- */}
         <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Attachments</h3>
+          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Documents</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-            {[
-              { label: "Attachment 1 URL", value: attachment1, set: setAttachment1 },
-              { label: "Attachment 2 URL", value: attachment2, set: setAttachment2 },
-              { label: "Attachment 3 URL", value: attachment3, set: setAttachment3 },
-              { label: "Attachment 4 URL", value: attachment4, set: setAttachment4 },
-              { label: "Attachment 5 URL", value: attachment5, set: setAttachment5 },
-              { label: "Attachment 6 URL", value: attachment6, set: setAttachment6 },
-            ].map(({ label, value, set }) => (
-              <div key={label} className="space-y-2">
-                <label className={labelClass}>{label}</label>
-                <Input
-                  value={value}
-                  onChange={(e) => set(e.target.value)}
-                  placeholder="https://..."
-                  className={inputClass}
-                />
-              </div>
-            ))}
+            {DOC_SLOTS.map(({ key, label }) => {
+              const doc = documents[key];
+              const busy = uploadingDoc === key;
+              return (
+                <div key={key} className="space-y-2">
+                  <label className={labelClass}>{label}</label>
+                  <input
+                    ref={(el) => { docInputRefs.current[key] = el; }}
+                    type="file"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (e.target) e.target.value = "";
+                      if (f) handleDocFile(key, f);
+                    }}
+                  />
+                  {doc ? (
+                    <div className="flex items-center justify-between gap-2 h-12 rounded-xl bg-muted/30 border border-border/60 px-3">
+                      <a
+                        href={doc.fileUrl || "#"}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => { if (!doc.fileUrl) e.preventDefault(); }}
+                        className="text-sm font-medium text-foreground truncate hover:text-[#0052FF] hover:underline"
+                        title={doc.fileName}
+                      >
+                        {doc.fileName}
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => setDocuments((prev) => ({ ...prev, [key]: null }))}
+                        className="shrink-0 h-6 w-6 rounded-full bg-black/10 hover:bg-red-600 hover:text-white flex items-center justify-center transition-colors"
+                        title="Remove"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => docInputRefs.current[key]?.click()}
+                      className="w-full h-12 rounded-xl border-2 border-dashed border-border/60 hover:bg-muted/30 transition-colors flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground disabled:opacity-60"
+                    >
+                      {busy ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <UploadCloud className="h-4 w-4" />
+                      )}
+                      {busy ? "Uploading..." : `Upload ${label}`}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 

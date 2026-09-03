@@ -78,6 +78,9 @@ export class CreatePropertyDto {
   @IsOptional() @IsArray()
   imageUrls?: { imageUrl: string; imageKey: string; isPrimary: boolean }[];
 
+  @IsOptional() @IsArray()
+  documents?: { fileKey: string; fileName?: string; mimeType?: string; fileSize?: number; documentType?: string; title?: string }[];
+
   @IsOptional() @IsObject()
   locationData?: { address?: string; latitude?: number; longitude?: number };
 
