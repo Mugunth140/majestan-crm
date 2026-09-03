@@ -7,55 +7,48 @@ import { lastValueFrom } from 'rxjs';
 export class SmsService {
   private readonly logger = new Logger(SmsService.name);
   private readonly apiUrl: string;
-  private readonly apiKey: string;
+  private readonly authKey: string;
   private readonly senderId: string;
-  private readonly method: 'GET' | 'POST';
+  private readonly route: string;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
   ) {
-    this.apiUrl = this.configService.get<string>('SMS_API_URL', '');
-    this.apiKey = this.configService.get<string>('SMS_API_KEY', '');
-    this.senderId = this.configService.get<string>('SMS_SENDER_ID', '');
-    this.method = this.configService.get<'GET'|'POST'>('SMS_API_METHOD', 'POST');
+    this.apiUrl = this.configService.get<string>('SMS_API_URL', 'http://sms.maximaa.biz/api/sendhttp.php');
+    this.authKey = this.configService.get<string>('SMS_API_KEY', '');
+    this.senderId = this.configService.get<string>('SMS_SENDER_ID', 'FISHMX');
+    this.route = this.configService.get<string>('SMS_ROUTE', '2');
   }
 
   async sendSms(to: string, message: string, templateId?: string): Promise<boolean> {
-    if (!this.apiUrl) {
-      this.logger.warn('SMS API URL not configured. Skipping SMS.');
+    if (!this.apiUrl || !this.authKey) {
+      this.logger.warn('SMS API URL or Auth Key not configured. Skipping SMS.');
       return false;
     }
 
     try {
-      if (this.method === 'GET') {
-        // Replace placeholders in the URL if it's a GET based API
-        // Example: https://api.local-sms.com/send?apikey={api_key}&phone={to}&msg={message}
-        let formattedUrl = this.apiUrl
-          .replace('{api_key}', encodeURIComponent(this.apiKey))
-          .replace('{to}', encodeURIComponent(to))
-          .replace('{message}', encodeURIComponent(message))
-          .replace('{sender}', encodeURIComponent(this.senderId));
-          
-        if (templateId) {
-          formattedUrl = formattedUrl.replace('{template_id}', encodeURIComponent(templateId));
-        }
+      // Build the payload required by maximaa.biz sendhttp.php API
+      const payload = new URLSearchParams({
+        authkey: this.authKey,
+        mobiles: to,
+        message: message,
+        sender: this.senderId,
+        route: this.route,
+      });
 
-        await lastValueFrom(this.httpService.get(formattedUrl));
-      } else {
-        // Standard POST payload
-        const payload = {
-          apikey: this.apiKey,
-          sender: this.senderId,
-          to: to,
-          message: message,
-          ...(templateId && { template_id: templateId })
-        };
-
-        await lastValueFrom(this.httpService.post(this.apiUrl, payload));
+      if (templateId) {
+        payload.append('DLT_TE_ID', templateId);
       }
 
-      this.logger.log(`SMS sent to ${to}`);
+      // The old CRM used POST for this specific provider
+      const response = await lastValueFrom(
+        this.httpService.post(this.apiUrl, payload, {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        })
+      );
+      
+      this.logger.log(`SMS dispatched to ${to}. Response: ${typeof response.data === 'object' ? JSON.stringify(response.data) : response.data}`);
       return true;
     } catch (error: any) {
       this.logger.error(`Failed to send SMS to ${to}: ${error?.response?.data || error.message}`);
