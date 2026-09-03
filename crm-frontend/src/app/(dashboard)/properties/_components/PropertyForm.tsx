@@ -34,6 +34,7 @@ import {
   Save,
   UploadCloud,
   X,
+  Plus,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -51,12 +52,6 @@ const PROPERTY_TYPE_OPTIONS = [
   { value: "individual_portion", label: "Independent House" },
 ];
 
-const STATUS_OPTIONS = [
-  { value: "available", label: "Available" },
-  { value: "sold", label: "Sold" },
-  { value: "rented", label: "Rented" },
-  { value: "unavailable", label: "Unavailable" },
-];
 
 const FURNISHING_STATUS_OPTIONS = [
   { value: "BARESHELL", label: "Bareshell" },
@@ -83,6 +78,7 @@ interface Sublocation {
 interface FormDataShape {
   cities: City[];
   sublocations: Sublocation[];
+  amenities: any[];
 }
 
 interface UploadedImage {
@@ -116,7 +112,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   // ---- Meta state ----
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingFormData, setIsLoadingFormData] = useState(true);
-  const [formData, setFormData] = useState<FormDataShape>({ cities: [], sublocations: [] });
+  const [formData, setFormData] = useState<FormDataShape>({ cities: [], sublocations: [], amenities: [] });
 
   // Shorthand helpers for initialData
   const d = initialData as any;
@@ -132,6 +128,13 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   );
   const [propertyType, setPropertyType] = useState(d?.propertyType ?? "");
   const [status, setStatus] = useState(d?.status ?? "available");
+  const [availableFrom, setAvailableFrom] = useState(d?.availableFrom ? new Date(d.availableFrom).toISOString().split('T')[0] : "");
+  const [availableUntil, setAvailableUntil] = useState(d?.availableUntil ? new Date(d.availableUntil).toISOString().split('T')[0] : "");
+  const [propertyCondition, setPropertyCondition] = useState(d?.propertyCondition ?? "");
+  const [ownershipType, setOwnershipType] = useState(d?.ownershipType ?? "");
+  const [reraNumber, setReraNumber] = useState(d?.reraNumber ?? "");
+  const [projectName, setProjectName] = useState(d?.projectName ?? "");
+  const [builderName, setBuilderName] = useState(d?.builderName ?? "");
   const [transactionType, setTransactionType] = useState(d?.transactionType ?? "");
   const [handoverDate, setHandoverDate] = useState(d?.handoverDate ?? "");
   const [saleType, setSaleType] = useState(d?.saleType ?? "");
@@ -142,6 +145,9 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   // ---- Pricing ----
   const [price, setPrice] = useState(d?.price ? String(d.price) : "");
   const [negotiable, setNegotiable] = useState<boolean>(d?.negotiable ?? false);
+  const [bookingAmount, setBookingAmount] = useState(d?.bookingAmount ?? "");
+  const [brokerageType, setBrokerageType] = useState(d?.brokerageType ?? "no_brokerage");
+  const [brokerageValue, setBrokerageValue] = useState(d?.brokerageValue ?? "");
   const [expectedSalePrice, setExpectedSalePrice] = useState(d?.expectedSalePrice ? String(d.expectedSalePrice) : "");
   const [monthlyRent, setMonthlyRent] = useState(d?.monthlyRent ? String(d.monthlyRent) : "");
   const [maintenanceCharges, setMaintenanceCharges] = useState(d?.maintenanceCharges ?? "");
@@ -155,21 +161,34 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   // ---- Location ----
   const [cityId, setCityId] = useState<string>(d?.cityId ? String(d.cityId) : "");
   const [sublocationId, setSublocationId] = useState<string>(d?.sublocationId ? String(d.sublocationId) : "");
+  const [pincode, setPincode] = useState(loc0?.pincode ?? "");
   const [address, setAddress] = useState(loc0?.address ?? "");
   const [latitude, setLatitude] = useState(loc0?.latitude ? String(loc0.latitude) : "");
   const [longitude, setLongitude] = useState(loc0?.longitude ? String(loc0.longitude) : "");
 
-  // ---- Details ----
+  // ---- Specs / Details ----
   const [bedrooms, setBedrooms] = useState(det?.bedrooms ? String(det.bedrooms) : "");
   const [bathrooms, setBathrooms] = useState(det?.bathrooms ? String(det.bathrooms) : "");
   const [areaSqft, setAreaSqft] = useState(det?.areaSqft ? String(det.areaSqft) : "");
+  const [areaUnit, setAreaUnit] = useState(det?.areaUnit ?? "Sq Ft");
   const [furnished, setFurnished] = useState<boolean>(det?.furnished ?? false);
   const [furnishingStatus, setFurnishingStatus] = useState(det?.furnishingStatus ?? "");
   const [propertyFacing, setPropertyFacing] = useState(det?.propertyFacing ?? "");
   const [propertyAge, setPropertyAge] = useState(det?.propertyAge ?? "");
+  const [possessionStatus, setPossessionStatus] = useState(det?.possessionStatus ?? "");
+  const [openSides, setOpenSides] = useState(det?.openSides ? String(det.openSides) : "");
+  const [suitableFor, setSuitableFor] = useState(det?.suitableFor ?? "");
   const [floorNumber, setFloorNumber] = useState(det?.floorNumber ? String(det.floorNumber) : "");
   const [totalFloors, setTotalFloors] = useState(det?.totalFloors ? String(det.totalFloors) : "");
+  const [guestParking, setGuestParking] = useState<boolean>(det?.guestParking ?? false);
+  const [floorsOccupied, setFloorsOccupied] = useState<string>(det?.floorsOccupied ? det.floorsOccupied.join(", ") : "");
+  const [hasRestroom, setHasRestroom] = useState<boolean>(det?.hasRestroom ?? false);
 
+  // ---- Arrays: Amenities, FAQs, Connectivity, Rooms ----
+  const [amenityIds, setAmenityIds] = useState<number[]>(d?.amenityIds ?? []);
+  const [faqs, setFaqs] = useState<{ question: string; answer: string; section?: string }[]>(d?.faqs ?? []);
+  const [connectivity, setConnectivity] = useState<{ icon: string; label: string; detail: string }[]>(loc0?.localityData?.connectivity ?? []);
+  const [roomDimensions, setRoomDimensions] = useState<{ name: string; dimensions: string }[]>(det?.roomDimensions ?? []);
   // ---- Apartment / Villa / Individual House ----
   const [unitType, setUnitType] = useState(det?.unitType ?? "");
   const [unitNumber, setUnitNumber] = useState(det?.unitNumber ?? "");
@@ -371,10 +390,11 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
       .formData()
       .then((data: any) => {
         if (data) {
-          setFormData({
-            cities: data.cities ?? [],
-            sublocations: data.sublocations ?? [],
-          });
+        setFormData({
+          cities: data.cities ?? [],
+          sublocations: data.sublocations ?? [],
+          amenities: data.amenities ?? [],
+        });
         }
       })
       .catch(() => {
@@ -469,10 +489,17 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         price: Number(price),
         negotiable,
         status,
+        availableFrom: availableFrom || undefined,
+        availableUntil: availableUntil || undefined,
         cityId: cityId ? Number(cityId) : undefined,
         sublocationId: sublocationId ? Number(sublocationId) : undefined,
 
         // Basic Info extras
+        propertyCondition: propertyCondition.trim() || undefined,
+        ownershipType: ownershipType.trim() || undefined,
+        reraNumber: reraNumber.trim() || "Not Applicable",
+        projectName: projectName.trim() || undefined,
+        builderName: builderName.trim() || undefined,
         transactionType: transactionType.trim() || undefined,
         handoverDate: handoverDate.trim() || undefined,
         saleType: saleType.trim() || undefined,
@@ -481,6 +508,9 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         tenantOccupied: tenantOccupied.trim() || undefined,
 
         // Pricing
+        bookingAmount: bookingAmount.trim() || undefined,
+        brokerageType: brokerageType.trim() || undefined,
+        brokerageValue: brokerageValue.trim() || undefined,
         expectedSalePrice: expectedSalePrice ? Number(expectedSalePrice) : undefined,
         monthlyRent: monthlyRent ? Number(monthlyRent) : undefined,
         maintenanceCharges: maintenanceCharges.trim() || undefined,
@@ -493,25 +523,39 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
         // Location
         locationData:
-          address.trim() || latitude.trim() || longitude.trim()
+          address.trim() || latitude.trim() || longitude.trim() || pincode.trim() || connectivity.length > 0
             ? {
                 address: address.trim() || undefined,
-                latitude: latitude ? parseFloat(latitude) : undefined,
-                longitude: longitude ? parseFloat(longitude) : undefined,
+                pincode: pincode.trim() || undefined,
+                latitude: latitude.trim() ? parseFloat(latitude) : undefined,
+                longitude: longitude.trim() ? parseFloat(longitude) : undefined,
+                localityData: connectivity.length > 0 ? { connectivity: connectivity.filter((c) => c.label || c.detail) } : undefined,
               }
             : undefined,
 
-        // Details
+        // Specs (common)
         bedrooms: bedrooms ? Number(bedrooms) : undefined,
         bathrooms: bathrooms ? Number(bathrooms) : undefined,
         areaSqft: areaSqft ? Number(areaSqft) : undefined,
+        areaUnit,
         furnished,
-        furnishingStatus: furnishingStatus || undefined,
+        furnishingStatus: furnishingStatus.trim() || undefined,
         propertyFacing: propertyFacing.trim() || undefined,
         propertyAge: propertyAge.trim() || undefined,
+        possessionStatus: possessionStatus.trim() || undefined,
+        openSides: openSides ? Number(openSides) : undefined,
+        suitableFor: suitableFor.trim() || undefined,
         floorNumber: floorNumber.trim() || undefined,
         totalFloors: totalFloors ? Number(totalFloors) : undefined,
+        guestParking,
+        floorsOccupied: floorsOccupied.trim() ? floorsOccupied.split(",").map((s) => s.trim()) : undefined,
+        hasRestroom,
+        roomDimensions: roomDimensions.filter((r) => r.name || r.dimensions).length > 0 ? roomDimensions : undefined,
 
+        // Arrays
+        amenityIds: amenityIds.length > 0 ? amenityIds : undefined,
+        faqs: faqs.filter((f) => f.question && f.answer).length > 0 ? faqs : undefined,
+        
         // Owner
         ownerName: ownerName.trim() || undefined,
         ownerPhone: ownerPhone.trim() || undefined,
@@ -844,13 +888,113 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               <FormSelect
                 name="status"
                 placeholder="Select Status"
-                options={STATUS_OPTIONS}
+                options={[
+                  { label: "Available", value: "available" },
+                  { label: "Sold", value: "sold" },
+                  { label: "Rented", value: "rented" },
+                  { label: "Unavailable", value: "unavailable" },
+                ]}
                 value={status || null}
                 onValueChange={setStatus}
               />
             </div>
 
-            {/* Transaction Type */}
+            {/* Available From */}
+            <div className="space-y-2">
+              <label className={labelClass}>Available From</label>
+              <Input
+                type="date"
+                value={availableFrom}
+                onChange={(e) => setAvailableFrom(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+
+            {/* Available Until */}
+            <div className="space-y-2">
+              <label className={labelClass}>Available Until</label>
+              <Input
+                type="date"
+                value={availableUntil}
+                onChange={(e) => setAvailableUntil(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+
+            {/* RERA Number */}
+            <div className="space-y-2 lg:col-span-3">
+              <label className={labelClass}>RERA Number *</label>
+              <div className="flex gap-4">
+                <Input
+                  value={reraNumber}
+                  onChange={(e) => setReraNumber(e.target.value)}
+                  placeholder="e.g. TN/29/Building/0001/2021"
+                  required
+                  disabled={reraNumber === "Not Applicable"}
+                  className={inputClass}
+                />
+                <label className="flex items-center gap-2 text-sm font-medium cursor-pointer shrink-0">
+                  <Checkbox
+                    checked={reraNumber === "Not Applicable"}
+                    onCheckedChange={(checked) => setReraNumber(checked ? "Not Applicable" : "")}
+                  />
+                  Not Applicable
+                </label>
+              </div>
+            </div>
+
+            {/* Property Condition */}
+            <div className="space-y-2">
+              <label className={labelClass}>Property Condition</label>
+              <FormSelect
+                name="propertyCondition"
+                placeholder="Select Condition"
+                options={[
+                  { label: "New", value: "New" },
+                  { label: "Under Construction", value: "Under Construction" },
+                  { label: "Resale", value: "Resale" }
+                ]}
+                value={propertyCondition || null}
+                onValueChange={setPropertyCondition}
+              />
+            </div>
+
+            {/* Ownership Type */}
+            <div className="space-y-2">
+              <label className={labelClass}>Ownership Type</label>
+              <FormSelect
+                name="ownershipType"
+                placeholder="Select Ownership"
+                options={[
+                  { label: "Freehold", value: "Freehold" },
+                  { label: "Leasehold", value: "Leasehold" }
+                ]}
+                value={ownershipType || null}
+                onValueChange={setOwnershipType}
+              />
+            </div>
+
+            {/* Builder Name */}
+            <div className="space-y-2">
+              <label className={labelClass}>Builder Name</label>
+              <Input
+                value={builderName}
+                onChange={(e) => setBuilderName(e.target.value)}
+                placeholder="e.g. Sobha Developers"
+                className={inputClass}
+              />
+            </div>
+
+            {/* Project Name */}
+            <div className="space-y-2">
+              <label className={labelClass}>Project Name</label>
+              <Input
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                placeholder="e.g. Sobha City"
+                className={inputClass}
+              />
+            </div>
             <div className="space-y-2">
               <label className={labelClass}>Transaction Type</label>
               <Input
@@ -951,6 +1095,52 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 </label>
               </div>
             </div>
+
+            {/* Booking Amount */}
+            <div className="space-y-2">
+              <label className={labelClass}>{listingType === "Rent" ? "Security Deposit" : "Booking Amount"}</label>
+              <Input
+                type="number"
+                value={bookingAmount}
+                onChange={(e) => setBookingAmount(e.target.value)}
+                placeholder="e.g. 50000"
+                min={0}
+                className={inputClass}
+              />
+            </div>
+
+            {/* Brokerage Type */}
+            <div className="space-y-2">
+              <label className={labelClass}>Brokerage Type</label>
+              <FormSelect
+                name="brokerageType"
+                placeholder="Select Brokerage"
+                options={[
+                  { label: "No Brokerage", value: "no_brokerage" },
+                  { label: listingType === "Rent" ? "Days" : "Percentage", value: listingType === "Rent" ? "days" : "percentage" },
+                  { label: "Fixed", value: "fixed" }
+                ]}
+                value={brokerageType || null}
+                onValueChange={setBrokerageType}
+              />
+            </div>
+
+            {/* Brokerage Value */}
+            {brokerageType !== "no_brokerage" && (
+              <div className="space-y-2">
+                <label className={labelClass}>
+                  Brokerage {brokerageType === "percentage" ? "Percentage (%)" : brokerageType === "days" ? "Days" : "Amount (₹)"}
+                </label>
+                <Input
+                  type="number"
+                  value={brokerageValue}
+                  onChange={(e) => setBrokerageValue(e.target.value)}
+                  placeholder={brokerageType === "percentage" ? "e.g. 2" : "e.g. 15"}
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+            )}
 
             {/* Expected Sale Price */}
             <div className="space-y-2">
@@ -1093,6 +1283,17 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               />
             </div>
 
+            {/* Pincode */}
+            <div className="space-y-2">
+              <label className={labelClass}>Pincode</label>
+              <Input
+                value={pincode}
+                onChange={(e) => setPincode(e.target.value)}
+                placeholder="e.g. 600001"
+                className={inputClass}
+              />
+            </div>
+
             {/* Full Address */}
             <div className="space-y-2 lg:col-span-3">
               <label className={labelClass}>Full Address</label>
@@ -1162,15 +1363,29 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
             {/* Area */}
             <div className="space-y-2">
-              <label className={labelClass}>Area (sq ft)</label>
-              <Input
-                type="number"
-                value={areaSqft}
-                onChange={(e) => setAreaSqft(e.target.value)}
-                placeholder="e.g. 1200"
-                min={0}
-                className={inputClass}
-              />
+              <label className={labelClass}>Area</label>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  value={areaSqft}
+                  onChange={(e) => setAreaSqft(e.target.value)}
+                  placeholder="e.g. 1500"
+                  min={0}
+                  className={`${inputClass} flex-1`}
+                />
+                <FormSelect
+                  name="areaUnit"
+                  placeholder="Unit"
+                  options={[
+                    { label: "Sq Ft", value: "Sq Ft" },
+                    { label: "Sq M", value: "Sq M" },
+                    { label: "Acres", value: "Acres" },
+                    { label: "Cents", value: "Cents" }
+                  ]}
+                  value={areaUnit || null}
+                  onValueChange={setAreaUnit}
+                />
+              </div>
             </div>
 
             {/* Furnishing Status */}
@@ -1207,6 +1422,48 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 value={propertyFacing}
                 onChange={(e) => setPropertyFacing(e.target.value)}
                 placeholder="e.g. East"
+                className={inputClass}
+              />
+            </div>
+
+            {/* Possession Status */}
+            <div className="space-y-2">
+              <label className={labelClass}>Possession Status</label>
+              <FormSelect
+                name="possessionStatus"
+                placeholder="Select Status"
+                options={[
+                  { label: "Ready To Move", value: "Ready To Move" },
+                  { label: "Under Construction", value: "Under Construction" },
+                  { label: "Immediate", value: "Immediate" },
+                  { label: "Future Date", value: "Future Date" }
+                ]}
+                value={possessionStatus || null}
+                onValueChange={setPossessionStatus}
+              />
+            </div>
+
+            {/* Open Sides */}
+            <div className="space-y-2">
+              <label className={labelClass}>Open Sides</label>
+              <Input
+                type="number"
+                value={openSides}
+                onChange={(e) => setOpenSides(e.target.value)}
+                placeholder="e.g. 2"
+                min={0}
+                max={4}
+                className={inputClass}
+              />
+            </div>
+
+            {/* Suitable For */}
+            <div className="space-y-2">
+              <label className={labelClass}>Suitable For</label>
+              <Input
+                value={suitableFor}
+                onChange={(e) => setSuitableFor(e.target.value)}
+                placeholder="e.g. Family, Bachelors"
                 className={inputClass}
               />
             </div>
@@ -1399,6 +1656,20 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               </div>
 
               <div className="space-y-2">
+                <label className={labelClass}>Guest Parking</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="guestParking"
+                    checked={guestParking}
+                    onCheckedChange={(checked) => setGuestParking(!!checked)}
+                  />
+                  <label htmlFor="guestParking" className="text-sm font-semibold cursor-pointer flex-1">
+                    Guest Parking Available
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
                 <label className={labelClass}>Architectural Style</label>
                 <Input
                   value={architecturalStyle}
@@ -1459,11 +1730,11 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               </div>
 
               <div className="space-y-2 lg:col-span-3">
-                <label className={labelClass}>Amenities (comma separated)</label>
+                <label className={labelClass}>Amenities (Apartment specific notes)</label>
                 <Textarea
                   value={amenities}
                   onChange={(e) => setAmenities(e.target.value)}
-                  placeholder="e.g. Swimming Pool, Gym, Clubhouse"
+                  placeholder="Any additional amenity notes..."
                   rows={3}
                   className="rounded-xl bg-muted/30 resize-none"
                 />
@@ -1762,6 +2033,16 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 />
               </div>
 
+              <div className="space-y-2 lg:col-span-2">
+                <label className={labelClass}>Floors Occupied</label>
+                <Input
+                  value={floorsOccupied}
+                  onChange={(e) => setFloorsOccupied(e.target.value)}
+                  placeholder="e.g. Basement, Ground, 1st"
+                  className={inputClass}
+                />
+              </div>
+
               <div className="space-y-2">
                 <label className={labelClass}>Visitors Parking</label>
                 <Input
@@ -1899,11 +2180,11 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               </div>
 
               <div className="space-y-2 lg:col-span-3">
-                <label className={labelClass}>Amenities</label>
+                <label className={labelClass}>Amenities (Commercial notes)</label>
                 <Textarea
                   value={commercialAmenities}
                   onChange={(e) => setCommercialAmenities(e.target.value)}
-                  placeholder="e.g. Reception, Cafeteria, Gym"
+                  placeholder="Any additional notes..."
                   rows={3}
                   className="rounded-xl bg-muted/30 resize-none"
                 />
@@ -1990,6 +2271,20 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   min={0}
                   className={inputClass}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Restroom</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="hasRestroom"
+                    checked={hasRestroom}
+                    onCheckedChange={(checked) => setHasRestroom(!!checked)}
+                  />
+                  <label htmlFor="hasRestroom" className="text-sm font-semibold cursor-pointer flex-1">
+                    Has Restroom
+                  </label>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -2854,7 +3149,227 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           )}
         </div>
 
-        {/* ---- Documents ---- */}
+        {/* ---- Master Amenities ---- */}
+        <div className="bg-card border rounded-2xl p-8 shadow-sm">
+          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Amenities</h3>
+          {formData.amenities.length === 0 ? (
+            <p className="text-sm text-muted-foreground italic">No amenities available in the master list.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {formData.amenities.map((amenity: any) => (
+                <label
+                  key={amenity.id}
+                  className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                    amenityIds.includes(amenity.id)
+                      ? "bg-[#0052FF]/5 border-[#0052FF]/30"
+                      : "bg-muted/10 border-border/40 hover:bg-muted/30"
+                  }`}
+                >
+                  <Checkbox
+                    checked={amenityIds.includes(amenity.id)}
+                    onCheckedChange={(checked) => {
+                      if (checked) setAmenityIds((prev) => [...prev, amenity.id]);
+                      else setAmenityIds((prev) => prev.filter((id) => id !== amenity.id));
+                    }}
+                  />
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-sm font-semibold text-foreground truncate" title={amenity.name}>
+                      {amenity.name}
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">
+                      {amenity.category || "General"}
+                    </span>
+                  </div>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ---- Floor Plans & Rooms ---- */}
+        {!["plot", "farmland"].includes(propertyType) && (
+          <div className="bg-card border rounded-2xl p-8 shadow-sm">
+            <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Room Dimensions</h3>
+            <div className="space-y-4">
+              {roomDimensions.map((room, idx) => (
+                <div key={idx} className="flex gap-4 items-start">
+                  <div className="flex-1 space-y-2">
+                    <Input
+                      value={room.name}
+                      onChange={(e) => {
+                        const newRooms = [...roomDimensions];
+                        newRooms[idx].name = e.target.value;
+                        setRoomDimensions(newRooms);
+                      }}
+                      placeholder="Room Name (e.g. Master Bedroom)"
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <Input
+                      value={room.dimensions}
+                      onChange={(e) => {
+                        const newRooms = [...roomDimensions];
+                        newRooms[idx].dimensions = e.target.value;
+                        setRoomDimensions(newRooms);
+                      }}
+                      placeholder="Dimensions (e.g. 12x14 ft)"
+                      className={inputClass}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      const newRooms = [...roomDimensions];
+                      newRooms.splice(idx, 1);
+                      setRoomDimensions(newRooms);
+                    }}
+                    className="mt-1 h-10 w-10 shrink-0 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setRoomDimensions([...roomDimensions, { name: "", dimensions: "" }])}
+                className="w-full border-dashed border-2 h-12"
+              >
+                <Plus className="h-4 w-4 mr-2" /> Add Room Dimension
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ---- Localities (Connectivity) ---- */}
+        <div className="bg-card border rounded-2xl p-8 shadow-sm">
+          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Connectivity & Localities</h3>
+          <div className="space-y-4">
+            {connectivity.map((conn, idx) => (
+              <div key={idx} className="flex gap-4 items-start">
+                <div className="w-1/4 space-y-2">
+                  <FormSelect
+                    name={`connIcon-${idx}`}
+                    placeholder="Icon"
+                    options={[
+                      { label: "Bus", value: "bus" },
+                      { label: "Train", value: "train" },
+                      { label: "Plane", value: "plane" },
+                      { label: "Navigation", value: "navigation" },
+                      { label: "Map Pin", value: "map-pin" },
+                    ]}
+                    value={conn.icon || null}
+                    onValueChange={(v) => {
+                      const newConn = [...connectivity];
+                      newConn[idx].icon = v;
+                      setConnectivity(newConn);
+                    }}
+                  />
+                </div>
+                <div className="w-1/3 space-y-2">
+                  <Input
+                    value={conn.label}
+                    onChange={(e) => {
+                      const newConn = [...connectivity];
+                      newConn[idx].label = e.target.value;
+                      setConnectivity(newConn);
+                    }}
+                    placeholder="Label (e.g. Highway)"
+                    className={inputClass}
+                  />
+                </div>
+                <div className="w-1/3 space-y-2">
+                  <Input
+                    value={conn.detail}
+                    onChange={(e) => {
+                      const newConn = [...connectivity];
+                      newConn[idx].detail = e.target.value;
+                      setConnectivity(newConn);
+                    }}
+                    placeholder="Distance (e.g. 5 mins away)"
+                    className={inputClass}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    const newConn = [...connectivity];
+                    newConn.splice(idx, 1);
+                    setConnectivity(newConn);
+                  }}
+                  className="mt-1 h-10 w-10 shrink-0 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConnectivity([...connectivity, { icon: "navigation", label: "", detail: "" }])}
+              className="w-full border-dashed border-2 h-12"
+            >
+              <Plus className="h-4 w-4 mr-2" /> Add Connectivity Highlight
+            </Button>
+          </div>
+        </div>
+
+        {/* ---- FAQs ---- */}
+        <div className="bg-card border rounded-2xl p-8 shadow-sm">
+          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">FAQs</h3>
+          <div className="space-y-4">
+            {faqs.map((faq, idx) => (
+              <div key={idx} className="flex gap-4 items-start p-4 border rounded-xl bg-muted/5 relative">
+                <div className="flex-1 space-y-4">
+                  <Input
+                    value={faq.question}
+                    onChange={(e) => {
+                      const newFaqs = [...faqs];
+                      newFaqs[idx].question = e.target.value;
+                      setFaqs(newFaqs);
+                    }}
+                    placeholder="Question"
+                    className={inputClass}
+                  />
+                  <Textarea
+                    value={faq.answer}
+                    onChange={(e) => {
+                      const newFaqs = [...faqs];
+                      newFaqs[idx].answer = e.target.value;
+                      setFaqs(newFaqs);
+                    }}
+                    placeholder="Answer"
+                    rows={2}
+                    className="rounded-xl bg-muted/30 resize-none"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    const newFaqs = [...faqs];
+                    newFaqs.splice(idx, 1);
+                    setFaqs(newFaqs);
+                  }}
+                  className="shrink-0 text-muted-foreground hover:text-red-600 hover:bg-red-50 h-10 w-10"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setFaqs([...faqs, { question: "", answer: "", section: "overview" }])}
+              className="w-full border-dashed border-2 h-12"
+            >
+              <Plus className="h-4 w-4 mr-2" /> Add FAQ
+            </Button>
+          </div>
+        </div>
         <div className="bg-card border rounded-2xl p-8 shadow-sm">
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Documents</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -64,6 +64,10 @@ const CRM_TOP_LEVEL_KEYS = new Set([
   'attachment4', 'attachment5', 'attachment6',
 ]);
 
+const ARRAY_DETAILS_KEYS = new Set([
+  'floorsOccupied', 'roomDimensions'
+]);
+
 function num(v: any): number | undefined {
   if (v === undefined || v === null || v === '') return undefined;
   const n = Number(v);
@@ -78,19 +82,20 @@ function str(v: any): string | undefined {
 
 @Injectable()
 export class PropertiesService {
-  private citiesCache: { at: number; cities: any[]; sublocations: any[] } | null = null;
+  private citiesCache: { at: number; cities: any[]; sublocations: any[]; amenities: any[] } | null = null;
 
   constructor(private readonly siteApi: SiteApiService) {}
 
-  private async formDataCached(): Promise<{ cities: any[]; sublocations: any[] }> {
+  private async formDataCached(): Promise<{ cities: any[]; sublocations: any[]; amenities: any[] }> {
     if (this.citiesCache && Date.now() - this.citiesCache.at < 5 * 60 * 1000) {
       return this.citiesCache;
     }
     const data = await this.siteApi.get('/properties/form-data');
     const cities = data?.cities ?? [];
     const sublocations = data?.sublocations ?? [];
-    this.citiesCache = { at: Date.now(), cities, sublocations };
-    return { cities, sublocations };
+    const amenities = data?.amenities ?? [];
+    this.citiesCache = { at: Date.now(), cities, sublocations, amenities };
+    return { cities, sublocations, amenities };
   }
 
   private cityNameOf(cities: any[], id: number): any | null {
@@ -123,8 +128,9 @@ export class PropertiesService {
 
   // ── findFormData ───────────────────────────────────────────────────────────
   async findFormData() {
-    const { cities, sublocations } = await this.formDataCached();
+    const { cities, sublocations, amenities } = await this.formDataCached();
     return {
+      amenities,
       cities: cities.map((c: any) => ({
         id: c.id,
         cityName: c.city_name ?? c.cityName,
@@ -158,8 +164,10 @@ export class PropertiesService {
       propertyLocations: (record.propertyLocations ?? []).map((l: any) => ({
         ...l,
         address: l.address ?? null,
+        pincode: l.pincode ?? null,
         latitude: l.latitude ?? null,
         longitude: l.longitude ?? null,
+        localityData: l.localityData ?? null,
       })),
       // Flat aliases the CRM form/list historically consumed
       cityId: record.cityId ?? null,
@@ -178,6 +186,8 @@ export class PropertiesService {
         documentType: pf.documentType ?? 'other',
         title: pf.title ?? null,
       })),
+      faqs: record.faqs ?? [],
+      amenityIds: (record.propertyAmenities ?? []).map((pa: any) => pa.amenityId),
     };
   }
 
@@ -263,6 +273,10 @@ export class PropertiesService {
       if (dto[key] === undefined) continue;
       details[key] = dto[key] ?? null;
     }
+    for (const key of ARRAY_DETAILS_KEYS) {
+      if (dto[key] === undefined) continue;
+      details[key] = Array.isArray(dto[key]) ? dto[key] : null;
+    }
     return details;
   }
 
@@ -278,6 +292,15 @@ export class PropertiesService {
       listingType: dto.listingType === 'Buy' ? 'Sell' : (dto.listingType ?? 'Sell'),
       status: dto.status ?? 'available',
       reraNumber: dto.reraNumber ?? 'Not Applicable',
+      builderName: str(dto.builderName),
+      projectName: str(dto.projectName),
+      propertyCondition: str(dto.propertyCondition),
+      ownershipType: str(dto.ownershipType),
+      brokerageType: str(dto.brokerageType),
+      brokerageValue: str(dto.brokerageValue),
+      bookingAmount: str(dto.bookingAmount),
+      availableFrom: str(dto.availableFrom),
+      availableUntil: str(dto.availableUntil),
       city: city ? (city.city_name ?? city.cityName) : dto.city,
       state: city ? (city.state_name ?? city.stateName) : dto.state,
       country: city ? (city.country_name ?? city.countryName ?? 'India') : (dto.country ?? 'India'),
@@ -302,11 +325,13 @@ export class PropertiesService {
     const details = this.buildDetails(dto);
     if (Object.keys(details).length > 0) payload.details = details;
 
-    if (dto.locationData && (dto.locationData.address || dto.locationData.latitude || dto.locationData.longitude)) {
+    if (dto.locationData && (dto.locationData.address || dto.locationData.latitude || dto.locationData.longitude || dto.locationData.pincode || dto.locationData.localityData)) {
       payload.location = {
         address: str(dto.locationData.address),
+        pincode: str(dto.locationData.pincode),
         latitude: num(dto.locationData.latitude),
         longitude: num(dto.locationData.longitude),
+        localityData: dto.locationData.localityData,
       };
     }
 
@@ -327,6 +352,18 @@ export class PropertiesService {
         documentType: doc.documentType || 'other',
         title: doc.title || doc.fileName,
         isPublic: true,
+      }));
+    }
+
+    if ((dto as any).amenityIds !== undefined) {
+      payload.amenities = ((dto as any).amenityIds as number[]).map(id => ({ amenityId: id }));
+    }
+
+    if ((dto as any).faqs !== undefined) {
+      payload.faqs = ((dto as any).faqs as any[]).filter(f => f.question && f.answer).map(f => ({
+        question: f.question,
+        answer: f.answer,
+        section: f.section || 'overview',
       }));
     }
 

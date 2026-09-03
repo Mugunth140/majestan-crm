@@ -81,6 +81,12 @@ export class CreatePropertyDto {
   @IsOptional() @IsArray()
   documents?: { fileKey: string; fileName?: string; mimeType?: string; fileSize?: number; documentType?: string; title?: string }[];
 
+  @IsOptional() @IsArray()
+  amenityIds?: number[];
+
+  @IsOptional() @IsArray()
+  faqs?: { question: string; answer: string; section?: string }[];
+
   @IsOptional() @IsObject()
   locationData?: { address?: string; latitude?: number; longitude?: number };
 
@@ -92,6 +98,33 @@ export class CreatePropertyDto {
 
   @IsOptional() @IsString()
   reraNumber?: string;
+
+  @IsOptional() @IsString()
+  builderName?: string;
+
+  @IsOptional() @IsString()
+  projectName?: string;
+
+  @IsOptional() @IsString()
+  propertyCondition?: string;
+
+  @IsOptional() @IsString()
+  ownershipType?: string;
+
+  @IsOptional() @IsString()
+  brokerageType?: string;
+
+  @IsOptional() @IsString()
+  brokerageValue?: string;
+
+  @IsOptional() @IsString()
+  bookingAmount?: string;
+
+  @IsOptional() @IsString()
+  availableFrom?: string;
+
+  @IsOptional() @IsString()
+  availableUntil?: string;
 
   // ── Property table: alternate contact ──────────────────────────────────────
   @IsOptional() @IsString()
@@ -530,4 +563,12 @@ export class CreatePropertyDto {
 
   @IsOptional() @IsBoolean()
   heavyVehicleAccess?: boolean;
+
+  @IsOptional() @IsString() areaUnit?: string;
+  @IsOptional() @IsString() possessionStatus?: string;
+  @IsOptional() @Type(() => Number) @IsNumber() openSides?: number;
+  @IsOptional() @IsBoolean() guestParking?: boolean;
+  @IsOptional() @IsArray() floorsOccupied?: string[];
+  @IsOptional() @IsBoolean() hasRestroom?: boolean;
+  @IsOptional() @IsArray() roomDimensions?: { name: string; dimensions: string }[];
 }
