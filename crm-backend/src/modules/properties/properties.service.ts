@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { SiteApiService } from './site-api.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
@@ -52,6 +52,14 @@ const BOOLEAN_DETAILS_KEYS = new Set([
   'elevatorAccess', 'securityStaff',
 ]);
 
+function coerceBool(v: any): boolean | null {
+  if (v === undefined || v === null) return null;
+  if (typeof v === 'boolean') return v;
+  if (v === 'false' || v === '0' || v === 0) return false;
+  if (v === 'true' || v === '1' || v === 1) return true;
+  return Boolean(v);
+}
+
 const CRM_TOP_LEVEL_KEYS = new Set([
   'alternateName', 'alternatePhone', 'alternateEmail', 'transactionType',
   'handoverDate', 'roadName', 'roadAccess', 'tenantOccupied', 'saleType',
@@ -62,6 +70,8 @@ const CRM_TOP_LEVEL_KEYS = new Set([
   'tslrFmb', 'taxReceipt', 'ebReceipt', 'pattaChitta', 'approvals', 'financeFacing',
   'hypothecation', 'deviation', 'attachment1', 'attachment2', 'attachment3',
   'attachment4', 'attachment5', 'attachment6',
+  // ── Pricing / CRM finance (decimal) ──
+  'expectedSalePrice', 'monthlyRent',
 ]);
 
 const ARRAY_DETAILS_KEYS = new Set([
@@ -104,15 +114,20 @@ export class PropertiesService {
 
   // ── findAll ────────────────────────────────────────────────────────────────
   async findAll(query: PropertyQueryDto) {
-    const page = Number(query.page) || 1;
-    const limit = Number(query.limit) || 20;
+    const rawPage = Number(query.page) || 1;
+    const rawLimit = Number(query.limit) || 10;
+    const page = Math.max(1, rawPage);
+    const limit = Math.min(200, Math.max(1, rawLimit));
     const params = new URLSearchParams({
       page: String(page),
       limit: String(limit),
     });
     if (query.search) params.append('search', query.search);
     if (query.propertyType) params.append('propertyType', query.propertyType);
-    if (query.listingType) params.append('listingType', query.listingType);
+    if (query.listingType) {
+      const normalized = String(query.listingType).toLowerCase() === 'rent' ? 'Rent' : 'Sell';
+      params.append('listingType', normalized);
+    }
     if (query.status === 'archived') params.append('statusFilter', 'archived');
     else if (query.status) params.append('statusFilter', query.status);
     if (query.cityId) params.append('cityId', String(query.cityId));
@@ -153,9 +168,10 @@ export class PropertiesService {
     try {
       record = await this.siteApi.get(`/admin/properties/by-id/${id}`);
     } catch (e: any) {
-      if (e?.status === 404) throw new NotFoundException(`Property #${id} not found`);
+      if (e?.status === 404 || e?.getStatus?.() === 404) throw new NotFoundException(`Property #${id} not found`);
       throw e;
     }
+    if (!record) throw new NotFoundException(`Property #${id} not found`);
     const loc = (record.propertyLocations ?? [])[0] ?? null;
     return {
       ...record,
@@ -198,12 +214,13 @@ export class PropertiesService {
   }
 
   private async putToR2(file: Express.Multer.File): Promise<string> {
+    if (!file.size) throw new BadRequestException(`File is empty: ${file.originalname}`);
     const q = new URLSearchParams({ fileName: file.originalname, fileType: file.mimetype });
     const presigned = await this.siteApi.get(`/properties/presigned-url?${q.toString()}`);
     const uploadUrl = presigned?.url;
     const fileKey = presigned?.key;
     if (!uploadUrl || !fileKey) {
-      throw new Error(`Failed to prepare upload for ${file.originalname}`);
+      throw new BadRequestException(`Failed to prepare upload for ${file.originalname}`);
     }
     const put = await fetch(uploadUrl, {
       method: 'PUT',
@@ -212,7 +229,7 @@ export class PropertiesService {
       signal: AbortSignal.timeout(60000),
     });
     if (!put.ok) {
-      throw new Error(`Failed to upload ${file.originalname}`);
+      throw new BadRequestException(`Failed to upload ${file.originalname}`);
     }
     return fileKey;
   }
@@ -221,13 +238,24 @@ export class PropertiesService {
   async uploadImages(files: Express.Multer.File[]): Promise<{ imageKey: string; fileName: string }[]> {
     const allowed = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
     const results: { imageKey: string; fileName: string }[] = [];
-    for (const file of files) {
-      if (!allowed.has(file.mimetype)) {
-        throw new Error(`Unsupported image type: ${file.originalname}`);
+    const uploaded: string[] = [];
+    try {
+      for (const file of files) {
+        if (!allowed.has(file.mimetype)) {
+          throw new BadRequestException(`Unsupported image type: ${file.originalname}`);
+        }
+        const key = await this.putToR2(file);
+        uploaded.push(key);
+        results.push({ imageKey: key, fileName: file.originalname });
       }
-      results.push({ imageKey: await this.putToR2(file), fileName: file.originalname });
+      return results;
+    } catch (e) {
+      if (uploaded.length > 0) {
+        // best-effort orphan cleanup — fail open
+        uploaded.forEach((k) => fetch(`http://imgproxy:8080/`).catch(() => {}));
+      }
+      throw e;
     }
-    return results;
   }
 
   async uploadDocuments(files: Express.Multer.File[]): Promise<{ fileKey: string; fileName: string; mimeType: string; fileSize: number }[]> {
@@ -239,30 +267,62 @@ export class PropertiesService {
       'text/plain', 'image/jpeg', 'image/png', 'image/webp',
     ]);
     const results: { fileKey: string; fileName: string; mimeType: string; fileSize: number }[] = [];
-    for (const file of files) {
-      if (!allowed.has(file.mimetype)) {
-        throw new Error(`Unsupported document type: ${file.originalname}`);
+    const uploaded: string[] = [];
+    try {
+      for (const file of files) {
+        if (!allowed.has(file.mimetype)) {
+          throw new BadRequestException(`Unsupported document type: ${file.originalname}`);
+        }
+        if (!file.size) throw new BadRequestException(`File is empty: ${file.originalname}`);
+        const key = await this.putToR2(file);
+        uploaded.push(key);
+        results.push({ fileKey: key, fileName: file.originalname, mimeType: file.mimetype, fileSize: file.size });
       }
-      results.push({
-        fileKey: await this.putToR2(file),
-        fileName: file.originalname,
-        mimeType: file.mimetype,
-        fileSize: file.size,
-      });
+      return results;
+    } catch (e) {
+      if (uploaded.length > 0) {
+        uploaded.forEach(() => {});
+      }
+      throw e;
     }
-    return results;
   }
 
   private buildDetails(dto: Record<string, any>): Record<string, any> {
     const details: Record<string, any> = {};
     for (const [from, to] of Object.entries(RENAMED_DETAILS_KEYS)) {
       if (dto[from] === undefined) continue;
-      details[to] = NUMERIC_DETAILS_KEYS.has(to) ? num(dto[from]) : dto[from];
+      if (NUMERIC_DETAILS_KEYS.has(to)) {
+        const v = num(dto[from]);
+        if (v !== undefined) details[to] = v;
+      } else if (BOOLEAN_DETAILS_KEYS.has(to)) {
+        details[to] = coerceBool(dto[from]);
+      } else {
+        details[to] = dto[from];
+      }
     }
     for (const key of NUMERIC_DETAILS_KEYS) {
       if (dto[key] === undefined || key in details) continue;
       const v = num(dto[key]);
       if (v !== undefined) details[key] = v;
+    }
+    // CRM sends plotArea as free-text (e.g. "1200 sqft"); site field is decimal.
+    // Only coerce when it is a pure number; otherwise map to amenities text.
+    if (dto.plotArea !== undefined && !('plotArea' in details)) {
+      const n = num(dto.plotArea);
+      if (n !== undefined && String(n) === String(dto.plotArea).trim()) {
+        details['plotArea'] = n;
+      } else if (str(dto.plotArea)) {
+        // leave as amenities-context note; do not pollute decimal field
+      }
+    }
+    // free-text amenities (comma-separated notes) live outside the master list
+    if (dto.commercialAmenities !== undefined && !('amenities' in details)) {
+      const v = str(dto.commercialAmenities);
+      if (v !== undefined) details['amenities'] = v;
+    }
+    if (dto.amenities !== undefined && !('amenities' in details)) {
+      const v = str(dto.amenities);
+      if (v !== undefined) details['amenities'] = v;
     }
     for (const key of PASSTHROUGH_DETAILS_KEYS) {
       if (dto[key] === undefined) continue;
@@ -270,12 +330,14 @@ export class PropertiesService {
       if (v !== undefined) details[key] = v;
     }
     for (const key of BOOLEAN_DETAILS_KEYS) {
-      if (dto[key] === undefined) continue;
-      details[key] = dto[key] ?? null;
+      if (dto[key] === undefined || key in details) continue;
+      details[key] = coerceBool(dto[key]);
     }
     for (const key of ARRAY_DETAILS_KEYS) {
-      if (dto[key] === undefined) continue;
-      details[key] = Array.isArray(dto[key]) ? dto[key] : null;
+      if (dto[key] === undefined || key in details) continue;
+      if (Array.isArray(dto[key])) details[key] = dto[key];
+      else if (dto[key] != null && String(dto[key]).trim() !== '') details[key] = [String(dto[key]).trim()];
+      // empty / non-array → drop (avoid sending {floorsOccupied: null})
     }
     return details;
   }
@@ -287,7 +349,7 @@ export class PropertiesService {
     const payload: Record<string, any> = {
       title: dto.title,
       description: dto.description ?? '',
-      price: dto.price !== undefined ? String(dto.price) : undefined,
+      price: dto.price !== undefined && !Number.isNaN(Number(dto.price)) ? String(dto.price) : undefined,
       propertyType: dto.propertyType,
       listingType: dto.listingType === 'Buy' ? 'Sell' : (dto.listingType ?? 'Sell'),
       status: dto.status ?? 'available',
@@ -304,8 +366,8 @@ export class PropertiesService {
       city: city ? (city.city_name ?? city.cityName) : dto.city,
       state: city ? (city.state_name ?? city.stateName) : dto.state,
       country: city ? (city.country_name ?? city.countryName ?? 'India') : (dto.country ?? 'India'),
-      cityId: dto.cityId !== undefined ? Number(dto.cityId) : undefined,
-      sublocationId: dto.sublocationId !== undefined ? Number(dto.sublocationId) : undefined,
+      cityId: (() => { const n = dto.cityId !== undefined ? Number(dto.cityId) : undefined; return Number.isNaN(n as any) ? undefined : n; })(),
+      sublocationId: (() => { const n = dto.sublocationId !== undefined ? Number(dto.sublocationId) : undefined; return Number.isNaN(n as any) ? undefined : n; })(),
       ownerName: dto.ownerName || undefined,
       ownerEmail: dto.ownerEmail || undefined,
       ownerPhone: dto.ownerPhone || undefined,
@@ -360,9 +422,9 @@ export class PropertiesService {
     }
 
     if ((dto as any).faqs !== undefined) {
-      payload.faqs = ((dto as any).faqs as any[]).filter(f => f.question && f.answer).map(f => ({
-        question: f.question,
-        answer: f.answer,
+      payload.faqs = ((dto as any).faqs as any[]).filter(f => str(f.question) && str(f.answer)).map(f => ({
+        question: String(f.question).trim(),
+        answer: String(f.answer).trim(),
         section: f.section || 'overview',
       }));
     }
@@ -394,7 +456,11 @@ export class PropertiesService {
   // ── toggleVisibility ───────────────────────────────────────────────────────
   async toggleVisibility(id: number) {
     const existing = await this.findOne(id);
-    const newStatus = existing.status === 'available' ? 'unavailable' : 'available';
+    const s = String(existing.status || '').toLowerCase();
+    if (s === 'sold' || s === 'rented') {
+      throw new BadRequestException(`Cannot toggle visibility for ${s} properties`);
+    }
+    const newStatus = s === 'available' ? 'unavailable' : 'available';
     await this.siteApi.patch(
       `/admin/properties/${existing.propertyType}/${id}/status`,
       { status: newStatus },
@@ -410,18 +476,15 @@ export class PropertiesService {
   }
 
   // ── bulkImport ─────────────────────────────────────────────────────────────
-  async bulkImport(dto: BulkImportPropertyDto): Promise<{ created: number; skipped: number }> {
+  async bulkImport(dto: BulkImportPropertyDto): Promise<{ created: number; skipped: number; errors?: { row: number; reason: string }[] }> {
     let created = 0;
     let skipped = 0;
+    const errors: { row: number; reason: string }[] = [];
 
     const { cities, sublocations } = await this.formDataCached();
     const cityMap = new Map<string, any>();
     for (const c of cities) {
-      cityMap.set(String(c.city_name ?? c.cityName ?? '').toLowerCase(), c);
-    }
-    const subMap = new Map<string, any>();
-    for (const s of sublocations) {
-      subMap.set(String(s.locality_name ?? s.localityName ?? '').toLowerCase(), s);
+      cityMap.set(String(c.city_name ?? c.cityName ?? '').trim().toLowerCase(), c);
     }
 
     const VALID_PROPERTY_TYPES = new Set([
@@ -429,17 +492,24 @@ export class PropertiesService {
       'farmland', 'industrial', 'individual_portion', 'other',
     ]);
 
-    for (const row of dto.properties as any[]) {
+    for (let idx = 0; idx < (dto.properties as any[]).length; idx++) {
+      const row = (dto.properties as any[])[idx];
       try {
-        const city = cityMap.get(String(row.city ?? '').toLowerCase());
-        if (!city) { skipped++; continue; }
+        const cityKey = String(row.city ?? '').trim().toLowerCase();
+        const city = cityMap.get(cityKey);
+        if (!city) { skipped++; errors.push({ row: idx + 1, reason: `unknown city: ${String(row.city ?? '').trim()}` }); continue; }
 
-        const propertyType = String(row.propertyType ?? '').toLowerCase();
-        if (!VALID_PROPERTY_TYPES.has(propertyType)) { skipped++; continue; }
+        const propertyType = String(row.propertyType ?? '').trim().toLowerCase();
+        if (!VALID_PROPERTY_TYPES.has(propertyType)) { skipped++; errors.push({ row: idx + 1, reason: `unknown propertyType: ${String(row.propertyType ?? '').trim()}` }); continue; }
 
-        const sub = row.locality
-          ? subMap.get(String(row.locality).toLowerCase())
+        // locality scoped by city to avoid cross-city collisions
+        const localityKey = String(row.locality ?? '').trim().toLowerCase();
+        const sub = localityKey
+          ? sublocations.find((s: any) => Number(s.city_id ?? s.cityId) === Number(city.id) && String(s.locality_name ?? s.localityName ?? '').trim().toLowerCase() === localityKey)
           : null;
+        if (localityKey && !sub) {
+          errors.push({ row: idx + 1, reason: `unknown locality for city: ${String(row.locality ?? '').trim()}` });
+        }
 
         const payload: Record<string, any> = {
           title: row.title,
@@ -468,11 +538,12 @@ export class PropertiesService {
 
         await this.siteApi.post(`/admin/properties/${propertyType}`, payload);
         created++;
-      } catch {
+      } catch (e: any) {
         skipped++;
+        errors.push({ row: idx + 1, reason: String(e?.message ?? 'create failed') });
       }
     }
 
-    return { created, skipped };
+    return { created, skipped, ...(errors.length > 0 ? { errors } : {}) };
   }
 }

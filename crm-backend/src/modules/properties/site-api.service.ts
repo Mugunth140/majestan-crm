@@ -23,6 +23,9 @@ export class SiteApiService {
   }
 
   private async login(): Promise<string> {
+    if (!this.username || !this.password) {
+      throw new HttpException('Site service credentials not configured', 500);
+    }
     if (!this.loginInFlight) {
       this.loginInFlight = (async () => {
         this.logger.log(`Logging in to site API as ${this.username}`);
@@ -76,11 +79,10 @@ export class SiteApiService {
   }
 
   private toError(status: number, data: any): HttpException {
-    const message =
-      (data && (data.message || data.error)) ||
-      `Site API request failed with status ${status}`;
-    const mapped = status === 404 ? 404 : status === 400 ? 400 : 502;
-    return new HttpException(Array.isArray(message) ? message.join(', ') : String(message), mapped);
+    const raw = data && (data.message || data.error);
+    const message = Array.isArray(raw) ? raw.join(', ') : (raw ?? `Site API request failed with status ${status}`);
+    const mapped = status === 404 ? 404 : status === 401 || status === 403 ? status : status === 400 ? 400 : 502;
+    return new HttpException(String(message), mapped);
   }
 
   async request(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string, body?: any, retry = true): Promise<any> {
@@ -89,8 +91,10 @@ export class SiteApiService {
         throw new HttpException(`Site API unavailable: ${(e as Error).message}`, 502);
       });
     }
+    let status!: number;
+    let data: any;
     try {
-      var { status, data } = await this.raw(method, path, body, this.token!);
+      ({ status, data } = await this.raw(method, path, body, this.token!));
     } catch (e) {
       throw new HttpException(`Site API unreachable: ${(e as Error).message}`, 502);
     }

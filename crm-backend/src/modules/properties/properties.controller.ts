@@ -11,6 +11,7 @@ import {
   UploadedFiles,
   UseInterceptors,
   BadRequestException,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -82,8 +83,8 @@ export class PropertiesController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string) {
-    const data = await this.propertiesService.findOne(+id);
+  async findOne(@Param('id', ParseIntPipe) id: number) {
+    const data = await this.propertiesService.findOne(id);
     return { success: true, data };
   }
 
@@ -94,20 +95,20 @@ export class PropertiesController {
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdatePropertyDto) {
-    const data = await this.propertiesService.update(+id, dto);
+  async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdatePropertyDto) {
+    const data = await this.propertiesService.update(id, dto);
     return { success: true, data };
   }
 
   @Patch(':id/visibility')
-  async toggleVisibility(@Param('id') id: string) {
-    const data = await this.propertiesService.toggleVisibility(+id);
+  async toggleVisibility(@Param('id', ParseIntPipe) id: number) {
+    const data = await this.propertiesService.toggleVisibility(id);
     return { success: true, data };
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string) {
-    const data = await this.propertiesService.remove(+id);
+  async remove(@Param('id', ParseIntPipe) id: number) {
+    const data = await this.propertiesService.remove(id);
     return { success: true, data };
   }
 }
