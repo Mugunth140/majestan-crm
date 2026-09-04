@@ -38,8 +38,14 @@ export class DeviceAuthGuard implements CanActivate {
       [deviceId],
     );
     const row = rows?.[0];
-    if (!row || row.is_active !== 1) {
+    if (!row) {
       throw new UnauthorizedException('Unknown device');
+    }
+    if (row.is_active !== 1) {
+      // User account was deactivated by an admin. Return 403 so the Android
+      // worker treats this like device_revoked and stops retrying (a 401 here
+      // would loop indefinitely with backoff).
+      throw new ForbiddenException('account_deactivated');
     }
     if (row.revoked_at) {
       throw new ForbiddenException('device_revoked');

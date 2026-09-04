@@ -77,7 +77,7 @@ export class ContactLogsService {
    * newer than `since`, so pre-assignment history is never sent.
    */
   async getTrackableNumbers(userId: number): Promise<{ number: string; since: string | null }[]> {
-    const rows = await this.fetchMatchRows(userId, true);
+    const rows = await this.fetchMatchRows(userId);
     const earliest = new Map<string, string | null>();
     for (const { row, columns } of rows) {
       for (const col of columns) {
@@ -92,7 +92,7 @@ export class ContactLogsService {
     return Array.from(earliest.entries()).map(([number, since]) => ({ number, since }));
   }
 
-  private async fetchMatchRows(userId: number, forTrackable: boolean) {
+  private async fetchMatchRows(userId: number) {
     const selectFor = (table: string, extra: string, assigned: boolean) => {
       const cols = ContactLogsService.NUMBER_COLUMNS[table].join(', ');
       const where = assigned ? 'WHERE assigned_staff_id = ?' : '';
@@ -113,7 +113,6 @@ export class ContactLogsService {
     const hr = await this.dataSource.query(
       `SELECT id, mobile, whatsapp, createdAt AS created_at FROM hr_candidates`,
     ).then((rows: any[]) => rows.map((row) => ({ table: 'hr_candidates', row, columns: ContactLogsService.NUMBER_COLUMNS['hr_candidates'] })));
-    void forTrackable;
     return [...leads, ...agents, ...inbounds, ...assets, ...hr];
   }
 
@@ -266,7 +265,7 @@ export class ContactLogsService {
     const receipts: LogReceipt[] = [];
     if (!Array.isArray(logs) || logs.length === 0) return { synced: 0, duplicates: 0, rejected: [], receipts };
 
-    const matchRows = await this.fetchMatchRows(userId, false);
+    const matchRows = await this.fetchMatchRows(userId);
     const seenInBatch = new Set<string>();
     const pending: { log: IncomingCallLog; table: string; entityId: number; callAt: Date }[] = [];
 
@@ -288,7 +287,10 @@ export class ContactLogsService {
         receipts.push({ sourceCallId: log.sourceCallId, status: 'rejected', reason: 'no_number_match' });
         continue;
       }
-      if (callAt < new Date(match.row.created_at)) {
+      // Guard: if created_at is missing, treat the entity as always-valid rather
+      // than silently accepting (new Date(null) === epoch which is always < callAt).
+      const assignedAt = match.row.created_at ? new Date(match.row.created_at) : null;
+      if (assignedAt && callAt < assignedAt) {
         receipts.push({ sourceCallId: log.sourceCallId, status: 'rejected', reason: 'predates_assignment' });
         continue;
       }
@@ -376,12 +378,14 @@ export class ContactLogsService {
   private async insertCallLogs(queryRunner: QueryRunner, table: string, entityColumn: string, values: unknown[][]) {
     if (!values.length) return 0;
     const placeholders = values.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(', ');
-    const result = await queryRunner.query(
-      `INSERT INTO ${table} (${entityColumn}, contact_type, sent_by_id, call_duration, call_direction, source_call_id, created_at)
-       VALUES ${placeholders} ON DUPLICATE KEY UPDATE id = id`,
+    await queryRunner.query(
+      `INSERT INTO ${table} (${entityColumn}, contact_type, sent_by_id, call_duration, call_direction, source_call_id, created_at)\n       VALUES ${placeholders} ON DUPLICATE KEY UPDATE id = id`,
       values.flat(),
     );
-    return Number(result?.affectedRows || 0);
+    // MySQL's affectedRows returns 2 for ON DUPLICATE KEY matched rows, making
+    // the count unreliable. Since duplicates are filtered upstream by
+    // findExistingSourceIds, every row in `values` is a genuine new insert.
+    return values.length;
   }
 
   private parseCallLog(candidate: unknown): IncomingCallLog | null {
