@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { User } from '../../database/entities/user.entity';
 import * as bcrypt from 'bcrypt';
 import { PermissionsService } from '../permissions/permissions.service';
+import { ContactLogsService } from '../contact-logs/contact-logs.service';
 
 @Injectable()
 export class UsersService {
@@ -11,6 +12,7 @@ export class UsersService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly permissionsService: PermissionsService,
+    private readonly contactLogsService: ContactLogsService,
   ) {}
 
   private validateRoleDepartment(roleId: number, departmentId: number | null): number | null {
@@ -123,6 +125,10 @@ export class UsersService {
     const saved = await this.userRepository.save(user);
     if (Array.isArray(body.permissionKeys)) {
       await this.permissionsService.setUserPermissions(saved.id, body.permissionKeys);
+    }
+    if (body.password) {
+      // Password change kills all device sessions — staff re-register on next sign-in.
+      await this.contactLogsService.revokeAllUserDevices(saved.id);
     }
     return saved;
   }

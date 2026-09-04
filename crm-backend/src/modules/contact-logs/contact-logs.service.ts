@@ -1,6 +1,8 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, QueryRunner, Repository } from 'typeorm';
+import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { User } from '../../database/entities/user.entity';
 
 type CallDirection = 'Incoming' | 'Outgoing' | 'Missed';
@@ -25,6 +27,32 @@ interface DeviceReport {
   error: string | null;
 }
 
+export interface LogReceipt {
+  sourceCallId: string;
+  status: 'accepted' | 'duplicate' | 'rejected';
+  reason?: string;
+}
+
+// Minimum significant digits for suffix matching. Shorter suffixes collide
+// across contacts (e.g. "12" matches any number ending in 12).
+const MIN_MATCH_DIGITS = 7;
+const MAX_SYNC_BATCH = 1000;
+
+const cleanDigits = (value: string | null | undefined) => (value || '').replace(/[^0-9]/g, '');
+
+function numbersMatch(saved: string | null | undefined, observed: string): boolean {
+  const left = cleanDigits(saved);
+  const right = cleanDigits(observed);
+  if (left.length < MIN_MATCH_DIGITS || right.length < MIN_MATCH_DIGITS) return false;
+  return left.endsWith(right) || right.endsWith(left);
+}
+
+// Format a Date as UTC 'YYYY-MM-DD HH:mm:ss' for DATETIME columns.
+function toUtcSqlString(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
+}
+
 @Injectable()
 export class ContactLogsService {
   constructor(
@@ -32,22 +60,111 @@ export class ContactLogsService {
     private readonly dataSource: DataSource,
   ) {}
 
+  // Column sets here MUST mirror matchCandidate() below — same tables, same
+  // columns — so the whitelist the device filters on is exactly what the
+  // server matches against.
+  private static readonly NUMBER_COLUMNS: Record<string, string[]> = {
+    leads: ['mobile_number', 'whatsapp_number'],
+    agents: ['mobile_number', 'whatsapp_number'],
+    inbounds: ['mobile_number', 'whatsapp_number', 'manager_mobile', 'caretaker_mobile', 'security_contact', 'broker_mobile'],
+    assets: ['mobile_number'],
+    hr_candidates: ['mobile', 'whatsapp'],
+  };
+
   async getTrackableNumbers(userId: number) {
-    await this.userRepo.update(userId, { device_last_sync_at: new Date() });
-
-    const leads = await this.dataSource.query(`SELECT mobile_number, whatsapp_number FROM leads WHERE assigned_staff_id = ?`, [userId]);
-    const agents = await this.dataSource.query(`SELECT mobile_number, whatsapp_number FROM agents WHERE assigned_staff_id = ?`, [userId]);
-    const inbounds = await this.dataSource.query(`SELECT mobile_number, whatsapp_number, manager_mobile, caretaker_mobile, security_contact, broker_mobile FROM inbounds WHERE assigned_staff_id = ?`, [userId]);
+    const rows = await this.fetchMatchRows(userId, true);
     const numbers = new Set<string>();
-
-    for (const rows of [leads, agents, inbounds]) {
-      for (const row of rows) {
-        for (const value of Object.values(row)) {
-          if (typeof value === 'string' && value.trim().length > 5) numbers.add(value.trim());
+    for (const { row, columns } of rows) {
+      for (const col of columns) {
+        const value = row[col];
+        if (typeof value === 'string' && cleanDigits(value).length >= MIN_MATCH_DIGITS) {
+          numbers.add(value.trim());
         }
       }
     }
     return Array.from(numbers);
+  }
+
+  private async fetchMatchRows(userId: number, forTrackable: boolean) {
+    const selectFor = (table: string, extra: string, assigned: boolean) => {
+      const cols = ContactLogsService.NUMBER_COLUMNS[table].join(', ');
+      const where = assigned ? 'WHERE assigned_staff_id = ?' : '';
+      const params = assigned ? [userId] : [];
+      return this.dataSource.query(
+        `SELECT id, ${cols}, created_at ${extra} FROM ${table} ${where}`,
+        params,
+      ).then((rows: any[]) => rows.map((row) => ({ table, row, columns: ContactLogsService.NUMBER_COLUMNS[table] })));
+    };
+    const [leads, agents, inbounds, assets] = await Promise.all([
+      selectFor('leads', '', true),
+      selectFor('agents', '', true),
+      selectFor('inbounds', '', true),
+      selectFor('assets', '', true),
+    ]);
+    // HR candidates have no staff assignment — matched org-wide.
+    // NOTE: hr_candidates uses camelCase createdAt (not created_at).
+    const hr = await this.dataSource.query(
+      `SELECT id, mobile, whatsapp, createdAt AS created_at FROM hr_candidates`,
+    ).then((rows: any[]) => rows.map((row) => ({ table: 'hr_candidates', row, columns: ContactLogsService.NUMBER_COLUMNS['hr_candidates'] })));
+    void forTrackable;
+    return [...leads, ...agents, ...inbounds, ...assets, ...hr];
+  }
+
+  private matchCandidate(rows: { table: string; row: any; columns: string[] }[], phoneNumber: string):
+    { table: string; row: any } | null {
+    for (const { table, row, columns } of rows) {
+      if (columns.some((col) => numbersMatch(row[col], phoneNumber))) {
+        return { table, row };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Issue (or rotate) a long-lived device secret. Returns the plaintext
+   * secret exactly once — the app must store it; it is never readable again.
+   * Sliding 30-day expiry is maintained on every authenticated use.
+   */
+  async registerDevice(userId: number, deviceId: string): Promise<{ deviceSecret: string; expiresInDays: number }> {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user || !user.is_active) throw new NotFoundException('User not found');
+    const secret = crypto.randomBytes(32).toString('hex');
+    const secretHash = await bcrypt.hash(secret, 10);
+    await this.dataSource.query(
+      `INSERT INTO logger_device_secrets (user_id, device_id, secret_hash, expires_at)
+       VALUES (?, ?, ?, DATE_ADD(NOW(6), INTERVAL 30 DAY))
+       ON DUPLICATE KEY UPDATE secret_hash = VALUES(secret_hash), expires_at = VALUES(expires_at), revoked_at = NULL, last_used_at = NULL`,
+      [userId, deviceId, secretHash],
+    );
+    return { deviceSecret: secret, expiresInDays: 30 };
+  }
+
+  /** Revoke a device secret. Owners revoke their own; Admins revoke any. */
+  async revokeDevice(requesterId: number, deviceId: string, reqUser: any): Promise<{ revoked: boolean }> {
+    const role = reqUser?.role;
+    const isAdmin = role === 'Admin' || role === 'Super Admin';
+    const rows = await this.dataSource.query(
+      `SELECT user_id FROM logger_device_secrets WHERE device_id = ?`,
+      [deviceId],
+    );
+    const ownerId = rows?.[0]?.user_id;
+    if (!ownerId) return { revoked: false };
+    if (Number(ownerId) !== Number(requesterId) && !isAdmin) {
+      throw new ForbiddenException('Cannot revoke another user’s device');
+    }
+    await this.dataSource.query(
+      `UPDATE logger_device_secrets SET revoked_at = NOW(6) WHERE device_id = ?`,
+      [deviceId],
+    );
+    return { revoked: true };
+  }
+
+  /** Called on password change — all device secrets die, forcing re-login. */
+  async revokeAllUserDevices(userId: number): Promise<void> {
+    await this.dataSource.query(
+      `UPDATE logger_device_secrets SET revoked_at = NOW(6) WHERE user_id = ? AND revoked_at IS NULL`,
+      [userId],
+    );
   }
 
   async recordDeviceHeartbeat(userId: number, body: unknown) {
@@ -81,7 +198,6 @@ export class ContactLogsService {
         result, report.syncedCount, report.error,
       ],
     );
-    await this.userRepo.update(userId, { device_last_sync_at: now });
     return { registered: true };
   }
 
@@ -139,56 +255,121 @@ export class ContactLogsService {
     });
   }
 
-  async syncCallLogs(userId: number, logs: unknown) {
-    if (!Array.isArray(logs) || logs.length === 0) return { synced: 0 };
+  async syncCallLogs(userId: number, logs: unknown): Promise<{ synced: number; duplicates: number; rejected: LogReceipt[]; receipts: LogReceipt[] }> {
+    const receipts: LogReceipt[] = [];
+    if (!Array.isArray(logs) || logs.length === 0) return { synced: 0, duplicates: 0, rejected: [], receipts };
 
-    const leads = await this.dataSource.query(`SELECT id, mobile_number, whatsapp_number, created_at FROM leads WHERE assigned_staff_id = ?`, [userId]);
-    const agents = await this.dataSource.query(`SELECT id, mobile_number, whatsapp_number, created_at FROM agents WHERE assigned_staff_id = ?`, [userId]);
-    const inbounds = await this.dataSource.query(`SELECT id, mobile_number, whatsapp_number, created_at FROM inbounds WHERE assigned_staff_id = ?`, [userId]);
-    const clean = (value: string | null | undefined) => (value || '').replace(/[^0-9+]/g, '');
-    const matches = (saved: string | null | undefined, observed: string) => {
-      const left = clean(saved);
-      const right = clean(observed);
-      return Boolean(left && right && (left.endsWith(right) || right.endsWith(left)));
-    };
+    const matchRows = await this.fetchMatchRows(userId, false);
+    const seenInBatch = new Set<string>();
+    const pending: { log: IncomingCallLog; table: string; entityId: number; callAt: Date }[] = [];
 
-    const sourceIds = new Set<string>();
-    const leadLogs: unknown[][] = [];
-    const agentLogs: unknown[][] = [];
-    const inboundLogs: unknown[][] = [];
-    for (const candidate of logs.slice(0, 500)) {
+    for (const candidate of logs.slice(0, MAX_SYNC_BATCH)) {
       const log = this.parseCallLog(candidate);
-      if (!log || sourceIds.has(log.sourceCallId)) continue;
-      sourceIds.add(log.sourceCallId);
+      if (!log) {
+        receipts.push({ sourceCallId: '?', status: 'rejected', reason: 'malformed_log' });
+        continue;
+      }
+      if (seenInBatch.has(log.sourceCallId)) {
+        receipts.push({ sourceCallId: log.sourceCallId, status: 'duplicate', reason: 'duplicate_in_batch' });
+        continue;
+      }
+      seenInBatch.add(log.sourceCallId);
 
       const callAt = new Date(log.timestamp);
-      const lead = leads.find((item: any) => matches(item.mobile_number, log.phoneNumber) || matches(item.whatsapp_number, log.phoneNumber));
-      if (lead && callAt >= new Date(lead.created_at)) {
-        leadLogs.push([lead.id, 'call', userId, log.duration, log.direction, log.sourceCallId, callAt]);
+      const match = this.matchCandidate(matchRows, log.phoneNumber);
+      if (!match) {
+        receipts.push({ sourceCallId: log.sourceCallId, status: 'rejected', reason: 'no_number_match' });
         continue;
       }
-      const agent = agents.find((item: any) => matches(item.mobile_number, log.phoneNumber) || matches(item.whatsapp_number, log.phoneNumber));
-      if (agent && callAt >= new Date(agent.created_at)) {
-        agentLogs.push([agent.id, 'call', userId, log.duration, log.direction, log.sourceCallId, callAt]);
+      if (callAt < new Date(match.row.created_at)) {
+        receipts.push({ sourceCallId: log.sourceCallId, status: 'rejected', reason: 'predates_assignment' });
         continue;
       }
-      const inbound = inbounds.find((item: any) => matches(item.mobile_number, log.phoneNumber) || matches(item.whatsapp_number, log.phoneNumber));
-      if (inbound && callAt >= new Date(inbound.created_at)) {
-        inboundLogs.push([inbound.id, 'call', userId, log.duration, log.direction, log.sourceCallId, callAt]);
-      }
+      pending.push({ log, table: match.table, entityId: match.row.id, callAt });
     }
 
+    if (logs.length > MAX_SYNC_BATCH) {
+      receipts.push({ sourceCallId: '*', status: 'rejected', reason: `batch_truncated_at_${MAX_SYNC_BATCH}` });
+    }
+
+    // Pre-check existing source ids so receipts distinguish duplicates.
+    const existing = pending.length > 0 ? await this.findExistingSourceIds(pending.map((p) => p.log.sourceCallId)) : new Set<string>();
+
+    const toInsert = {
+      leads: [] as unknown[][],
+      agents: [] as unknown[][],
+      inbounds: [] as unknown[][],
+      assets: [] as unknown[][],
+      hr_candidates: [] as unknown[][],
+    };
+    for (const p of pending) {
+      if (existing.has(p.log.sourceCallId)) {
+        receipts.push({ sourceCallId: p.log.sourceCallId, status: 'duplicate', reason: 'already_synced' });
+        continue;
+      }
+      const row = [p.entityId, 'call', userId, p.log.duration, p.log.direction, p.log.sourceCallId, toUtcSqlString(p.callAt)];
+      (toInsert[p.table as keyof typeof toInsert] as unknown[][]).push(row);
+      receipts.push({ sourceCallId: p.log.sourceCallId, status: 'accepted' });
+    }
+
+    // Single transaction across all five log tables — all or nothing, so the
+    // client checkpoint (advanced only to acked receipts) never diverges.
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
     let synced = 0;
-    synced += await this.insertCallLogs('contact_logs', 'lead_id', leadLogs);
-    synced += await this.insertCallLogs('agent_contact_logs', 'agent_id', agentLogs);
-    synced += await this.insertCallLogs('inbound_contact_logs', 'inbound_id', inboundLogs);
-    return { synced };
+    try {
+      synced += await this.insertCallLogs(queryRunner, 'contact_logs', 'lead_id', toInsert.leads);
+      synced += await this.insertCallLogs(queryRunner, 'agent_contact_logs', 'agent_id', toInsert.agents);
+      synced += await this.insertCallLogs(queryRunner, 'inbound_contact_logs', 'inbound_id', toInsert.inbounds);
+      synced += await this.insertCallLogs(queryRunner, 'asset_contact_logs', 'asset_id', toInsert.assets);
+      synced += await this.insertCallLogs(queryRunner, 'hr_contact_logs', 'hr_candidate_id', toInsert.hr_candidates);
+      await queryRunner.commitTransaction();
+    } catch (e) {
+      await queryRunner.rollbackTransaction();
+      throw e;
+    } finally {
+      await queryRunner.release();
+    }
+
+    const duplicates = receipts.filter((r) => r.status === 'duplicate').length;
+    const rejected = receipts.filter((r) => r.status === 'rejected');
+    return { synced, duplicates, rejected, receipts };
   }
 
-  private async insertCallLogs(table: string, entityColumn: string, values: unknown[][]) {
+  /** Server high-water helper for the repair endpoint: newest acked call per device owner. */
+  async repairStatus(userId: number) {
+    const rows = await this.dataSource.query(`
+      SELECT MAX(created_at) AS newest FROM (
+        SELECT created_at FROM contact_logs WHERE sent_by_id = ?
+        UNION ALL SELECT created_at FROM agent_contact_logs WHERE sent_by_id = ?
+        UNION ALL SELECT created_at FROM inbound_contact_logs WHERE sent_by_id = ?
+        UNION ALL SELECT created_at FROM asset_contact_logs WHERE sent_by_id = ?
+        UNION ALL SELECT created_at FROM hr_contact_logs WHERE sent_by_id = ?
+      ) t
+    `, [userId, userId, userId, userId, userId]);
+    return { newest_acked_at: rows?.[0]?.newest ?? null };
+  }
+
+  private async findExistingSourceIds(ids: string[]): Promise<Set<string>> {
+    const found = new Set<string>();
+    if (ids.length === 0) return found;
+    const tables = ['contact_logs', 'agent_contact_logs', 'inbound_contact_logs', 'asset_contact_logs', 'hr_contact_logs'];
+    for (const table of tables) {
+      const placeholders = ids.map(() => '?').join(',');
+      const rows = await this.dataSource.query(
+        `SELECT source_call_id FROM ${table} WHERE source_call_id IN (${placeholders})`,
+        ids,
+      );
+      for (const r of rows) found.add(r.source_call_id);
+    }
+    return found;
+  }
+
+  private async insertCallLogs(queryRunner: QueryRunner, table: string, entityColumn: string, values: unknown[][]) {
     if (!values.length) return 0;
     const placeholders = values.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(', ');
-    const result = await this.dataSource.query(
+    const result = await queryRunner.query(
       `INSERT INTO ${table} (${entityColumn}, contact_type, sent_by_id, call_duration, call_direction, source_call_id, created_at)
        VALUES ${placeholders} ON DUPLICATE KEY UPDATE id = id`,
       values.flat(),
@@ -232,6 +413,8 @@ export class ContactLogsService {
       SELECT 'Lead' as entity_type, l.id as entity_id, l.name as entity_name, c.contact_type, c.call_duration, c.call_direction, c.created_at, u.name as staff_name FROM contact_logs c JOIN leads l ON c.lead_id = l.id LEFT JOIN users u ON c.sent_by_id = u.id
       UNION ALL SELECT 'Agent', a.id, a.name, ac.contact_type, ac.call_duration, ac.call_direction, ac.created_at, u.name FROM agent_contact_logs ac JOIN agents a ON ac.agent_id = a.id LEFT JOIN users u ON ac.sent_by_id = u.id
       UNION ALL SELECT 'Inbound', i.id, i.property_title, ic.contact_type, ic.call_duration, ic.call_direction, ic.created_at, u.name FROM inbound_contact_logs ic JOIN inbounds i ON ic.inbound_id = i.id LEFT JOIN users u ON ic.sent_by_id = u.id
+      UNION ALL SELECT 'Asset', ast.id, ast.owner_name, acl.contact_type, acl.call_duration, acl.call_direction, acl.created_at, u.name FROM asset_contact_logs acl JOIN assets ast ON acl.asset_id = ast.id LEFT JOIN users u ON acl.sent_by_id = u.id
+      UNION ALL SELECT 'HR', h.id, h.name, hc.contact_type, hc.call_duration, hc.call_direction, hc.created_at, u.name FROM hr_contact_logs hc JOIN hr_candidates h ON hc.hr_candidate_id = h.id LEFT JOIN users u ON hc.sent_by_id = u.id
       ORDER BY created_at DESC LIMIT 100
     `);
   }
