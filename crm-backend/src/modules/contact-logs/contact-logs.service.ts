@@ -71,18 +71,25 @@ export class ContactLogsService {
     hr_candidates: ['mobile', 'whatsapp'],
   };
 
-  async getTrackableNumbers(userId: number) {
+  /**
+   * Returns [{number, since}] — `since` is the earliest created_at across the
+   * staffer's entities holding that number. The device uploads only calls
+   * newer than `since`, so pre-assignment history is never sent.
+   */
+  async getTrackableNumbers(userId: number): Promise<{ number: string; since: string | null }[]> {
     const rows = await this.fetchMatchRows(userId, true);
-    const numbers = new Set<string>();
+    const earliest = new Map<string, string | null>();
     for (const { row, columns } of rows) {
       for (const col of columns) {
         const value = row[col];
-        if (typeof value === 'string' && cleanDigits(value).length >= MIN_MATCH_DIGITS) {
-          numbers.add(value.trim());
-        }
+        if (typeof value !== 'string' || cleanDigits(value).length < MIN_MATCH_DIGITS) continue;
+        const key = value.trim();
+        const created = row.created_at ? new Date(row.created_at).toISOString() : null;
+        const prev = earliest.get(key);
+        if (!prev || (created && created < prev)) earliest.set(key, created ?? prev ?? null);
       }
     }
-    return Array.from(numbers);
+    return Array.from(earliest.entries()).map(([number, since]) => ({ number, since }));
   }
 
   private async fetchMatchRows(userId: number, forTrackable: boolean) {

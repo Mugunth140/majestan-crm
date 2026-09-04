@@ -103,6 +103,14 @@ function formatTimestamp(ts: string) {
     " at " + d.toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
+function formatDuration(totalSeconds: any): string {
+  const s = Number(totalSeconds) || 0;
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rest = s % 60;
+  return rest === 0 ? `${m}m` : `${m}m ${rest}s`;
+}
+
 // ── Loading Skeleton ─────────────────────────────────────────────────────────
 function PageSkeleton() {
   return (
@@ -431,7 +439,11 @@ export default function LeadViewPage() {
   const statusName = lead.status || "New Lead";
   const badgeCls = STATUS_STYLES[statusName] ?? "bg-gray-100 text-gray-800 border-gray-200";
   const followUps: any[] = lead.follow_ups || [];
-  const contactLogs: any[] = lead.contact_logs || [];
+  // Defensive newest-first sort (created_at, id tiebreak) — backend orders
+  // the same way, but bulk device syncs share second precision.
+  const contactLogs: any[] = [...(lead.contact_logs || [])].sort((a: any, b: any) =>
+    (new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) || ((b.id ?? 0) - (a.id ?? 0)),
+  );
   const callDirectionCounts = contactLogs.reduce((counts: Record<string, number>, log: any) => {
     if (log.contact_type === "call") {
       const direction = (log.call_direction || "Unknown").toLowerCase();
@@ -1064,7 +1076,7 @@ export default function LeadViewPage() {
                           <span className="text-[#0052FF]">{log.sent_by?.name || "Staff"}</span>
                           <span className="mx-1.5 text-muted-foreground/60">•</span>
                           {log.contact_type === "call" ? (
-                            <>{log.call_direction || "Voice"} call <span className="font-normal text-muted-foreground">({log.call_duration ? `${Math.floor(log.call_duration / 60)}m ${log.call_duration % 60}s` : "0s"})</span></>
+                            <>{log.call_direction || "Voice"} call <span className="font-normal text-muted-foreground whitespace-nowrap">({formatDuration(log.call_duration)})</span></>
                           ) : (
                             <span className="capitalize">{log.contact_type}</span>
                           )}

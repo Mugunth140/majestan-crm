@@ -65,11 +65,12 @@ export class LeadsService {
       order: { created_at: 'DESC' },
     });
 
-    // Load contact logs with sent_by relation
+    // Load contact logs with sent_by relation. id DESC breaks created_at
+    // ties deterministically (bulk device syncs share second precision).
     const contactLogs = await this.dataSource.getRepository(ContactLog).find({
       where: { lead_id: id },
       relations: { sent_by: true },
-      order: { created_at: 'DESC' },
+      order: { created_at: 'DESC', id: 'DESC' },
     });
 
     return { ...lead, follow_ups: followUps, contact_logs: contactLogs };
