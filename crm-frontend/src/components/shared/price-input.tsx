@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { formatIndianCurrencyShort, parseIndianCurrency } from "@/lib/indian-currency";
+import { formatIndianCurrencyWords, parseIndianCurrency } from "@/lib/indian-currency";
 
 interface PriceInputProps {
   value?: string;
@@ -33,7 +33,7 @@ export function PriceInput({
   );
   const current = value !== undefined ? value : internal;
   const numeric = type === "number" ? Number(current) : parseIndianCurrency(current);
-  const caption = current !== "" && numeric > 0 ? formatIndianCurrencyShort(numeric) : "";
+  const caption = current !== "" && numeric > 0 ? formatIndianCurrencyWords(numeric) : "";
   return (
     <div className="space-y-1">
       <Input
