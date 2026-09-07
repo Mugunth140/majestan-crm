@@ -10,6 +10,8 @@ import { ArrowLeft, Loader2, Save, UploadCloud, X, FileText, Image as ImageIcon,
 import { toast } from "sonner";
 import { RadioPills } from "./RadioPills";
 import { FormSelect } from "@/components/shared/form-select";
+import { PriceInput } from "@/components/shared/price-input";
+import { parseIndianCurrency } from "@/lib/indian-currency";
 import { MobileHeader } from "@/components/layout/mobile-header";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -253,7 +255,7 @@ function AssetForm() {
           ...formData.financials,
           land_price: formData.financials.land_price ? Number(formData.financials.land_price) : undefined,
           dtcp_price: formData.financials.dtcp_price ? Number(formData.financials.dtcp_price) : undefined,
-          lo_price: formData.financials.lo_price ? Number(formData.financials.lo_price) : undefined,
+          lo_price: formData.financials.lo_price ? parseIndianCurrency(formData.financials.lo_price) : undefined,
           expectation: formData.financials.expectation ? Number(formData.financials.expectation) : undefined,
         }
       };
@@ -669,7 +671,7 @@ function AssetForm() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">LO Price</label>
-                  <Input type="number" value={formData.financials.lo_price} onChange={e => setFormData({...formData, financials: {...formData.financials, lo_price: e.target.value}})} placeholder="Amount" className="h-12 rounded-xl bg-muted/30" />
+                  <PriceInput value={formData.financials.lo_price || ""} onChange={v => setFormData({...formData, financials: {...formData.financials, lo_price: v}})} placeholder="e.g. 80L or 1.2Cr" />
                 </div>
                 <div className="space-y-2 lg:col-span-1">
                   <SliderWithValue

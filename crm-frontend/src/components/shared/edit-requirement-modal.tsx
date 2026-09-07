@@ -6,52 +6,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormSelect } from "@/components/shared/form-select";
+import { PriceInput } from "@/components/shared/price-input";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { 
-  PURCHASE_TYPES, PURCHASE_TIMELINES, QUALIFICATION_PURPOSES, 
-  PROPERTY_CATEGORIES, PROPERTY_TYPES_MAP, FUNDERS, PROJECTS 
+import {
+  PURCHASE_TYPES, PURCHASE_TIMELINES, QUALIFICATION_PURPOSES,
+  PROPERTY_CATEGORIES, PROPERTY_TYPES_MAP, FUNDERS, PROJECTS
 } from "@/lib/lead-constants";
+import { parseIndianCurrency } from "@/lib/indian-currency";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
-
-function parseIndianCurrency(input: string): number {
-  if (!input) return 0;
-  const cleanInput = input.toString().toLowerCase().replace(/,/g, '').trim();
-  let multiplier = 1;
-  let numericStr = cleanInput;
-
-  if (cleanInput.endsWith('cr') || cleanInput.endsWith('crore') || cleanInput.endsWith('crores')) {
-    multiplier = 10000000;
-    numericStr = cleanInput.replace(/cr(ore)?s?$/, '');
-  } else if (cleanInput.endsWith('l') || cleanInput.endsWith('lac') || cleanInput.endsWith('lakh') || cleanInput.endsWith('lakhs')) {
-    multiplier = 100000;
-    numericStr = cleanInput.replace(/l(akh)?s?|lacs?$/, '');
-  } else if (cleanInput.endsWith('k') || cleanInput.endsWith('thousand') || cleanInput.endsWith('thousands')) {
-    multiplier = 1000;
-    numericStr = cleanInput.replace(/k|thousands?$/, '');
-  }
-
-  const val = parseFloat(numericStr);
-  return isNaN(val) ? 0 : val * multiplier;
-}
-
-function formatIndianCurrencyWords(num: number): string {
-  if (!num || isNaN(num) || num === 0) return "";
-  
-  const cr = Math.floor(num / 10000000);
-  const lk = Math.floor((num % 10000000) / 100000);
-  const th = Math.floor((num % 100000) / 1000);
-  const rem = Math.floor(num % 1000);
-
-  const parts = [];
-  if (cr > 0) parts.push(`${cr} Crore${cr > 1 ? 's' : ''}`);
-  if (lk > 0) parts.push(`${lk} Lakh${lk > 1 ? 's' : ''}`);
-  if (th > 0) parts.push(`${th} Thousand`);
-  if (rem > 0) parts.push(`${rem}`);
-
-  return "₹ " + parts.join(' ');
-}
 
 interface EditRequirementModalProps {
   open: boolean;
@@ -295,21 +259,11 @@ export function EditRequirementModal({ open, onClose, inquiry, leadId, onSuccess
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Min Budget</label>
-                    <Input type="text" placeholder="e.g. 2.5Cr or 50L" value={preferences?.minBudget || ""} onChange={e => setPreferences({...preferences, minBudget: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
-                    {preferences?.minBudget && parseIndianCurrency(preferences.minBudget) > 0 && (
-                      <p className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 pl-1">
-                        {formatIndianCurrencyWords(parseIndianCurrency(preferences.minBudget))}
-                      </p>
-                    )}
+                    <PriceInput placeholder="e.g. 2.5Cr or 50L" value={preferences?.minBudget || ""} onChange={v => setPreferences({...preferences, minBudget: v})} />
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Max Budget</label>
-                    <Input type="text" placeholder="e.g. 3Cr or 75L" value={preferences?.maxBudget || ""} onChange={e => setPreferences({...preferences, maxBudget: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
-                    {preferences?.maxBudget && parseIndianCurrency(preferences.maxBudget) > 0 && (
-                      <p className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 pl-1">
-                        {formatIndianCurrencyWords(parseIndianCurrency(preferences.maxBudget))}
-                      </p>
-                    )}
+                    <PriceInput placeholder="e.g. 3Cr or 75L" value={preferences?.maxBudget || ""} onChange={v => setPreferences({...preferences, maxBudget: v})} />
                   </div>
 
                   {selectedCategory === "residential" && (

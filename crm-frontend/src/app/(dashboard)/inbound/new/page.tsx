@@ -12,6 +12,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Camera, CheckCircle2, Loader2, MapPin, Save, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 import { FormSelect } from "@/components/shared/form-select";
+import { PriceInput } from "@/components/shared/price-input";
+import { parseIndianCurrency } from "@/lib/indian-currency";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
 import { TimePicker } from "@/components/shared/time-picker";
 import { MobileHeader } from "@/components/layout/mobile-header";
@@ -319,7 +321,8 @@ function InboundForm() {
       payload.locality = selectedLocality;
       payload.bhk = selectedBhk;
       
-      payload.advance = formData.get("advance") || null;
+      const advanceRaw = String(formData.get("advance") || "").trim();
+      payload.advance = advanceRaw ? (parseIndianCurrency(advanceRaw) || advanceRaw) : null;
 
       if (selectedPurpose === "Rent") {
         payload.total_rent = formData.get("total_rent") ? parseFloat(formData.get("total_rent") as string) : null;
@@ -561,7 +564,7 @@ function InboundForm() {
             {selectedPurpose === "Rent" && (
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Total Rent</label>
-                <Input type="number" name="total_rent" defaultValue={inboundData?.total_rent || ""} placeholder="e.g. 15000" className="h-12 rounded-xl bg-muted/30" />
+                <PriceInput type="number" name="total_rent" defaultValue={inboundData?.total_rent || ""} placeholder="e.g. 15000" />
               </div>
             )}
             
@@ -589,7 +592,7 @@ function InboundForm() {
                     ]}
                   />
                 ) : (
-                  <Input type="text" name="advance" defaultValue={inboundData?.advance || ""} placeholder={selectedPurpose === "Sale" ? "e.g. 5 Lakhs" : "e.g. 1 Lakh"} className="h-12 rounded-xl bg-muted/30" />
+                  <PriceInput name="advance" defaultValue={inboundData?.advance || ""} placeholder={selectedPurpose === "Sale" ? "e.g. 5 Lakhs" : "e.g. 1 Lakh"} />
                 )}
               </div>
             )}
@@ -597,7 +600,7 @@ function InboundForm() {
             {selectedPurpose === "Rent" && (
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Rent per Sq Ft</label>
-                <Input type="number" step="0.01" name="rent_per_sqft" defaultValue={inboundData?.rent_per_sqft || ""} placeholder="e.g. 25.5" className="h-12 rounded-xl bg-muted/30" />
+                <PriceInput type="number" step="0.01" name="rent_per_sqft" defaultValue={inboundData?.rent_per_sqft || ""} placeholder="e.g. 25.5" />
               </div>
             )}
 

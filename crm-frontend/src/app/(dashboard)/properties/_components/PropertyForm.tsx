@@ -8,8 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { FormSelect } from "@/components/shared/form-select";
+import { PriceInput } from "@/components/shared/price-input";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { apiFetch } from "@/lib/api-fetch";
+import { parseIndianCurrency } from "@/lib/indian-currency";
 import { propertiesApi } from "@/lib/properties-api";
 import { canViewPropertyContacts } from "@/lib/permissions";
 export interface Property {
@@ -487,7 +489,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         title: title.trim(),
         listingType: listingType === "Buy" ? "Sell" : "Rent",
         propertyType,
-        price: Number(price),
+        price: parseIndianCurrency(price),
         negotiable,
         status,
         availableFrom: availableFrom || undefined,
@@ -509,11 +511,11 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         tenantOccupied: tenantOccupied.trim() || undefined,
 
         // Pricing
-        bookingAmount: bookingAmount.trim() || undefined,
+        bookingAmount: bookingAmount.trim() ? parseIndianCurrency(bookingAmount) : undefined,
         brokerageType: brokerageType.trim() || undefined,
         brokerageValue: brokerageValue.trim() || undefined,
-        expectedSalePrice: expectedSalePrice ? Number(expectedSalePrice) : undefined,
-        monthlyRent: monthlyRent ? Number(monthlyRent) : undefined,
+        expectedSalePrice: expectedSalePrice ? parseIndianCurrency(expectedSalePrice) : undefined,
+        monthlyRent: monthlyRent ? parseIndianCurrency(monthlyRent) : undefined,
         maintenanceCharges: maintenanceCharges.trim() || undefined,
         securityDeposit: securityDeposit.trim() || undefined,
         lockInPeriod: lockInPeriod.trim() || undefined,
@@ -1071,14 +1073,10 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             {/* Price */}
             <div className="space-y-2">
               <label className={labelClass}>Price *</label>
-              <Input
-                type="number"
+              <PriceInput
                 value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="e.g. 5000000"
-                required
-                min={0}
-                className={inputClass}
+                onChange={setPrice}
+                placeholder="e.g. 50L or 1.2Cr"
               />
             </div>
 
@@ -1100,13 +1098,10 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             {/* Booking Amount */}
             <div className="space-y-2">
               <label className={labelClass}>{listingType === "Rent" ? "Security Deposit" : "Booking Amount"}</label>
-              <Input
-                type="number"
+              <PriceInput
                 value={bookingAmount}
-                onChange={(e) => setBookingAmount(e.target.value)}
-                placeholder="e.g. 50000"
-                min={0}
-                className={inputClass}
+                onChange={setBookingAmount}
+                placeholder="e.g. 50k or 2L"
               />
             </div>
 
@@ -1146,26 +1141,20 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             {/* Expected Sale Price */}
             <div className="space-y-2">
               <label className={labelClass}>Expected Sale Price</label>
-              <Input
-                type="number"
+              <PriceInput
                 value={expectedSalePrice}
-                onChange={(e) => setExpectedSalePrice(e.target.value)}
-                placeholder="e.g. 5500000"
-                min={0}
-                className={inputClass}
+                onChange={setExpectedSalePrice}
+                placeholder="e.g. 55L or 1.1Cr"
               />
             </div>
 
             {/* Monthly Rent */}
             <div className="space-y-2">
               <label className={labelClass}>Monthly Rent</label>
-              <Input
-                type="number"
+              <PriceInput
                 value={monthlyRent}
-                onChange={(e) => setMonthlyRent(e.target.value)}
-                placeholder="e.g. 25000"
-                min={0}
-                className={inputClass}
+                onChange={setMonthlyRent}
+                placeholder="e.g. 25k"
               />
             </div>
 

@@ -1,15 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { format } from "date-fns";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { FormSelect } from "@/components/shared/form-select";
+import { DatePicker } from "@/components/shared/date-picker";
+import { PriceInput } from "@/components/shared/price-input";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { Loader2, Plus, Trash2, X } from "lucide-react";
+import { ImagePlus, Loader2, Plus, Trash2, X } from "lucide-react";
 import { projectsApi } from "@/lib/projects-api";
+import { propertiesApi } from "@/lib/properties-api";
+import { parseIndianCurrency } from "@/lib/indian-currency";
 import { computeProjectRanges, formatPriceRange } from "@/lib/project-ranges";
 
 const labelClass = "text-xs font-bold uppercase tracking-wider text-muted-foreground";
@@ -95,6 +100,27 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
   const d = initialData as any;
 
   const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState<{ cities: any[]; sublocations: any[] }>({ cities: [], sublocations: [] });
+
+  useEffect(() => {
+    propertiesApi
+      .formData()
+      .then((res: any) => {
+        const data = res?.data ?? res ?? {};
+        setFormData({
+          cities: data.cities ?? [],
+          sublocations: data.sublocations ?? [],
+        });
+      })
+      .catch(() => {});
+  }, []);
+
+  const cityIdOf = (cityName: string) => {
+    const found = formData.cities.find(
+      (c: any) => (c.cityName ?? c.city_name ?? "") === cityName
+    );
+    return found ? String(found.id) : "";
+  };
 
   const [name, setName] = useState(d?.name ?? "");
   const [projectType, setProjectType] = useState(d?.projectType ?? "apartment");
@@ -110,6 +136,11 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
   const [totalUnits, setTotalUnits] = useState(d?.totalUnits ? String(d.totalUnits) : "");
   const [description, setDescription] = useState(d?.description ?? "");
   const [coverImageUrl, setCoverImageUrl] = useState(d?.coverImageUrl ?? "");
+  const [coverPreview, setCoverPreview] = useState(d?.coverImageUrl ?? "");
+  const [floorPlanPreviews, setFloorPlanPreviews] = useState<Record<number, string>>({});
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [uploadingFloorPlanIdx, setUploadingFloorPlanIdx] = useState<number | null>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState(d?.status ?? "draft");
 
   const [units, setUnits] = useState<UnitRow[]>(() => {
@@ -134,7 +165,7 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
     const rows = units
       .filter((u) => u.unitCode.trim())
       .map((u) => ({
-        price: u.price ? Number(u.price) : null,
+        price: u.price ? parseIndianCurrency(u.price) || null : null,
         builtupAreaSqft: u.builtupAreaSqft ? Number(u.builtupAreaSqft) : null,
         carpetAreaSqft: u.carpetAreaSqft ? Number(u.carpetAreaSqft) : null,
         superBuiltupAreaSqft: u.superBuiltupAreaSqft ? Number(u.superBuiltupAreaSqft) : null,
@@ -150,6 +181,42 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
 
   const removeUnit = (idx: number) => {
     setUnits((prev) => (prev.length === 1 ? [emptyUnit()] : prev.filter((_, i) => i !== idx)));
+  };
+
+  const handleCoverFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (coverInputRef.current) coverInputRef.current.value = "";
+    if (!file) return;
+    setUploadingCover(true);
+    try {
+      const result = await propertiesApi.uploadImages([file]);
+      const uploaded = result?.data ?? [];
+      if (!result?.success || uploaded.length === 0) throw new Error("Upload failed");
+      setCoverImageUrl(uploaded[0].imageKey);
+      setCoverPreview(URL.createObjectURL(file));
+    } catch {
+      toast.error("Failed to upload cover image. Please try again.");
+    } finally {
+      setUploadingCover(false);
+    }
+  };
+
+  const handleFloorPlanFiles = async (e: React.ChangeEvent<HTMLInputElement>, idx: number) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploadingFloorPlanIdx(idx);
+    try {
+      const result = await propertiesApi.uploadImages([file]);
+      const uploaded = result?.data ?? [];
+      if (!result?.success || uploaded.length === 0) throw new Error("Upload failed");
+      updateUnit(idx, { floorPlanImageUrl: uploaded[0].imageKey });
+      setFloorPlanPreviews((prev) => ({ ...prev, [idx]: URL.createObjectURL(file) }));
+    } catch {
+      toast.error("Failed to upload floor plan. Please try again.");
+    } finally {
+      setUploadingFloorPlanIdx(null);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -188,7 +255,7 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
           carpetAreaSqft: u.carpetAreaSqft ? Number(u.carpetAreaSqft) : undefined,
           builtupAreaSqft: u.builtupAreaSqft ? Number(u.builtupAreaSqft) : undefined,
           superBuiltupAreaSqft: u.superBuiltupAreaSqft ? Number(u.superBuiltupAreaSqft) : undefined,
-          price: u.price ? Number(u.price) : undefined,
+          price: u.price ? parseIndianCurrency(u.price) || undefined : undefined,
           facing: u.facing || undefined,
           furnishedStatus: u.furnishedStatus || undefined,
           floorPlanImageUrl: u.floorPlanImageUrl.trim() || undefined,
@@ -226,25 +293,11 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
     <>
       <MobileHeader title={mode === "create" ? "New Project" : "Edit Project"} showBack />
       <form onSubmit={handleSubmit} className="w-full flex flex-col gap-6 pb-10">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-[28px] font-bold tracking-tight">{mode === "create" ? "New Project" : "Edit Project"}</h1>
-            <p className="text-muted-foreground text-sm mt-0.5">
-              {preview.unitsCount > 0
-                ? `${formatPriceRange(preview.minPrice, preview.maxPrice)} · ${preview.bhk.length ? preview.bhk.map((b) => `${b}BHK`).join(", ") : "No BHK"} · ${preview.unitsCount} unit${preview.unitsCount > 1 ? "s" : ""}`
-                : "Add units below to build the price range"}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button type="button" variant="outline" className="h-11 rounded-full px-5" onClick={() => router.push("/projects")}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading} className="h-11 rounded-full bg-[#0052FF] px-6 text-white hover:bg-[#0052FF]/90">
-              {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {mode === "create" ? "Create Project" : "Save Changes"}
-            </Button>
-          </div>
-        </div>
+        {preview.unitsCount > 0 && (
+          <p className="text-muted-foreground text-sm">
+            {`${formatPriceRange(preview.minPrice, preview.maxPrice)} · ${preview.bhk.length ? preview.bhk.map((b) => `${b}BHK`).join(", ") : "No BHK"} · ${preview.unitsCount} unit${preview.unitsCount > 1 ? "s" : ""}`}
+          </p>
+        )}
 
         <div className="bg-card border rounded-2xl p-8 shadow-sm">
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Basic Info</h3>
@@ -271,11 +324,28 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
             </div>
             <div className="space-y-2">
               <label className={labelClass}>Possession Date</label>
-              <Input type="date" value={possessionDate} onChange={(e) => setPossessionDate(e.target.value)} className={inputClass} />
+              <DatePicker
+                value={possessionDate ? new Date(`${possessionDate}T00:00:00`) : undefined}
+                onChange={(d) => setPossessionDate(d ? format(d, "yyyy-MM-dd") : "")}
+                placeholder="Pick possession date"
+                className="h-12 rounded-xl bg-muted/30"
+              />
             </div>
             <div className="space-y-2">
               <label className={labelClass}>City *</label>
-              <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Coimbatore" className={inputClass} />
+              <FormSelect
+                name="city"
+                options={formData.cities.map((c: any) => {
+                  const n = c.cityName ?? c.city_name ?? "";
+                  return { label: n, value: n };
+                })}
+                value={city}
+                onValueChange={(v) => {
+                  setCity(v || "");
+                  setSublocation("");
+                }}
+                placeholder="Select city"
+              />
             </div>
             <div className="space-y-2">
               <label className={labelClass}>State</label>
@@ -283,7 +353,21 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
             </div>
             <div className="space-y-2">
               <label className={labelClass}>Sublocation / Locality</label>
-              <Input value={sublocation} onChange={(e) => setSublocation(e.target.value)} placeholder="e.g. Saravanampatti" className={inputClass} />
+              <FormSelect
+                name="sublocation"
+                options={formData.sublocations
+                  .filter((s: any) => {
+                    const cid = cityIdOf(city);
+                    return !cid || String(s.cityId ?? s.city_id ?? "") === cid;
+                  })
+                  .map((s: any) => {
+                    const n = s.localityName ?? s.locality_name ?? "";
+                    return { label: n, value: n };
+                  })}
+                value={sublocation}
+                onValueChange={(v) => setSublocation(v || "")}
+                placeholder={city ? "Select locality" : "Select city first"}
+              />
             </div>
             <div className="space-y-2">
               <label className={labelClass}>Towers</label>
@@ -298,8 +382,56 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
               <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="About this project..." className="rounded-xl bg-muted/30 min-h-[120px]" />
             </div>
             <div className="space-y-2">
-              <label className={labelClass}>Cover Image URL</label>
-              <Input value={coverImageUrl} onChange={(e) => setCoverImageUrl(e.target.value)} placeholder="https://..." className={inputClass} />
+              <label className={labelClass}>Cover Image</label>
+              <input ref={coverInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleCoverFiles} />
+              {coverPreview && (coverPreview.startsWith("http") || coverPreview.startsWith("blob:")) ? (
+                <div className="relative w-full h-44 rounded-xl overflow-hidden border border-border/60 bg-muted/20">
+                  <img src={coverPreview} alt="Cover preview" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCoverImageUrl("");
+                      setCoverPreview("");
+                    }}
+                    className="absolute top-2 right-2 p-2 rounded-lg bg-black/60 text-white hover:bg-red-600 transition-colors"
+                    aria-label="Remove cover image"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : coverImageUrl ? (
+                <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 p-2">
+                  <span className="flex-1 truncate text-xs text-muted-foreground">{coverImageUrl}</span>
+                  <button
+                    type="button"
+                    onClick={() => coverInputRef.current?.click()}
+                    className="!px-3 !py-1.5 !text-[12px] !font-medium !text-[#0052FF] hover:!bg-[#0052FF]/10 !rounded-lg"
+                  >
+                    Replace
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCoverImageUrl("");
+                      setCoverPreview("");
+                    }}
+                    className="p-2 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                    aria-label="Remove cover image"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={uploadingCover}
+                  onClick={() => coverInputRef.current?.click()}
+                  className="w-full h-24 rounded-xl border-2 border-dashed border-border/60 flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:border-[#0052FF]/50 hover:text-[#0052FF] transition-colors disabled:opacity-60"
+                >
+                  {uploadingCover ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
+                  {uploadingCover ? "Uploading..." : "Upload cover image"}
+                </button>
+              )}
             </div>
             <div className="space-y-2">
               <label className={labelClass}>Status</label>
@@ -346,7 +478,7 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
                   </div>
                   <div className="space-y-2">
                     <label className={labelClass}>Price (₹)</label>
-                    <Input type="number" min={0} value={unit.price} onChange={(e) => updateUnit(idx, { price: e.target.value })} placeholder="8000000" className={inputClass} />
+                    <PriceInput value={unit.price} onChange={(v) => updateUnit(idx, { price: v })} placeholder="e.g. 80L or 1.2Cr" />
                   </div>
                   <div className="space-y-2">
                     <label className={labelClass}>Carpet (sqft)</label>
@@ -373,8 +505,50 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
                     <FormSelect name={`furnished-${idx}`} options={FURNISHED_OPTIONS} value={unit.furnishedStatus} onValueChange={(v) => updateUnit(idx, { furnishedStatus: v || "" })} placeholder="Any" />
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <label className={labelClass}>Floor Plan Image URL</label>
-                    <Input value={unit.floorPlanImageUrl} onChange={(e) => updateUnit(idx, { floorPlanImageUrl: e.target.value })} placeholder="https://..." className={inputClass} />
+                    <label className={labelClass}>Floor Plan Image</label>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      className="hidden"
+                      data-floorplan-idx={idx}
+                      onChange={(e) => handleFloorPlanFiles(e, idx)}
+                    />
+                    {unit.floorPlanImageUrl ? (
+                      <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 p-2">
+                        {(floorPlanPreviews[idx] || unit.floorPlanImageUrl.startsWith("http")) && (
+                          <img src={floorPlanPreviews[idx] || unit.floorPlanImageUrl} alt="Floor plan" className="h-16 w-16 rounded-lg object-cover bg-white" />
+                        )}
+                        <span className="flex-1 truncate text-xs text-muted-foreground">{unit.floorPlanImageUrl}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            updateUnit(idx, { floorPlanImageUrl: "" });
+                            setFloorPlanPreviews((prev) => {
+                              const next = { ...prev };
+                              delete next[idx];
+                              return next;
+                            });
+                          }}
+                          className="p-2 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                          aria-label="Remove floor plan"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={uploadingFloorPlanIdx === idx}
+                        onClick={(e) => {
+                          const input = (e.currentTarget.parentElement?.querySelector("input[type=file]") as HTMLInputElement) ?? null;
+                          input?.click();
+                        }}
+                        className="w-full h-14 rounded-xl border-2 border-dashed border-border/60 flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:border-[#0052FF]/50 hover:text-[#0052FF] transition-colors disabled:opacity-60"
+                      >
+                        {uploadingFloorPlanIdx === idx ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+                        {uploadingFloorPlanIdx === idx ? "Uploading..." : "Upload floor plan"}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
