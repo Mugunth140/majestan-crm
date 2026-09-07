@@ -11,7 +11,7 @@ import { FormSelect } from "@/components/shared/form-select";
 import { DatePicker } from "@/components/shared/date-picker";
 import { PriceInput } from "@/components/shared/price-input";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { ImagePlus, Loader2, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, ImagePlus, Loader2, Plus, Trash2, X } from "lucide-react";
 import { projectsApi } from "@/lib/projects-api";
 import { propertiesApi } from "@/lib/properties-api";
 import { parseIndianCurrency } from "@/lib/indian-currency";
@@ -293,6 +293,19 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
     <>
       <MobileHeader title={mode === "create" ? "New Project" : "Edit Project"} showBack />
       <form onSubmit={handleSubmit} className="w-full flex flex-col gap-6 pb-10">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => router.push("/projects")}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border/60 text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+            aria-label="Back to projects"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <h1 className="text-[28px] font-bold tracking-tight">
+            {mode === "create" ? "Add New Project" : "Edit Project"}
+          </h1>
+        </div>
         {preview.unitsCount > 0 && (
           <p className="text-muted-foreground text-sm">
             {`${formatPriceRange(preview.minPrice, preview.maxPrice)} · ${preview.bhk.length ? preview.bhk.map((b) => `${b}BHK`).join(", ") : "No BHK"} · ${preview.unitsCount} unit${preview.unitsCount > 1 ? "s" : ""}`}
