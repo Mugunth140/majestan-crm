@@ -19,10 +19,9 @@ import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
 import { propertiesApi } from "@/lib/properties-api";
 import { canViewPropertyContacts } from "@/lib/permissions";
-import { BulkImportDialog } from "./_components/BulkImportDialog";
 import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
-import { Edit, Eye, Filter, Lock, Plus, RefreshCw, Search, Upload, X } from "lucide-react";
+import { Edit, Eye, Filter, Lock, Plus, RefreshCw, Search, X } from "lucide-react";
 
 const PROPERTY_TYPE_OPTIONS = [
   { value: "apartment", label: "Apartment" },
@@ -55,7 +54,6 @@ export default function PropertiesPage() {
   const [properties, setProperties] = useState<any[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
@@ -493,10 +491,6 @@ export default function PropertiesPage() {
                 <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={fetchProperties} title="Refresh">
                   <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
                 </Button>
-                <Button variant="outline" className="h-11 rounded-full border-border/60 px-5 text-[14px] font-medium flex items-center gap-2" onClick={() => setIsBulkImportOpen(true)}>
-                  <Upload className="h-4 w-4" />
-                  Bulk Import
-                </Button>
                 <Link href="/properties/new" className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
                   <Plus size={18} />
                   Add Property
@@ -509,7 +503,6 @@ export default function PropertiesPage() {
         <Device mobile={mobileFilters} desktop={desktopFilters} />
         <Device desktop={null} mobile={<div className="w-full px-4 md:px-0">{tableSection}</div>} />
 
-        <BulkImportDialog open={isBulkImportOpen} onOpenChange={setIsBulkImportOpen} onSuccess={fetchProperties} />
       </div>
 
       <Dialog open={bulkDeleteIds !== null} onOpenChange={(open) => { if (!open) setBulkDeleteIds(null); }}>
