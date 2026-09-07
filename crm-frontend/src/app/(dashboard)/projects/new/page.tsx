@@ -1,15 +1,61 @@
-import { MobileHeader } from "@/components/layout/mobile-header";
+"use client";
+
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { projectsApi } from "@/lib/projects-api";
+import { ProjectForm } from "../_components/ProjectForm";
+
+function ProjectFormLoader() {
+  return (
+    <div className="flex h-[60vh] w-full items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-[#0052FF]" />
+        <p className="text-muted-foreground font-medium">Loading project data...</p>
+      </div>
+    </div>
+  );
+}
+
+function ProjectFormPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const editId = searchParams.get("edit");
+
+  const [initialData, setInitialData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(!!editId);
+
+  useEffect(() => {
+    if (!editId) return;
+    setIsLoading(true);
+    projectsApi
+      .getOne(Number(editId))
+      .then((result) => {
+        if (result && result.success !== false) {
+          setInitialData(result.data ?? result);
+        } else {
+          toast.error("Project not found.");
+          router.push("/projects");
+        }
+      })
+      .catch(() => {
+        toast.error("Failed to load project.");
+        router.push("/projects");
+      })
+      .finally(() => setIsLoading(false));
+  }, [editId, router]);
+
+  if (isLoading) return <ProjectFormLoader />;
+  if (editId && !initialData) return null;
+
+  return <ProjectForm mode={editId ? "edit" : "create"} initialData={initialData ?? undefined} />;
+}
 
 export default function NewProjectPage() {
   return (
-    <div className="flex flex-col space-y-6 animate-in fade-in duration-500">
-      <MobileHeader title="New Project" showBack />
-      <div className="px-4 md:px-0">
-        <div className="bg-card border rounded-2xl p-10 shadow-sm flex flex-col items-center justify-center text-center h-[50vh]">
-          <h3 className="text-xl font-bold text-foreground mb-2">Projects is coming soon</h3>
-          <p className="text-muted-foreground">This module is currently under development. Please check back later.</p>
-        </div>
-      </div>
-    </div>
+    <Suspense fallback={<ProjectFormLoader />}>
+      <ProjectFormPage />
+    </Suspense>
   );
 }
