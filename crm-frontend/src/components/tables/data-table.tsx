@@ -92,7 +92,7 @@ export function DataTable<TData, TValue>({
   });
 
   return (
-    <div className="space-y-4 md:space-y-0 md:flex md:flex-col md:flex-1 md:h-full md:min-h-0 md:gap-4 w-full">
+    <div className="space-y-4 md:space-y-0 md:flex md:flex-col md:flex-1 md:h-full md:min-h-0 md:gap-4 w-full min-w-0 max-w-full">
       {/* Floating Toolbar for Selected Actions */}
       {Object.keys(rowSelection).length > 0 && showToolbar && (
         <div className={cn(
@@ -125,7 +125,7 @@ export function DataTable<TData, TValue>({
       )}
 
       <div className={cn(
-        "overflow-auto table-scroll md:flex-1 md:h-full md:min-h-0 w-full relative",
+        "overflow-auto table-scroll md:flex-1 md:h-full md:min-h-0 w-full max-w-full min-w-0 relative",
         flush ? "" : "rounded-md border bg-card"
       )}>
         <table className="min-w-max w-full caption-bottom text-sm">
