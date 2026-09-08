@@ -368,7 +368,7 @@ export default function ProjectsPage() {
 
   const tableSection = (
     <div className="w-full md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col">
-      {isLoading ? <TableSkeleton /> : <DataTable {...tableProps} />}
+      {isLoading ? <TableSkeleton columns={11} rows={10} flush /> : <DataTable {...tableProps} />}
     </div>
   );
 

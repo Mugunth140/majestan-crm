@@ -152,4 +152,29 @@
       transform: translateX(100%);
     }
   }
+
+  /* Visible thin scrollbars for data tables (both axes) — opt-out of the global hide */
+  .table-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+    -ms-overflow-style: auto;
+  }
+  .table-scroll::-webkit-scrollbar {
+    display: block;
+    width: 8px;
+    height: 8px;
+  }
+  .table-scroll::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 8px;
+  }
+  .table-scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
+  }
+  .table-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .table-scroll::-webkit-scrollbar-corner {
+    background: transparent;
+  }
 }
