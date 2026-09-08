@@ -156,7 +156,11 @@ export function DataTable<TData, TValue>({
                   <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && "selected"}
-                    onClick={() => onRowClick && onRowClick(row.original)}
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).closest("a,button")) return;
+                      row.toggleSelected();
+                      if (onRowClick) onRowClick(row.original);
+                    }}
                     className="hover:bg-muted/50 transition-colors duration-150 cursor-pointer border-b border-border/40 active:scale-[0.998]"
                   >
                     {row.getVisibleCells().map((cell, idx) => (
