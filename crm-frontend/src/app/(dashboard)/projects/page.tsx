@@ -153,6 +153,19 @@ export default function ProjectsPage() {
       ),
     },
     {
+      accessorKey: "projectCode",
+      header: "Code",
+      cell: ({ row }) => (
+        row.original.projectCode ? (
+          <span className="font-mono text-xs font-semibold text-muted-foreground tracking-wide">
+            {row.original.projectCode}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        )
+      ),
+    },
+    {
       accessorKey: "name",
       header: "Project",
       cell: ({ row }) => {
