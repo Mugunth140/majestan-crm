@@ -61,11 +61,16 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   return (
     <>
       <MobileHeader title={project.name} showBack />
-      <div className="w-full flex flex-col gap-6 pb-10">
-        <div className="flex items-center justify-between">
+      <div className="w-full flex flex-col gap-6 pt-4 lg:p-0">
+        <div className="hidden md:flex items-center justify-between pr-[150px] min-h-[48px]">
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-[28px] font-bold tracking-tight">{project.name}</h1>
+              {project.projectCode && (
+                <span className="font-mono text-xs font-bold text-muted-foreground bg-muted border px-2 py-1 rounded-md">
+                  {project.projectCode}
+                </span>
+              )}
               <Badge className="font-medium shadow-sm border whitespace-nowrap capitalize bg-blue-100 text-blue-800 border-blue-200">
                 {project.projectType}
               </Badge>
@@ -79,8 +84,34 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             </p>
           </div>
           <Link href={`/projects/new?edit=${project.id}`}>
-            <Button variant="outline" className="h-11 rounded-full px-5">
-              <Edit className="h-4 w-4 mr-2" /> Edit
+            <Button className="rounded-full px-8 py-5 bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md">
+              <Edit className="h-4 w-4 mr-2" /> Edit Project
+            </Button>
+          </Link>
+        </div>
+
+        {/* ── Mobile Header Strip ── */}
+        <div className="md:hidden flex flex-col gap-3 px-4 pb-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {project.projectCode && (
+              <span className="font-mono text-xs font-bold text-muted-foreground bg-muted border px-2 py-1 rounded-md">
+                {project.projectCode}
+              </span>
+            )}
+            <Badge className="font-medium shadow-sm border whitespace-nowrap capitalize bg-blue-100 text-blue-800 border-blue-200">
+              {project.projectType}
+            </Badge>
+            <Badge className="font-medium shadow-sm border whitespace-nowrap capitalize bg-gray-100 text-gray-800 border-gray-200">
+              {project.status}
+            </Badge>
+          </div>
+          <p className="text-muted-foreground text-sm">
+            {project.city}
+            {project.sublocation ? ` · ${project.sublocation}` : ""} · {formatPriceRange(ranges.minPrice, ranges.maxPrice)}
+          </p>
+          <Link href={`/projects/new?edit=${project.id}`} className="w-full">
+            <Button variant="outline" className="w-full h-11 rounded-xl text-foreground font-semibold border-border/60">
+              <Edit className="w-4 h-4 mr-2 text-muted-foreground" /> Edit Project
             </Button>
           </Link>
         </div>
