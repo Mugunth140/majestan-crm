@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -17,7 +16,7 @@ import { MobileHeader } from "@/components/layout/mobile-header";
 import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
-import { projectsApi } from "@/lib/projects-api";
+import { useProjectsList } from "@/hooks/use-projects-list";
 import { computeProjectRanges, formatPriceRange } from "@/lib/project-ranges";
 import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
@@ -37,9 +36,6 @@ const STATUS_STYLES: Record<string, string> = {
 export default function ProjectsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("All");
-  const [projects, setProjects] = useState<any[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
@@ -48,6 +44,8 @@ export default function ProjectsPage() {
   const [filters, setFilters] = useState({ projectType: "" });
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [role, setRole] = useState("");
+
+  const { projects, totalCount, isLoading, fetchProjects, deleteBulk } = useProjectsList();
 
   useEffect(() => {
     try {
@@ -58,63 +56,24 @@ export default function ProjectsPage() {
 
   const tabs = ["All", "Published", "Draft", "Archived"];
 
-  const fetchProjects = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const params: Record<string, any> = {
-        page: pagination.pageIndex + 1,
-        limit: pagination.pageSize,
-      };
-      if (debouncedSearchQuery.trim()) params.search = debouncedSearchQuery.trim();
-      if (activeTab !== "All") params.status = activeTab.toLowerCase();
-      if (filters.projectType) params.projectType = filters.projectType;
-      const data = await projectsApi.list(params);
-      if (data && data.success !== false) {
-        setProjects(data.data ?? []);
-        setTotalCount(data.meta?.total ?? 0);
-      } else {
-        setProjects([]);
-        setTotalCount(0);
-      }
-    } catch {
-      toast.error("Failed to load projects.");
-      setProjects([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [pagination, debouncedSearchQuery, activeTab, filters]);
+  useEffect(() => {
+    fetchProjects({ pagination, debouncedSearchQuery, activeTab, filters });
+  }, [fetchProjects, pagination, debouncedSearchQuery, activeTab, filters]);
 
   useEffect(() => {
-    fetchProjects();
     window.scrollTo(0, 0);
     const main = document.querySelector("main");
     if (main) main.scrollTop = 0;
-  }, [fetchProjects]);
+  }, []);
 
   const resetPage = () => setPagination((p) => ({ ...p, pageIndex: 0 }));
 
   const handleBulkDelete = async () => {
     if (!bulkDeleteIds || bulkDeleteIds.length === 0) return;
     setIsDeletingBulk(true);
-    try {
-      const results = await Promise.all(
-        bulkDeleteIds.map((id) =>
-          projectsApi.remove(id).then(() => true).catch(() => false)
-        )
-      );
-      const failed = results.filter((r) => !r).length;
-      const ok = results.filter((r) => r).length;
-      if (failed > 0) toast.error(`Failed to delete ${failed} projects`);
-      if (ok > 0) {
-        toast.success(`${ok} project${ok === 1 ? "" : "s"} deleted successfully`);
-        setProjects((prev) => prev.filter((p) => !bulkDeleteIds.includes(p.id)));
-      }
-    } catch {
-      toast.error("Failed to delete projects");
-    } finally {
-      setIsDeletingBulk(false);
-      setBulkDeleteIds(null);
-    }
+    await deleteBulk(bulkDeleteIds);
+    setIsDeletingBulk(false);
+    setBulkDeleteIds(null);
   };
 
   const columns: ColumnDef<any>[] = [
@@ -428,7 +387,7 @@ export default function ProjectsPage() {
                 <p className="text-muted-foreground text-sm mt-0.5">Manage your villa and apartment projects</p>
               </div>
               <div className="flex items-center gap-3">
-                <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={fetchProjects} title="Refresh">
+                <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={() => fetchProjects({ pagination, debouncedSearchQuery, activeTab, filters })} title="Refresh">
                   <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
                 </Button>
                 <Link href="/projects/new" className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">

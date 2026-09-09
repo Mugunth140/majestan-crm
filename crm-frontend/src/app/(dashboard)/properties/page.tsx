@@ -17,7 +17,7 @@ import { MobileHeader } from "@/components/layout/mobile-header";
 import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
-import { propertiesApi } from "@/lib/properties-api";
+import { usePropertiesList } from "@/hooks/use-properties-list";
 import { canViewPropertyContacts } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
@@ -51,9 +51,6 @@ function formatPrice(price: number): string {
 export default function PropertiesPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("Available");
-  const [properties, setProperties] = useState<any[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
@@ -61,97 +58,47 @@ export default function PropertiesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [filters, setFilters] = useState({ propertyType: "", listingType: "", cityId: "" });
-  const [cities, setCities] = useState<{ id: number; cityName: string }[]>([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [role, setRole] = useState("");
+
+  const { properties, totalCount, isLoading, cities, fetchProperties, toggleVisibility, deleteBulk } = usePropertiesList();
 
   useEffect(() => {
     try {
       const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
       setRole(user?.role?.name || user?.role || "");
     } catch { /* ignore */ }
-    propertiesApi.formData()
-      .then((res) => {
-        const list = res?.data?.cities ?? res?.cities ?? [];
-        setCities(list.map((c: any) => ({ id: c.id, cityName: c.cityName ?? c.city_name ?? "" })));
-      })
-      .catch(() => { /* city filter stays empty */ });
   }, []);
 
   const tabs = ["Available", "Archived"];
 
-  const fetchProperties = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const params: Record<string, any> = {
-        page: pagination.pageIndex + 1,
-        limit: pagination.pageSize,
-      };
-      if (debouncedSearchQuery.trim()) params.search = debouncedSearchQuery.trim();
-      params.status = activeTab === "Archived" ? "archived" : "available";
-      if (filters.propertyType) params.propertyType = filters.propertyType;
-      if (filters.listingType) params.listingType = filters.listingType;
-      if (filters.cityId) params.cityId = filters.cityId;
-      const data = await propertiesApi.list(params);
-      if (data && data.success !== false) {
-        setProperties(data.data ?? []);
-        setTotalCount(data.meta?.total ?? 0);
-      } else {
-        setProperties([]);
-        setTotalCount(0);
-      }
-    } catch {
-      toast.error("Failed to load properties.");
-      setProperties([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [pagination, debouncedSearchQuery, activeTab, filters]);
+  useEffect(() => {
+    fetchProperties({ pagination, debouncedSearchQuery, activeTab, filters });
+  }, [fetchProperties, pagination, debouncedSearchQuery, activeTab, filters]);
 
   useEffect(() => {
-    fetchProperties();
     window.scrollTo(0, 0);
     const main = document.querySelector("main");
     if (main) main.scrollTop = 0;
-  }, [fetchProperties]);
+  }, []);
 
   const resetPage = () => setPagination((p) => ({ ...p, pageIndex: 0 }));
 
   const handleBulkDelete = async () => {
     if (!bulkDeleteIds || bulkDeleteIds.length === 0) return;
     setIsDeletingBulk(true);
-    try {
-      const results = await Promise.all(
-        bulkDeleteIds.map((id) =>
-          propertiesApi.remove(id).then(() => true).catch(() => false)
-        )
-      );
-      const failed = results.filter((r) => !r).length;
-      const ok = results.filter((r) => r).length;
-      if (failed > 0) toast.error(`Failed to delete ${failed} properties`);
-      if (ok > 0) {
-        toast.success(`${ok} propert${ok === 1 ? "y" : "ies"} deleted successfully`);
-        setProperties((prev) => prev.filter((p) => !bulkDeleteIds.includes(p.id)));
-      }
-    } catch {
-      toast.error("Failed to delete properties");
-    } finally {
-      setIsDeletingBulk(false);
-      setBulkDeleteIds(null);
-    }
+    await deleteBulk(bulkDeleteIds);
+    setIsDeletingBulk(false);
+    setBulkDeleteIds(null);
   };
 
   const handleToggleVisibility = async (id: number) => {
     setIsToggling(true);
-    try {
-      await propertiesApi.toggleVisibility(id);
-      toast.success("Visibility updated.");
-      fetchProperties();
-    } catch {
-      toast.error("Failed to toggle visibility.");
-    } finally {
-      setIsToggling(false);
+    const success = await toggleVisibility(id);
+    if (success) {
+      fetchProperties({ pagination, debouncedSearchQuery, activeTab, filters });
     }
+    setIsToggling(false);
   };
 
   const columns: ColumnDef<any>[] = [
@@ -488,7 +435,7 @@ export default function PropertiesPage() {
                 <p className="text-muted-foreground text-sm mt-0.5">Manage your property listings</p>
               </div>
               <div className="flex items-center gap-3">
-                <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={fetchProperties} title="Refresh">
+                <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={() => fetchProperties({ pagination, debouncedSearchQuery, activeTab, filters })} title="Refresh">
                   <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
                 </Button>
                 <Link href="/properties/new" className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
