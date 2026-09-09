@@ -61,6 +61,9 @@ const UNIT_STATUS_OPTIONS = [
   { value: "inactive", label: "Inactive" },
 ];
 
+const slugify = (value: string) =>
+  value.trim().toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
 interface UnitRow {
   unitCode: string;
   bedrooms: string;
@@ -123,6 +126,8 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
   };
 
   const [name, setName] = useState(d?.name ?? "");
+  const [slug, setSlug] = useState(d?.slug ?? "");
+  const [slugTouched, setSlugTouched] = useState(false);
   const [projectType, setProjectType] = useState(d?.projectType ?? "apartment");
   const [builderName, setBuilderName] = useState(d?.builderName ?? "");
   const [reraNumber, setReraNumber] = useState(d?.reraNumber ?? "");
@@ -234,6 +239,7 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
     try {
       const payload: Record<string, any> = {
         name: name.trim(),
+        slug: slug.trim() || slugify(name),
         projectType,
         builderName: builderName.trim() || undefined,
         reraNumber: reraNumber.trim() || undefined,
@@ -317,7 +323,15 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
               <label className={labelClass}>Project Name *</label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Emerald Heights" className={inputClass} />
+              <Input value={name} onChange={(e) => { setName(e.target.value); if (!slugTouched) setSlug(slugify(e.target.value)); }} placeholder="e.g. Emerald Heights" className={inputClass} />
+            </div>
+            <div className="space-y-2">
+              <label className={labelClass}>Custom URL Slug</label>
+              <Input value={slug} onChange={(e) => { setSlug(e.target.value); setSlugTouched(true); }} placeholder="e.g. emerald-heights" className={inputClass} />
+              <p className="text-xs text-muted-foreground">/{slug.trim() || slugify(name) || "your-slug"}</p>
+              {mode === "edit" && (
+                <p className="text-xs text-muted-foreground">Changing the slug changes the public URL.</p>
+              )}
             </div>
             <div className="space-y-2">
               <label className={labelClass}>Project Type *</label>
