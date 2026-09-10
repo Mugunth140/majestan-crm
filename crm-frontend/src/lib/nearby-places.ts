@@ -71,3 +71,35 @@ export async function fetchNearbyCategories(
   );
   return results.filter((c) => c.places.length > 0);
 }
+
+export interface ResolvedCenter {
+  latitude: number;
+  longitude: number;
+  label: string;
+}
+
+export async function resolveCenterFromText(
+  query: string,
+  apiKey: string
+): Promise<ResolvedCenter> {
+  const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+    method: "POST",
+    headers: {
+      "X-Goog-Api-Key": apiKey,
+      "X-Goog-FieldMask": "places.location,places.displayName",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ textQuery: query, pageSize: 5 }),
+  });
+  if (!res.ok) throw new Error("Failed to geocode locality with Google Places API");
+  const data = await res.json();
+  const first = ((data.places ?? []) as any[]).find(
+    (p) => p.location?.latitude && p.location?.longitude
+  );
+  if (!first) throw new Error(`No location found for "${query}"`);
+  return {
+    latitude: first.location.latitude,
+    longitude: first.location.longitude,
+    label: first.displayName?.text ?? query,
+  };
+}

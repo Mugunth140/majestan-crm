@@ -32,8 +32,12 @@ persisted via the existing `locationData.localityData` path into
 
 ### UI (in "Connectivity & Localities" card)
 - "Auto-Populate Nearby Places" button with fetching spinner state.
-- Shown only when latitude + longitude are set; otherwise the site's
-  yellow hint ("set the exact map location in Location above").
+- Shown when latitude + longitude are set OR a city/locality is selected;
+  otherwise a hint line. Without coordinates, the selected
+  "locality, city" text is geocoded first via Places API v1 `searchText`
+  (`resolveCenterFromText` in `src/lib/nearby-places.ts`) and the returned
+  point is used as the search center; the success toast names the resolved
+  place so the approximation is visible.
 - Fetched categories rendered as read-only cards (title + places with
   distance badges), matching site display.
 - Manual connectivity editor unchanged, below the fetched categories.

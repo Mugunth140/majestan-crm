@@ -8,12 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { FormSelect } from "@/components/shared/form-select";
+import { DatePicker } from "@/components/shared/date-picker";
+import { format } from "date-fns";
 import { PriceInput } from "@/components/shared/price-input";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { apiFetch } from "@/lib/api-fetch";
 import { parseIndianCurrency } from "@/lib/indian-currency";
 import { propertiesApi } from "@/lib/properties-api";
-import { fetchNearbyCategories, type LocalityCategory } from "@/lib/nearby-places";
+import { fetchNearbyCategories, resolveCenterFromText, type LocalityCategory } from "@/lib/nearby-places";
 import { canViewPropertyContacts } from "@/lib/permissions";
 export interface Property {
   id: number;
@@ -425,6 +427,20 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
     ? formData.sublocations.filter((s) => subCityId(s) === cityId)
     : [];
 
+  // ---- Locality text fallback for nearby-places when lat/lng are missing ----
+  const selectedCityName = cityNameOf(
+    formData.cities.find((c: any) => String(c.id) === cityId) ?? { cityName: "" }
+  );
+  const selectedLocalityName = subName(
+    formData.sublocations.find((s: any) => String(s.id) === sublocationId) ?? {}
+  );
+  const localityQuery = [selectedLocalityName, selectedCityName]
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join(", ");
+  const hasCoords = latitude.trim() !== "" && longitude.trim() !== "";
+  const canAutoFetch = hasCoords || localityQuery !== "";
+
   // ---- Resolve city from locality on edit ----
   useEffect(() => {
     if (cityId || !sublocationId || formData.sublocations.length === 0) return;
@@ -451,20 +467,38 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   };
 
   const handleAutoPopulatePlaces = async () => {
-    if (!latitude.trim() || !longitude.trim()) {
-      toast.error("Latitude and longitude are required. Please set them in Location above.");
-      return;
-    }
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
       toast.error("Google Maps API key is missing. Please configure NEXT_PUBLIC_GOOGLE_MAPS_API_KEY.");
       return;
     }
+    if (!hasCoords && !localityQuery) {
+      toast.error("Set latitude/longitude or select a city and locality first.");
+      return;
+    }
     setIsFetchingPlaces(true);
     try {
-      const filled = await fetchNearbyCategories(Number(latitude), Number(longitude), apiKey);
+      let centerLat: number;
+      let centerLng: number;
+      let centerLabel: string;
+      if (hasCoords) {
+        centerLat = Number(latitude);
+        centerLng = Number(longitude);
+        centerLabel = "property coordinates";
+      } else {
+        try {
+          const resolved = await resolveCenterFromText(localityQuery, apiKey);
+          centerLat = resolved.latitude;
+          centerLng = resolved.longitude;
+          centerLabel = resolved.label;
+        } catch {
+          toast.error(`Could not locate "${localityQuery}" on Google Maps.`);
+          return;
+        }
+      }
+      const filled = await fetchNearbyCategories(centerLat, centerLng, apiKey);
       setCategories(filled);
-      toast.success("Nearby places successfully populated from Google Maps!");
+      toast.success(`Nearby places populated around ${centerLabel}!`);
     } catch {
       toast.error("Failed to fetch nearby places. Check your API Key permissions.");
     } finally {
@@ -971,11 +1005,11 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             {/* Available Until */}
             <div className="space-y-2">
               <label className={labelClass}>Available Until</label>
-              <Input
-                type="date"
-                value={availableUntil}
-                onChange={(e) => setAvailableUntil(e.target.value)}
-                className={inputClass}
+              <DatePicker
+                value={availableUntil ? new Date(`${availableUntil}T00:00:00`) : undefined}
+                onChange={(d) => setAvailableUntil(d ? format(d, "yyyy-MM-dd") : "")}
+                placeholder="Pick end date"
+                className="h-12 rounded-xl bg-muted/30"
               />
             </div>
 
@@ -3308,7 +3342,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         {/* ---- Localities (Connectivity) ---- */}
         <div className="bg-card border rounded-2xl p-8 shadow-sm">
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Connectivity & Localities</h3>
-          {latitude.trim() && longitude.trim() ? (
+          {canAutoFetch ? (
             <Button
               type="button"
               onClick={handleAutoPopulatePlaces}
@@ -3321,7 +3355,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           ) : (
             <p className="mb-6 text-sm text-muted-foreground flex items-center gap-2">
               <MapPin className="h-4 w-4 shrink-0" />
-              Set latitude and longitude in Location above to auto-fetch nearby places.
+              Set latitude/longitude or select a city and locality above to auto-fetch nearby places.
             </p>
           )}
           {categories.length > 0 && (
