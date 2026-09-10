@@ -13,6 +13,7 @@ import { MobileHeader } from "@/components/layout/mobile-header";
 import { apiFetch } from "@/lib/api-fetch";
 import { parseIndianCurrency } from "@/lib/indian-currency";
 import { propertiesApi } from "@/lib/properties-api";
+import { fetchNearbyCategories, type LocalityCategory } from "@/lib/nearby-places";
 import { canViewPropertyContacts } from "@/lib/permissions";
 export interface Property {
   id: number;
@@ -34,6 +35,7 @@ export interface Property {
 import {
   ArrowLeft,
   Loader2,
+  MapPin,
   Save,
   UploadCloud,
   X,
@@ -196,6 +198,8 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   const [amenityIds, setAmenityIds] = useState<number[]>(d?.amenityIds ?? []);
   const [faqs, setFaqs] = useState<{ question: string; answer: string; section?: string }[]>(d?.faqs ?? []);
   const [connectivity, setConnectivity] = useState<{ icon: string; label: string; detail: string }[]>(loc0?.localityData?.connectivity ?? []);
+  const [categories, setCategories] = useState<LocalityCategory[]>(loc0?.localityData?.categories ?? []);
+  const [isFetchingPlaces, setIsFetchingPlaces] = useState(false);
   const [roomDimensions, setRoomDimensions] = useState<{ name: string; dimensions: string }[]>(det?.roomDimensions ?? []);
   // ---- Apartment / Villa / Individual House ----
   const [unitType, setUnitType] = useState(det?.unitType ?? "");
@@ -446,6 +450,28 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
     setSublocationId("");
   };
 
+  const handleAutoPopulatePlaces = async () => {
+    if (!latitude.trim() || !longitude.trim()) {
+      toast.error("Latitude and longitude are required. Please set them in Location above.");
+      return;
+    }
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (!apiKey) {
+      toast.error("Google Maps API key is missing. Please configure NEXT_PUBLIC_GOOGLE_MAPS_API_KEY.");
+      return;
+    }
+    setIsFetchingPlaces(true);
+    try {
+      const filled = await fetchNearbyCategories(Number(latitude), Number(longitude), apiKey);
+      setCategories(filled);
+      toast.success("Nearby places successfully populated from Google Maps!");
+    } catch {
+      toast.error("Failed to fetch nearby places. Check your API Key permissions.");
+    } finally {
+      setIsFetchingPlaces(false);
+    }
+  };
+
   // ---- Image upload logic ----
   const handleImageFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files ? Array.from(e.target.files) : [];
@@ -555,13 +581,13 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
         // Location
         locationData:
-          address.trim() || latitude.trim() || longitude.trim() || pincode.trim() || connectivity.length > 0
+          address.trim() || latitude.trim() || longitude.trim() || pincode.trim() || connectivity.length > 0 || categories.length > 0
             ? {
                 address: address.trim() || undefined,
                 pincode: pincode.trim() || undefined,
                 latitude: latitude.trim() ? parseFloat(latitude) : undefined,
                 longitude: longitude.trim() ? parseFloat(longitude) : undefined,
-                localityData: connectivity.length > 0 ? { connectivity: connectivity.filter((c) => c.label || c.detail) } : undefined,
+                localityData: connectivity.length > 0 || categories.length > 0 ? { categories: categories.length > 0 ? categories : undefined, connectivity: connectivity.length > 0 ? connectivity.filter((c) => c.label || c.detail) : undefined } : undefined,
               }
             : undefined,
 
@@ -1092,6 +1118,18 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               />
             </div>
           </div>
+        </div>
+
+        {/* ---- Description ---- */}
+        <div className="bg-card border rounded-2xl p-8 shadow-sm">
+          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Description</h3>
+          <Textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Describe the property, key features, surroundings, etc."
+            rows={5}
+            className="rounded-xl bg-muted/30 resize-none"
+          />
         </div>
 
         {/* ---- Pricing ---- */}
@@ -3270,6 +3308,39 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         {/* ---- Localities (Connectivity) ---- */}
         <div className="bg-card border rounded-2xl p-8 shadow-sm">
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Connectivity & Localities</h3>
+          {latitude.trim() && longitude.trim() ? (
+            <Button
+              type="button"
+              onClick={handleAutoPopulatePlaces}
+              disabled={isFetchingPlaces}
+              className="mb-6 bg-[#0052FF] text-white hover:bg-[#0052FF]/90"
+            >
+              {isFetchingPlaces ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <MapPin className="h-4 w-4 mr-2" />}
+              {isFetchingPlaces ? "Fetching from Google Places..." : "Auto-Populate Nearby Places"}
+            </Button>
+          ) : (
+            <p className="mb-6 text-sm text-muted-foreground flex items-center gap-2">
+              <MapPin className="h-4 w-4 shrink-0" />
+              Set latitude and longitude in Location above to auto-fetch nearby places.
+            </p>
+          )}
+          {categories.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+              {categories.map((cat, idx) => (
+                <div key={idx} className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                  <h5 className="font-semibold text-sm mb-3">{cat.title}</h5>
+                  <ul className="space-y-2">
+                    {cat.places.map((p, pIdx) => (
+                      <li key={pIdx} className="flex items-center justify-between gap-2 text-sm">
+                        <span className="truncate text-muted-foreground" title={p.name}>{p.name}</span>
+                        <span className="text-[11px] font-medium px-2 py-1 rounded-md border border-border/60 whitespace-nowrap">{p.distance}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="space-y-4">
             {connectivity.map((conn, idx) => (
               <div key={idx} className="flex gap-4 items-start">
@@ -3454,18 +3525,6 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               );
             })}
           </div>
-        </div>
-
-        {/* ---- Description ---- */}
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Description</h3>
-          <Textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Describe the property, key features, surroundings, etc."
-            rows={5}
-            className="rounded-xl bg-muted/30 resize-none"
-          />
         </div>
 
         {/* ---- Actions ---- */}
