@@ -82,29 +82,42 @@ function HrCandidateForm() {
       const url = editId ? `${API_URL}/hr/${editId}` : `${API_URL}/hr`;
       const method = editId ? "PATCH" : "POST";
 
+      const payload = { ...formData };
+      if (!payload.interviewDate) {
+        (payload as Record<string, unknown>).interviewDate = null;
+      }
+
       const res = await apiFetch(url, {
-        method, 
+        method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
-      
+
+      if (!res.ok) {
+        const errorMsg = Array.isArray(data.message) ? data.message.join(", ") : data.message;
+        throw new Error(errorMsg || `Failed to ${editId ? 'update' : 'add'} candidate`);
+      }
+
       const candidateId = editId || data.id;
 
       // Upload Resume if selected
       if (resumeFile && candidateId) {
         const fileData = new FormData();
         fileData.append("file", resumeFile);
-        await apiFetch(`${API_URL}/hr/${candidateId}/upload/resume`, {
+        const uploadRes = await apiFetch(`${API_URL}/hr/${candidateId}/upload/resume`, {
           method: "POST",
           body: fileData
         });
+        if (!uploadRes.ok) {
+          throw new Error("Candidate saved, but resume upload failed");
+        }
       }
 
       toast.success(`Candidate ${editId ? 'updated' : 'added'} successfully!`);
       router.push("/hr");
     } catch (err) {
-      toast.error(`Failed to ${editId ? 'update' : 'add'} candidate`);
+      toast.error(err instanceof Error ? err.message : `Failed to ${editId ? 'update' : 'add'} candidate`);
     } finally {
       setIsSaving(false);
     }
