@@ -79,8 +79,8 @@ interface Sublocation {
 }
 
 interface FormDataShape {
-  cities: City[];
-  sublocations: Sublocation[];
+  cities: any[];
+  sublocations: any[];
   amenities: any[];
 }
 
@@ -162,8 +162,13 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   const [timeForRegistration, setTimeForRegistration] = useState(d?.timeForRegistration ?? "");
 
   // ---- Location ----
+  // Edit API returns propertyLocations[0].locationId (locality id) and a city
+  // name string — never cityId — so fall back to locationId here and resolve
+  // the city once form data loads (see effect below).
   const [cityId, setCityId] = useState<string>(d?.cityId ? String(d.cityId) : "");
-  const [sublocationId, setSublocationId] = useState<string>(d?.sublocationId ? String(d.sublocationId) : "");
+  const [sublocationId, setSublocationId] = useState<string>(
+    d?.sublocationId ? String(d.sublocationId) : loc0?.locationId ? String(loc0.locationId) : ""
+  );
   const [pincode, setPincode] = useState(loc0?.pincode ?? "");
   const [address, setAddress] = useState(loc0?.address ?? "");
   const [latitude, setLatitude] = useState(loc0?.latitude ? String(loc0.latitude) : "");
@@ -391,7 +396,8 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
     setIsLoadingFormData(true);
     propertiesApi
       .formData()
-      .then((data: any) => {
+      .then((res: any) => {
+        const data = res?.data ?? res ?? {};
         if (data) {
         setFormData({
           cities: data.cities ?? [],
@@ -406,10 +412,33 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
       .finally(() => setIsLoadingFormData(false));
   }, []);
 
-  // ---- Filtered sublocations based on selected city ----
+  // ---- Filtered sublocations based on selected city (tolerant field names) ----
+  const subCityId = (s: any): string => String(s.cityId ?? s.city_id ?? "");
+  const subName = (s: any): string => s.localityName ?? s.locality_name ?? s.name ?? "";
+  const cityNameOf = (c: any): string => c.cityName ?? c.city_name ?? c.name ?? "";
+
   const filteredSublocations = cityId
-    ? formData.sublocations.filter((s) => String(s.cityId) === cityId)
+    ? formData.sublocations.filter((s) => subCityId(s) === cityId)
     : [];
+
+  // ---- Resolve city from locality on edit ----
+  useEffect(() => {
+    if (cityId || !sublocationId || formData.sublocations.length === 0) return;
+    const match = formData.sublocations.find((s: any) => String(s.id) === sublocationId);
+    if (match && subCityId(match)) {
+      setCityId(subCityId(match));
+      return;
+    }
+    // Fallback: match property city name to cities list
+    const wanted = String(d?.city ?? "").trim().toLowerCase();
+    if (wanted && formData.cities.length > 0) {
+      const cityMatch = formData.cities.find(
+        (c: any) => cityNameOf(c).trim().toLowerCase() === wanted
+      );
+      if (cityMatch) setCityId(String(cityMatch.id));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData, sublocationId]);
 
   // ---- Handle city change (reset locality) ----
   const handleCityChange = (val: string) => {
@@ -1250,7 +1279,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 placeholder="Select City"
                 options={formData.cities.map((c) => ({
                   value: String(c.id),
-                  label: c.cityName,
+                  label: cityNameOf(c),
                 }))}
                 value={cityId || null}
                 onValueChange={handleCityChange}
@@ -1265,7 +1294,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 placeholder={cityId ? "Select Locality" : "Select a city first"}
                 options={filteredSublocations.map((s) => ({
                   value: String(s.id),
-                  label: s.localityName,
+                  label: subName(s),
                 }))}
                 value={sublocationId || null}
                 onValueChange={setSublocationId}
@@ -1361,10 +1390,11 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   onChange={(e) => setAreaSqft(e.target.value)}
                   placeholder="e.g. 1500"
                   min={0}
-                  className={`${inputClass} flex-1`}
+                  className={`${inputClass} flex-1 min-w-0`}
                 />
                 <FormSelect
                   name="areaUnit"
+                  className="w-32 shrink-0"
                   placeholder="Unit"
                   options={[
                     { label: "Sq Ft", value: "Sq Ft" },
