@@ -2,13 +2,17 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { LeadSource } from '../../database/entities/lead-source.entity';
+import { SiteApiService } from '../properties/site-api.service';
 
 @Injectable()
 export class MasterService {
   constructor(
     @InjectDataSource() private crmDataSource: DataSource,
     @InjectDataSource('site') private siteDataSource: DataSource,
+    private readonly siteApi: SiteApiService,
   ) {}
+
+  // ---- Cities (read via direct DB, CRUD via site admin API) ----
 
   async getCities() {
     try {
@@ -17,12 +21,41 @@ export class MasterService {
       );
       return rows.map((r: { id: number; city_name: string }) => ({
         label: r.city_name,
-        value: r.city_name, // store city name in Lead.city column
+        value: r.city_name,
       }));
     } catch (e) {
       throw new InternalServerErrorException('Failed to load cities');
     }
   }
+
+  async getAllCities(search?: string) {
+    try {
+      let sql = 'SELECT id, city_name, state_name, country_name, country_code, is_active FROM cities';
+      const params: any[] = [];
+      if (search) {
+        sql += ' WHERE city_name LIKE ? OR state_name LIKE ?';
+        params.push(`%${search}%`, `%${search}%`);
+      }
+      sql += ' ORDER BY city_name ASC';
+      return await this.siteDataSource.query(sql, params);
+    } catch (e) {
+      throw new InternalServerErrorException('Failed to load cities');
+    }
+  }
+
+  async createCity(data: { city_name: string; state_name: string; country_name?: string; country_code?: string; is_active?: number }) {
+    return this.siteApi.post('/admin/cities', { data });
+  }
+
+  async updateCity(id: number, data: { city_name?: string; state_name?: string; country_name?: string; country_code?: string; is_active?: number }) {
+    return this.siteApi.patch(`/admin/cities/${id}`, { data });
+  }
+
+  async deleteCity(id: number) {
+    return this.siteApi.del(`/admin/cities/${id}`);
+  }
+
+  // ---- Sublocations ----
 
   async getSublocations(cityName: string) {
     if (!cityName) return [];
@@ -44,6 +77,38 @@ export class MasterService {
     }
   }
 
+  async getAllSublocations(search?: string) {
+    try {
+      let sql = `SELECT s.id, s.city_id, s.locality_name, s.postal_code, s.is_active,
+                        c.city_name, c.state_name, c.country_name
+                 FROM sublocations s
+                 LEFT JOIN cities c ON c.id = s.city_id`;
+      const params: any[] = [];
+      if (search) {
+        sql += ' WHERE s.locality_name LIKE ? OR c.city_name LIKE ?';
+        params.push(`%${search}%`, `%${search}%`);
+      }
+      sql += ' ORDER BY c.city_name ASC, s.locality_name ASC';
+      return await this.siteDataSource.query(sql, params);
+    } catch (e) {
+      throw new InternalServerErrorException('Failed to load sublocations');
+    }
+  }
+
+  async createSublocation(data: { city_id: number; locality_name: string; postal_code?: string; is_active?: number }) {
+    return this.siteApi.post('/admin/sublocations', { data });
+  }
+
+  async updateSublocation(id: number, data: { city_id?: number; locality_name?: string; postal_code?: string; is_active?: number }) {
+    return this.siteApi.patch(`/admin/sublocations/${id}`, { data });
+  }
+
+  async deleteSublocation(id: number) {
+    return this.siteApi.del(`/admin/sublocations/${id}`);
+  }
+
+  // ---- Projects ----
+
   async getProjects() {
     try {
       const rows = await this.siteDataSource.query(
@@ -57,6 +122,8 @@ export class MasterService {
       throw new InternalServerErrorException('Failed to load projects');
     }
   }
+
+  // ---- Lead Sources ----
 
   async getLeadSources() {
     const repo = this.crmDataSource.getRepository(LeadSource);

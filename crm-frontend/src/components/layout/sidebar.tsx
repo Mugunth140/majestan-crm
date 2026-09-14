@@ -52,7 +52,9 @@ const navigation = [
     adminOnly: true,
     subItems: [
       { name: "Lead Sources", href: "/master/sources" },
-      { name: "Property Types", href: "/master/property-types" }
+      { name: "Property Types", href: "/master/property-types" },
+      { name: "Cities", href: "/master/cities" },
+      { name: "Sublocations", href: "/master/sublocations" },
     ]
   },
 ];
