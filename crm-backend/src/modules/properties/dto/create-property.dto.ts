@@ -39,6 +39,9 @@ export class CreatePropertyDto {
   @IsOptional() @Type(() => Number) @IsNumber()
   parking?: number;
 
+  @IsOptional() @IsString()
+  parkingType?: string;
+
   @IsOptional() @IsBoolean()
   furnished?: boolean;
 
@@ -47,6 +50,9 @@ export class CreatePropertyDto {
 
   @IsOptional() @IsString()
   propertyFacing?: string;
+
+  @IsOptional() @IsString()
+  floorFacing?: string;
 
   @IsOptional() @IsString()
   propertyAge?: string;

@@ -43,6 +43,7 @@ const PASSTHROUGH_DETAILS_KEYS = new Set([
   'nearestAirport', 'labourAvailability', 'leaseTerm', 'incrementalRent',
   'electricityCharges', 'furnitureProvided', 'outdoorSpaces', 'utilitiesProvided',
   'neighborhoodHighlights', 'communityFacilities', 'accessibility',
+  'parkingType', 'floorFacing',
 ]);
 
 const BOOLEAN_DETAILS_KEYS = new Set([

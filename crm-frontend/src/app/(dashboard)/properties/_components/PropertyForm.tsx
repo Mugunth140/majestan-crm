@@ -60,6 +60,19 @@ const PROPERTY_TYPE_OPTIONS = [
 ];
 
 
+const FACING_DIRECTION_OPTIONS = [
+  { value: "North", label: "North" },
+  { value: "South", label: "South" },
+  { value: "East", label: "East" },
+  { value: "West", label: "West" },
+  { value: "North East", label: "North East" },
+  { value: "North West", label: "North West" },
+  { value: "South East", label: "South East" },
+  { value: "South West", label: "South West" },
+  { value: "North-East to South-West", label: "North-East to South-West" },
+  { value: "North-West to South-East", label: "North-West to South-East" },
+];
+
 const FURNISHING_STATUS_OPTIONS = [
   { value: "BARESHELL", label: "Bareshell" },
   { value: "SEMI FURNISHED", label: "Semi Furnished" },
@@ -186,6 +199,8 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   const [furnished, setFurnished] = useState<boolean>(det?.furnished ?? false);
   const [furnishingStatus, setFurnishingStatus] = useState(det?.furnishingStatus ?? "");
   const [propertyFacing, setPropertyFacing] = useState(det?.propertyFacing ?? "");
+  const [floorFacing, setFloorFacing] = useState(det?.floorFacing ?? "");
+  const [parkingType, setParkingType] = useState(det?.parkingType ?? "");
   const [propertyAge, setPropertyAge] = useState(det?.propertyAge ?? "");
   const [possessionStatus, setPossessionStatus] = useState(det?.possessionStatus ?? "");
   const [openSides, setOpenSides] = useState(det?.openSides ? String(det.openSides) : "");
@@ -633,6 +648,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         furnished,
         furnishingStatus: furnishingStatus.trim() || undefined,
         propertyFacing: propertyFacing.trim() || undefined,
+        floorFacing: floorFacing.trim() || undefined,
         propertyAge: propertyAge.trim() || undefined,
         possessionStatus: possessionStatus.trim() || undefined,
         openSides: openSides ? Number(openSides) : undefined,
@@ -640,6 +656,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         floorNumber: floorNumber.trim() || undefined,
         totalFloors: totalFloors ? Number(totalFloors) : undefined,
         guestParking,
+        parkingType: parkingType.trim() || undefined,
         floorsOccupied: floorsOccupied.trim() ? floorsOccupied.split(",").map((s) => s.trim()) : undefined,
         hasRestroom,
         roomDimensions: roomDimensions.filter((r) => r.name || r.dimensions).length > 0 ? roomDimensions : undefined,
@@ -1510,11 +1527,24 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             {/* Facing Direction */}
             <div className="space-y-2">
               <label className={labelClass}>Facing Direction</label>
-              <Input
-                value={propertyFacing}
-                onChange={(e) => setPropertyFacing(e.target.value)}
-                placeholder="e.g. East"
-                className={inputClass}
+              <FormSelect
+                name="propertyFacing"
+                placeholder="Select Direction"
+                options={FACING_DIRECTION_OPTIONS}
+                value={propertyFacing || null}
+                onValueChange={setPropertyFacing}
+              />
+            </div>
+
+            {/* Floor Facing */}
+            <div className="space-y-2">
+              <label className={labelClass}>Floor Facing</label>
+              <FormSelect
+                name="floorFacing"
+                placeholder="Select Direction"
+                options={FACING_DIRECTION_OPTIONS}
+                value={floorFacing || null}
+                onValueChange={setFloorFacing}
               />
             </div>
 
@@ -1759,6 +1789,21 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                     Guest Parking Available
                   </label>
                 </div>
+              </div>
+
+              {/* Parking Type */}
+              <div className="space-y-2">
+                <label className={labelClass}>Parking Type</label>
+                <FormSelect
+                  name="parkingType"
+                  placeholder="Select Type"
+                  options={[
+                    { label: "Covered", value: "Covered" },
+                    { label: "Open", value: "Open" },
+                  ]}
+                  value={parkingType || null}
+                  onValueChange={setParkingType}
+                />
               </div>
 
               <div className="space-y-2">
