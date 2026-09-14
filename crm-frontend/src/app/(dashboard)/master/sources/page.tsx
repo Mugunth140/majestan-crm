@@ -13,6 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 
+import { MobileHeader } from "@/components/layout/mobile-header";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 export default function LeadSourcesMasterPage() {
@@ -163,17 +165,20 @@ export default function LeadSourcesMasterPage() {
   ];
 
   return (
-    <div className="flex flex-col space-y-6">
-      <div className="flex items-center justify-between pr-37.5 min-h-12">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Master: Lead Sources</h1>
-        </div>
-        <Button className="px-4 py-5 rounded-full bg-[#0052FF] text-white hover:bg-[#0040CC]" onClick={() => { setFormData({ name: "", is_active: true }); setIsAddOpen(true); }}>
+    <div className="flex flex-col space-y-6 mb-20 md:mb-0 px-4 md:px-8 mt-2 md:mt-0">
+      <MobileHeader title="Master: Lead Sources" showBack />
+
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pr-0 md:pr-10 min-h-12">
+        <h1 className="text-3xl font-bold tracking-tight hidden md:block">Master: Lead Sources</h1>
+        <Button 
+          className="h-11 px-5 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC] shrink-0 w-full sm:w-auto"
+          onClick={() => { setFormData({ name: "", is_active: true }); setIsAddOpen(true); }}
+        >
           <Plus className="mr-1.5 h-4 w-4" /> Add Source
         </Button>
       </div>
 
-      <div className="bg-card border rounded-xl overflow-hidden shadow-sm p-6">
+      <div className="bg-card border rounded-2xl overflow-hidden shadow-sm p-4 md:p-6">
         {isLoading ? (
           <div className="flex h-40 items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -185,7 +190,7 @@ export default function LeadSourcesMasterPage() {
 
       {/* Add Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent>
+        <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-5 md:p-6">
           <DialogHeader>
             <DialogTitle>Add Lead Source</DialogTitle>
             <DialogDescription>Create a new source channel for incoming leads.</DialogDescription>
@@ -207,7 +212,7 @@ export default function LeadSourcesMasterPage() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent>
+        <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-5 md:p-6">
           <DialogHeader>
             <DialogTitle>Edit Lead Source</DialogTitle>
             <DialogDescription>Update details and status for this lead source.</DialogDescription>
@@ -236,7 +241,7 @@ export default function LeadSourcesMasterPage() {
 
       {/* Delete Dialog */}
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-        <DialogContent>
+        <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-5 md:p-6">
           <DialogHeader>
             <DialogTitle>Delete Lead Source</DialogTitle>
             <DialogDescription>

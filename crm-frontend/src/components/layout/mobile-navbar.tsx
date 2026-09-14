@@ -15,7 +15,8 @@ import {
   Users,
   Network,
   Building2,
-  Layers
+  Layers,
+  Home
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNotifications } from "@/context/notification-context";
@@ -41,6 +42,8 @@ export function MobileNavbar() {
     if (pathname.startsWith("/hr")) return "/hr/new";
     if (pathname.startsWith("/users")) return "/users/new";
     if (pathname.startsWith("/tasks")) return "/tasks/new";
+    if (pathname.startsWith("/properties")) return "/properties/new";
+    if (pathname.startsWith("/projects")) return "/projects/new";
     return null; 
   };
 
@@ -138,6 +141,7 @@ export function MobileNavbar() {
               <div className="grid grid-cols-4 gap-y-6 gap-x-2">
                 <QuickAddButton icon={Contact} label="Lead" onClick={() => { setIsAddMenuOpen(false); router.push("/leads/new"); }} color="bg-blue-500/10 text-blue-600" />
                 <QuickAddButton icon={Building2} label="Inbound" onClick={() => { setIsAddMenuOpen(false); router.push("/inbound/new"); }} color="bg-emerald-500/10 text-emerald-600" />
+                <QuickAddButton icon={Home} label="Property" onClick={() => { setIsAddMenuOpen(false); router.push("/properties/new"); }} color="bg-cyan-500/10 text-cyan-600" />
                 <QuickAddButton icon={Layers} label="Asset" onClick={() => { setIsAddMenuOpen(false); router.push("/asset-inventory/new"); }} color="bg-amber-500/10 text-amber-600" />
                 <QuickAddButton icon={Network} label="Agent" onClick={() => { setIsAddMenuOpen(false); router.push("/agent-network/new"); }} color="bg-indigo-500/10 text-indigo-600" />
                 <QuickAddButton icon={Briefcase} label="Project" onClick={() => { setIsAddMenuOpen(false); router.push("/projects/new"); }} color="bg-rose-500/10 text-rose-600" />

@@ -418,6 +418,10 @@ export default function PropertiesPage() {
         {searchBar(true)}
         {renderFilterPopover(true)}
       </div>
+      <Link href="/properties/new" className="flex h-11 w-full rounded-xl bg-[#0052FF] px-4 text-[14px] font-semibold text-white shadow-md hover:bg-[#0052FF]/90 items-center justify-center gap-2 transition-transform active:scale-95">
+        <Plus size={18} />
+        Add Property
+      </Link>
       {pillTabs}
     </div>
   );
