@@ -90,7 +90,7 @@ export default function DashboardPage() {
               {isAdmin && (
                 <>
                   <MenuCard icon={Activity} label="Activity Logs" onClick={() => router.push('/activity-logs')} color="text-red-600" bg="bg-red-500/10" />
-                  <MenuCard icon={Database} label="Master Registry" onClick={() => router.push('/master/sources')} color="text-zinc-600" bg="bg-zinc-500/10" />
+                  <MenuCard icon={Database} label="Master Registry" onClick={() => router.push('/master')} color="text-zinc-600" bg="bg-zinc-500/10" />
                 </>
               )}
             </MenuSection>
