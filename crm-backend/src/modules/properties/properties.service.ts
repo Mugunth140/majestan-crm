@@ -5,6 +5,9 @@ import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { BulkImportPropertyDto } from './dto/bulk-import-property.dto';
 import { PropertyQueryDto } from './dto/property-query.dto';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
+import { PropertyType } from '../../database/entities/property-type.entity';
 
 // CRM form keys → site details keys
 const RENAMED_DETAILS_KEYS: Record<string, string> = {
@@ -99,6 +102,7 @@ export class PropertiesService {
   constructor(
     private readonly siteApi: SiteApiService,
     private readonly permissionsService: PermissionsService,
+    @InjectDataSource() private readonly crmDataSource: DataSource,
   ) {}
 
   // Owner/agent contact keys — omitted entirely for callers without the grant.
@@ -171,8 +175,12 @@ export class PropertiesService {
   // ── findFormData ───────────────────────────────────────────────────────────
   async findFormData() {
     const { cities, sublocations, amenities } = await this.formDataCached();
+    const propertyTypesRepo = this.crmDataSource.getRepository(PropertyType);
+    const propertyTypes = await propertyTypesRepo.find({ where: { is_active: true }, order: { name: 'ASC' } });
+
     return {
       amenities,
+      propertyTypes: propertyTypes.map(t => ({ value: t.value, label: t.name })),
       cities: cities.map((c: any) => ({
         id: c.id,
         cityName: c.city_name ?? c.cityName,

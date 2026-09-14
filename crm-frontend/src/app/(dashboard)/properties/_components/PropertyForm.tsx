@@ -48,18 +48,6 @@ import {
 // Constants
 // ---------------------------------------------------------------------------
 
-const PROPERTY_TYPE_OPTIONS = [
-  { value: "apartment", label: "Apartment" },
-  { value: "villa", label: "Villa" },
-  { value: "plot", label: "Plot" },
-  { value: "commercial", label: "Commercial Space" },
-  { value: "coworking", label: "Co-working" },
-  { value: "farmland", label: "Farmland" },
-  { value: "industrial", label: "Industrial" },
-  { value: "individual_portion", label: "Independent House" },
-];
-
-
 const FACING_DIRECTION_OPTIONS = [
   { value: "North", label: "North" },
   { value: "South", label: "South" },
@@ -99,6 +87,7 @@ interface FormDataShape {
   cities: any[];
   sublocations: any[];
   amenities: any[];
+  propertyTypes: any[];
 }
 
 interface UploadedImage {
@@ -132,7 +121,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   // ---- Meta state ----
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingFormData, setIsLoadingFormData] = useState(true);
-  const [formData, setFormData] = useState<FormDataShape>({ cities: [], sublocations: [], amenities: [] });
+  const [formData, setFormData] = useState<FormDataShape>({ cities: [], sublocations: [], amenities: [], propertyTypes: [] });
 
   // Shorthand helpers for initialData
   const d = initialData as any;
@@ -424,6 +413,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           cities: data.cities ?? [],
           sublocations: data.sublocations ?? [],
           amenities: data.amenities ?? [],
+          propertyTypes: data.propertyTypes ?? [],
         });
         }
       })
@@ -984,7 +974,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               <FormSelect
                 name="propertyType"
                 placeholder="Select Type"
-                options={PROPERTY_TYPE_OPTIONS}
+                options={formData.propertyTypes || []}
                 value={propertyType || null}
                 onValueChange={setPropertyType}
                 required
