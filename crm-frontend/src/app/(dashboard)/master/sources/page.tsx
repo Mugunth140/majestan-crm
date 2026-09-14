@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Plus, Loader2 } from "lucide-react";
+import { Edit, Trash2, Plus, Loader2, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
@@ -19,6 +19,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 export default function LeadSourcesMasterPage() {
   const [sources, setSources] = useState<any[]>([]);
+  const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -137,45 +138,70 @@ export default function LeadSourcesMasterPage() {
   // Note for future developer:
   // Role permissions can be applied here by checking user's roles context before rendering Edit/Delete actions.
   const columns: ColumnDef<any>[] = [
-    { accessorKey: "id", header: "ID" },
-    { accessorKey: "name", header: "Source Name" },
+    { 
+      accessorKey: "name", 
+      header: "Source Name",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+            <Filter size={15} className="text-muted-foreground" />
+          </div>
+          <span className="font-medium capitalize">{row.original.name}</span>
+        </div>
+      )
+    },
     {
       accessorKey: "is_active",
       header: "Status",
       cell: ({ row }) => (
-        <Badge variant={row.original.is_active ? "default" : "secondary"} className={row.original.is_active ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border-none shadow-none" : "bg-gray-100 text-gray-800 hover:bg-gray-200 border-none shadow-none"}>
+        <Badge
+          variant={row.original.is_active ? "default" : "secondary"}
+          className={row.original.is_active
+            ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border-none shadow-none"
+            : "bg-gray-100 text-gray-600 hover:bg-gray-200 border-none shadow-none"}
+        >
           {row.original.is_active ? "Active" : "Inactive"}
         </Badge>
-      )
+      ),
     },
     {
       id: "actions",
-      header: "Action",
+      header: "Actions",
       cell: ({ row }) => (
-        <div className="flex items-center justify-center gap-2">
+        <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-[#0052FF] hover:bg-blue-50" onClick={() => openEdit(row.original)}>
-            <Edit size={16} />
+            <Edit size={15} />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950" onClick={() => openDelete(row.original)}>
-            <Trash2 size={16} />
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-rose-600 hover:bg-rose-50" onClick={() => openDelete(row.original)}>
+            <Trash2 size={15} />
           </Button>
         </div>
-      )
-    }
+      ),
+    },
   ];
+
+  const filteredSources = sources.filter((s) => s.name?.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div className="flex flex-col space-y-6 mb-20 md:mb-0 px-4 md:px-8 mt-2 md:mt-0">
       <MobileHeader title="Master: Lead Sources" showBack />
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pr-0 md:pr-10 min-h-12">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pr-0 md:pr-[150px] min-h-12">
         <h1 className="text-3xl font-bold tracking-tight hidden md:block">Master: Lead Sources</h1>
-        <Button 
-          className="h-11 px-5 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC] shrink-0 w-full sm:w-auto"
-          onClick={() => { setFormData({ name: "", is_active: true }); setIsAddOpen(true); }}
-        >
-          <Plus className="mr-1.5 h-4 w-4" /> Add Source
-        </Button>
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+          <Input
+            placeholder="Search sources..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-11 rounded-xl w-full sm:w-64 bg-background"
+          />
+          <Button 
+            className="h-11 px-5 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC] shrink-0 w-full sm:w-auto"
+            onClick={() => { setFormData({ name: "", is_active: true }); setIsAddOpen(true); }}
+          >
+            <Plus className="mr-1.5 h-4 w-4" /> Add Source
+          </Button>
+        </div>
       </div>
 
       <div className="bg-card border rounded-2xl overflow-hidden shadow-sm p-4 md:p-6">
@@ -184,7 +210,7 @@ export default function LeadSourcesMasterPage() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <DataTable columns={columns} data={sources} />
+          <DataTable columns={columns} data={filteredSources} />
         )}
       </div>
 

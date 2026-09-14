@@ -227,7 +227,7 @@ export default function MasterCitiesPage() {
     <div className="flex flex-col space-y-6 mb-20 md:mb-0 px-4 md:px-8 mt-2 md:mt-0">
       <MobileHeader title="Master: Cities" showBack />
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pr-0 md:pr-10 min-h-12">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pr-0 md:pr-[150px] min-h-12">
         <h1 className="text-3xl font-bold tracking-tight hidden md:block">Master: Cities</h1>
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
           <Input
