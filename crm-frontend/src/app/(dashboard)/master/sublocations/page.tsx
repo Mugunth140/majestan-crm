@@ -229,7 +229,7 @@ export default function MasterSublocationsPage() {
   ];
 
   const CitySelect = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
-    <Select required value={value} onValueChange={onChange}>
+    <Select required value={value} onValueChange={(val) => onChange(val ?? "")}>
       <SelectTrigger className="h-10 w-full rounded-lg border border-input bg-transparent dark:bg-input/30 px-3 py-2 text-sm focus:ring-3 focus:ring-ring/50">
         <SelectValue placeholder="— Select a city —">
           {(val: string | null) => {
