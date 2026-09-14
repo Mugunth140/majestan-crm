@@ -60,7 +60,6 @@ export default function MasterRegistryOverview() {
           color="text-amber-600"
           bg="bg-amber-500/10"
         />
-        {/*
         <RegistryCard
           icon={Building2}
           title="Property Types"
@@ -69,7 +68,6 @@ export default function MasterRegistryOverview() {
           color="text-purple-600"
           bg="bg-purple-500/10"
         />
-        */}
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { apiFetch } from "@/lib/api-fetch";
 import { useState, useEffect, useCallback } from "react";
 import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Edit, Trash2, Plus, Loader2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,9 @@ export default function MasterSublocationsPage() {
   const [selected, setSelected] = useState<any>(null);
   const [form, setForm] = useState({ ...emptyForm });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
   const fetchSublocations = useCallback(async (q = search) => {
     setIsLoading(true);
@@ -170,7 +174,52 @@ export default function MasterSublocationsPage() {
     setIsDeleteOpen(true);
   };
 
+  const handleBulkDelete = async () => {
+    if (!bulkDeleteIds || bulkDeleteIds.length === 0) return;
+    setIsDeletingBulk(true);
+    let successCount = 0;
+    try {
+      await Promise.all(
+        bulkDeleteIds.map(async (id) => {
+          const res = await apiFetch(`${API_URL}/master/sublocations/${id}`, { method: "DELETE" });
+          const data = await res.json();
+          if (data.success) successCount++;
+        })
+      );
+      toast.success(`Deleted ${successCount} sublocations successfully`);
+    } catch {
+      toast.error("Some sublocations failed to delete");
+    } finally {
+      setIsDeletingBulk(false);
+      setBulkDeleteIds(null);
+      fetchSublocations(search);
+    }
+  };
+
   const columns: ColumnDef<any>[] = [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <div className="flex items-center justify-center">
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected()}
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Select all"
+            className="data-[state=checked]:bg-[#0052FF] data-[state=checked]:border-[#0052FF]"
+          />
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label="Select row"
+            className="data-[state=checked]:bg-[#0052FF] data-[state=checked]:border-[#0052FF]"
+          />
+        </div>
+      ),
+    },
     {
       accessorKey: "locality_name",
       header: "Sublocation",
@@ -277,7 +326,13 @@ export default function MasterSublocationsPage() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <DataTable columns={columns} data={sublocations} />
+          <DataTable 
+            columns={columns} 
+            data={sublocations} 
+            showToolbar={true}
+            showDeleteAction={true}
+            onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
+          />
         )}
       </div>
 
@@ -368,6 +423,24 @@ export default function MasterSublocationsPage() {
             <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>Cancel</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Dialog */}
+      <Dialog open={bulkDeleteIds !== null} onOpenChange={(open) => { if (!open) setBulkDeleteIds(null); }}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Sublocation{bulkDeleteIds && bulkDeleteIds.length > 1 ? "s" : ""}</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {bulkDeleteIds ? `${bulkDeleteIds.length} sublocation${bulkDeleteIds.length > 1 ? "s" : ""}` : "this sublocation"}? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setBulkDeleteIds(null)} disabled={isDeletingBulk}>Cancel</Button>
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={isDeletingBulk}>
+              {isDeletingBulk ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

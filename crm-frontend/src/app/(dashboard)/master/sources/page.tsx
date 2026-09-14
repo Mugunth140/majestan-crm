@@ -5,6 +5,7 @@ import { apiFetch } from "@/lib/api-fetch";
 import { useState, useEffect, useCallback } from "react";
 import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Edit, Trash2, Plus, Loader2, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,9 @@ export default function LeadSourcesMasterPage() {
   const [selectedSource, setSelectedSource] = useState<any>(null);
   const [formData, setFormData] = useState({ name: "", is_active: true });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
+  const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
   const fetchSources = useCallback(async () => {
     try {
@@ -135,9 +139,54 @@ export default function LeadSourcesMasterPage() {
     setIsDeleteOpen(true);
   };
 
+  const handleBulkDelete = async () => {
+    if (!bulkDeleteIds || bulkDeleteIds.length === 0) return;
+    setIsDeletingBulk(true);
+    let successCount = 0;
+    try {
+      await Promise.all(
+        bulkDeleteIds.map(async (id) => {
+          const res = await apiFetch(`${API_URL}/master/lead-sources/${id}`, { method: "DELETE" });
+          const data = await res.json();
+          if (data.success) successCount++;
+        })
+      );
+      toast.success(`Deleted ${successCount} lead sources successfully`);
+    } catch {
+      toast.error("Some lead sources failed to delete");
+    } finally {
+      setIsDeletingBulk(false);
+      setBulkDeleteIds(null);
+      fetchSources();
+    }
+  };
+
   // Note for future developer:
   // Role permissions can be applied here by checking user's roles context before rendering Edit/Delete actions.
   const columns: ColumnDef<any>[] = [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <div className="flex items-center justify-center">
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected()}
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Select all"
+            className="data-[state=checked]:bg-[#0052FF] data-[state=checked]:border-[#0052FF]"
+          />
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label="Select row"
+            className="data-[state=checked]:bg-[#0052FF] data-[state=checked]:border-[#0052FF]"
+          />
+        </div>
+      ),
+    },
     { 
       accessorKey: "name", 
       header: "Source Name",
@@ -210,7 +259,13 @@ export default function LeadSourcesMasterPage() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <DataTable columns={columns} data={filteredSources} />
+          <DataTable 
+            columns={columns} 
+            data={filteredSources} 
+            showToolbar={true}
+            showDeleteAction={true}
+            onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
+          />
         )}
       </div>
 
@@ -278,6 +333,24 @@ export default function LeadSourcesMasterPage() {
             <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>Cancel</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Dialog */}
+      <Dialog open={bulkDeleteIds !== null} onOpenChange={(open) => { if (!open) setBulkDeleteIds(null); }}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Source{bulkDeleteIds && bulkDeleteIds.length > 1 ? "s" : ""}</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {bulkDeleteIds ? `${bulkDeleteIds.length} source${bulkDeleteIds.length > 1 ? "s" : ""}` : "this source"}? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setBulkDeleteIds(null)} disabled={isDeletingBulk}>Cancel</Button>
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={isDeletingBulk}>
+              {isDeletingBulk ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

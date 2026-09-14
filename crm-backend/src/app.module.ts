@@ -38,6 +38,7 @@ import { UserPermission } from './database/entities/user-permission.entity';
 import { Role } from './database/entities/role.entity';
 import { User } from './database/entities/user.entity';
 import { LeadSource } from './database/entities/lead-source.entity';
+import { PropertyType } from './database/entities/property-type.entity';
 import { Lead } from './database/entities/lead.entity';
 import { LeadInquiry } from './database/entities/lead-inquiry.entity';
 import { LeadFollowUp } from './database/entities/lead-follow-up.entity';
@@ -96,7 +97,7 @@ import { CommunicationsModule } from './modules/communications/communications.mo
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('CRM_DB_NAME', 'majestan_crm'),
-        entities: [User, Role, Permission, RolePermission, UserPermission, Department, ActivityLog, LeadSource, Lead, LeadInquiry, LeadFollowUp, LeadDocument, ContactLog, Agent, AgentFollowUp, AgentContactLog, Inbound, InboundFollowUp, InboundContactLog, HrCandidate, HrFollowUp, HrContactLog, AssetLayout, Asset, AssetLocation, AssetFinancials, AssetFeature, AssetDocument, AssetContactLog, RoutingHistory, Notification, TaskTemplate, TaskMetricTarget, TaskMetricProgress, TaskActivityLog, TaskReceipt],
+        entities: [User, Role, Permission, RolePermission, UserPermission, Department, ActivityLog, LeadSource, PropertyType, Lead, LeadInquiry, LeadFollowUp, LeadDocument, ContactLog, Agent, AgentFollowUp, AgentContactLog, Inbound, InboundFollowUp, InboundContactLog, HrCandidate, HrFollowUp, HrContactLog, AssetLayout, Asset, AssetLocation, AssetFinancials, AssetFeature, AssetDocument, AssetContactLog, RoutingHistory, Notification, TaskTemplate, TaskMetricTarget, TaskMetricProgress, TaskActivityLog, TaskReceipt],
         synchronize: false, // Migrations are used instead
         extra: {
           connectionLimit: configService.get<number>('DB_CONNECTION_LIMIT', 25),

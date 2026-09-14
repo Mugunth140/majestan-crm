@@ -2,6 +2,7 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { LeadSource } from '../../database/entities/lead-source.entity';
+import { PropertyType } from '../../database/entities/property-type.entity';
 import { SiteApiService } from '../properties/site-api.service';
 
 @Injectable()
@@ -162,6 +163,50 @@ export class MasterService {
     const result = await repo.delete(id);
     if (result.affected === 0) {
       throw new InternalServerErrorException('Source not found or could not be deleted');
+    }
+    return { success: true };
+  }
+
+  // ---- Property Types ----
+
+  async getPropertyTypes() {
+    const repo = this.crmDataSource.getRepository(PropertyType);
+    const types = await repo.find({ where: { is_active: true }, order: { name: 'ASC' } });
+    return types.map((t) => ({ id: t.id, label: t.name, value: t.value, is_active: t.is_active }));
+  }
+
+  async getAllPropertyTypes() {
+    const repo = this.crmDataSource.getRepository(PropertyType);
+    const types = await repo.find({ order: { name: 'ASC' } });
+    return types.map((t) => ({ id: t.id, label: t.name, value: t.value, is_active: t.is_active, name: t.name }));
+  }
+
+  async createPropertyType(data: { name: string; value: string; is_active?: boolean }) {
+    const repo = this.crmDataSource.getRepository(PropertyType);
+    const existing = await repo.findOne({ where: { value: data.value } });
+    if (existing) {
+      throw new InternalServerErrorException('Property type with this value already exists');
+    }
+    const created = await repo.save(repo.create({ ...data, is_active: data.is_active ?? true }));
+    return { id: created.id, label: created.name, value: created.value, is_active: created.is_active };
+  }
+
+  async updatePropertyType(id: number, data: { name: string; value: string; is_active: boolean }) {
+    const repo = this.crmDataSource.getRepository(PropertyType);
+    const type = await repo.findOne({ where: { id } });
+    if (!type) throw new InternalServerErrorException('Property type not found');
+    type.name = data.name;
+    type.value = data.value;
+    type.is_active = data.is_active;
+    const updated = await repo.save(type);
+    return { id: updated.id, label: updated.name, value: updated.value, is_active: updated.is_active };
+  }
+
+  async deletePropertyType(id: number) {
+    const repo = this.crmDataSource.getRepository(PropertyType);
+    const result = await repo.delete(id);
+    if (result.affected === 0) {
+      throw new InternalServerErrorException('Property type not found or could not be deleted');
     }
     return { success: true };
   }

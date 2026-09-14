@@ -121,4 +121,39 @@ export class MasterController {
     const data = await this.masterService.deleteLeadSource(id);
     return { success: true, data };
   }
+
+  // ---- Property Types ----
+
+  @Get('property-types')
+  async getPropertyTypes() {
+    const data = await this.masterService.getPropertyTypes();
+    return { success: true, data };
+  }
+
+  @Get('all-property-types')
+  async getAllPropertyTypes() {
+    const data = await this.masterService.getAllPropertyTypes();
+    return { success: true, data };
+  }
+
+  @Post('property-types')
+  @Roles('Admin')
+  async createPropertyType(@Body() body: { name: string; value: string; is_active?: boolean }) {
+    const data = await this.masterService.createPropertyType(body);
+    return { success: true, data };
+  }
+
+  @Put('property-types/:id')
+  @Roles('Admin')
+  async updatePropertyType(@Param('id') id: number, @Body() body: { name: string; value: string; is_active: boolean }) {
+    const data = await this.masterService.updatePropertyType(id, body);
+    return { success: true, data };
+  }
+
+  @Delete('property-types/:id')
+  @Roles('Admin')
+  async deletePropertyType(@Param('id') id: number) {
+    const data = await this.masterService.deletePropertyType(id);
+    return { success: true, data };
+  }
 }
