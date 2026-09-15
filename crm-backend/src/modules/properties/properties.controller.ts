@@ -22,6 +22,8 @@ import { UpdatePropertyDto } from './dto/update-property.dto';
 import { BulkImportPropertyDto } from './dto/bulk-import-property.dto';
 import { PropertyQueryDto } from './dto/property-query.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('api/v1/properties')
 @UseGuards(JwtAuthGuard)
@@ -104,6 +106,22 @@ export class PropertiesController {
   @Patch(':id/visibility')
   async toggleVisibility(@Param('id', ParseIntPipe) id: number) {
     const data = await this.propertiesService.toggleVisibility(id);
+    return { success: true, data };
+  }
+
+  @Patch(':id/approve')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Admin', 'Manager')
+  async approve(@Param('id', ParseIntPipe) id: number) {
+    const data = await this.propertiesService.setApprovalStatus(id, 'Approved');
+    return { success: true, data };
+  }
+
+  @Patch(':id/revoke-approval')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Admin', 'Manager')
+  async revokeApproval(@Param('id', ParseIntPipe) id: number) {
+    const data = await this.propertiesService.setApprovalStatus(id, 'Pending');
     return { success: true, data };
   }
 

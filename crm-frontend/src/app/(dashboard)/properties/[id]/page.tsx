@@ -102,6 +102,41 @@ export default function PropertyViewPage() {
 
   const [property, setProperty] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [role, setRole] = useState<string>("");
+  const [isApproving, setIsApproving] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
+        setRole(user?.role?.name || user?.role || "");
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
+
+  const canApprove = role === "Admin" || role === "Super Admin" || role === "Manager";
+
+  const handleApproval = useCallback(async (approve: boolean) => {
+    if (!id) return;
+    setIsApproving(true);
+    try {
+      const result = approve
+        ? await propertiesApi.approve(Number(id))
+        : await propertiesApi.revokeApproval(Number(id));
+      if (result && result.success !== false) {
+        setProperty((prev: any) => prev ? { ...prev, approvalStatus: approve ? "Approved" : "Pending" } : prev);
+        toast.success(approve ? "Property approved." : "Approval revoked.");
+      } else {
+        toast.error("Failed to update approval.");
+      }
+    } catch {
+      toast.error("Failed to update approval.");
+    } finally {
+      setIsApproving(false);
+    }
+  }, [id]);
 
   const fetchProperty = useCallback(async () => {
     if (!id) return;
@@ -129,6 +164,7 @@ export default function PropertyViewPage() {
   if (!property) return null;
 
   const statusKey = (property.status || "").toLowerCase();
+  const isApproved = (property.approvalStatus || "Pending").toLowerCase() === "approved";
   const det = property.propertyDetails ?? {};
   const images: any[] = property.propertyImages ?? property.images ?? [];
   const documents: any[] = property.documents ?? [];
@@ -165,12 +201,28 @@ export default function PropertyViewPage() {
             <Badge className={`capitalize ${STATUS_BADGE[statusKey] ?? STATUS_BADGE["unavailable"]}`}>
               {property.status}
             </Badge>
+            <Badge className={isApproved ? "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 font-medium shadow-sm border capitalize" : "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 font-medium shadow-sm border capitalize"}>
+              {isApproved ? "Approved" : "Pending"}
+            </Badge>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" className="h-9 w-9 rounded-full" onClick={fetchProperty} title="Refresh">
             <RefreshCw className="h-4 w-4" />
           </Button>
+          {canApprove && (
+            isApproved ? (
+              <Button variant="outline" onClick={() => handleApproval(false)} disabled={isApproving} className="rounded-full px-6 border-amber-300 text-amber-700 hover:bg-amber-50">
+                <ShieldCheck className="h-4 w-4 mr-2" />
+                {isApproving ? "Revoking…" : "Revoke Approval"}
+              </Button>
+            ) : (
+              <Button onClick={() => handleApproval(true)} disabled={isApproving} className="rounded-full px-6 bg-green-600 text-white hover:bg-green-700 shadow-md">
+                <ShieldCheck className="h-4 w-4 mr-2" />
+                {isApproving ? "Approving…" : "Approve"}
+              </Button>
+            )
+          )}
           <Button onClick={() => router.push(`/properties/new?edit=${property.id}`)} className="rounded-full px-8 py-5 bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md">
             <Edit className="h-4 w-4 mr-2" />
             Edit Property
@@ -182,8 +234,19 @@ export default function PropertyViewPage() {
       <div className="md:hidden flex flex-col gap-3 px-4 pb-4">
         <div className="flex items-center gap-2 flex-wrap">
           <Badge className={`capitalize ${STATUS_BADGE[statusKey] ?? STATUS_BADGE["unavailable"]}`}>{property.status}</Badge>
+          <Badge className={isApproved ? "bg-green-100 text-green-800 border-green-200 font-medium shadow-sm border capitalize" : "bg-amber-100 text-amber-800 border-amber-200 font-medium shadow-sm border capitalize"}>{isApproved ? "Approved" : "Pending"}</Badge>
           <span className="text-sm font-semibold text-muted-foreground">{formatPrice(Number(property.price))}</span>
         </div>
+        {canApprove && (
+          <Button
+            variant={isApproved ? "outline" : undefined}
+            onClick={() => handleApproval(!isApproved)}
+            disabled={isApproving}
+            className={isApproved ? "h-11 rounded-xl border-amber-300 text-amber-700 font-semibold" : "h-11 rounded-xl bg-green-600 text-white hover:bg-green-700 font-semibold"}
+          >
+            <ShieldCheck className="w-4 h-4 mr-2" /> {isApproving ? "Updating…" : isApproved ? "Revoke Approval" : "Approve"}
+          </Button>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Button variant="outline" onClick={() => router.push(`/properties/new?edit=${property.id}`)} className="h-11 rounded-xl text-foreground font-semibold border-border/60">
             <Edit className="w-4 h-4 mr-2 text-muted-foreground" /> Edit

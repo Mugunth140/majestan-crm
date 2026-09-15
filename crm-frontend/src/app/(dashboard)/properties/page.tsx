@@ -41,6 +41,11 @@ const STATUS_STYLES: Record<string, string> = {
   rented: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
 };
 
+const APPROVAL_STYLES: Record<string, string> = {
+  approved: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
+  pending: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
+};
+
 function formatPrice(price: number): string {
   if (!price) return "-";
   if (price >= 10000000) return `₹${(price / 10000000).toFixed(2)} Cr`;
@@ -224,6 +229,15 @@ export default function PropertiesPage() {
         const s = (row.original.status || "").toLowerCase();
         const cls = STATUS_STYLES[s] ?? "bg-gray-100 text-gray-800 border-gray-200";
         return <Badge className={"font-medium shadow-sm border whitespace-nowrap capitalize " + cls}>{s || "-"}</Badge>;
+      },
+    },
+    {
+      id: "approval",
+      header: "Approval",
+      cell: ({ row }) => {
+        const a = (row.original.approvalStatus || "Pending").toLowerCase();
+        const cls = APPROVAL_STYLES[a] ?? "bg-gray-100 text-gray-800 border-gray-200";
+        return <Badge className={"font-medium shadow-sm border whitespace-nowrap capitalize " + cls}>{a}</Badge>;
       },
     },
     {

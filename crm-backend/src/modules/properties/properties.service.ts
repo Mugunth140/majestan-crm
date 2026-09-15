@@ -520,6 +520,16 @@ export class PropertiesService {
     return { id, status: newStatus };
   }
 
+  // ── setApprovalStatus ──────────────────────────────────────────────────
+  async setApprovalStatus(id: number, approvalStatus: 'Approved' | 'Pending') {
+    const existing = await this.findOne(id);
+    await this.siteApi.patch(
+      `/admin/properties/${existing.propertyType}/${id}`,
+      { approvalStatus },
+    );
+    return { id, approvalStatus };
+  }
+
   // ── remove ─────────────────────────────────────────────────────────────────
   async remove(id: number) {
     const existing = await this.findOne(id);
