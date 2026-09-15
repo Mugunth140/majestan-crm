@@ -142,13 +142,13 @@ export function TeamLeadDashboard({ user }: { user: any }) {
       <section>
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Charts</h3>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="rounded-2xl border bg-card p-5 shadow-sm lg:col-span-2">
+            <h4 className="text-sm font-semibold mb-3">Team Trend</h4>
+            <TeamTrendChart data={charts.team_trend} loading={loadingCharts.team_trend} />
+          </div>
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
             <h4 className="text-sm font-semibold mb-3">Team Progress</h4>
             <TeamProgressChart data={charts.team_progress} loading={loadingCharts.team_progress} />
-          </div>
-          <div className="rounded-2xl border bg-card p-5 shadow-sm">
-            <h4 className="text-sm font-semibold mb-3">Team Trend</h4>
-            <TeamTrendChart data={charts.team_trend} loading={loadingCharts.team_trend} />
           </div>
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
             <h4 className="text-sm font-semibold mb-3">Team Leads</h4>
