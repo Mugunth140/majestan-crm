@@ -173,14 +173,28 @@ export class PropertiesService {
   }
 
   // ── findFormData ───────────────────────────────────────────────────────────
+  // One failing source must never 500 the whole form: each part degrades to [].
   async findFormData() {
-    const { cities, sublocations, amenities } = await this.formDataCached();
-    const propertyTypesRepo = this.crmDataSource.getRepository(PropertyType);
-    const propertyTypes = await propertyTypesRepo.find({ where: { is_active: true }, order: { name: 'ASC' } });
+    let cities: any[] = [];
+    let sublocations: any[] = [];
+    let amenities: any[] = [];
+    try {
+      ({ cities, sublocations, amenities } = await this.formDataCached());
+    } catch (e) {
+      console.error('[Properties] formDataCached failed, degrading to empty lists', e);
+    }
+    let propertyTypes: { value: string; label: string }[] = [];
+    try {
+      const propertyTypesRepo = this.crmDataSource.getRepository(PropertyType);
+      const rows = await propertyTypesRepo.find({ where: { is_active: true }, order: { name: 'ASC' } });
+      propertyTypes = rows.map(t => ({ value: t.value, label: t.name }));
+    } catch (e) {
+      console.error('[Properties] property_types lookup failed, degrading to empty list', e);
+    }
 
     return {
       amenities,
-      propertyTypes: propertyTypes.map(t => ({ value: t.value, label: t.name })),
+      propertyTypes,
       cities: cities.map((c: any) => ({
         id: c.id,
         cityName: c.city_name ?? c.cityName,
