@@ -225,7 +225,7 @@ export function AdminDashboard({ user }: { user: any }) {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <MetricCard label="Active Templates" value={n(task.activeTemplates)} loading={loadingSummary} />
           <MetricCard label="Org Completion %" value={n(task.completionPct)} loading={loadingSummary} />
-          <MetricCard label="Manual Logs (month)" value={n(task.manualLogs)} loading={loadingSummary} />
+          <MetricCard label="Manual Logs" value={n(task.manualLogs)} loading={loadingSummary} />
         </div>
       </section>
 

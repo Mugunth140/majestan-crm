@@ -146,7 +146,7 @@ export class MetricsService {
     const cached = await this.cacheGet(key);
     if (cached) return cached;
     const result = await this.buildChartData(user, type, from, to);
-    await this.cacheSet(key, result, 600);
+    await this.cacheSet(key, result, 60);
     return result;
   }
   private async buildChartData(user: any, type: string, from: string, to: string) {
