@@ -1,10 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import {
-  UserPlus, Phone, PhoneCall, CalendarClock,
-  ClipboardCheck, CheckCircle2, Flame, Trophy, RefreshCw,
-} from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
 import { MetricCard } from './MetricCard';
 import { MonthlyRings } from './staff/MonthlyRings';
@@ -31,7 +28,7 @@ export function StaffDashboard({ user }: { user: any }) {
   const fetchSummary = useCallback(async () => {
     setLoadingSummary(true);
     try {
-      const res = await apiFetch(`/api/v1/metrics/summary?from=${monthStart()}&to=${today()}`);
+      const res = await apiFetch(`/api/v1/metrics/summary`);
       if (res.ok) {
         const json = await res.json();
         setSummary(json?.data ?? json ?? null);
@@ -91,14 +88,14 @@ export function StaffDashboard({ user }: { user: any }) {
       <section>
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">My KPIs</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          <MetricCard label="Leads Assigned" value={n(sm.myLeadsAssigned)} icon={UserPlus} loading={loadingSummary} />
-          <MetricCard label="Follow-Ups Today" value={n(sm.followUpsDoneToday)} icon={Phone} loading={loadingSummary} />
-          <MetricCard label="Calls This Week" value={n(sm.callsThisWeek)} icon={PhoneCall} loading={loadingSummary} />
-          <MetricCard label="Site Visits (month)" value={n(sm.svDoneThisMonth)} icon={CalendarClock} loading={loadingSummary} />
-          <MetricCard label="Monthly Task %" value={sm.taskMonthlyPct != null ? `${sm.taskMonthlyPct}%` : '--'} icon={ClipboardCheck} loading={loadingSummary} />
-          <MetricCard label="Weekly Task %" value={sm.taskWeeklyPct != null ? `${sm.taskWeeklyPct}%` : '--'} icon={CheckCircle2} loading={loadingSummary} />
-          <MetricCard label="Activity Streak" value={sm.currentStreak != null ? `${sm.currentStreak} days` : '--'} icon={Flame} loading={loadingSummary} />
-          <MetricCard label="Team Rank" value={sm.monthlyRankInDept != null || sm.deptSize != null ? `#${n(sm.monthlyRankInDept)} / ${n(sm.deptSize)}` : '--'} icon={Trophy} loading={loadingSummary} />
+          <MetricCard label="Leads Assigned" value={n(sm.myLeadsAssigned)} loading={loadingSummary} />
+          <MetricCard label="Follow-Ups Today" value={n(sm.followUpsDoneToday)} loading={loadingSummary} />
+          <MetricCard label="Calls This Week" value={n(sm.callsThisWeek)} loading={loadingSummary} />
+          <MetricCard label="Site Visits (month)" value={n(sm.svDoneThisMonth)} loading={loadingSummary} />
+          <MetricCard label="Monthly Task %" value={sm.taskMonthlyPct != null ? `${sm.taskMonthlyPct}%` : '--'} loading={loadingSummary} />
+          <MetricCard label="Weekly Task %" value={sm.taskWeeklyPct != null ? `${sm.taskWeeklyPct}%` : '--'} loading={loadingSummary} />
+          <MetricCard label="Activity Streak" value={sm.currentStreak != null ? `${sm.currentStreak} days` : '--'} loading={loadingSummary} />
+          <MetricCard label="Team Rank" value={sm.monthlyRankInDept != null || sm.deptSize != null ? `#${n(sm.monthlyRankInDept)} / ${n(sm.deptSize)}` : '--'} loading={loadingSummary} />
         </div>
       </section>
 

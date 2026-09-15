@@ -21,7 +21,7 @@ export class MetricsService {
     const cached = await this.cacheGet(key);
     if (cached) return cached;
     const result = await this.buildSummary(user, from, to);
-    await this.cacheSet(key, result, 120);
+    await this.cacheSet(key, result, 60);
     return result;
   }
   private async buildSummary(user: any, from: string, to: string) {
@@ -30,40 +30,42 @@ export class MetricsService {
     return this.buildStaffSummary(user, from, to);
   }
   private async buildAdminSummary(from: string, to: string) {
-    const q = (sql: string) => this.ds.query(sql, [from, to]);
-    const qNoRange = (sql: string) => this.ds.query(sql);
+    // KPI cards are ALL-TIME live totals — no date filtering (from/to ignored).
+    // Only newAgents/newHires-style cards use the current month; everything else counts every row ever worked.
+    const qAll = (sql: string) => this.ds.query(sql);
+    void from; void to;
     const [ [totalLeads], [newLeads], [followUpLeads], [svDone], [booked], [convInbound], [convAgent], [dropped], [totalInbounds], [activeInbounds], [exclusive], [prime], [avgQuality], [totalAgents], [activeAgents], [commAccepted], [newAgents], [totalAssets], [approvedAssets], [avgAssetQuality], [activeStaff], [followUps], [calls], [whatsapp], [routingEvents], [hrTotal], [hrInterviews], [hrHired], [activeTasks], taskCompletion, [manualLogs] ] = await Promise.all([
-      q(`SELECT COUNT(*) as c FROM leads WHERE created_at BETWEEN ? AND ?`),
-      q(`SELECT COUNT(*) as c FROM leads WHERE status = 'New Lead' AND created_at BETWEEN ? AND ?`),
-      q(`SELECT COUNT(*) as c FROM leads WHERE status = 'Follow Up' AND created_at BETWEEN ? AND ?`),
-      q(`SELECT COUNT(*) as c FROM leads WHERE status = 'Site Visit Completed' AND created_at BETWEEN ? AND ?`),
-      q(`SELECT COUNT(*) as c FROM leads WHERE status = 'Booking Advance' AND created_at BETWEEN ? AND ?`),
-      q(`SELECT COUNT(*) as c FROM leads WHERE converted_to = 'inbound' AND converted_at BETWEEN ? AND ?`),
-      q(`SELECT COUNT(*) as c FROM leads WHERE converted_to = 'agent' AND converted_at BETWEEN ? AND ?`),
-      q(`SELECT COUNT(*) as c FROM leads WHERE is_unqualified = 1 AND updated_at BETWEEN ? AND ?`),
-      q(`SELECT COUNT(*) as c FROM inbounds WHERE created_at BETWEEN ? AND ?`),
-      q(`SELECT COUNT(*) as c FROM inbounds WHERE status NOT IN ('Closed','Rented','Sold') AND created_at BETWEEN ? AND ?`),
-      qNoRange(`SELECT COUNT(*) as c FROM inbounds WHERE is_exclusive = 1`),
-      qNoRange(`SELECT COUNT(*) as c FROM inbounds WHERE is_prime_location = 1`),
-      q(`SELECT ROUND(AVG(quality_score),1) as c FROM inbounds WHERE created_at BETWEEN ? AND ?`),
-      qNoRange(`SELECT COUNT(*) as c FROM agents`),
-      qNoRange(`SELECT COUNT(*) as c FROM agents WHERE status = 'Active'`),
-      qNoRange(`SELECT COUNT(*) as c FROM agents WHERE commission_accepted = 1`),
-      q(`SELECT COUNT(*) as c FROM agents WHERE created_at BETWEEN ? AND ?`),
-      qNoRange(`SELECT COUNT(*) as c FROM assets`),
-      qNoRange(`SELECT COUNT(*) as c FROM assets WHERE status = 'Approved'`),
-      qNoRange(`SELECT ROUND(AVG(quality_score),1) as c FROM assets`),
-      qNoRange(`SELECT COUNT(*) as c FROM users WHERE is_active = 1`),
-      q(`SELECT COUNT(*) as c FROM lead_follow_ups WHERE created_at BETWEEN ? AND ?`),
-      q(`SELECT COUNT(*) as c FROM contact_logs WHERE contact_type = 'call' AND created_at BETWEEN ? AND ?`),
-      q(`SELECT COUNT(*) as c FROM contact_logs WHERE contact_type = 'whatsapp' AND created_at BETWEEN ? AND ?`),
-      q(`SELECT COUNT(*) as c FROM routing_histories WHERE created_at BETWEEN ? AND ?`),
-      q(`SELECT COUNT(*) as c FROM hr_candidates WHERE created_at BETWEEN ? AND ?`),
-      qNoRange(`SELECT COUNT(*) as c FROM hr_candidates WHERE status = 'Interview Scheduled'`),
-      q(`SELECT COUNT(*) as c FROM hr_candidates WHERE status = 'Joined' AND created_at BETWEEN ? AND ?`),
-      qNoRange(`SELECT COUNT(*) as c FROM task_templates WHERE status = 'active'`),
+      qAll(`SELECT COUNT(*) as c FROM leads`),
+      qAll(`SELECT COUNT(*) as c FROM leads WHERE status = 'New Lead'`),
+      qAll(`SELECT COUNT(*) as c FROM leads WHERE status = 'Follow Up'`),
+      qAll(`SELECT COUNT(*) as c FROM leads WHERE status = 'Site Visit Completed'`),
+      qAll(`SELECT COUNT(*) as c FROM leads WHERE status = 'Booking Advance'`),
+      qAll(`SELECT COUNT(*) as c FROM leads WHERE converted_to = 'inbound'`),
+      qAll(`SELECT COUNT(*) as c FROM leads WHERE converted_to = 'agent'`),
+      qAll(`SELECT COUNT(*) as c FROM leads WHERE is_unqualified = 1`),
+      qAll(`SELECT COUNT(*) as c FROM inbounds`),
+      qAll(`SELECT COUNT(*) as c FROM inbounds WHERE status NOT IN ('Closed','Rented','Sold')`),
+      qAll(`SELECT COUNT(*) as c FROM inbounds WHERE is_exclusive = 1`),
+      qAll(`SELECT COUNT(*) as c FROM inbounds WHERE is_prime_location = 1`),
+      qAll(`SELECT ROUND(AVG(quality_score),1) as c FROM inbounds`),
+      qAll(`SELECT COUNT(*) as c FROM agents`),
+      qAll(`SELECT COUNT(*) as c FROM agents WHERE status = 'Active'`),
+      qAll(`SELECT COUNT(*) as c FROM agents WHERE commission_accepted = 1`),
+      qAll(`SELECT COUNT(*) as c FROM agents WHERE created_at >= DATE_FORMAT(CURDATE(),'%Y-%m-01')`),
+      qAll(`SELECT COUNT(*) as c FROM assets`),
+      qAll(`SELECT COUNT(*) as c FROM assets WHERE status = 'Approved'`),
+      qAll(`SELECT ROUND(AVG(quality_score),1) as c FROM assets`),
+      qAll(`SELECT COUNT(*) as c FROM users WHERE is_active = 1`),
+      qAll(`SELECT COUNT(*) as c FROM lead_follow_ups`),
+      qAll(`SELECT COUNT(*) as c FROM contact_logs WHERE contact_type = 'call'`),
+      qAll(`SELECT COUNT(*) as c FROM contact_logs WHERE contact_type = 'whatsapp'`),
+      qAll(`SELECT COUNT(*) as c FROM routing_histories`),
+      qAll(`SELECT COUNT(*) as c FROM hr_candidates`),
+      qAll(`SELECT COUNT(*) as c FROM hr_candidates WHERE status = 'Interview Scheduled'`),
+      qAll(`SELECT COUNT(*) as c FROM hr_candidates WHERE status = 'Joined'`),
+      qAll(`SELECT COUNT(*) as c FROM task_templates WHERE status = 'active'`),
       this.ds.query(`SELECT COALESCE(ROUND(SUM(p.achieved_count) / NULLIF(SUM(t.monthly_target),0) * 100, 1), 0) as pct FROM task_metric_progress p JOIN task_metric_targets t ON p.task_template_id = t.task_template_id AND p.metric_key = t.metric_key`),
-      q(`SELECT COUNT(*) as c FROM task_activity_logs WHERE logged_date BETWEEN ? AND ?`),
+      qAll(`SELECT COUNT(*) as c FROM task_activity_logs`),
     ]);
     const n = (r: any) => Number(r?.c ?? 0);
     return { role: 'admin',
@@ -82,11 +84,11 @@ export class MetricsService {
     const inClause = ids.length ? ids.join(',') : '0';
     const [ [activeStaff], [leadsAssigned], [followUpsWeek], [calls], [svDone], [conversions], taskCompDesc, taskCompAsc, [weeklyAchieved], [monthlyAchieved], [weeklyTarget], [monthlyTarget], [rnrHigh] ] = await Promise.all([
       this.ds.query(`SELECT COUNT(*) as c FROM users WHERE department_id = ? AND is_active = 1`, [deptId]),
-      this.ds.query(`SELECT COUNT(*) as c FROM leads WHERE assigned_staff_id IN (${inClause}) AND created_at BETWEEN ? AND ?`, [from, to]),
+      this.ds.query(`SELECT COUNT(*) as c FROM leads WHERE assigned_staff_id IN (${inClause})`),
       this.ds.query(`SELECT COUNT(*) as c FROM lead_follow_ups WHERE created_by_id IN (${inClause}) AND created_at >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)`),
-      this.ds.query(`SELECT COUNT(*) as c FROM contact_logs WHERE contact_type = 'call' AND sent_by_id IN (${inClause}) AND created_at BETWEEN ? AND ?`, [from, to]),
-      this.ds.query(`SELECT COUNT(*) as c FROM leads WHERE status = 'Site Visit Completed' AND assigned_staff_id IN (${inClause}) AND updated_at BETWEEN ? AND ?`, [from, to]),
-      this.ds.query(`SELECT COUNT(*) as c FROM leads WHERE converted_to IS NOT NULL AND assigned_staff_id IN (${inClause}) AND converted_at BETWEEN ? AND ?`, [from, to]),
+      this.ds.query(`SELECT COUNT(*) as c FROM contact_logs WHERE contact_type = 'call' AND sent_by_id IN (${inClause})`),
+      this.ds.query(`SELECT COUNT(*) as c FROM leads WHERE status = 'Site Visit Completed' AND assigned_staff_id IN (${inClause})`),
+      this.ds.query(`SELECT COUNT(*) as c FROM leads WHERE converted_to IS NOT NULL AND assigned_staff_id IN (${inClause})`),
       this.ds.query(`SELECT u.id, u.name, COALESCE(ROUND(SUM(p.achieved_count) / NULLIF(SUM(t.monthly_target),0) * 100, 1), 0) as pct FROM users u JOIN task_templates tt ON tt.assigned_to = u.id AND tt.status = 'active' JOIN task_metric_targets t ON t.task_template_id = tt.id LEFT JOIN task_metric_progress p ON p.task_template_id = tt.id AND p.metric_key = t.metric_key WHERE u.department_id = ? GROUP BY u.id, u.name ORDER BY pct DESC`, [deptId]),
       this.ds.query(`SELECT u.id, u.name, COALESCE(ROUND(SUM(p.achieved_count) / NULLIF(SUM(t.monthly_target),0) * 100, 1), 0) as pct FROM users u JOIN task_templates tt ON tt.assigned_to = u.id AND tt.status = 'active' JOIN task_metric_targets t ON t.task_template_id = tt.id LEFT JOIN task_metric_progress p ON p.task_template_id = tt.id AND p.metric_key = t.metric_key WHERE u.department_id = ? GROUP BY u.id, u.name ORDER BY pct ASC`, [deptId]),
       this.ds.query(`SELECT COALESCE(SUM(p.achieved_count), 0) as c FROM task_metric_progress p JOIN task_templates tt ON p.task_template_id = tt.id JOIN users u ON tt.assigned_to = u.id WHERE u.department_id = ? AND p.week_number = CEIL(DAYOFMONTH(CURDATE())/7)`, [deptId]),

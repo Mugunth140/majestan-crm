@@ -1,14 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import {
-  Users, UserPlus, Phone, PhoneCall, CalendarClock,
-  CheckCircle2, ClipboardCheck, Flame, Trophy,
-  AlertTriangle, TrendingUp, Target, RefreshCw,
-} from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
 import { MetricCard } from './MetricCard';
-import { DateRangePicker } from './DateRangePicker';
 import { TeamProgressChart } from './charts/TeamProgressChart';
 import { TeamTrendChart } from './charts/TeamTrendChart';
 import { TeamLeadDonut } from './charts/TeamLeadDonut';
@@ -29,18 +24,17 @@ function today(): string {
 const n = (v: any): string | number => (v ?? '--') as string | number;
 
 export function TeamLeadDashboard({ user }: { user: any }) {
-  const [from, setFrom] = useState(monthStart());
-  const [to, setTo] = useState(today());
   const [summary, setSummary] = useState<any>(null);
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [charts, setCharts] = useState<Record<string, any>>({});
   const [loadingCharts, setLoadingCharts] = useState<Record<string, boolean>>({});
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchSummary = useCallback(async (f: string, t: string) => {
+  // KPI cards are all-time live totals (no date filter). Charts use the current month range.
+  const fetchSummary = useCallback(async () => {
     setLoadingSummary(true);
     try {
-      const res = await apiFetch(`/api/v1/metrics/summary?from=${f}&to=${t}`);
+      const res = await apiFetch(`/api/v1/metrics/summary`);
       if (res.ok) {
         const json = await res.json();
         setSummary(json?.data ?? json ?? null);
@@ -72,23 +66,19 @@ export function TeamLeadDashboard({ user }: { user: any }) {
   }, []);
 
   const fetchAll = useCallback(
-    (f: string, t: string) => {
-      fetchSummary(f, t);
+    () => {
+      fetchSummary();
+      const f = monthStart();
+      const t = today();
       CHART_TYPES.forEach((ct) => fetchChart(ct, f, t));
     },
     [fetchSummary, fetchChart]
   );
 
   useEffect(() => {
-    fetchAll(from, to);
+    fetchAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const handleRangeChange = (f: string, t: string) => {
-    setFrom(f);
-    setTo(t);
-    fetchAll(f, t);
-  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -97,7 +87,7 @@ export function TeamLeadDashboard({ user }: { user: any }) {
     } catch {
       // ignore cache-clear errors, still refetch
     } finally {
-      fetchAll(from, to);
+      fetchAll();
       setRefreshing(false);
     }
   };
@@ -116,7 +106,6 @@ export function TeamLeadDashboard({ user }: { user: any }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <DateRangePicker from={from} to={to} onChange={handleRangeChange} disabled={busy} />
           <button
             onClick={handleRefresh}
             disabled={busy}
@@ -131,22 +120,22 @@ export function TeamLeadDashboard({ user }: { user: any }) {
       <section>
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Team KPIs</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          <MetricCard label="Active Staff" value={n(tlm.activeStaffInDept)} icon={Users} loading={loadingSummary} />
-          <MetricCard label="Leads Assigned" value={n(tlm.leadsAssigned)} icon={UserPlus} loading={loadingSummary} />
-          <MetricCard label="Follow-Ups (week)" value={n(tlm.followUpsThisWeek)} icon={Phone} loading={loadingSummary} />
-          <MetricCard label="Calls Made" value={n(tlm.callsMade)} icon={PhoneCall} loading={loadingSummary} />
-          <MetricCard label="Site Visits Done" value={n(tlm.svDone)} icon={CalendarClock} loading={loadingSummary} />
-          <MetricCard label="Conversions" value={n(tlm.conversions)} icon={CheckCircle2} loading={loadingSummary} />
-          <MetricCard label="Task Completion %" value={tlm.taskCompletionPct != null ? `${tlm.taskCompletionPct}%` : '--'} icon={ClipboardCheck} loading={loadingSummary} />
-          <MetricCard label="RNR ≥3" value={n(tlm.rnrHighCount)} icon={Flame} loading={loadingSummary} />
+          <MetricCard label="Active Staff" value={n(tlm.activeStaffInDept)} loading={loadingSummary} />
+          <MetricCard label="Leads Assigned" value={n(tlm.leadsAssigned)} loading={loadingSummary} />
+          <MetricCard label="Follow-Ups (week)" value={n(tlm.followUpsThisWeek)} loading={loadingSummary} />
+          <MetricCard label="Calls Made" value={n(tlm.callsMade)} loading={loadingSummary} />
+          <MetricCard label="Site Visits Done" value={n(tlm.svDone)} loading={loadingSummary} />
+          <MetricCard label="Conversions" value={n(tlm.conversions)} loading={loadingSummary} />
+          <MetricCard label="Task Completion %" value={tlm.taskCompletionPct != null ? `${tlm.taskCompletionPct}%` : '--'} loading={loadingSummary} />
+          <MetricCard label="RNR ≥3" value={n(tlm.rnrHighCount)} loading={loadingSummary} />
           {best ? (
-            <MetricCard label="Best Performer" value={`${best.name ?? '--'} (${best.pct ?? '--'}%)`} icon={Trophy} loading={loadingSummary} />
+            <MetricCard label="Best Performer" value={`${best.name ?? '--'} (${best.pct ?? '--'}%)`} loading={loadingSummary} />
           ) : null}
           {tlm.needsAttention ? (
-            <MetricCard label="Needs Attention" value={n(tlm.needsAttention)} icon={AlertTriangle} loading={loadingSummary} />
+            <MetricCard label="Needs Attention" value={n(tlm.needsAttention)} loading={loadingSummary} />
           ) : null}
-          <MetricCard label="Weekly Progress" value={tlm.weeklyAchieved != null || tlm.weeklyTarget != null ? `${n(tlm.weeklyAchieved)} / ${n(tlm.weeklyTarget)}` : '--'} icon={TrendingUp} loading={loadingSummary} />
-          <MetricCard label="Monthly Progress" value={tlm.monthlyAchieved != null || tlm.monthlyTarget != null ? `${n(tlm.monthlyAchieved)} / ${n(tlm.monthlyTarget)}` : '--'} icon={Target} loading={loadingSummary} />
+          <MetricCard label="Weekly Progress" value={tlm.weeklyAchieved != null || tlm.weeklyTarget != null ? `${n(tlm.weeklyAchieved)} / ${n(tlm.weeklyTarget)}` : '--'} loading={loadingSummary} />
+          <MetricCard label="Monthly Progress" value={tlm.monthlyAchieved != null || tlm.monthlyTarget != null ? `${n(tlm.monthlyAchieved)} / ${n(tlm.monthlyTarget)}` : '--'} loading={loadingSummary} />
         </div>
       </section>
 

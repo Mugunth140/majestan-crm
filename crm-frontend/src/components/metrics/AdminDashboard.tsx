@@ -1,14 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import {
-  Users, UserCheck, UserPlus, Phone, MessageCircle, GitBranch,
-  Building2, KeyRound, Star, CheckCircle2, ClipboardCheck,
-  ListTodo, Target, TrendingUp, CalendarClock, Briefcase, RefreshCw,
-} from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
 import { MetricCard } from './MetricCard';
-import { DateRangePicker } from './DateRangePicker';
 import { LeadTrendChart } from './charts/LeadTrendChart';
 import { LeadFunnelChart } from './charts/LeadFunnelChart';
 import { LeadSourceDonut } from './charts/LeadSourceDonut';
@@ -32,18 +27,17 @@ function today(): string {
 const n = (v: any): string | number => (v ?? '--') as string | number;
 
 export function AdminDashboard({ user }: { user: any }) {
-  const [from, setFrom] = useState(monthStart());
-  const [to, setTo] = useState(today());
   const [summary, setSummary] = useState<any>(null);
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [charts, setCharts] = useState<Record<string, any>>({});
   const [loadingCharts, setLoadingCharts] = useState<Record<string, boolean>>({});
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchSummary = useCallback(async (f: string, t: string) => {
+  // KPI cards are all-time live totals (no date filter). Charts use the current month range.
+  const fetchSummary = useCallback(async () => {
     setLoadingSummary(true);
     try {
-      const res = await apiFetch(`/api/v1/metrics/summary?from=${f}&to=${t}`);
+      const res = await apiFetch(`/api/v1/metrics/summary`);
       if (res.ok) {
         const json = await res.json();
         setSummary(json?.data ?? json ?? null);
@@ -75,23 +69,19 @@ export function AdminDashboard({ user }: { user: any }) {
   }, []);
 
   const fetchAll = useCallback(
-    (f: string, t: string) => {
-      fetchSummary(f, t);
+    () => {
+      fetchSummary();
+      const f = monthStart();
+      const t = today();
       CHART_TYPES.forEach((ct) => fetchChart(ct, f, t));
     },
     [fetchSummary, fetchChart]
   );
 
   useEffect(() => {
-    fetchAll(from, to);
+    fetchAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const handleRangeChange = (f: string, t: string) => {
-    setFrom(f);
-    setTo(t);
-    fetchAll(f, t);
-  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -100,7 +90,7 @@ export function AdminDashboard({ user }: { user: any }) {
     } catch {
       // ignore cache-clear errors, still refetch
     } finally {
-      fetchAll(from, to);
+      fetchAll();
       setRefreshing(false);
     }
   };
@@ -125,7 +115,6 @@ export function AdminDashboard({ user }: { user: any }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <DateRangePicker from={from} to={to} onChange={handleRangeChange} disabled={busy} />
           <button
             onClick={handleRefresh}
             disabled={busy}
@@ -140,73 +129,73 @@ export function AdminDashboard({ user }: { user: any }) {
       <section>
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Lead Pipeline</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          <MetricCard label="Total Leads" value={n(pipe.total)} icon={Users} loading={loadingSummary} />
-          <MetricCard label="New Leads" value={n(pipe.newLeads)} icon={UserPlus} loading={loadingSummary} />
-          <MetricCard label="Follow-Up Leads" value={n(pipe.followUp)} icon={Phone} loading={loadingSummary} />
-          <MetricCard label="Site Visits Done" value={n(pipe.svDone)} icon={CalendarClock} loading={loadingSummary} />
-          <MetricCard label="Bookings (Advance)" value={n(pipe.booked)} icon={CheckCircle2} loading={loadingSummary} />
-          <MetricCard label="Converted → Inbound" value={n(pipe.convertedInbound)} icon={TrendingUp} loading={loadingSummary} />
-          <MetricCard label="Converted → Agent" value={n(pipe.convertedAgent)} icon={Briefcase} loading={loadingSummary} />
-          <MetricCard label="Dropped / Unqualified" value={n(pipe.dropped)} icon={Target} loading={loadingSummary} />
+          <MetricCard label="Total Leads" value={n(pipe.total)} loading={loadingSummary} />
+          <MetricCard label="New Leads" value={n(pipe.newLeads)} loading={loadingSummary} />
+          <MetricCard label="Follow-Up Leads" value={n(pipe.followUp)} loading={loadingSummary} />
+          <MetricCard label="Site Visits Done" value={n(pipe.svDone)} loading={loadingSummary} />
+          <MetricCard label="Bookings (Advance)" value={n(pipe.booked)} loading={loadingSummary} />
+          <MetricCard label="Converted → Inbound" value={n(pipe.convertedInbound)} loading={loadingSummary} />
+          <MetricCard label="Converted → Agent" value={n(pipe.convertedAgent)} loading={loadingSummary} />
+          <MetricCard label="Dropped / Unqualified" value={n(pipe.dropped)} loading={loadingSummary} />
         </div>
       </section>
 
       <section>
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Inbound Supply</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <MetricCard label="Total Inbounds" value={n(inb.total)} icon={Building2} loading={loadingSummary} />
-          <MetricCard label="Active Inbounds" value={n(inb.active)} icon={CheckCircle2} loading={loadingSummary} />
-          <MetricCard label="Exclusive Listings" value={n(inb.exclusive)} icon={Star} loading={loadingSummary} />
-          <MetricCard label="Prime Locations" value={n(inb.prime)} icon={Target} loading={loadingSummary} />
-          <MetricCard label="Avg Quality Score" value={n(inb.avgQuality)} icon={TrendingUp} loading={loadingSummary} />
+          <MetricCard label="Total Inbounds" value={n(inb.total)} loading={loadingSummary} />
+          <MetricCard label="Active Inbounds" value={n(inb.active)} loading={loadingSummary} />
+          <MetricCard label="Exclusive Listings" value={n(inb.exclusive)} loading={loadingSummary} />
+          <MetricCard label="Prime Locations" value={n(inb.prime)} loading={loadingSummary} />
+          <MetricCard label="Avg Quality Score" value={n(inb.avgQuality)} loading={loadingSummary} />
         </div>
       </section>
 
       <section>
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Agent Network</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          <MetricCard label="Total Agents" value={n(ag.total)} icon={Users} loading={loadingSummary} />
-          <MetricCard label="Active Agents" value={n(ag.active)} icon={UserCheck} loading={loadingSummary} />
-          <MetricCard label="Commission-Accepted" value={n(ag.commissionAccepted)} icon={CheckCircle2} loading={loadingSummary} />
-          <MetricCard label="New Agents (range)" value={n(ag.newInRange)} icon={UserPlus} loading={loadingSummary} />
+          <MetricCard label="Total Agents" value={n(ag.total)} loading={loadingSummary} />
+          <MetricCard label="Active Agents" value={n(ag.active)} loading={loadingSummary} />
+          <MetricCard label="Commission-Accepted" value={n(ag.commissionAccepted)} loading={loadingSummary} />
+          <MetricCard label="New Agents (month)" value={n(ag.newInRange)} loading={loadingSummary} />
         </div>
       </section>
 
       <section>
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Asset Inventory</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <MetricCard label="Total Assets" value={n(ast.total)} icon={Building2} loading={loadingSummary} />
-          <MetricCard label="Approved Assets" value={n(ast.approved)} icon={CheckCircle2} loading={loadingSummary} />
-          <MetricCard label="Avg Asset Score" value={n(ast.avgQuality)} icon={Star} loading={loadingSummary} />
+          <MetricCard label="Total Assets" value={n(ast.total)} loading={loadingSummary} />
+          <MetricCard label="Approved Assets" value={n(ast.approved)} loading={loadingSummary} />
+          <MetricCard label="Avg Asset Score" value={n(ast.avgQuality)} loading={loadingSummary} />
         </div>
       </section>
 
       <section>
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Staff &amp; Activity</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <MetricCard label="Active Staff" value={n(act.activeStaff)} icon={Users} loading={loadingSummary} />
-          <MetricCard label="Follow-Ups Logged" value={n(act.followUps)} icon={Phone} loading={loadingSummary} />
-          <MetricCard label="Calls Made" value={n(act.calls)} icon={Phone} loading={loadingSummary} />
-          <MetricCard label="WhatsApp Messages" value={n(act.whatsapp)} icon={MessageCircle} loading={loadingSummary} />
-          <MetricCard label="Routing Events" value={n(act.routingEvents)} icon={GitBranch} loading={loadingSummary} />
+          <MetricCard label="Active Staff" value={n(act.activeStaff)} loading={loadingSummary} />
+          <MetricCard label="Follow-Ups Logged" value={n(act.followUps)} loading={loadingSummary} />
+          <MetricCard label="Calls Made" value={n(act.calls)} loading={loadingSummary} />
+          <MetricCard label="WhatsApp Messages" value={n(act.whatsapp)} loading={loadingSummary} />
+          <MetricCard label="Routing Events" value={n(act.routingEvents)} loading={loadingSummary} />
         </div>
       </section>
 
       <section>
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">HR Pipeline</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <MetricCard label="Candidates" value={n(hr.total)} icon={Users} loading={loadingSummary} />
-          <MetricCard label="Interviews Scheduled" value={n(hr.interviewsScheduled)} icon={CalendarClock} loading={loadingSummary} />
-          <MetricCard label="Hires Made" value={n(hr.hired)} icon={UserCheck} loading={loadingSummary} />
+          <MetricCard label="Candidates" value={n(hr.total)} loading={loadingSummary} />
+          <MetricCard label="Interviews Scheduled" value={n(hr.interviewsScheduled)} loading={loadingSummary} />
+          <MetricCard label="Hires Made" value={n(hr.hired)} loading={loadingSummary} />
         </div>
       </section>
 
       <section>
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Task Completion</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <MetricCard label="Active Templates" value={n(task.activeTemplates)} icon={ListTodo} loading={loadingSummary} />
-          <MetricCard label="Org Completion %" value={n(task.completionPct)} icon={ClipboardCheck} loading={loadingSummary} />
-          <MetricCard label="Manual Logs (month)" value={n(task.manualLogs)} icon={KeyRound} loading={loadingSummary} />
+          <MetricCard label="Active Templates" value={n(task.activeTemplates)} loading={loadingSummary} />
+          <MetricCard label="Org Completion %" value={n(task.completionPct)} loading={loadingSummary} />
+          <MetricCard label="Manual Logs (month)" value={n(task.manualLogs)} loading={loadingSummary} />
         </div>
       </section>
 
