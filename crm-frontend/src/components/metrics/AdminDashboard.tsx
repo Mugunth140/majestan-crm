@@ -127,29 +127,33 @@ export function AdminDashboard({ user }: { user: any }) {
       </div>
 
       <section>
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Lead Pipeline</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          <MetricCard label="Total Leads" value={n(pipe.total)} loading={loadingSummary} />
-          <MetricCard label="New Leads" value={n(pipe.newLeads)} loading={loadingSummary} />
-          <MetricCard label="Follow-Up Leads" value={n(pipe.followUp)} loading={loadingSummary} />
-          <MetricCard label="Site Visits Done" value={n(pipe.svDone)} loading={loadingSummary} />
-          <MetricCard label="Bookings (Advance)" value={n(pipe.booked)} loading={loadingSummary} />
-          <MetricCard label="Converted → Inbound" value={n(pipe.convertedInbound)} loading={loadingSummary} />
-          <MetricCard label="Converted → Agent" value={n(pipe.convertedAgent)} loading={loadingSummary} />
-          <MetricCard label="Dropped / Unqualified" value={n(pipe.dropped)} loading={loadingSummary} />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="rounded-2xl border bg-card p-5 shadow-sm">
+            <h4 className="text-sm font-semibold mb-3">Lead Sources</h4>
+            <LeadSourceDonut data={charts.sources} loading={loadingCharts.sources} />
+          </div>
+          <div className="lg:col-span-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Lead Pipeline</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <MetricCard label="Total Leads" value={n(pipe.total)} loading={loadingSummary} />
+              <MetricCard label="New Leads" value={n(pipe.newLeads)} loading={loadingSummary} />
+              <MetricCard label="Follow-Up Leads" value={n(pipe.followUp)} loading={loadingSummary} />
+              <MetricCard label="Site Visits Done" value={n(pipe.svDone)} loading={loadingSummary} />
+              <MetricCard label="Bookings (Advance)" value={n(pipe.booked)} loading={loadingSummary} />
+              <MetricCard label="Converted → Inbound" value={n(pipe.convertedInbound)} loading={loadingSummary} />
+              <MetricCard label="Converted → Agent" value={n(pipe.convertedAgent)} loading={loadingSummary} />
+              <MetricCard label="Dropped / Unqualified" value={n(pipe.dropped)} loading={loadingSummary} />
+            </div>
+          </div>
         </div>
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="rounded-2xl border bg-card p-5 shadow-sm lg:col-span-3">
+      <div className="grid grid-cols-1 gap-4">
+        <div className="rounded-2xl border bg-card p-5 shadow-sm">
           <h4 className="text-sm font-semibold mb-3">Lead Trend</h4>
           <LeadTrendChart data={charts.trends} loading={loadingCharts.trends} />
         </div>
-        <div className="rounded-2xl border bg-card p-5 shadow-sm lg:col-span-1">
-          <h4 className="text-sm font-semibold mb-3">Lead Sources</h4>
-          <LeadSourceDonut data={charts.sources} loading={loadingCharts.sources} />
-        </div>
-        <div className="rounded-2xl border bg-card p-5 shadow-sm lg:col-span-2">
+        <div className="rounded-2xl border bg-card p-5 shadow-sm">
           <h4 className="text-sm font-semibold mb-3">Lead Funnel</h4>
           <LeadFunnelChart data={charts.funnel} loading={loadingCharts.funnel} />
         </div>
