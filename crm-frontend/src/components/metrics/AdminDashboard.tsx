@@ -29,7 +29,7 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-const n = (v: unknown) => v ?? '--';
+const n = (v: any): string | number => (v ?? '--') as string | number;
 
 export function AdminDashboard({ user }: { user: any }) {
   const [from, setFrom] = useState(monthStart());

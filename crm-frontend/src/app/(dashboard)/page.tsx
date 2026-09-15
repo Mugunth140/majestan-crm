@@ -11,6 +11,9 @@ import { apiFetch } from "@/lib/api-fetch";
 
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { Device } from "@/components/shared/device";
+import { AdminDashboard } from '@/components/metrics/AdminDashboard';
+import { TeamLeadDashboard } from '@/components/metrics/TeamLeadDashboard';
+import { StaffDashboard } from '@/components/metrics/StaffDashboard';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -100,42 +103,16 @@ export default function DashboardPage() {
         }
       />
 
-      {/* DESKTOP ONLY: Analytics Dashboard */}
+      {/* DESKTOP ONLY: Role-based KPI Dashboard */}
       <Device 
         mobile={null}
         desktop={
           <>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-xl border bg-card text-card-foreground shadow p-6 flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <h3 className="tracking-tight text-sm font-medium">Total Leads</h3>
-                  <User className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <div className="text-2xl font-bold mt-2">--</div>
-              </div>
-              <div className="rounded-xl border bg-card text-card-foreground shadow p-6 flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <h3 className="tracking-tight text-sm font-medium">Inbounds</h3>
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <div className="text-2xl font-bold mt-2">--</div>
-              </div>
-              <div className="rounded-xl border bg-card text-card-foreground shadow p-6 flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <h3 className="tracking-tight text-sm font-medium">Active Assets</h3>
-                  <Layers className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <div className="text-2xl font-bold mt-2">--</div>
-              </div>
-              <div className="rounded-xl border bg-card text-card-foreground shadow p-6 flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <h3 className="tracking-tight text-sm font-medium">Agents</h3>
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <div className="text-2xl font-bold mt-2">--</div>
-              </div>
-            </div>
-            
+            {(isAdmin || isManager) && <AdminDashboard user={user} />}
+            {isTeamLead && <TeamLeadDashboard user={user} />}
+            {isStaff && <StaffDashboard user={user} />}
+            {!isAdmin && !isManager && !isTeamLead && !isStaff && (<AdminDashboard user={user} />)}
+
             {tasksDashboard && (
               <div className="mt-6">
                 <div className="max-w-2xl">
