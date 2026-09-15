@@ -106,7 +106,7 @@ export function AdminDashboard({ user }: { user: any }) {
   const busy = loadingSummary || refreshing;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 metrics-stagger">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold">Command Center</h2>
@@ -139,6 +139,21 @@ export function AdminDashboard({ user }: { user: any }) {
           <MetricCard label="Dropped / Unqualified" value={n(pipe.dropped)} loading={loadingSummary} />
         </div>
       </section>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="rounded-2xl border bg-card p-5 shadow-sm lg:col-span-3">
+          <h4 className="text-sm font-semibold mb-3">Lead Trend</h4>
+          <LeadTrendChart data={charts.trends} loading={loadingCharts.trends} />
+        </div>
+        <div className="rounded-2xl border bg-card p-5 shadow-sm lg:col-span-1">
+          <h4 className="text-sm font-semibold mb-3">Lead Sources</h4>
+          <LeadSourceDonut data={charts.sources} loading={loadingCharts.sources} />
+        </div>
+        <div className="rounded-2xl border bg-card p-5 shadow-sm lg:col-span-2">
+          <h4 className="text-sm font-semibold mb-3">Lead Funnel</h4>
+          <LeadFunnelChart data={charts.funnel} loading={loadingCharts.funnel} />
+        </div>
+      </div>
 
       <section>
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Inbound Supply</h3>
@@ -181,6 +196,17 @@ export function AdminDashboard({ user }: { user: any }) {
         </div>
       </section>
 
+      <div className="grid grid-cols-1 gap-4">
+        <div className="rounded-2xl border bg-card p-5 shadow-sm">
+          <h4 className="text-sm font-semibold mb-3">Staff Performance</h4>
+          <StaffScatterChart data={charts.scatter} loading={loadingCharts.scatter} />
+        </div>
+        <div className="rounded-2xl border bg-card p-5 shadow-sm">
+          <h4 className="text-sm font-semibold mb-3">Activity Heatmap</h4>
+          <ActivityHeatmap data={charts.heatmap} loading={loadingCharts.heatmap} />
+        </div>
+      </div>
+
       <section>
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">HR Pipeline</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -199,35 +225,10 @@ export function AdminDashboard({ user }: { user: any }) {
         </div>
       </section>
 
-      <section>
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Charts</h3>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="rounded-2xl border bg-card p-5 shadow-sm lg:col-span-3">
-            <h4 className="text-sm font-semibold mb-3">Lead Trend</h4>
-            <LeadTrendChart data={charts.trends} loading={loadingCharts.trends} />
-          </div>
-          <div className="rounded-2xl border bg-card p-5 shadow-sm lg:col-span-1">
-            <h4 className="text-sm font-semibold mb-3">Lead Sources</h4>
-            <LeadSourceDonut data={charts.sources} loading={loadingCharts.sources} />
-          </div>
-          <div className="rounded-2xl border bg-card p-5 shadow-sm lg:col-span-2">
-            <h4 className="text-sm font-semibold mb-3">Lead Funnel</h4>
-            <LeadFunnelChart data={charts.funnel} loading={loadingCharts.funnel} />
-          </div>
-          <div className="rounded-2xl border bg-card p-5 shadow-sm lg:col-span-3">
-            <h4 className="text-sm font-semibold mb-3">Department Performance</h4>
-            <DeptPerformanceChart data={charts.dept_perf} loading={loadingCharts.dept_perf} />
-          </div>
-          <div className="rounded-2xl border bg-card p-5 shadow-sm lg:col-span-3">
-            <h4 className="text-sm font-semibold mb-3">Staff Performance</h4>
-            <StaffScatterChart data={charts.scatter} loading={loadingCharts.scatter} />
-          </div>
-          <div className="rounded-2xl border bg-card p-5 shadow-sm lg:col-span-3">
-            <h4 className="text-sm font-semibold mb-3">Activity Heatmap</h4>
-            <ActivityHeatmap data={charts.heatmap} loading={loadingCharts.heatmap} />
-          </div>
-        </div>
-      </section>
+      <div className="rounded-2xl border bg-card p-5 shadow-sm">
+        <h4 className="text-sm font-semibold mb-3">Department Performance</h4>
+        <DeptPerformanceChart data={charts.dept_perf} loading={loadingCharts.dept_perf} />
+      </div>
     </div>
   );
 }

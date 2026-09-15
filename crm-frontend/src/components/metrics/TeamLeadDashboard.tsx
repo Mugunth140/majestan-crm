@@ -97,7 +97,7 @@ export function TeamLeadDashboard({ user }: { user: any }) {
   const best = tlm.bestPerformer as { name?: string; pct?: number } | undefined;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 metrics-stagger">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold">Team Dashboard</h2>

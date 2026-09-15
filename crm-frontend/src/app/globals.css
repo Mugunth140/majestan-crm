@@ -154,6 +154,45 @@
   }
 }
 
+/* Dashboard entrance animations — staggered fade-up on load */
+@keyframes metrics-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.metrics-reveal {
+  opacity: 0;
+  animation: metrics-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+/* Staggered entrance: every direct child fades up in sequence, no per-element classes needed */
+.metrics-stagger > * {
+  opacity: 0;
+  animation: metrics-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.metrics-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.metrics-stagger > *:nth-child(2) { animation-delay: 70ms; }
+.metrics-stagger > *:nth-child(3) { animation-delay: 140ms; }
+.metrics-stagger > *:nth-child(4) { animation-delay: 210ms; }
+.metrics-stagger > *:nth-child(5) { animation-delay: 280ms; }
+.metrics-stagger > *:nth-child(6) { animation-delay: 350ms; }
+.metrics-stagger > *:nth-child(7) { animation-delay: 420ms; }
+.metrics-stagger > *:nth-child(8) { animation-delay: 490ms; }
+.metrics-stagger > *:nth-child(9) { animation-delay: 560ms; }
+.metrics-stagger > *:nth-child(10) { animation-delay: 630ms; }
+.metrics-stagger > *:nth-child(11) { animation-delay: 700ms; }
+.metrics-stagger > *:nth-child(12) { animation-delay: 770ms; }
+@media (prefers-reduced-motion: reduce) {
+  .metrics-reveal {
+    opacity: 1;
+    animation: none;
+  }
+}
+
 /* Visible thin scrollbars for data tables (both axes) — opt-out of the global hide.
    Unlayered on purpose: unlayered styles beat the `@layer base` global hide. */
 .table-scroll {

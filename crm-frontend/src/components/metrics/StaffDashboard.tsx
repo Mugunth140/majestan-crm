@@ -64,7 +64,7 @@ export function StaffDashboard({ user }: { user: any }) {
   const hasRank = sm.monthlyRankInDept != null || sm.deptSize != null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 metrics-stagger">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold">My Dashboard</h2>
