@@ -60,14 +60,14 @@ export class MasterController {
 
   @Post('sublocations')
   @Roles('Admin')
-  async createSublocation(@Body() body: { city_id: number; locality_name: string; postal_code?: string; is_active?: number }) {
+  async createSublocation(@Body() body: { city_id: number; locality_name: string; postal_code?: string; description?: string | null; is_active?: number }) {
     const data = await this.masterService.createSublocation(body);
     return { success: true, data };
   }
 
   @Patch('sublocations/:id')
   @Roles('Admin')
-  async updateSublocation(@Param('id') id: number, @Body() body: { city_id?: number; locality_name?: string; postal_code?: string; is_active?: number }) {
+  async updateSublocation(@Param('id') id: number, @Body() body: { city_id?: number; locality_name?: string; postal_code?: string; description?: string | null; is_active?: number }) {
     const data = await this.masterService.updateSublocation(id, body);
     return { success: true, data };
   }

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Edit, Trash2, Plus, Loader2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
@@ -24,7 +25,7 @@ import { MobileHeader } from "@/components/layout/mobile-header";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
-const emptyForm = { city_id: "", locality_name: "", postal_code: "", is_active: 1 };
+const emptyForm = { city_id: "", locality_name: "", postal_code: "", description: "", is_active: 1 };
 
 export default function MasterSublocationsPage() {
   const [sublocations, setSublocations] = useState<any[]>([]);
@@ -49,6 +50,8 @@ export default function MasterSublocationsPage() {
       const url = new URL(`${API_URL}/master/all-sublocations`, window.location.origin);
       if (q) url.searchParams.set("search", q);
       const res = await apiFetch(url.toString());
+      // 304 = data unchanged (backend ETags); keep current rows, no error.
+      if (res.status === 304) return;
       const data = await res.json();
       if (data.success) setSublocations(data.data ?? []);
     } catch {
@@ -61,6 +64,7 @@ export default function MasterSublocationsPage() {
   const fetchCities = useCallback(async () => {
     try {
       const res = await apiFetch(`${API_URL}/master/all-cities`);
+      if (res.status === 304) return;
       const data = await res.json();
       if (data.success) setCities(data.data ?? []);
     } catch {
@@ -89,6 +93,7 @@ export default function MasterSublocationsPage() {
           city_id: Number(form.city_id),
           locality_name: form.locality_name.trim(),
           postal_code: form.postal_code.trim() || undefined,
+          description: form.description.trim() || undefined,
           is_active: form.is_active,
         }),
       });
@@ -120,6 +125,7 @@ export default function MasterSublocationsPage() {
           city_id: Number(form.city_id),
           locality_name: form.locality_name.trim(),
           postal_code: form.postal_code.trim() || undefined,
+          description: form.description.trim() || undefined,
           is_active: form.is_active,
         }),
       });
@@ -164,6 +170,7 @@ export default function MasterSublocationsPage() {
       city_id: String(sub.city_id ?? ""),
       locality_name: sub.locality_name ?? "",
       postal_code: sub.postal_code ?? "",
+      description: sub.description ?? "",
       is_active: sub.is_active ?? 1,
     });
     setIsEditOpen(true);
@@ -228,7 +235,14 @@ export default function MasterSublocationsPage() {
           <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
             <MapPin size={15} className="text-muted-foreground" />
           </div>
-          <span className="font-medium capitalize">{row.original.locality_name}</span>
+          <div className="min-w-0">
+            <div className="font-medium capitalize">{row.original.locality_name}</div>
+            {row.original.description ? (
+              <div className="text-xs text-muted-foreground truncate max-w-64">{row.original.description}</div>
+            ) : (
+              <div className="text-xs text-muted-foreground/60 italic">No overview yet</div>
+            )}
+          </div>
         </div>
       ),
     },
@@ -356,6 +370,15 @@ export default function MasterSublocationsPage() {
               <label className="text-sm font-medium">PIN Code</label>
               <Input placeholder="e.g. 600042" value={form.postal_code} onChange={(e) => setForm({ ...form, postal_code: e.target.value })} className="h-10" />
             </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Overview Description</label>
+              <Textarea
+                placeholder="Shown on the site as 'Overview of {locality}' — e.g. schools, connectivity, lifestyle..."
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                rows={4}
+              />
+            </div>
             <div className="flex items-center justify-between pt-1">
               <div>
                 <label className="text-sm font-medium">Active</label>
@@ -392,6 +415,15 @@ export default function MasterSublocationsPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">PIN Code</label>
               <Input placeholder="e.g. 600042" value={form.postal_code} onChange={(e) => setForm({ ...form, postal_code: e.target.value })} className="h-10" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Overview Description</label>
+              <Textarea
+                placeholder="Shown on the site as 'Overview of {locality}' — e.g. schools, connectivity, lifestyle..."
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                rows={4}
+              />
             </div>
             <div className="flex items-center justify-between pt-1">
               <div>

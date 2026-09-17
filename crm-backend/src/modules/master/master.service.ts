@@ -80,7 +80,7 @@ export class MasterService {
 
   async getAllSublocations(search?: string) {
     try {
-      let sql = `SELECT s.id, s.city_id, s.locality_name, s.postal_code, s.is_active,
+      let sql = `SELECT s.id, s.city_id, s.locality_name, s.postal_code, s.description, s.is_active,
                         c.city_name, c.state_name, c.country_name
                  FROM sublocations s
                  LEFT JOIN cities c ON c.id = s.city_id`;
@@ -96,11 +96,11 @@ export class MasterService {
     }
   }
 
-  async createSublocation(data: { city_id: number; locality_name: string; postal_code?: string; is_active?: number }) {
+  async createSublocation(data: { city_id: number; locality_name: string; postal_code?: string; description?: string | null; is_active?: number }) {
     return this.siteApi.post('/admin/sublocations', { data });
   }
 
-  async updateSublocation(id: number, data: { city_id?: number; locality_name?: string; postal_code?: string; is_active?: number }) {
+  async updateSublocation(id: number, data: { city_id?: number; locality_name?: string; postal_code?: string; description?: string | null; is_active?: number }) {
     return this.siteApi.patch(`/admin/sublocations/${id}`, { data });
   }
 

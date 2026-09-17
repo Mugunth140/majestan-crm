@@ -33,6 +33,9 @@ export class Sublocation {
   @Column({ name: 'postal_code', type: 'varchar', length: 20, nullable: true })
   postalCode!: string | null;
 
+  @Column({ name: 'description', type: 'text', nullable: true })
+  description!: string | null;
+
   @Column({ name: 'latitude', type: 'decimal', precision: 10, scale: 7, nullable: true })
   latitude!: number | null;
 
