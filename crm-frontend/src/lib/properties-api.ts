@@ -1,4 +1,4 @@
-import { apiFetch } from './api-fetch';
+import { apiJson } from './api-fetch';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 const BASE = `${API_URL}/properties`;
@@ -10,48 +10,48 @@ export const propertiesApi = {
         Object.entries(params).filter(([, v]) => v != null && v !== '')
       )
     );
-    return apiFetch(`${BASE}?${q}`).then(r => r.json());
+    return apiJson(`${BASE}?${q}`);
   },
-  formData: () => apiFetch(`${BASE}/form-data`).then(r => r.json()),
+  formData: () => apiJson(`${BASE}/form-data`),
   presignedUrl: (fileName: string, fileType: string) => {
     const q = new URLSearchParams({ fileName, fileType });
-    return apiFetch(`${BASE}/presigned-url?${q}`).then(r => r.json());
+    return apiJson(`${BASE}/presigned-url?${q}`);
   },
   uploadImages: (files: File[]) => {
     const form = new FormData();
     files.forEach((f) => form.append('images', f));
-    return apiFetch(`${BASE}/upload`, { method: 'POST', body: form }).then(r => r.json());
+    return apiJson(`${BASE}/upload`, { method: 'POST', body: form });
   },
   uploadDocs: (files: File[]) => {
     const form = new FormData();
     files.forEach((f) => form.append('documents', f));
-    return apiFetch(`${BASE}/upload-docs`, { method: 'POST', body: form }).then(r => r.json());
+    return apiJson(`${BASE}/upload-docs`, { method: 'POST', body: form });
   },
-  getOne: (id: number) => apiFetch(`${BASE}/${id}`).then(r => r.json()),
+  getOne: (id: number) => apiJson(`${BASE}/${id}`),
   create: (body: any) =>
-    apiFetch(BASE, {
+    apiJson(BASE, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    }).then(r => r.json()),
+    }),
   update: (id: number, body: any) =>
-    apiFetch(`${BASE}/${id}`, {
+    apiJson(`${BASE}/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    }).then(r => r.json()),
+    }),
   toggleVisibility: (id: number) =>
-    apiFetch(`${BASE}/${id}/visibility`, { method: 'PATCH' }).then(r => r.json()),
+    apiJson(`${BASE}/${id}/visibility`, { method: 'PATCH' }),
   approve: (id: number) =>
-    apiFetch(`${BASE}/${id}/approve`, { method: 'PATCH' }).then(r => r.json()),
+    apiJson(`${BASE}/${id}/approve`, { method: 'PATCH' }),
   revokeApproval: (id: number) =>
-    apiFetch(`${BASE}/${id}/revoke-approval`, { method: 'PATCH' }).then(r => r.json()),
+    apiJson(`${BASE}/${id}/revoke-approval`, { method: 'PATCH' }),
   remove: (id: number) =>
-    apiFetch(`${BASE}/${id}`, { method: 'DELETE' }).then(r => r.json()),
+    apiJson(`${BASE}/${id}`, { method: 'DELETE' }),
   bulk: (properties: any[]) =>
-    apiFetch(`${BASE}/bulk`, {
+    apiJson(`${BASE}/bulk`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ properties }),
-    }).then(r => r.json()),
+    }),
 };

@@ -65,6 +65,14 @@ export class BulkPropertyRowDto {
   areaSqft?: number;
 
   @IsOptional()
+  @Transform(toNumber)
+  @IsNumber()
+  parking?: number;
+
+  @IsOptional()
+  furnished?: boolean;
+
+  @IsOptional()
   @Transform(toTrimmedString)
   @IsString()
   ownerName?: string;

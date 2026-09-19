@@ -89,6 +89,14 @@ function num(v: any): number | undefined {
   return Number.isNaN(n) ? undefined : n;
 }
 
+/** Parse bulk-row furnished values (true/1/yes/furnished → true, else false). */
+function parseBulkFurnished(v: any): boolean {
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number') return v !== 0;
+  const s = String(v ?? '').trim().toLowerCase();
+  return ['true', '1', 'yes', 'y', 'furnished', 'fully-furnished', 'fully furnished'].includes(s);
+}
+
 function str(v: any): string | undefined {
   if (v === undefined || v === null) return undefined;
   const s = String(v).trim();
@@ -410,7 +418,9 @@ export class PropertiesService {
       price: dto.price !== undefined && !Number.isNaN(Number(dto.price)) ? String(dto.price) : undefined,
       propertyType: dto.propertyType,
       listingType: dto.listingType === 'Buy' ? 'Sell' : (dto.listingType ?? 'Sell'),
-      status: dto.status ?? 'available',
+      // New properties land as drafts (unavailable) — they go public only
+      // after approval + visibility toggle. Public search gates on both.
+      status: dto.status ?? 'unavailable',
       reraNumber: dto.reraNumber ?? 'Not Applicable',
       builderName: str(dto.builderName),
       projectName: str(dto.projectName),
@@ -510,6 +520,9 @@ export class PropertiesService {
     // NOTE: property type changes are ignored — the site API keys routes,
     // slugs and detail lookups off the stored type.
     const body = { ...(dto as unknown as Record<string, any>) };
+    // Preserve the stored status when the edit doesn't set one — otherwise a
+    // plain field edit would silently flip visibility (draft↔live).
+    if (body.status === undefined) body.status = (existing as any).status;
     if (!(await this.canSeeContacts(reqUser))) {
       for (const k of PropertiesService.CONTACT_KEYS) delete body[k];
     }
@@ -594,7 +607,8 @@ export class PropertiesService {
           price: row.price !== undefined ? String(row.price) : undefined,
           propertyType,
           listingType: String(row.listingType ?? '').toLowerCase() === 'rent' ? 'Rent' : 'Sell',
-          status: 'available',
+          // Draft first — goes public only after approval + visibility toggle.
+          status: 'unavailable',
           reraNumber: 'Not Applicable',
           city: city.city_name ?? city.cityName,
           state: city.state_name ?? city.stateName,
@@ -609,8 +623,8 @@ export class PropertiesService {
             bedrooms: num(row.bedrooms) ?? 0,
             bathrooms: num(row.bathrooms) ?? 0,
             areaSqft: num(row.areaSqft) ?? 0,
-            parking: 0,
-            furnished: false,
+            parking: num((row as any).parking) ?? 0,
+            furnished: parseBulkFurnished((row as any).furnished),
           },
         };
 

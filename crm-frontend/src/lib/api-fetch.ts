@@ -26,3 +26,53 @@ export function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Prom
     return res;
   });
 }
+
+/**
+ * Error thrown by apiJson when the request fails. Carries the HTTP status so
+ * callers can branch (e.g. 404 vs 500). Message is always human-readable —
+ * never a JSON.parse SyntaxError.
+ */
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+/**
+ * apiJson — apiFetch + safe JSON parsing. Use this instead of
+ * `apiFetch(...).then(r => r.json())`.
+ *
+ * Why: when the backend (or the Next.js rewrite proxy in front of it) fails
+ * hard, the response body is plain text like "Internal Server Error" — a bare
+ * `res.json()` then throws `Unexpected token 'I'... is not valid JSON`, which
+ * hides the real problem. This helper converts that into an ApiError with the
+ * status and a readable message. Success payloads (including `{success:false}`
+ * bodies on 200) resolve exactly as before, so existing branching is untouched.
+ */
+export async function apiJson<T = any>(input: RequestInfo | URL, init: RequestInit = {}): Promise<T> {
+  const res = await apiFetch(input, init);
+  const text = await res.text();
+  if (!text) {
+    if (!res.ok) throw new ApiError(res.status, `Request failed (${res.status})`);
+    return null as T;
+  }
+  let data: any;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new ApiError(
+      res.status,
+      res.ok
+        ? 'Invalid response from server'
+        : `Request failed (${res.status}): ${text.slice(0, 160)}`,
+    );
+  }
+  if (!res.ok) {
+    const raw = data?.message ?? `Request failed (${res.status})`;
+    throw new ApiError(res.status, Array.isArray(raw) ? raw.join(', ') : String(raw));
+  }
+  return data as T;
+}
