@@ -12,7 +12,7 @@ import { DatePicker } from "@/components/shared/date-picker";
 import { format } from "date-fns";
 import { PriceInput } from "@/components/shared/price-input";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { apiFetch } from "@/lib/api-fetch";
+import { apiFetch, ApiError } from "@/lib/api-fetch";
 import { parseIndianCurrency } from "@/lib/indian-currency";
 import { propertiesApi } from "@/lib/properties-api";
 import { fetchNearbyCategories, resolveCenterFromText, type LocalityCategory } from "@/lib/nearby-places";
@@ -154,13 +154,16 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   // ---- Pricing ----
   const [price, setPrice] = useState(d?.price ? String(d.price) : "");
   const [negotiable, setNegotiable] = useState<boolean>(d?.negotiable ?? false);
-  const [bookingAmount, setBookingAmount] = useState(d?.bookingAmount ?? "");
+  // String-coerced: the API may return numbers for these varchar columns —
+  // without String() the .trim() calls in submit would throw (bookingAmount
+  // previously broke saving for exactly this reason).
+  const [bookingAmount, setBookingAmount] = useState(d?.bookingAmount != null ? String(d.bookingAmount) : "");
   const [brokerageType, setBrokerageType] = useState(d?.brokerageType ?? "no_brokerage");
-  const [brokerageValue, setBrokerageValue] = useState(d?.brokerageValue ?? "");
+  const [brokerageValue, setBrokerageValue] = useState(d?.brokerageValue != null ? String(d.brokerageValue) : "");
   const [expectedSalePrice, setExpectedSalePrice] = useState(d?.expectedSalePrice ? String(d.expectedSalePrice) : "");
   const [monthlyRent, setMonthlyRent] = useState(d?.monthlyRent ? String(d.monthlyRent) : "");
-  const [maintenanceCharges, setMaintenanceCharges] = useState(d?.maintenanceCharges ?? "");
-  const [securityDeposit, setSecurityDeposit] = useState(d?.securityDeposit ?? "");
+  const [maintenanceCharges, setMaintenanceCharges] = useState(d?.maintenanceCharges != null ? String(d.maintenanceCharges) : "");
+  const [securityDeposit, setSecurityDeposit] = useState(d?.securityDeposit != null ? String(d.securityDeposit) : "");
   const [lockInPeriod, setLockInPeriod] = useState(d?.lockInPeriod ?? "");
   const [taxes, setTaxes] = useState(d?.taxes ?? "");
   const [registrationCharge, setRegistrationCharge] = useState(d?.registrationCharge ?? "");
@@ -401,6 +404,379 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   const [uploadTotalCount, setUploadTotalCount] = useState(0);
   const imgInputRef = useRef<HTMLInputElement>(null);
 
+  // ---- Draft persistence (localStorage) — form survives refresh ----
+  // Snapshots the whole form (debounced) so a refresh/PWA restart restores
+  // exactly what was on screen. Uploads in flight can't persist (blob URLs
+  // and File objects die with the page) — only fully-uploaded images
+  // (server keys) are kept. Cleared on successful submit.
+  const DRAFT_VERSION = 1;
+  const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+  const editReady = mode === "create" || (initialData as any)?.id != null;
+  const draftKey =
+    `majestan:property-form:${mode}:${mode === "edit" ? ((initialData as any)?.id ?? "unknown") : "new"}`;
+  const restoredDraftRef = useRef(false);
+
+  type DraftKind = "s" | "b" | "a" | "listing" | "amenityIds" | "images" | "docs" | "uploads";
+  const draftFields: Array<{ key: string; kind: DraftKind; get: () => unknown; set: (v: any) => void }> = [
+    { key: "title", kind: "s", get: () => title, set: setTitle },
+    { key: "listingType", kind: "listing", get: () => listingType, set: setListingType },
+    { key: "propertyType", kind: "s", get: () => propertyType, set: setPropertyType },
+    { key: "status", kind: "s", get: () => status, set: setStatus },
+    { key: "availableFrom", kind: "s", get: () => availableFrom, set: setAvailableFrom },
+    { key: "availableUntil", kind: "s", get: () => availableUntil, set: setAvailableUntil },
+    { key: "propertyCondition", kind: "s", get: () => propertyCondition, set: setPropertyCondition },
+    { key: "ownershipType", kind: "s", get: () => ownershipType, set: setOwnershipType },
+    { key: "reraNumber", kind: "s", get: () => reraNumber, set: setReraNumber },
+    { key: "projectName", kind: "s", get: () => projectName, set: setProjectName },
+    { key: "builderName", kind: "s", get: () => builderName, set: setBuilderName },
+    { key: "transactionType", kind: "s", get: () => transactionType, set: setTransactionType },
+    { key: "handoverDate", kind: "s", get: () => handoverDate, set: setHandoverDate },
+    { key: "saleType", kind: "s", get: () => saleType, set: setSaleType },
+    { key: "roadAccess", kind: "s", get: () => roadAccess, set: setRoadAccess },
+    { key: "roadName", kind: "s", get: () => roadName, set: setRoadName },
+    { key: "tenantOccupied", kind: "s", get: () => tenantOccupied, set: setTenantOccupied },
+    { key: "price", kind: "s", get: () => price, set: setPrice },
+    { key: "negotiable", kind: "b", get: () => negotiable, set: setNegotiable },
+    { key: "bookingAmount", kind: "s", get: () => bookingAmount, set: setBookingAmount },
+    { key: "brokerageType", kind: "s", get: () => brokerageType, set: setBrokerageType },
+    { key: "brokerageValue", kind: "s", get: () => brokerageValue, set: setBrokerageValue },
+    { key: "expectedSalePrice", kind: "s", get: () => expectedSalePrice, set: setExpectedSalePrice },
+    { key: "monthlyRent", kind: "s", get: () => monthlyRent, set: setMonthlyRent },
+    { key: "maintenanceCharges", kind: "s", get: () => maintenanceCharges, set: setMaintenanceCharges },
+    { key: "securityDeposit", kind: "s", get: () => securityDeposit, set: setSecurityDeposit },
+    { key: "lockInPeriod", kind: "s", get: () => lockInPeriod, set: setLockInPeriod },
+    { key: "taxes", kind: "s", get: () => taxes, set: setTaxes },
+    { key: "registrationCharge", kind: "s", get: () => registrationCharge, set: setRegistrationCharge },
+    { key: "modeOfPayment", kind: "s", get: () => modeOfPayment, set: setModeOfPayment },
+    { key: "timeForRegistration", kind: "s", get: () => timeForRegistration, set: setTimeForRegistration },
+    { key: "cityId", kind: "s", get: () => cityId, set: setCityId },
+    { key: "sublocationId", kind: "s", get: () => sublocationId, set: setSublocationId },
+    { key: "pincode", kind: "s", get: () => pincode, set: setPincode },
+    { key: "address", kind: "s", get: () => address, set: setAddress },
+    { key: "latitude", kind: "s", get: () => latitude, set: setLatitude },
+    { key: "longitude", kind: "s", get: () => longitude, set: setLongitude },
+    { key: "bedrooms", kind: "s", get: () => bedrooms, set: setBedrooms },
+    { key: "bathrooms", kind: "s", get: () => bathrooms, set: setBathrooms },
+    { key: "areaSqft", kind: "s", get: () => areaSqft, set: setAreaSqft },
+    { key: "areaUnit", kind: "s", get: () => areaUnit, set: setAreaUnit },
+    { key: "furnished", kind: "b", get: () => furnished, set: setFurnished },
+    { key: "furnishingStatus", kind: "s", get: () => furnishingStatus, set: setFurnishingStatus },
+    { key: "propertyFacing", kind: "s", get: () => propertyFacing, set: setPropertyFacing },
+    { key: "floorFacing", kind: "s", get: () => floorFacing, set: setFloorFacing },
+    { key: "parkingType", kind: "s", get: () => parkingType, set: setParkingType },
+    { key: "propertyAge", kind: "s", get: () => propertyAge, set: setPropertyAge },
+    { key: "possessionStatus", kind: "s", get: () => possessionStatus, set: setPossessionStatus },
+    { key: "openSides", kind: "s", get: () => openSides, set: setOpenSides },
+    { key: "suitableFor", kind: "s", get: () => suitableFor, set: setSuitableFor },
+    { key: "floorNumber", kind: "s", get: () => floorNumber, set: setFloorNumber },
+    { key: "totalFloors", kind: "s", get: () => totalFloors, set: setTotalFloors },
+    { key: "guestParking", kind: "b", get: () => guestParking, set: setGuestParking },
+    { key: "floorsOccupied", kind: "s", get: () => floorsOccupied, set: setFloorsOccupied },
+    { key: "hasRestroom", kind: "b", get: () => hasRestroom, set: setHasRestroom },
+    { key: "amenityIds", kind: "amenityIds", get: () => amenityIds, set: setAmenityIds },
+    { key: "faqs", kind: "a", get: () => faqs, set: setFaqs },
+    { key: "connectivity", kind: "a", get: () => connectivity, set: setConnectivity },
+    { key: "categories", kind: "a", get: () => categories, set: setCategories },
+    { key: "roomDimensions", kind: "a", get: () => roomDimensions, set: setRoomDimensions },
+    { key: "unitType", kind: "s", get: () => unitType, set: setUnitType },
+    { key: "unitNumber", kind: "s", get: () => unitNumber, set: setUnitNumber },
+    { key: "numberOfFlats", kind: "s", get: () => numberOfFlats, set: setNumberOfFlats },
+    { key: "towerNos", kind: "s", get: () => towerNos, set: setTowerNos },
+    { key: "builtUpArea", kind: "s", get: () => builtUpArea, set: setBuiltUpArea },
+    { key: "carpetArea", kind: "s", get: () => carpetArea, set: setCarpetArea },
+    { key: "superBuiltUpArea", kind: "s", get: () => superBuiltUpArea, set: setSuperBuiltUpArea },
+    { key: "udsArea", kind: "s", get: () => udsArea, set: setUdsArea },
+    { key: "plotArea", kind: "s", get: () => plotArea, set: setPlotArea },
+    { key: "balconies", kind: "s", get: () => balconies, set: setBalconies },
+    { key: "poojaRoom", kind: "b", get: () => poojaRoom, set: setPoojaRoom },
+    { key: "studyRoom", kind: "b", get: () => studyRoom, set: setStudyRoom },
+    { key: "architecturalStyle", kind: "s", get: () => architecturalStyle, set: setArchitecturalStyle },
+    { key: "availablePortion", kind: "s", get: () => availablePortion, set: setAvailablePortion },
+    { key: "amenities", kind: "s", get: () => amenities, set: setAmenities },
+    { key: "outdoorSpaces", kind: "s", get: () => outdoorSpaces, set: setOutdoorSpaces },
+    { key: "utilitiesProvided", kind: "s", get: () => utilitiesProvided, set: setUtilitiesProvided },
+    { key: "neighborhoodHighlights", kind: "s", get: () => neighborhoodHighlights, set: setNeighborhoodHighlights },
+    { key: "communityFacilities", kind: "s", get: () => communityFacilities, set: setCommunityFacilities },
+    { key: "plotSizeCents", kind: "s", get: () => plotSizeCents, set: setPlotSizeCents },
+    { key: "plotNos", kind: "s", get: () => plotNos, set: setPlotNos },
+    { key: "zoning", kind: "s", get: () => zoning, set: setZoning },
+    { key: "plotType", kind: "s", get: () => plotType, set: setPlotType },
+    { key: "sfNumber", kind: "s", get: () => sfNumber, set: setSfNumber },
+    { key: "landType", kind: "s", get: () => landType, set: setLandType },
+    { key: "topography", kind: "s", get: () => topography, set: setTopography },
+    { key: "soilType", kind: "s", get: () => soilType, set: setSoilType },
+    { key: "irrigation", kind: "s", get: () => irrigation, set: setIrrigation },
+    { key: "fencing", kind: "s", get: () => fencing, set: setFencing },
+    { key: "cropSuitability", kind: "s", get: () => cropSuitability, set: setCropSuitability },
+    { key: "existingPlantation", kind: "s", get: () => existingPlantation, set: setExistingPlantation },
+    { key: "boreWell", kind: "b", get: () => boreWell, set: setBoreWell },
+    { key: "storageTank", kind: "b", get: () => storageTank, set: setStorageTank },
+    { key: "waterSources", kind: "s", get: () => waterSources, set: setWaterSources },
+    { key: "boundaryWall", kind: "b", get: () => boundaryWall, set: setBoundaryWall },
+    { key: "plotLength", kind: "s", get: () => plotLength, set: setPlotLength },
+    { key: "plotWidth", kind: "s", get: () => plotWidth, set: setPlotWidth },
+    { key: "propertyUse", kind: "s", get: () => propertyUse, set: setPropertyUse },
+    { key: "noOfLifts", kind: "s", get: () => noOfLifts, set: setNoOfLifts },
+    { key: "dimension", kind: "s", get: () => dimension, set: setDimension },
+    { key: "frontage", kind: "s", get: () => frontage, set: setFrontage },
+    { key: "carParking", kind: "s", get: () => carParking, set: setCarParking },
+    { key: "bikeParking", kind: "s", get: () => bikeParking, set: setBikeParking },
+    { key: "outsideParking", kind: "b", get: () => outsideParking, set: setOutsideParking },
+    { key: "visitorsParking", kind: "s", get: () => visitorsParking, set: setVisitorsParking },
+    { key: "fireSafety", kind: "b", get: () => fireSafety, set: setFireSafety },
+    { key: "ceilingHeightFt", kind: "s", get: () => ceilingHeightFt, set: setCeilingHeightFt },
+    { key: "electricityConnection", kind: "s", get: () => electricityConnection, set: setElectricityConnection },
+    { key: "powerBackup", kind: "b", get: () => powerBackup, set: setPowerBackup },
+    { key: "hasCentralAc", kind: "b", get: () => hasCentralAc, set: setHasCentralAc },
+    { key: "hasPantry", kind: "b", get: () => hasPantry, set: setHasPantry },
+    { key: "conferenceRoom", kind: "s", get: () => conferenceRoom, set: setConferenceRoom },
+    { key: "seater", kind: "s", get: () => seater, set: setSeater },
+    { key: "tenantMix", kind: "s", get: () => tenantMix, set: setTenantMix },
+    { key: "commercialAmenities", kind: "s", get: () => commercialAmenities, set: setCommercialAmenities },
+    { key: "availableWorkstations", kind: "s", get: () => availableWorkstations, set: setAvailableWorkstations },
+    { key: "privateCabins", kind: "s", get: () => privateCabins, set: setPrivateCabins },
+    { key: "meetingRooms", kind: "s", get: () => meetingRooms, set: setMeetingRooms },
+    { key: "minSeats", kind: "s", get: () => minSeats, set: setMinSeats },
+    { key: "rentPerSeat", kind: "s", get: () => rentPerSeat, set: setRentPerSeat },
+    { key: "advanceRent", kind: "s", get: () => advanceRent, set: setAdvanceRent },
+    { key: "leaseTerm", kind: "s", get: () => leaseTerm, set: setLeaseTerm },
+    { key: "incrementalRent", kind: "s", get: () => incrementalRent, set: setIncrementalRent },
+    { key: "electricityCharges", kind: "s", get: () => electricityCharges, set: setElectricityCharges },
+    { key: "highSpeedWifi", kind: "b", get: () => highSpeedWifi, set: setHighSpeedWifi },
+    { key: "airConditioning", kind: "b", get: () => airConditioning, set: setAirConditioning },
+    { key: "cctvSurveillance", kind: "b", get: () => cctvSurveillance, set: setCctvSurveillance },
+    { key: "coworkingPowerBackup", kind: "b", get: () => coworkingPowerBackup, set: setCoworkingPowerBackup },
+    { key: "elevatorAccess", kind: "b", get: () => elevatorAccess, set: setElevatorAccess },
+    { key: "coworkingHasPantry", kind: "b", get: () => coworkingHasPantry, set: setCoworkingHasPantry },
+    { key: "securityStaff", kind: "b", get: () => securityStaff, set: setSecurityStaff },
+    { key: "furnitureProvided", kind: "s", get: () => furnitureProvided, set: setFurnitureProvided },
+    { key: "accessibility", kind: "s", get: () => accessibility, set: setAccessibility },
+    { key: "buildingType", kind: "s", get: () => buildingType, set: setBuildingType },
+    { key: "industrialPropertyUse", kind: "s", get: () => industrialPropertyUse, set: setIndustrialPropertyUse },
+    { key: "coveredArea", kind: "s", get: () => coveredArea, set: setCoveredArea },
+    { key: "openArea", kind: "s", get: () => openArea, set: setOpenArea },
+    { key: "industrialCeilingHeight", kind: "s", get: () => industrialCeilingHeight, set: setIndustrialCeilingHeight },
+    { key: "floorType", kind: "s", get: () => floorType, set: setFloorType },
+    { key: "numberOfBays", kind: "s", get: () => numberOfBays, set: setNumberOfBays },
+    { key: "numberOfCabins", kind: "s", get: () => numberOfCabins, set: setNumberOfCabins },
+    { key: "powerSupplyHp", kind: "s", get: () => powerSupplyHp, set: setPowerSupplyHp },
+    { key: "waterSupply", kind: "s", get: () => waterSupply, set: setWaterSupply },
+    { key: "truckParking", kind: "s", get: () => truckParking, set: setTruckParking },
+    { key: "industrialCarParking", kind: "s", get: () => industrialCarParking, set: setIndustrialCarParking },
+    { key: "industrialBikeParking", kind: "s", get: () => industrialBikeParking, set: setIndustrialBikeParking },
+    { key: "industrialFireSafety", kind: "b", get: () => industrialFireSafety, set: setIndustrialFireSafety },
+    { key: "loadingBays", kind: "s", get: () => loadingBays, set: setLoadingBays },
+    { key: "warehouseRacks", kind: "s", get: () => warehouseRacks, set: setWarehouseRacks },
+    { key: "truckTrailerAccess", kind: "b", get: () => truckTrailerAccess, set: setTruckTrailerAccess },
+    { key: "craneAvailable", kind: "b", get: () => craneAvailable, set: setCraneAvailable },
+    { key: "workerFacilities", kind: "s", get: () => workerFacilities, set: setWorkerFacilities },
+    { key: "nearestHighway", kind: "s", get: () => nearestHighway, set: setNearestHighway },
+    { key: "nearestRailway", kind: "s", get: () => nearestRailway, set: setNearestRailway },
+    { key: "nearestPort", kind: "s", get: () => nearestPort, set: setNearestPort },
+    { key: "nearestAirport", kind: "s", get: () => nearestAirport, set: setNearestAirport },
+    { key: "labourAvailability", kind: "s", get: () => labourAvailability, set: setLabourAvailability },
+    { key: "industrialPowerBackup", kind: "b", get: () => industrialPowerBackup, set: setIndustrialPowerBackup },
+    { key: "heavyVehicleAccess", kind: "b", get: () => heavyVehicleAccess, set: setHeavyVehicleAccess },
+    { key: "ownerName", kind: "s", get: () => ownerName, set: setOwnerName },
+    { key: "ownerPhone", kind: "s", get: () => ownerPhone, set: setOwnerPhone },
+    { key: "ownerEmail", kind: "s", get: () => ownerEmail, set: setOwnerEmail },
+    { key: "agentName", kind: "s", get: () => agentName, set: setAgentName },
+    { key: "agencyName", kind: "s", get: () => agencyName, set: setAgencyName },
+    { key: "commissionTerms", kind: "s", get: () => commissionTerms, set: setCommissionTerms },
+    { key: "alternateName", kind: "s", get: () => alternateName, set: setAlternateName },
+    { key: "alternatePhone", kind: "s", get: () => alternatePhone, set: setAlternatePhone },
+    { key: "alternateEmail", kind: "s", get: () => alternateEmail, set: setAlternateEmail },
+    { key: "ownershipTitleVerified", kind: "s", get: () => ownershipTitleVerified, set: setOwnershipTitleVerified },
+    { key: "encumbranceCertificate", kind: "s", get: () => encumbranceCertificate, set: setEncumbranceCertificate },
+    { key: "rentalAgreementDraft", kind: "s", get: () => rentalAgreementDraft, set: setRentalAgreementDraft },
+    { key: "tslrFmb", kind: "s", get: () => tslrFmb, set: setTslrFmb },
+    { key: "taxReceipt", kind: "s", get: () => taxReceipt, set: setTaxReceipt },
+    { key: "ebReceipt", kind: "s", get: () => ebReceipt, set: setEbReceipt },
+    { key: "pattaChitta", kind: "s", get: () => pattaChitta, set: setPattaChitta },
+    { key: "approvals", kind: "s", get: () => approvals, set: setApprovals },
+    { key: "financeFacing", kind: "s", get: () => financeFacing, set: setFinanceFacing },
+    { key: "hypothecation", kind: "s", get: () => hypothecation, set: setHypothecation },
+    { key: "deviation", kind: "s", get: () => deviation, set: setDeviation },
+    { key: "comparativePrice", kind: "s", get: () => comparativePrice, set: setComparativePrice },
+    { key: "rentalYield", kind: "s", get: () => rentalYield, set: setRentalYield },
+    { key: "marketPrice", kind: "s", get: () => marketPrice, set: setMarketPrice },
+    { key: "demandArea", kind: "s", get: () => demandArea, set: setDemandArea },
+    { key: "remark", kind: "s", get: () => remark, set: setRemark },
+    { key: "description", kind: "s", get: () => description, set: setDescription },
+    { key: "existingImages", kind: "images", get: () => existingImages, set: setExistingImages },
+    { key: "documents", kind: "docs", get: () => documents, set: setDocuments },
+    { key: "uploadedImages", kind: "uploads", get: () => uploadedImages, set: setUploadedImages },
+  ];
+
+  const collectDraft = (): Record<string, any> => {
+    const data: Record<string, any> = {};
+    for (const f of draftFields) {
+      try {
+        const v = f.get();
+        if (f.kind === "uploads") {
+          // Only fully-uploaded images survive (server keys); blob previews die with the page.
+          const kept = (Array.isArray(v) ? v : [])
+            .filter((img: any) => img && img.imageKey)
+            .map((img: any) => ({ imageUrl: img.imageUrl ?? "", imageKey: img.imageKey ?? "", fileName: img.fileName ?? "" }));
+          data[f.key] = kept;
+        } else {
+          data[f.key] = v ?? null;
+        }
+      } catch {
+        /* skip unreadable field */
+      }
+    }
+    return data;
+  };
+
+  const DRAFT_CONTENT_KEYS = ["title", "price", "description", "address", "ownerPhone", "ownerName", "bookingAmount", "expectedSalePrice", "monthlyRent", "bedrooms", "areaSqft", "cityId", "sublocationId", "reraNumber", "projectName"];
+  const draftHasContent = (data: Record<string, any>): boolean =>
+    DRAFT_CONTENT_KEYS.some((k) => {
+      const v = data[k];
+      if (Array.isArray(v)) return v.length > 0;
+      return v !== null && v !== undefined && String(v).trim() !== "";
+    });
+
+  const applyDraft = (data: Record<string, any>): boolean => {
+    let applied = 0;
+    for (const f of draftFields) {
+      if (!(f.key in data)) continue;
+      const v = data[f.key];
+      try {
+        switch (f.kind) {
+          case "s":
+            f.set(v == null ? "" : String(v));
+            applied++;
+            break;
+          case "b":
+            f.set(v === true);
+            applied++;
+            break;
+          case "a":
+            if (Array.isArray(v)) {
+              f.set(v);
+              applied++;
+            }
+            break;
+          case "listing":
+            if (v === "Buy" || v === "Rent") {
+              f.set(v);
+              applied++;
+            }
+            break;
+          case "amenityIds":
+            if (Array.isArray(v)) {
+              f.set(v.filter((n: any) => Number.isFinite(Number(n))).map(Number));
+              applied++;
+            }
+            break;
+          case "images":
+            if (Array.isArray(v)) {
+              f.set(
+                v
+                  .filter((img: any) => img && (img.imageUrl || img.imageKey))
+                  .map((img: any) => ({
+                    imageUrl: String(img.imageUrl ?? ""),
+                    imageKey: String(img.imageKey ?? ""),
+                    isPrimary: img.isPrimary === true,
+                  }))
+              );
+              applied++;
+            }
+            break;
+          case "docs":
+            if (v && typeof v === "object" && !Array.isArray(v)) {
+              f.set(v);
+              applied++;
+            }
+            break;
+          case "uploads":
+            if (Array.isArray(v)) {
+              const kept = v
+                .filter((img: any) => img && img.imageKey)
+                .map((img: any) => ({
+                  imageUrl: String(img.imageUrl ?? ""),
+                  imageKey: String(img.imageKey ?? ""),
+                  fileName: String(img.fileName ?? ""),
+                  previewUrl: String(img.imageUrl ?? ""),
+                }));
+              f.set(kept);
+              if (kept.length > 0) applied++;
+            }
+            break;
+        }
+      } catch {
+        /* skip unrestorable field */
+      }
+    }
+    return applied > 0;
+  };
+
+  const saveDraft = () => {
+    if (!editReady) return;
+    try {
+      const snapshot = collectDraft();
+      if (!draftHasContent(snapshot)) {
+        // Form effectively empty — don't leave a stale/empty draft behind.
+        try {
+          localStorage.removeItem(draftKey);
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+      localStorage.setItem(draftKey, JSON.stringify({ v: DRAFT_VERSION, savedAt: Date.now(), data: snapshot }));
+    } catch {
+      /* quota/private-mode → ignore */
+    }
+  };
+
+  const clearDraft = () => {
+    try {
+      localStorage.removeItem(draftKey);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // Restore once when the form becomes ready (create, or edit with server data).
+  useEffect(() => {
+    if (!editReady || restoredDraftRef.current) return;
+    restoredDraftRef.current = true;
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!parsed || parsed.v !== DRAFT_VERSION || !parsed.data) return;
+      if (typeof parsed.savedAt === "number" && Date.now() - parsed.savedAt > DRAFT_TTL_MS) {
+        try {
+          localStorage.removeItem(draftKey);
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+      if (applyDraft(parsed.data)) {
+        toast.info("Previous unsaved draft restored.");
+      }
+    } catch {
+      /* corrupt draft → ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editReady]);
+
+  // Debounced save after every render + synchronous flush on unload/refresh.
+  useEffect(() => {
+    if (!editReady) return;
+    const t = setTimeout(saveDraft, 800);
+    const onUnload = () => saveDraft();
+    window.addEventListener("beforeunload", onUnload);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("beforeunload", onUnload);
+    };
+  });
+
   // ---- Load form data (cities & sublocations) ----
   useEffect(() => {
     setIsLoadingFormData(true);
@@ -558,24 +934,91 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   };
 
   // ---- Validation ----
-  const validate = (): string | null => {
-    if (!title.trim()) return "Title is required.";
-    if (!listingType) return "Listing type is required.";
-    if (!propertyType) return "Property type is required.";
-    if (!price || isNaN(Number(price))) return "A valid price is required.";
-    if (!cityId) return "City is required.";
-    if (!sublocationId) return "Locality is required.";
-    return null;
+  type FieldError = { field: string; message: string };
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const clearFieldError = (field: string) =>
+    setFieldErrors((prev) => {
+      if (!(field in prev)) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+
+  function FormErr({ field }: { field: string }) {
+    const msg = fieldErrors[field];
+    if (!msg) return null;
+    return <p className="text-xs font-medium text-red-600 dark:text-red-400 pl-1">{msg}</p>;
+  }
+
+  /** cityId → City, propertyFacing → Property Facing */
+  const humanizeField = (key: string): string =>
+    key
+      .replace(/Id$/, "")
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .replace(/^./, (c) => c.toUpperCase());
+
+  /** Backend DTO key → inline form key (only keys with wired <FormErr/>). */
+  const serverFieldToFormKey = (key: string): string => {
+    const map: Record<string, string> = { cityId: "city", sublocationId: "locality" };
+    return map[key] ?? key;
+  };
+
+  /** Nest validation messages look like "price must be a number" — split field + message. */
+  const parseServerFieldErrors = (details: string[] | undefined): FieldError[] => {
+    if (!details || details.length === 0) return [];
+    return details.slice(0, 4).map((rawMsg) => {
+      const raw = rawMsg.trim();
+      const m = raw.match(/^([A-Za-z][A-Za-z0-9]*)\b(.*)$/);
+      const field = m ? serverFieldToFormKey(m[1]) : "";
+      const rest = m ? m[2].trim() : raw;
+      return { field, message: field ? `${humanizeField(m![1])}: ${rest || raw}` : raw };
+    });
+  };
+
+  const scrollToFieldError = (field: string) => {
+    if (!field) return;
+    requestAnimationFrame(() => {
+      document.getElementById(`pf-${field}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  };
+
+  const validate = (): FieldError[] => {
+    const errs: FieldError[] = [];
+    if (!title.trim()) errs.push({ field: "title", message: "Title is required." });
+    if (!listingType) errs.push({ field: "listingType", message: "Listing type is required." });
+    if (!propertyType) errs.push({ field: "propertyType", message: "Property type is required." });
+    if (parseIndianCurrency(price) <= 0)
+      errs.push({ field: "price", message: "Enter a valid price (e.g. 1.2 Cr, 50 L, 8000000)." });
+    if (!cityId) errs.push({ field: "city", message: "City is required." });
+    if (!sublocationId) errs.push({ field: "locality", message: "Locality is required." });
+    const moneyFields: [string, unknown, string][] = [
+      ["bookingAmount", bookingAmount, "Booking Amount"],
+      ["expectedSalePrice", expectedSalePrice, "Expected Sale Price"],
+      ["monthlyRent", monthlyRent, "Monthly Rent"],
+    ];
+    for (const [field, val, label] of moneyFields) {
+      if (String(val ?? "").trim() && parseIndianCurrency(String(val)) <= 0) {
+        errs.push({ field, message: `${label} is not a valid amount.` });
+      }
+    }
+    return errs;
   };
 
   // ---- Submit ----
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const validationError = validate();
-    if (validationError) {
-      toast.error(validationError);
+    const validationErrors = validate();
+    if (validationErrors.length > 0) {
+      const map: Record<string, string> = {};
+      validationErrors.forEach((err) => {
+        if (err.field && !(err.field in map)) map[err.field] = err.message;
+      });
+      setFieldErrors(map);
+      validationErrors.slice(0, 3).forEach((err) => toast.error(err.message));
+      scrollToFieldError(validationErrors[0].field);
       return;
     }
+    setFieldErrors({});
 
     setIsLoading(true);
     try {
@@ -604,8 +1047,10 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         roadName: roadName.trim() || undefined,
         tenantOccupied: tenantOccupied.trim() || undefined,
 
-        // Pricing
-        bookingAmount: bookingAmount.trim() ? parseIndianCurrency(bookingAmount) : undefined,
+        // Pricing — bookingAmount is a free-text varchar server-side
+        // ("1.2 Cr", "50000"), so it MUST stay a string. Sending the parsed
+        // number fails @IsString validation and the save is rejected.
+        bookingAmount: bookingAmount.trim() ? bookingAmount.trim() : undefined,
         brokerageType: brokerageType.trim() || undefined,
         brokerageValue: brokerageValue.trim() || undefined,
         expectedSalePrice: expectedSalePrice ? parseIndianCurrency(expectedSalePrice) : undefined,
@@ -870,13 +1315,28 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
       }
 
       toast.success(`Property ${mode === "create" ? "created" : "updated"} successfully!`);
+      clearDraft();
       if (onSuccess) {
         onSuccess();
       } else {
         router.push("/properties");
       }
-    } catch {
-      toast.error("An unexpected error occurred.");
+    } catch (err) {
+      // Field-mapped errors: toast the exact field + show it inline.
+      if (err instanceof ApiError && err.details && err.details.length > 0) {
+        const parsed = parseServerFieldErrors(err.details);
+        const map: Record<string, string> = {};
+        parsed.forEach((fe) => {
+          if (fe.field && !(fe.field in map)) map[fe.field] = fe.message;
+        });
+        if (Object.keys(map).length > 0) setFieldErrors((prev) => ({ ...prev, ...map }));
+        parsed.slice(0, 3).forEach((fe) => toast.error(fe.message));
+        if (parsed[0]?.field) scrollToFieldError(parsed[0].field);
+      } else if (err instanceof ApiError) {
+        toast.error(err.message);
+      } else {
+        toast.error("An unexpected error occurred.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -939,23 +1399,25 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             <div className="space-y-2 lg:col-span-3">
               <label className={labelClass}>Title *</label>
               <Input
+                id="pf-title"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => { setTitle(e.target.value); clearFieldError("title"); }}
                 placeholder="e.g. 3 BHK Apartment in Anna Nagar"
                 required
                 className={inputClass}
               />
+              <FormErr field="title" />
             </div>
 
             {/* Listing Type */}
-            <div className="space-y-2">
+            <div className="space-y-2" id="pf-listingType">
               <label className={labelClass}>Listing Type *</label>
               <div className="flex gap-2">
                 {(["Buy", "Rent"] as const).map((type) => (
                   <button
                     key={type}
                     type="button"
-                    onClick={() => setListingType(type)}
+                    onClick={() => { setListingType(type); clearFieldError("listingType"); }}
                     className={`flex-1 h-12 rounded-xl border font-semibold text-sm transition-all ${
                       listingType === type
                         ? "bg-[#0052FF] text-white border-[#0052FF] shadow-md"
@@ -966,19 +1428,21 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   </button>
                 ))}
               </div>
+              <FormErr field="listingType" />
             </div>
 
             {/* Property Type */}
-            <div className="space-y-2">
+            <div className="space-y-2" id="pf-propertyType">
               <label className={labelClass}>Property Type *</label>
               <FormSelect
                 name="propertyType"
                 placeholder="Select Type"
                 options={formData.propertyTypes || []}
                 value={propertyType || null}
-                onValueChange={setPropertyType}
+                onValueChange={(v) => { setPropertyType(v); clearFieldError("propertyType"); }}
                 required
               />
+              <FormErr field="propertyType" />
             </div>
 
             {/* Status */}
@@ -1001,11 +1465,11 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             {/* Available From */}
             <div className="space-y-2">
               <label className={labelClass}>Available From</label>
-              <Input
-                type="date"
-                value={availableFrom}
-                onChange={(e) => setAvailableFrom(e.target.value)}
-                className={inputClass}
+              <DatePicker
+                value={availableFrom ? new Date(`${availableFrom}T00:00:00`) : undefined}
+                onChange={(d) => setAvailableFrom(d ? format(d, "yyyy-MM-dd") : "")}
+                placeholder="Pick start date"
+                className="h-12 rounded-xl bg-muted/30"
               />
             </div>
 
@@ -1179,13 +1643,14 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
             {/* Price */}
-            <div className="space-y-2">
+            <div className="space-y-2" id="pf-price">
               <label className={labelClass}>Price *</label>
               <PriceInput
                 value={price}
-                onChange={setPrice}
+                onChange={(v) => { setPrice(v); clearFieldError("price"); }}
                 placeholder="e.g. 50L or 1.2Cr"
               />
+              <FormErr field="price" />
             </div>
 
             {/* Negotiable */}
@@ -1204,13 +1669,14 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             </div>
 
             {/* Booking Amount */}
-            <div className="space-y-2">
+            <div className="space-y-2" id="pf-bookingAmount">
               <label className={labelClass}>{listingType === "Rent" ? "Security Deposit" : "Booking Amount"}</label>
               <PriceInput
                 value={bookingAmount}
-                onChange={setBookingAmount}
+                onChange={(v) => { setBookingAmount(v); clearFieldError("bookingAmount"); }}
                 placeholder="e.g. 50k or 2L"
               />
+              <FormErr field="bookingAmount" />
             </div>
 
             {/* Brokerage Type */}
@@ -1247,23 +1713,25 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             )}
 
             {/* Expected Sale Price */}
-            <div className="space-y-2">
+            <div className="space-y-2" id="pf-expectedSalePrice">
               <label className={labelClass}>Expected Sale Price</label>
               <PriceInput
                 value={expectedSalePrice}
-                onChange={setExpectedSalePrice}
+                onChange={(v) => { setExpectedSalePrice(v); clearFieldError("expectedSalePrice"); }}
                 placeholder="e.g. 55L or 1.1Cr"
               />
+              <FormErr field="expectedSalePrice" />
             </div>
 
             {/* Monthly Rent */}
-            <div className="space-y-2">
+            <div className="space-y-2" id="pf-monthlyRent">
               <label className={labelClass}>Monthly Rent</label>
               <PriceInput
                 value={monthlyRent}
-                onChange={setMonthlyRent}
+                onChange={(v) => { setMonthlyRent(v); clearFieldError("monthlyRent"); }}
                 placeholder="e.g. 25k"
               />
+              <FormErr field="monthlyRent" />
             </div>
 
             {/* Maintenance Charges */}
@@ -1302,11 +1770,21 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             {/* Taxes */}
             <div className="space-y-2">
               <label className={labelClass}>Taxes</label>
-              <Input
-                value={taxes}
-                onChange={(e) => setTaxes(e.target.value)}
-                placeholder="e.g. GST applicable"
-                className={inputClass}
+              <FormSelect
+                name="taxes"
+                placeholder="Select Tax"
+                options={[
+                  { label: "NA", value: "NA" },
+                  { label: "5% GST", value: "5% GST" },
+                  { label: "12% GST", value: "12% GST" },
+                  { label: "18% GST", value: "18% GST" },
+                  // Preserve legacy free-text values on edit so they don't blank out
+                  ...(taxes && !["NA", "5% GST", "12% GST", "18% GST"].includes(taxes)
+                    ? [{ label: taxes, value: taxes }]
+                    : []),
+                ]}
+                value={taxes || null}
+                onValueChange={setTaxes}
               />
             </div>
 
@@ -1351,7 +1829,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
             {/* City */}
-            <div className="space-y-2">
+            <div className="space-y-2" id="pf-city">
               <label className={labelClass}>City</label>
               <FormSelect
                 name="cityId"
@@ -1361,12 +1839,13 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   label: cityNameOf(c),
                 }))}
                 value={cityId || null}
-                onValueChange={handleCityChange}
+                onValueChange={(v) => { handleCityChange(v); clearFieldError("city"); }}
               />
+              <FormErr field="city" />
             </div>
 
             {/* Locality */}
-            <div className="space-y-2">
+            <div className="space-y-2" id="pf-locality">
               <label className={labelClass}>Locality</label>
               <FormSelect
                 name="sublocationId"
@@ -1376,9 +1855,10 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   label: subName(s),
                 }))}
                 value={sublocationId || null}
-                onValueChange={setSublocationId}
+                onValueChange={(v) => { setSublocationId(v); clearFieldError("locality"); }}
                 disabled={!cityId || filteredSublocations.length === 0}
               />
+              <FormErr field="locality" />
             </div>
 
             {/* Pincode */}
@@ -1514,9 +1994,9 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               </div>
             </div>
 
-            {/* Facing Direction */}
+            {/* Property Facing */}
             <div className="space-y-2">
-              <label className={labelClass}>Facing Direction</label>
+              <label className={labelClass}>Property Facing</label>
               <FormSelect
                 name="propertyFacing"
                 placeholder="Select Direction"

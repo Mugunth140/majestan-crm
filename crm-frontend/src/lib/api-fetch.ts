@@ -35,11 +35,14 @@ export function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Prom
 export class ApiError extends Error {
   status: number;
   url: string;
-  constructor(status: number, message: string, url: string) {
+  /** Raw server message list (e.g. NestJS validation errors), if any. */
+  details?: string[];
+  constructor(status: number, message: string, url: string, details?: string[]) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.url = url;
+    this.details = details;
   }
 }
 
@@ -76,7 +79,8 @@ export async function apiJson<T = any>(input: RequestInfo | URL, init: RequestIn
   }
   if (!res.ok) {
     const raw = data?.message ?? `Request failed (${res.status})`;
-    throw new ApiError(res.status, Array.isArray(raw) ? raw.join(', ') : String(raw), url);
+    const details = Array.isArray(data?.message) ? data.message.map(String) : undefined;
+    throw new ApiError(res.status, Array.isArray(raw) ? raw.join(', ') : String(raw), url, details);
   }
   return data as T;
 }
