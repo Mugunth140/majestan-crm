@@ -104,6 +104,8 @@ export class PropertiesController {
   }
 
   @Patch(':id/visibility')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Admin', 'Manager')
   async toggleVisibility(@Param('id', ParseIntPipe) id: number) {
     const data = await this.propertiesService.toggleVisibility(id);
     return { success: true, data };

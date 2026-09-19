@@ -25,6 +25,8 @@ import {
   IndianRupee,
   Building2,
   ShieldCheck,
+  Eye,
+  EyeOff,
   TrendingUp,
   HelpCircle,
   Sparkles,
@@ -103,7 +105,7 @@ export default function PropertyViewPage() {
   const [property, setProperty] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [role, setRole] = useState<string>("");
-  const [isApproving, setIsApproving] = useState(false);
+  const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -118,23 +120,22 @@ export default function PropertyViewPage() {
 
   const canApprove = role === "Admin" || role === "Super Admin" || role === "Manager";
 
-  const handleApproval = useCallback(async (approve: boolean) => {
+  const handleVisibility = useCallback(async () => {
     if (!id) return;
-    setIsApproving(true);
+    setIsTogglingVisibility(true);
     try {
-      const result = approve
-        ? await propertiesApi.approve(Number(id))
-        : await propertiesApi.revokeApproval(Number(id));
+      const result = await propertiesApi.toggleVisibility(Number(id));
       if (result && result.success !== false) {
-        setProperty((prev: any) => prev ? { ...prev, approvalStatus: approve ? "Approved" : "Pending" } : prev);
-        toast.success(approve ? "Property approved." : "Approval revoked.");
+        const nextStatus = result.data?.status ?? result.status;
+        setProperty((prev: any) => prev ? { ...prev, status: nextStatus } : prev);
+        toast.success(nextStatus === "available" ? "Property is now live on the site." : "Property hidden from the site.");
       } else {
-        toast.error("Failed to update approval.");
+        toast.error("Failed to update visibility.");
       }
     } catch {
-      toast.error("Failed to update approval.");
+      toast.error("Failed to update visibility.");
     } finally {
-      setIsApproving(false);
+      setIsTogglingVisibility(false);
     }
   }, [id]);
 
@@ -164,7 +165,8 @@ export default function PropertyViewPage() {
   if (!property) return null;
 
   const statusKey = (property.status || "").toLowerCase();
-  const isApproved = (property.approvalStatus || "Pending").toLowerCase() === "approved";
+  const isLive = statusKey === "available";
+  const isTerminalStatus = statusKey === "sold" || statusKey === "rented";
   const det = property.propertyDetails ?? {};
   const images: any[] = property.propertyImages ?? property.images ?? [];
   const documents: any[] = property.documents ?? [];
@@ -201,25 +203,22 @@ export default function PropertyViewPage() {
             <Badge className={`capitalize ${STATUS_BADGE[statusKey] ?? STATUS_BADGE["unavailable"]}`}>
               {property.status}
             </Badge>
-            <Badge className={isApproved ? "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 font-medium shadow-sm border capitalize" : "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 font-medium shadow-sm border capitalize"}>
-              {isApproved ? "Approved" : "Pending"}
-            </Badge>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" className="h-9 w-9 rounded-full" onClick={fetchProperty} title="Refresh">
             <RefreshCw className="h-4 w-4" />
           </Button>
-          {canApprove && (
-            isApproved ? (
-              <Button variant="outline" onClick={() => handleApproval(false)} disabled={isApproving} className="rounded-full px-6 border-amber-300 text-amber-700 hover:bg-amber-50">
-                <ShieldCheck className="h-4 w-4 mr-2" />
-                {isApproving ? "Revoking…" : "Revoke Approval"}
+          {canApprove && !isTerminalStatus && (
+            isLive ? (
+              <Button variant="outline" onClick={handleVisibility} disabled={isTogglingVisibility} className="rounded-full px-8 py-5" title="Hide this property from the public site">
+                <EyeOff className="h-4 w-4 mr-2" />
+                {isTogglingVisibility ? "Updating…" : "Unpublish"}
               </Button>
             ) : (
-              <Button onClick={() => handleApproval(true)} disabled={isApproving} className="rounded-full px-6 bg-green-600 text-white hover:bg-green-700 shadow-md">
-                <ShieldCheck className="h-4 w-4 mr-2" />
-                {isApproving ? "Approving…" : "Approve"}
+              <Button onClick={handleVisibility} disabled={isTogglingVisibility} className="rounded-full px-8 py-5 bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md" title="Show this property on the public site">
+                <Eye className="h-4 w-4 mr-2" />
+                {isTogglingVisibility ? "Updating…" : "Publish"}
               </Button>
             )
           )}
@@ -234,17 +233,16 @@ export default function PropertyViewPage() {
       <div className="md:hidden flex flex-col gap-3 px-4 pb-4">
         <div className="flex items-center gap-2 flex-wrap">
           <Badge className={`capitalize ${STATUS_BADGE[statusKey] ?? STATUS_BADGE["unavailable"]}`}>{property.status}</Badge>
-          <Badge className={isApproved ? "bg-green-100 text-green-800 border-green-200 font-medium shadow-sm border capitalize" : "bg-amber-100 text-amber-800 border-amber-200 font-medium shadow-sm border capitalize"}>{isApproved ? "Approved" : "Pending"}</Badge>
           <span className="text-sm font-semibold text-muted-foreground">{formatPrice(Number(property.price))}</span>
         </div>
-        {canApprove && (
+        {canApprove && !isTerminalStatus && (
           <Button
-            variant={isApproved ? "outline" : undefined}
-            onClick={() => handleApproval(!isApproved)}
-            disabled={isApproving}
-            className={isApproved ? "h-11 rounded-xl border-amber-300 text-amber-700 font-semibold" : "h-11 rounded-xl bg-green-600 text-white hover:bg-green-700 font-semibold"}
+            onClick={handleVisibility}
+            disabled={isTogglingVisibility}
+            className={isLive ? "h-11 rounded-xl font-semibold" : "h-11 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC] font-semibold"}
+            variant={isLive ? "outline" : undefined}
           >
-            <ShieldCheck className="w-4 h-4 mr-2" /> {isApproving ? "Updating…" : isApproved ? "Revoke Approval" : "Approve"}
+            {isLive ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />} {isTogglingVisibility ? "Updating…" : isLive ? "Unpublish" : "Publish"}
           </Button>
         )}
         <div className="grid grid-cols-2 gap-3">

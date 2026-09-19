@@ -34,10 +34,12 @@ export function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Prom
  */
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  url: string;
+  constructor(status: number, message: string, url: string) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.url = url;
   }
 }
 
@@ -54,9 +56,10 @@ export class ApiError extends Error {
  */
 export async function apiJson<T = any>(input: RequestInfo | URL, init: RequestInit = {}): Promise<T> {
   const res = await apiFetch(input, init);
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
   const text = await res.text();
   if (!text) {
-    if (!res.ok) throw new ApiError(res.status, `Request failed (${res.status})`);
+    if (!res.ok) throw new ApiError(res.status, `Request failed (${res.status})`, url);
     return null as T;
   }
   let data: any;
@@ -68,11 +71,12 @@ export async function apiJson<T = any>(input: RequestInfo | URL, init: RequestIn
       res.ok
         ? 'Invalid response from server'
         : `Request failed (${res.status}): ${text.slice(0, 160)}`,
+      url,
     );
   }
   if (!res.ok) {
     const raw = data?.message ?? `Request failed (${res.status})`;
-    throw new ApiError(res.status, Array.isArray(raw) ? raw.join(', ') : String(raw));
+    throw new ApiError(res.status, Array.isArray(raw) ? raw.join(', ') : String(raw), url);
   }
   return data as T;
 }
