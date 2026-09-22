@@ -225,6 +225,7 @@ export default function LeadViewPage() {
   // Convert Lead state
   const [role, setRole] = useState<string>("");
   const [userDept, setUserDept] = useState<string>("");
+  const [userDeptId, setUserDeptId] = useState<number | null>(null);
   const [currentUserId, setCurrentUserId] = useState<number>(0);
   const [isConvertOpen, setIsConvertOpen] = useState(false);
   const [convertTo, setConvertTo] = useState<"inbound" | "agent" | "">("");
@@ -249,6 +250,13 @@ export default function LeadViewPage() {
         const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
         setRole(user?.role?.name || user?.role || "");
         setUserDept((user?.department?.name || user?.department || "").toLowerCase());
+        setUserDeptId(
+          typeof user?.department_id === "number"
+            ? user.department_id
+            : typeof user?.department?.id === "number"
+              ? user.department.id
+              : null
+        );
         setCurrentUserId(user?.id || 0);
       } catch {
         // ignore
@@ -475,6 +483,18 @@ export default function LeadViewPage() {
   const isRnrMaxed = highestRnr >= 5;
 
   const canEdit = role === "Admin" || (lead?.assigned_staff?.id === currentUserId);
+  // Team Leads / Managers must see Reassign for leads in their purview, not
+  // just leads assigned to themselves: unassigned leads, or leads assigned
+  // to staff in their own department (mirrors the staff-list picker scope).
+  const assigneeDeptId =
+    typeof (lead?.assigned_staff as any)?.department_id === "number"
+      ? (lead?.assigned_staff as any).department_id
+      : null;
+  const canReassign =
+    role === "Admin" ||
+    ((role === "Manager" || role === "Team Lead") &&
+      (lead?.assigned_staff == null ||
+        (userDeptId != null && assigneeDeptId === userDeptId)));
 
   return (
     <div className="flex flex-col md:h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -507,9 +527,9 @@ export default function LeadViewPage() {
           <Button variant="outline" size="icon" className="h-9 w-9 rounded-full" onClick={() => fetchLead(true)} title="Refresh">
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
           </Button>
-          {canEdit && (
+          {(canEdit || canReassign) && (
             <>
-              {(role === "Admin" || role === "Manager" || role === "Team Lead") && !lead.is_converted && (
+              {canReassign && (role === "Admin" || role === "Manager" || role === "Team Lead") && !lead.is_converted && (
                 <Button
                   onClick={() => setIsAssignOpen(true)}
                   variant="outline"
@@ -519,7 +539,7 @@ export default function LeadViewPage() {
                   Reassign
                 </Button>
               )}
-              {(role === "Admin" || role === "Manager" || ((role === "Staff" || role === "Team Lead") && userDept === "telecalling")) && !lead.is_converted && (
+              {canEdit && (role === "Admin" || role === "Manager" || ((role === "Staff" || role === "Team Lead") && userDept === "telecalling")) && !lead.is_converted && (
                 <Button
                   onClick={() => { setConvertTo(""); setConvertFeedback(""); setIsConvertOpen(true); }}
                   className="rounded-full px-6 py-5 bg-emerald-600 text-white hover:bg-emerald-700 shadow-md gap-2"
@@ -554,7 +574,7 @@ export default function LeadViewPage() {
               <Edit className="w-4 h-4 mr-2 text-muted-foreground" /> Edit
             </Button>
           )}
-          {canEdit && (role === "Admin" || role === "Manager" || role === "Team Lead") && !lead.is_converted && (
+          {canReassign && (role === "Admin" || role === "Manager" || role === "Team Lead") && !lead.is_converted && (
             <Button onClick={() => setIsAssignOpen(true)} variant="outline" className="h-11 rounded-xl border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/50 dark:bg-blue-900/20 dark:text-blue-300">
               <UserPlus className="w-4 h-4 mr-2" /> Reassign
             </Button>
