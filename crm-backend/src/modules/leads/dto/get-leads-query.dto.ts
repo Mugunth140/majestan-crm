@@ -61,4 +61,16 @@ export class GetLeadsQueryDto {
   @IsOptional()
   @IsString()
   source?: string;
+
+  @IsOptional()
+  @IsString()
+  priority?: string;
+
+  @IsOptional()
+  @IsString()
+  minBudget?: string;
+
+  @IsOptional()
+  @IsString()
+  maxBudget?: string;
 }

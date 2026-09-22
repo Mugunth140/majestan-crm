@@ -595,6 +595,38 @@ export class LeadsService {
       params.push(query.staff);
     }
 
+    if (query?.priority) {
+      filterConds += ' AND LOWER(latest_f.priority) = ?';
+      params.push(String(query.priority).toLowerCase());
+    }
+
+    // Budget overlap against the latest inquiry preferences JSON
+    // ({minBudget, maxBudget}). A lead matches when its budget range
+    // intersects the requested range; open ends match anything. Leads
+    // without any stored budget bound are excluded while filtering.
+    const fMinBudget = query?.minBudget !== undefined && query.minBudget !== '' ? Number(query.minBudget) : undefined;
+    const fMaxBudget = query?.maxBudget !== undefined && query.maxBudget !== '' ? Number(query.maxBudget) : undefined;
+    if ((fMinBudget !== undefined && Number.isFinite(fMinBudget)) || (fMaxBudget !== undefined && Number.isFinite(fMaxBudget))) {
+      filterConds += ` AND (
+        NULLIF(TRIM(BOTH '"' FROM JSON_UNQUOTE(JSON_EXTRACT(i.preferences, '$.minBudget'))), '') IS NOT NULL
+        OR NULLIF(TRIM(BOTH '"' FROM JSON_UNQUOTE(JSON_EXTRACT(i.preferences, '$.maxBudget'))), '') IS NOT NULL
+      )`;
+      if (fMinBudget !== undefined && Number.isFinite(fMinBudget)) {
+        filterConds += ` AND (
+          NULLIF(TRIM(BOTH '"' FROM JSON_UNQUOTE(JSON_EXTRACT(i.preferences, '$.maxBudget'))), '') IS NULL
+          OR CAST(NULLIF(TRIM(BOTH '"' FROM JSON_UNQUOTE(JSON_EXTRACT(i.preferences, '$.maxBudget'))), '') AS DECIMAL(14,2)) >= ?
+        )`;
+        params.push(fMinBudget);
+      }
+      if (fMaxBudget !== undefined && Number.isFinite(fMaxBudget)) {
+        filterConds += ` AND (
+          NULLIF(TRIM(BOTH '"' FROM JSON_UNQUOTE(JSON_EXTRACT(i.preferences, '$.minBudget'))), '') IS NULL
+          OR CAST(NULLIF(TRIM(BOTH '"' FROM JSON_UNQUOTE(JSON_EXTRACT(i.preferences, '$.minBudget'))), '') AS DECIMAL(14,2)) <= ?
+        )`;
+        params.push(fMaxBudget);
+      }
+    }
+
     if (query?.tab === 'Unqualified') {
       filterConds += ' AND l.is_unqualified = 1';
     } else {
@@ -624,12 +656,12 @@ export class LeadsService {
     const joinClauses = `
       LEFT JOIN users s ON l.assigned_staff_id = s.id
       LEFT JOIN (
-        SELECT lead_id, property_type, property_category,
+        SELECT lead_id, property_type, property_category, preferences,
                ROW_NUMBER() OVER(PARTITION BY lead_id ORDER BY id DESC) as rn
         FROM lead_inquiries
       ) i ON i.lead_id = l.id AND i.rn = 1
       LEFT JOIN (
-        SELECT lead_id, next_follow_up_date,
+        SELECT lead_id, next_follow_up_date, priority,
                ROW_NUMBER() OVER(PARTITION BY lead_id ORDER BY created_at DESC) as rn
         FROM lead_follow_ups
       ) latest_f ON latest_f.lead_id = l.id AND latest_f.rn = 1
@@ -667,6 +699,7 @@ export class LeadsService {
         i.property_type as propertyType, 
         i.property_category as propertyCategory,
         latest_f.next_follow_up_date as nextFollowUpDate,
+        latest_f.priority as priority,
         latest_actual_f.follow_up_date as lastFollowedUpDate
       FROM leads l
       ${joinClauses}
@@ -699,6 +732,7 @@ export class LeadsService {
       department: row.department ?? 'telecalling',
       notes: '',
       nextFollowUpDate: row.nextFollowUpDate || null,
+      priority: row.priority ?? '',
       lastFollowedUpDate: row.lastFollowedUpDate || null,
       isUnqualified: Boolean(row.isUnqualified),
     }));

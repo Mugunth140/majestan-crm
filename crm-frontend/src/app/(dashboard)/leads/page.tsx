@@ -89,6 +89,9 @@ export default function LeadsPage() {
     staff: "",
     status: "",
     source: "",
+    priority: "",
+    minBudgetLakh: "",
+    maxBudgetLakh: "",
   });
 
   const [todayViewMode, setTodayViewMode] = useState<"pending" | "completed">("pending");
@@ -161,6 +164,15 @@ export default function LeadsPage() {
       if (filters.staff) params.append('staff', filters.staff);
       if (filters.status) params.append('status', filters.status);
       if (filters.source) params.append('source', filters.source);
+      if (filters.priority) params.append('priority', filters.priority);
+      const toRupees = (lakh: string) => {
+        const n = Number(lakh);
+        return Number.isFinite(n) && n >= 0 ? String(Math.round(n * 100000)) : "";
+      };
+      const minBudget = toRupees(filters.minBudgetLakh);
+      const maxBudget = toRupees(filters.maxBudgetLakh);
+      if (minBudget) params.append('minBudget', minBudget);
+      if (maxBudget) params.append('maxBudget', maxBudget);
 
       const res = await apiFetch(API_URL + "/leads?" + params.toString());
       const data = await res.json();
@@ -557,7 +569,7 @@ export default function LeadsPage() {
 
   const activeFiltersCount = Object.values(filters).filter(v => v !== "").length;
 
-  const clearFilters = () => setFilters({ dateFrom: "", dateTo: "", category: "", type: "", staff: "", status: "", source: "" });
+  const clearFilters = () => setFilters({ dateFrom: "", dateTo: "", category: "", type: "", staff: "", status: "", source: "", priority: "", minBudgetLakh: "", maxBudgetLakh: "" });
 
   const deptPipelines: { label: string; value: "telecalling" | "sales" }[] = [
     { label: "Telecalling Pipeline", value: "telecalling" },
@@ -629,6 +641,18 @@ export default function LeadsPage() {
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Property Type</label>
                     <FormSelect name="type" options={uniqueTypes.map(s => ({label: s, value: s}))} value={filters.type} onValueChange={v => setFilters(f => ({...f, type: v || ""}))} placeholder="All Types" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Priority</label>
+                    <FormSelect name="priority" options={[{label: "Low", value: "low"}, {label: "Medium", value: "medium"}, {label: "High", value: "high"}, {label: "Urgent", value: "urgent"}]} value={filters.priority} onValueChange={v => setFilters(f => ({...f, priority: v || ""}))} placeholder="All Priorities" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Budget (₹ Lakh)</label>
+                    <div className="flex items-center gap-2">
+                      <Input type="number" min="0" placeholder="Min" value={filters.minBudgetLakh} onChange={e => setFilters(f => ({...f, minBudgetLakh: e.target.value}))} className="h-9 rounded-lg text-sm" />
+                      <span className="text-muted-foreground text-xs shrink-0">—</span>
+                      <Input type="number" min="0" placeholder="Max" value={filters.maxBudgetLakh} onChange={e => setFilters(f => ({...f, maxBudgetLakh: e.target.value}))} className="h-9 rounded-lg text-sm" />
+                    </div>
                   </div>
                 </div>
               </PopoverContent>

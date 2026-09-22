@@ -48,4 +48,32 @@ describe('LeadsService', () => {
     const countQuery = queryMock.mock.calls[0][0];
     expect(countQuery).toContain('l.assigned_staff_id IS NOT NULL');
   });
+
+  it('should filter by latest follow-up priority', async () => {
+    await service.getLeads({ role: 'Admin', id: 99 }, { priority: 'High' });
+
+    const countQuery = queryMock.mock.calls[0][0];
+    const params = queryMock.mock.calls[0][1];
+    expect(countQuery).toContain('LOWER(latest_f.priority) = ?');
+    expect(countQuery).toContain('next_follow_up_date, priority,');
+    expect(params).toContain('high');
+  });
+
+  it('should filter by budget overlap against inquiry preferences', async () => {
+    await service.getLeads({ role: 'Admin', id: 99 }, { minBudget: '1000000', maxBudget: '5000000' });
+
+    const countQuery = queryMock.mock.calls[0][0];
+    const params = queryMock.mock.calls[0][1];
+    expect(countQuery).toContain("$.minBudget");
+    expect(countQuery).toContain("$.maxBudget");
+    expect(params).toContain(1000000);
+    expect(params).toContain(5000000);
+  });
+
+  it('should ignore non-numeric budget bounds', async () => {
+    await service.getLeads({ role: 'Admin', id: 99 }, { minBudget: 'abc' });
+
+    const countQuery = queryMock.mock.calls[0][0];
+    expect(countQuery).not.toContain('$.minBudget');
+  });
 });
