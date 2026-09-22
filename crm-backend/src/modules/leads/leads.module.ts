@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { LeadsController } from './leads.controller';
+import { WebsiteLeadsController } from './website-leads.controller';
 import { LeadsService } from './leads.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AuthModule } from '../auth/auth.module';
@@ -7,7 +8,7 @@ import { TasksModule } from '../tasks/tasks.module';
 
 @Module({
   imports: [NotificationsModule, AuthModule, TasksModule],
-  controllers: [LeadsController],
+  controllers: [LeadsController, WebsiteLeadsController],
   providers: [LeadsService],
   exports: [LeadsService],
 })
