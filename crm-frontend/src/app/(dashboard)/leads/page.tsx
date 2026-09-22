@@ -166,6 +166,7 @@ export default function LeadsPage() {
       if (filters.source) params.append('source', filters.source);
       if (filters.priority) params.append('priority', filters.priority);
       const toRupees = (lakh: string) => {
+        if (lakh.trim() === "") return "";
         const n = Number(lakh);
         return Number.isFinite(n) && n >= 0 ? String(Math.round(n * 100000)) : "";
       };
