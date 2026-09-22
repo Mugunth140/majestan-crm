@@ -482,19 +482,24 @@ export default function LeadViewPage() {
   const nextRnrValue = `rnr${nextRnrNumber}`;
   const isRnrMaxed = highestRnr >= 5;
 
-  const canEdit = role === "Admin" || (lead?.assigned_staff?.id === currentUserId);
-  // Team Leads / Managers must see Reassign for leads in their purview, not
-  // just leads assigned to themselves: unassigned leads, or leads assigned
-  // to staff in their own department (mirrors the staff-list picker scope).
+  // Department purview for Manager / Team Lead: unassigned leads, or leads
+  // assigned to staff in their own department (mirrors the staff-list
+  // picker scope). Works for telecalling and sales alike.
   const assigneeDeptId =
     typeof (lead?.assigned_staff as any)?.department_id === "number"
       ? (lead?.assigned_staff as any).department_id
       : null;
+  const inDeptPurview =
+    lead?.assigned_staff == null ||
+    (userDeptId != null && assigneeDeptId === userDeptId);
+
+  const canEdit =
+    role === "Admin" ||
+    lead?.assigned_staff?.id === currentUserId ||
+    ((role === "Manager" || role === "Team Lead") && inDeptPurview);
   const canReassign =
     role === "Admin" ||
-    ((role === "Manager" || role === "Team Lead") &&
-      (lead?.assigned_staff == null ||
-        (userDeptId != null && assigneeDeptId === userDeptId)));
+    ((role === "Manager" || role === "Team Lead") && inDeptPurview);
 
   return (
     <div className="flex flex-col md:h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
