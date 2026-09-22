@@ -11,22 +11,27 @@ export class WebsiteLeadDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   email?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   city?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(32)
   whatsapp?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   source?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   propertyType?: string;
 
   preferences?: object;
