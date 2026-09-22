@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class WebsiteLeadDto {
   @IsString()
@@ -34,5 +34,7 @@ export class WebsiteLeadDto {
   @MaxLength(100)
   propertyType?: string;
 
-  preferences?: object;
+  @IsOptional()
+  @IsObject()
+  preferences?: Record<string, unknown>;
 }
