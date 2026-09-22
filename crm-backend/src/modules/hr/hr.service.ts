@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { HrCandidate } from '../../database/entities/hr-candidate.entity';
 import { HrFollowUp } from '../../database/entities/hr-follow-up.entity';
+import { CreateHrCandidateDto } from './dto/create-hr-candidate.dto';
+import { UpdateHrCandidateDto } from './dto/update-hr-candidate.dto';
 
 @Injectable()
 export class HrService {
@@ -50,10 +52,22 @@ export class HrService {
     }
     return candidate;
   }
-  create(data: Partial<HrCandidate>) { return this.repo.save(this.repo.create(data)); }
-  async update(id: number, data: Partial<HrCandidate>) {
+  create(data: CreateHrCandidateDto) {
+    const { interviewDate, ...rest } = data;
+    return this.repo.save(
+      this.repo.create({
+        ...rest,
+        interviewDate: interviewDate ? new Date(interviewDate) : null,
+      } as Partial<HrCandidate>),
+    );
+  }
+  async update(id: number, data: UpdateHrCandidateDto) {
     await this.findOne(id);
-    await this.repo.update(id, data);
+    const { interviewDate, ...rest } = data;
+    await this.repo.update(id, {
+      ...rest,
+      ...(interviewDate !== undefined ? { interviewDate: interviewDate ? new Date(interviewDate) : null } : {}),
+    } as Partial<HrCandidate>);
     return this.repo.findOne({ where: { id } });
   }
   async remove(id: number) {

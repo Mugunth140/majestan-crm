@@ -1,5 +1,9 @@
-import { Type } from "class-transformer";
-import { IsString, IsOptional, IsEnum, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsDateString,
+} from 'class-validator';
 import { HrCandidateStatus } from '../../../database/entities/hr-candidate.entity';
 
 export class CreateHrCandidateDto {
@@ -51,10 +55,12 @@ export class CreateHrCandidateDto {
   @IsString()
   recruitmentSource?: string;
 
+  // Plain ISO string ("YYYY-MM-DD") — converted to Date in HrService.
+  // (A @Type(() => Date) here would turn the value into a Date object
+  // before validation, which @IsDateString then rejects.)
   @IsOptional()
   @IsDateString()
-  @Type(() => Date)
-  interviewDate?: Date;
+  interviewDate?: string;
 
   @IsOptional()
   @IsString()
