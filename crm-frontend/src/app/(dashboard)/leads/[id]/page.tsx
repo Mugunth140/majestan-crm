@@ -493,13 +493,16 @@ export default function LeadViewPage() {
     lead?.assigned_staff == null ||
     (userDeptId != null && assigneeDeptId === userDeptId);
 
+  // Access model: Admin and Manager share everything except delete
+  // (delete stays Admin-only). Team Leads are scoped to their department.
+  const isManagerOrAdmin = role === "Admin" || role === "Manager";
+
   const canEdit =
-    role === "Admin" ||
+    isManagerOrAdmin ||
     lead?.assigned_staff?.id === currentUserId ||
-    ((role === "Manager" || role === "Team Lead") && inDeptPurview);
+    (role === "Team Lead" && inDeptPurview);
   const canReassign =
-    role === "Admin" ||
-    ((role === "Manager" || role === "Team Lead") && inDeptPurview);
+    isManagerOrAdmin || (role === "Team Lead" && inDeptPurview);
 
   return (
     <div className="flex flex-col md:h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -1309,7 +1312,7 @@ export default function LeadViewPage() {
         open={isAssignOpen}
         onClose={() => setIsAssignOpen(false)}
         onConfirm={handleAssignLead}
-        department={role === "Team Lead" || role === "Manager" ? userDept : "all"}
+        department={role === "Team Lead" ? userDept : "all"}
         isLoading={isAssigning}
       />
     </div>

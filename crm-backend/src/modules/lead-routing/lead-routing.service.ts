@@ -432,14 +432,9 @@ export class LeadRoutingService {
       if (requestingUserDeptId) {
         qb.andWhere('u.department_id = :deptId', { deptId: requestingUserDeptId });
       }
-    } else if (requestingUserRole === 'Manager') {
-      // Manager: Team Leads + Staff in their own department
-      qb.andWhere('role.name IN (:...roles)', { roles: ['Team Lead', 'Staff'] });
-      if (requestingUserDeptId) {
-        qb.andWhere('u.department_id = :deptId', { deptId: requestingUserDeptId });
-      }
     } else {
-      // Admin: everyone (Manager + Team Lead + Staff), optionally filtered by department param
+      // Admin and Manager: everyone (Manager + Team Lead + Staff),
+      // optionally filtered by department param
       if (department && department.toLowerCase() !== 'all') {
         const searchTerm = department.toLowerCase().replace(' department', '').trim();
         qb.andWhere('LOWER(dept.name) LIKE :searchTerm', { searchTerm: `%${searchTerm}%` });
