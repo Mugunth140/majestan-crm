@@ -28,8 +28,8 @@ const Cloud = ({ className, opacity = 1 }: { className?: string; opacity?: numbe
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("admin@majestanrealty.com");
-  const [password, setPassword] = useState("Prismark@2026");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
