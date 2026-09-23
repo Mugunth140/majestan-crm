@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Inbound } from '../../database/entities/inbound.entity';
 import { InboundFollowUp } from '../../database/entities/inbound-follow-up.entity';
 import { InboundContactLog } from '../../database/entities/inbound-contact-log.entity';
+import { InboundUnit } from '../../database/entities/inbound-unit.entity';
 import { PermissionsService } from '../permissions/permissions.service';
 import { S3Client } from 'bun';
 import { extname } from 'path';
@@ -35,6 +36,8 @@ export class InboundsService {
     private followUpsRepository: Repository<InboundFollowUp>,
     @InjectRepository(InboundContactLog)
     private contactLogsRepository: Repository<InboundContactLog>,
+    @InjectRepository(InboundUnit)
+    private unitsRepository: Repository<InboundUnit>,
     private readonly permissionsService: PermissionsService,
   ) {}
 
@@ -101,8 +104,25 @@ export class InboundsService {
     return this.inboundsRepository.save(inbound);
   }
 
-  async create(createInboundDto: Partial<Inbound>): Promise<Inbound> {
-    const newInbound = this.inboundsRepository.create(createInboundDto);
+  /** Keep only rows with a floor label; coerce price to number-or-undefined. */
+  private sanitizeUnits(units: any): Array<{ floor_label: string; area?: string; price?: number; notes?: string }> {
+    if (!Array.isArray(units)) return [];
+    return units
+      .filter((u) => u && String(u.floor_label ?? '').trim() !== '')
+      .map((u) => {
+        const rawPrice = u.price == null || u.price === '' ? undefined : Number(u.price);
+        return {
+          floor_label: String(u.floor_label).trim(),
+          area: u.area != null && String(u.area).trim() !== '' ? String(u.area).trim() : undefined,
+          price: rawPrice !== undefined && Number.isFinite(rawPrice) ? rawPrice : undefined,
+          notes: u.notes != null && String(u.notes).trim() !== '' ? String(u.notes).trim() : undefined,
+        };
+      });
+  }
+
+  async create(createInboundDto: Omit<Partial<Inbound>, 'units'> & { units?: any[] }): Promise<Inbound> {
+    const { units, ...rest } = createInboundDto;
+    const newInbound = this.inboundsRepository.create(rest);
     
     // Save to get the auto-incremented ID
     let savedInbound = await this.inboundsRepository.save(newInbound);
@@ -113,7 +133,17 @@ export class InboundsService {
     
     // Save again with the property_id
     savedInbound = await this.inboundsRepository.save(savedInbound);
-    
+
+    const cleanUnits = this.sanitizeUnits(units);
+    if (cleanUnits.length > 0) {
+      const rows = cleanUnits.map((u) =>
+        this.unitsRepository.create({ ...u, inbound_id: savedInbound.id }),
+      );
+      (savedInbound as any).units = await this.unitsRepository.save(rows);
+    } else {
+      (savedInbound as any).units = [];
+    }
+
     return savedInbound;
   }
 
@@ -195,7 +225,8 @@ export class InboundsService {
         follow_ups: true,
         contact_logs: {
           sent_by: true
-        }
+        },
+        units: true
       },
       order: {
         follow_ups: {
@@ -209,17 +240,40 @@ export class InboundsService {
     if (!inbound) {
       throw new NotFoundException(`Inbound with ID ${id} not found`);
     }
+    // OneToMany collections can't be ordered in find() — keep floors stable.
+    if (Array.isArray((inbound as any).units)) {
+      (inbound as any).units.sort((a: any, b: any) => (a.id ?? 0) - (b.id ?? 0));
+    }
 
     return inbound;
   }
 
-  async update(id: number, updateInboundDto: Partial<Inbound>): Promise<Inbound> {
+  async update(id: number, updateInboundDto: Omit<Partial<Inbound>, 'units'> & { units?: any[] }): Promise<Inbound> {
     const inbound = await this.mustFindOne(id);
-    
+
+    const { units, ...rest } = updateInboundDto;
     // update properties (TypeORM hooks will trigger on save)
-    Object.assign(inbound, updateInboundDto);
-    
-    return this.inboundsRepository.save(inbound);
+    Object.assign(inbound, rest);
+
+    const saved = await this.inboundsRepository.save(inbound);
+
+    // Full replace when the form sends its floor rows (omitted = untouched).
+    if (units !== undefined) {
+      await this.unitsRepository.delete({ inbound_id: id });
+      const cleanUnits = this.sanitizeUnits(units);
+      (saved as any).units = cleanUnits.length > 0
+        ? await this.unitsRepository.save(
+            cleanUnits.map((u) => this.unitsRepository.create({ ...u, inbound_id: id })),
+          )
+        : [];
+      return saved;
+    }
+
+    (saved as any).units = await this.unitsRepository.find({
+      where: { inbound_id: id },
+      order: { id: 'ASC' },
+    });
+    return saved;
   }
 
   

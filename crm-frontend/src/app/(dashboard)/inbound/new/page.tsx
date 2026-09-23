@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Camera, CheckCircle2, Loader2, MapPin, Save, UploadCloud } from "lucide-react";
+import { ArrowLeft, Camera, CheckCircle2, Loader2, MapPin, Save, UploadCloud, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { FormSelect } from "@/components/shared/form-select";
 import { PriceInput } from "@/components/shared/price-input";
@@ -132,6 +132,13 @@ const BHK_OPTIONS = [
 
 const BHK_APPLICABLE_TYPES = ["apartment", "villa", "independent_house"];
 
+// Commercial types where per-floor area + pricing rows apply.
+// commercial_land is excluded (land has no floors).
+const FLOOR_PRICING_TYPES = [
+  "office", "shop", "showroom", "commercial_building",
+  "warehouse", "hotel", "restaurant",
+];
+
 // The backend AllExceptionsFilter responds with { success, error, reqId }
 // (no `message` field), and validation errors arrive as string arrays.
 // Surface the real reason instead of the generic fallback toast.
@@ -183,6 +190,11 @@ function InboundForm() {
 
   // BHK state
   const [selectedBhk, setSelectedBhk] = useState<string | null>(null);
+
+  // Per-floor rows (commercial): floor label + area + price + notes.
+  // Single-floor entries keep using the flat total_rent/advance fields.
+  const [units, setUnits] = useState<{ floor_label: string; area: string; price: string; notes: string }[]>([]);
+  const showFloorPricing = selectedCategory === "commercial" && !!selectedType && FLOOR_PRICING_TYPES.includes(selectedType);
 
   const [preferredContactTime, setPreferredContactTime] = useState<string | undefined>(undefined);
 
@@ -244,6 +256,16 @@ function InboundForm() {
             setSelectedCity(data.city || null);
             setSelectedLocality(data.locality || null);
             setSelectedBhk(data.bhk || null);
+            if (Array.isArray((data as any).units)) {
+              setUnits(
+                (data as any).units.map((u: any) => ({
+                  floor_label: u.floor_label || "",
+                  area: u.area || "",
+                  price: u.price != null ? String(u.price) : "",
+                  notes: u.notes || "",
+                }))
+              );
+            }
 
             setPrimaryContact(data.primary_contact || null);
             setKeyAvailableWith(data.key_available_with || null);
@@ -346,6 +368,22 @@ function InboundForm() {
       }
 
       payload.floor_number = formData.get("floor_number") || null;
+      // Per-floor rows (commercial only) — rows without a floor label are dropped.
+      if (showFloorPricing) {
+        const rows = units
+          .filter((u) => u.floor_label.trim() !== "")
+          .map((u) => {
+            const raw = String(u.price ?? "").trim();
+            const num = raw ? parseIndianCurrency(raw) : 0;
+            return {
+              floor_label: u.floor_label.trim(),
+              area: u.area.trim() || null,
+              price: num > 0 ? num : null,
+              notes: u.notes.trim() || null,
+            };
+          });
+        if (rows.length > 0) payload.units = rows;
+      }
       payload.brokerage_days = formData.get("brokerage_days") ? parseInt(formData.get("brokerage_days") as string, 10) : null;
       payload.primary_contact = primaryContact;
       payload.key_available_with = keyAvailableWith;
@@ -702,6 +740,95 @@ function InboundForm() {
             </div>
           </div>
         </div>
+
+        {/* Floors & Pricing (commercial only — one row per floor) */}
+        {showFloorPricing && (
+          <div className="bg-card border rounded-2xl p-5 sm:p-8 shadow-sm">
+            <div className="flex items-center justify-between border-b pb-3 mb-6">
+              <h3 className="text-lg font-bold text-foreground">Floors & Pricing</h3>
+              <button
+                type="button"
+                onClick={() => setUnits([...units, { floor_label: "", area: "", price: "", notes: "" }])}
+                className="flex items-center gap-1.5 h-9 px-4 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC] transition-all text-[13px] font-medium"
+              >
+                <Plus className="h-4 w-4" /> Add Floor
+              </button>
+            </div>
+            {units.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">
+                Single floor — use Total Rent / Advance above. Add rows here only when floors are priced differently.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {units.map((u, idx) => (
+                  <div key={idx} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] gap-4 items-end p-4 rounded-xl border border-border/60 bg-muted/10">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Floor *</label>
+                      <Input
+                        value={u.floor_label}
+                        onChange={(e) => {
+                          const next = [...units];
+                          next[idx] = { ...next[idx], floor_label: e.target.value };
+                          setUnits(next);
+                        }}
+                        placeholder="e.g. Ground Floor"
+                        className="h-12 rounded-xl bg-muted/30"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Area</label>
+                      <Input
+                        value={u.area}
+                        onChange={(e) => {
+                          const next = [...units];
+                          next[idx] = { ...next[idx], area: e.target.value };
+                          setUnits(next);
+                        }}
+                        placeholder="e.g. 1200 sqft"
+                        className="h-12 rounded-xl bg-muted/30"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        {selectedPurpose === "Rent" ? "Rent (₹)" : "Price (₹)"}
+                      </label>
+                      <PriceInput
+                        value={u.price}
+                        onChange={(v) => {
+                          const next = [...units];
+                          next[idx] = { ...next[idx], price: v };
+                          setUnits(next);
+                        }}
+                        placeholder="e.g. 50000"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Notes</label>
+                      <Input
+                        value={u.notes}
+                        onChange={(e) => {
+                          const next = [...units];
+                          next[idx] = { ...next[idx], notes: e.target.value };
+                          setUnits(next);
+                        }}
+                        placeholder="Optional"
+                        className="h-12 rounded-xl bg-muted/30"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setUnits(units.filter((_, i) => i !== idx))}
+                      className="h-12 w-12 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 transition-all flex items-center justify-center shrink-0"
+                      title="Remove floor"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Owner Information */}
         <div className="bg-card border rounded-2xl p-5 sm:p-8 shadow-sm">

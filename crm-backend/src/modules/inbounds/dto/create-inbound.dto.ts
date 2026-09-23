@@ -1,5 +1,24 @@
-import { IsString, IsOptional, IsInt, IsBoolean, IsNumber, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsBoolean, IsNumber, IsArray, ValidateNested, MaxLength } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+
+export class InboundUnitDto {
+  @IsString()
+  @MaxLength(100)
+  floor_label!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  area?: string;
+
+  @IsOptional()
+  @IsNumber()
+  price?: number;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
 
 /**
  * Mirrors the Inbound entity columns actually sent by the inbound form
@@ -254,4 +273,12 @@ export class CreateInboundDto {
   @Type(() => Number)
   @IsInt()
   assigned_staff_id?: number;
+
+  // Per-floor area + pricing rows (commercial). Optional; empty rows are
+  // dropped server-side. Single-floor entries keep using the flat fields.
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => InboundUnitDto)
+  units?: InboundUnitDto[];
 }

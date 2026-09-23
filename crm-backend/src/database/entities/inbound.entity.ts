@@ -14,6 +14,7 @@ import {
 import { User } from './user.entity';
 import { InboundFollowUp } from './inbound-follow-up.entity';
 import { InboundContactLog } from './inbound-contact-log.entity';
+import { InboundUnit } from './inbound-unit.entity';
 
 @Entity('inbounds')
 export class Inbound {
@@ -25,6 +26,9 @@ export class Inbound {
 
   @OneToMany(() => InboundContactLog, log => log.inbound)
   contact_logs: InboundContactLog[];
+
+  @OneToMany(() => InboundUnit, unit => unit.inbound)
+  units: InboundUnit[];
 
 
   @Column({ type: 'varchar', unique: true, nullable: true }) // Set nullable to true since we generate it after insert

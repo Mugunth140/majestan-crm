@@ -5,11 +5,12 @@ import { InboundsController } from './inbounds.controller';
 import { Inbound } from '../../database/entities/inbound.entity';
 import { InboundFollowUp } from '../../database/entities/inbound-follow-up.entity';
 import { InboundContactLog } from '../../database/entities/inbound-contact-log.entity';
+import { InboundUnit } from '../../database/entities/inbound-unit.entity';
 import { AuthModule } from '../auth/auth.module';
 import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Inbound, InboundFollowUp, InboundContactLog]), AuthModule, PermissionsModule],
+  imports: [TypeOrmModule.forFeature([Inbound, InboundFollowUp, InboundContactLog, InboundUnit]), AuthModule, PermissionsModule],
   controllers: [InboundsController],
   providers: [InboundsService],
   exports: [InboundsService],

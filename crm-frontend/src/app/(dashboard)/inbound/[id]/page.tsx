@@ -586,6 +586,48 @@ export default function InboundViewPage() {
           </div>
         </div>
 
+        {/* ── Floors & Pricing (commercial, per-floor rows) ── */}
+        {Array.isArray(inbound.units) && inbound.units.length > 0 && (
+          <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
+            <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-muted-foreground" /> Floors & Pricing
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/60">
+                    <th className="py-2 pr-4 font-bold">Floor</th>
+                    <th className="py-2 pr-4 font-bold">Area</th>
+                    <th className="py-2 pr-4 font-bold text-right">{inbound.purpose === "Rent" ? "Rent" : "Price"}</th>
+                    <th className="py-2 font-bold">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inbound.units.map((u: any) => (
+                    <tr key={u.id ?? u.floor_label} className="border-b border-border/30 last:border-0">
+                      <td className="py-2.5 pr-4 font-semibold text-foreground">{u.floor_label || "—"}</td>
+                      <td className="py-2.5 pr-4 text-foreground">{u.area || "—"}</td>
+                      <td className="py-2.5 pr-4 text-right font-semibold text-foreground">
+                        {u.price != null && u.price !== "" ? `₹${Number(u.price).toLocaleString("en-IN")}` : "—"}
+                      </td>
+                      <td className="py-2.5 text-muted-foreground">{u.notes || "—"}</td>
+                    </tr>
+                  ))}
+                  {inbound.units.some((u: any) => u.price != null && u.price !== "") && (
+                    <tr>
+                      <td colSpan={2} className="py-2.5 pr-4 text-right text-xs font-bold uppercase tracking-wider text-muted-foreground">Total</td>
+                      <td className="py-2.5 pr-4 text-right font-bold text-foreground">
+                        ₹{inbound.units.reduce((s: number, u: any) => s + (Number(u.price) || 0), 0).toLocaleString("en-IN")}
+                      </td>
+                      <td />
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* ── Row 2: Log New Follow Up Form ── */}
         <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
           <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">

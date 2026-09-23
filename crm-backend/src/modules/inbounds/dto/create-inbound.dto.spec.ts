@@ -94,4 +94,25 @@ describe('CreateInboundDto (inbound form contract)', () => {
     const errors = await pipeValidate(UpdateInboundDto, { status: 'Approved' });
     expect(errors).toEqual([]);
   });
+
+  it('accepts per-floor unit rows', async () => {
+    const errors = await pipeValidate(CreateInboundDto, {
+      ...staffRentPayload(7),
+      property_category: 'commercial',
+      property_type: 'shop',
+      units: [
+        { floor_label: 'Ground Floor', area: '1200 sqft', price: 80000, notes: 'Main road facing' },
+        { floor_label: 'First Floor', area: '1000 sqft', price: 70000 },
+      ],
+    });
+    expect(errors).toEqual([]);
+  });
+
+  it('rejects unit rows with a non-numeric price', async () => {
+    const errors = await pipeValidate(CreateInboundDto, {
+      mobile_number: '+91 98765 43210',
+      units: [{ floor_label: 'Ground Floor', price: 'not-a-number' }],
+    });
+    expect(errors.some((e) => e.property === 'units')).toBe(true);
+  });
 });
