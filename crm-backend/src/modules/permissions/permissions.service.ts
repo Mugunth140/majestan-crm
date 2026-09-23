@@ -7,9 +7,14 @@ import { UserPermission } from '../../database/entities/user-permission.entity';
 import { User } from '../../database/entities/user.entity';
 
 export const VIEW_PROPERTY_CONTACTS = 'properties.view_contacts';
+export const INBOUND_CALL_TRACKING = 'inbounds.call_tracking';
 
 function isAdminRole(roleName?: string | null): boolean {
   return roleName === 'Admin' || roleName === 'Super Admin';
+}
+
+function isManagerRole(roleName?: string | null): boolean {
+  return roleName === 'Manager';
 }
 
 @Injectable()
@@ -55,6 +60,27 @@ export class PermissionsService {
     const count = await this.userPermissionRepo
       .createQueryBuilder('up')
       .innerJoin(Permission, 'p', 'p.id = up.permission_id AND p.name = :key', { key })
+      .where('up.user_id = :userId', { userId })
+      .getCount();
+    return count > 0;
+  }
+
+  /**
+   * Inbound call-tracking access: contact-details visibility on inbounds plus
+   * device call-logger tracking of active inbound numbers. Admin / Super
+   * Admin / Manager have it by default; Team Lead / Staff need the explicit
+   * `inbounds.call_tracking` grant (toggled on the user form).
+   */
+  async hasInboundTrackingAccess(userId: number): Promise<boolean> {
+    const user = await this.userRepo.findOne({
+      where: { id: userId },
+      relations: { role: true },
+    });
+    if (!user) return false;
+    if (isAdminRole(user.role?.name) || isManagerRole(user.role?.name)) return true;
+    const count = await this.userPermissionRepo
+      .createQueryBuilder('up')
+      .innerJoin(Permission, 'p', 'p.id = up.permission_id AND p.name = :key', { key: INBOUND_CALL_TRACKING })
       .where('up.user_id = :userId', { userId })
       .getCount();
     return count > 0;

@@ -11,6 +11,15 @@ import { toast } from "sonner";
 import { FormSelect } from "@/components/shared/form-select";
 import { Switch } from "@/components/ui/switch";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { VIEW_PROPERTY_CONTACTS, INBOUND_CALL_TRACKING } from "@/lib/permissions";
+
+// Permission keys managed by the two toggles on this form. Everything else
+// already granted to the user is preserved verbatim on submit.
+const MANAGED_PERMISSION_KEYS = [VIEW_PROPERTY_CONTACTS, INBOUND_CALL_TRACKING];
+
+// Inbound is not departmental, so its call-tracking toggle only applies to
+// the roles that need an explicit grant (Admin/Manager bypass by default).
+const INBOUND_TOGGLE_ROLE_IDS = ["3", "4"]; // Team Lead, Staff
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -40,6 +49,8 @@ function UserFormContent() {
     qualification: "",
     is_active: true,
     can_view_contacts: false,
+    can_track_inbound: false,
+    permissionKeys: [] as string[],
   });
 
   const [isAdminViewer, setIsAdminViewer] = useState(false);
@@ -91,7 +102,9 @@ function UserFormContent() {
             join_date: data.data.join_date || "",
             qualification: data.data.qualification || "",
             is_active: data.data.is_active,
-            can_view_contacts: (data.data.permissions ?? []).includes("properties.view_contacts"),
+            can_view_contacts: (data.data.permissions ?? []).includes(VIEW_PROPERTY_CONTACTS),
+            can_track_inbound: (data.data.permissions ?? []).includes(INBOUND_CALL_TRACKING),
+            permissionKeys: data.data.permissions ?? [],
           });
         }
       } catch {
@@ -129,11 +142,15 @@ function UserFormContent() {
       const url = editId ? `${API_URL}/users/${editId}` : `${API_URL}/users`;
       const method = editId ? "PUT" : "POST";
       
-      const { can_view_contacts, ...rest } = formData;
+      const { can_view_contacts, can_track_inbound, permissionKeys, ...rest } = formData;
       void can_view_contacts;
+      void can_track_inbound;
+      const baseKeys = (permissionKeys || []).filter((k: string) => !MANAGED_PERMISSION_KEYS.includes(k));
+      if (formData.can_view_contacts) baseKeys.push(VIEW_PROPERTY_CONTACTS);
+      if (formData.can_track_inbound) baseKeys.push(INBOUND_CALL_TRACKING);
       const payload: Record<string, any> = {
         ...rest,
-        permissionKeys: formData.can_view_contacts ? ["properties.view_contacts"] : [],
+        permissionKeys: baseKeys,
         role_id: roleIdNum,
         department_id: requiresDept && formData.department_id ? parseInt(formData.department_id) : null,
         dob: formData.dob || null,
@@ -242,7 +259,10 @@ function UserFormContent() {
                   setFormData({
                     ...formData, 
                     role_id: newRole,
-                    department_id: isCrossDept ? "" : formData.department_id 
+                    department_id: isCrossDept ? "" : formData.department_id,
+                    // Inbound tracking is role-gated below; clear it when the
+                    // role no longer qualifies (Admin/Manager bypass by default).
+                    can_track_inbound: isCrossDept ? false : formData.can_track_inbound,
                   });
                 }}
                 placeholder="Select Role"
@@ -293,6 +313,19 @@ function UserFormContent() {
                   <p className="text-xs text-muted-foreground mt-0.5">Grants access to property owner and agent phone/email in list, detail and edit views. Admins always have this.</p>
                 </div>
               </div>
+              {INBOUND_TOGGLE_ROLE_IDS.includes(formData.role_id) && (
+                <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 px-4 py-4 mt-3">
+                  <Switch
+                    checked={formData.can_track_inbound}
+                    onCheckedChange={v => setFormData({...formData, can_track_inbound: v})}
+                    className="shadow-sm scale-125 origin-left"
+                  />
+                  <div>
+                    <p className="text-[14px] font-semibold text-foreground/90">Inbound call tracking & owner access</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Grants access to inbound owner contact details and tracks calls to active inbounds via the call logger. Only for Team Lead and Staff — Admins and Managers always have this.</p>
+                  </div>
+                </div>
+              )}
             </div>
           </>
         )}

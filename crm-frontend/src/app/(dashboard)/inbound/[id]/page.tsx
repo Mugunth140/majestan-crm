@@ -22,10 +22,11 @@ const ContactModal = dynamic(() => import("@/components/shared/contact-modal").t
 
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { cn } from "@/lib/utils";
+import { canViewInboundContacts } from "@/lib/permissions";
 import {
   ArrowLeft, Loader2, User, Phone, MapPin, Building2,
   Briefcase, Mail, MessageSquare, Plus, ArrowUpRight,
-  Clock, Send, RefreshCw, History, Edit, Shield, CheckCircle, Image as ImageIcon, ChevronLeft, PhoneIncoming
+  Clock, Send, RefreshCw, History, Edit, Shield, CheckCircle, Image as ImageIcon, ChevronLeft, PhoneIncoming, Lock
 } from "lucide-react";
 import {
   CONTACT_TYPE_STYLES,
@@ -358,6 +359,10 @@ export default function InboundViewPage() {
   const contactLogs: any[] = sortContactLogs(inbound?.contact_logs || []);
   const contactCounts = countByType(contactLogs);
   const callDirectionCounts = countCallDirections(contactLogs);
+  // Inbound contact access: Admin/Manager by default, Team Lead/Staff via
+  // the inbound-tracking toggle. Without it, phone/email values are masked
+  // (backend strips them too) and the log buttons are hidden.
+  const canSeeContacts = canViewInboundContacts();
   
   // RNR Calculation
   let highestRnr = 0;
@@ -722,9 +727,13 @@ export default function InboundViewPage() {
                   <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide shrink-0">Mobile</span>
                   <div className="flex items-center gap-3">
                     <span className="font-medium text-[14px] truncate text-right">
-                       {inbound.owner_mobile || inbound.mobile_number || "\u2014"}
+                      {canSeeContacts ? (inbound.owner_mobile || inbound.mobile_number || "\u2014") : (
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                          <Lock className="h-3 w-3" /> Restricted
+                        </span>
+                      )}
                     </span>
-                    {(inbound.owner_mobile || inbound.mobile_number) && (
+                    {canSeeContacts && (inbound.owner_mobile || inbound.mobile_number) && (
                       <div className="flex gap-1 shrink-0">
                         <Button variant="outline" size="icon" className="h-7 w-7 rounded-full bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700" onClick={() => openContact("call", inbound.owner_mobile || inbound.mobile_number)}>
                           <Phone className="h-3 w-3" />
@@ -740,9 +749,13 @@ export default function InboundViewPage() {
                   <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide shrink-0">Email</span>
                   <div className="flex items-center gap-3 min-w-0">
                     <span className="font-medium text-[14px] truncate max-w-[150px] sm:max-w-[200px] text-right">
-                       {inbound.owner_email || inbound.email || "\u2014"}
+                      {canSeeContacts ? (inbound.owner_email || inbound.email || "\u2014") : (
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                          <Lock className="h-3 w-3" /> Restricted
+                        </span>
+                      )}
                     </span>
-                    {(inbound.owner_email || inbound.email) && (
+                    {canSeeContacts && (inbound.owner_email || inbound.email) && (
                       <Button variant="outline" size="icon" className="h-7 w-7 rounded-full bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700 shrink-0" onClick={() => openContact("email", inbound.owner_email || inbound.email)}>
                         <Mail className="h-3 w-3" />
                       </Button>
@@ -764,8 +777,14 @@ export default function InboundViewPage() {
                     <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
                       <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide shrink-0">Primary Number</span>
                       <div className="flex items-center gap-3">
-                        <span className="font-medium text-[14px] text-right">{inbound.primary_contact_number || "\u2014"}</span>
-                        {inbound.primary_contact_number && (
+                        <span className="font-medium text-[14px] text-right">
+                          {canSeeContacts ? (inbound.primary_contact_number || "\u2014") : (
+                            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                              <Lock className="h-3 w-3" /> Restricted
+                            </span>
+                          )}
+                        </span>
+                        {canSeeContacts && inbound.primary_contact_number && (
                           <Button variant="outline" size="icon" className="h-7 w-7 rounded-full bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700 shrink-0" onClick={() => openContact("call", inbound.primary_contact_number)}>
                             <Phone className="h-3 w-3" />
                           </Button>
@@ -789,8 +808,14 @@ export default function InboundViewPage() {
                     <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
                       <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide shrink-0">Key Number</span>
                       <div className="flex items-center gap-3">
-                        <span className="font-medium text-[14px] text-right">{inbound.key_contact_number || "\u2014"}</span>
-                        {inbound.key_contact_number && (
+                        <span className="font-medium text-[14px] text-right">
+                          {canSeeContacts ? (inbound.key_contact_number || "\u2014") : (
+                            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                              <Lock className="h-3 w-3" /> Restricted
+                            </span>
+                          )}
+                        </span>
+                        {canSeeContacts && inbound.key_contact_number && (
                           <Button variant="outline" size="icon" className="h-7 w-7 rounded-full bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700 shrink-0" onClick={() => openContact("call", inbound.key_contact_number)}>
                             <Phone className="h-3 w-3" />
                           </Button>

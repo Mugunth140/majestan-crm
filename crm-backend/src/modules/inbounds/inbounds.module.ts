@@ -6,9 +6,10 @@ import { Inbound } from '../../database/entities/inbound.entity';
 import { InboundFollowUp } from '../../database/entities/inbound-follow-up.entity';
 import { InboundContactLog } from '../../database/entities/inbound-contact-log.entity';
 import { AuthModule } from '../auth/auth.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Inbound, InboundFollowUp, InboundContactLog]), AuthModule],
+  imports: [TypeOrmModule.forFeature([Inbound, InboundFollowUp, InboundContactLog]), AuthModule, PermissionsModule],
   controllers: [InboundsController],
   providers: [InboundsService],
   exports: [InboundsService],

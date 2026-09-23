@@ -38,6 +38,12 @@ export interface LogReceipt {
 const MIN_MATCH_DIGITS = 7;
 const MAX_SYNC_BATCH = 1000;
 
+// Permission key granting inbound call tracking (contact-details access +
+// device tracking of active inbound numbers). Admin / Manager bypass by role.
+const INBOUND_TRACK_KEY = 'inbounds.call_tracking';
+// Terminal inbound statuses — everything else counts as active for tracking.
+const INBOUND_ACTIVE_FILTER = `(status IS NULL OR status NOT IN ('Closed', 'Rejected'))`;
+
 const cleanDigits = (value: string | null | undefined) => (value || '').replace(/[^0-9]/g, '');
 
 function numbersMatch(saved: string | null | undefined, observed: string): boolean {
@@ -93,19 +99,31 @@ export class ContactLogsService {
   }
 
   private async fetchMatchRows(userId: number) {
-    const selectFor = (table: string, extra: string, assigned: boolean) => {
+    const selectFor = (table: string, extra: string, assigned: boolean, statusFilter?: string) => {
       const cols = ContactLogsService.NUMBER_COLUMNS[table].join(', ');
-      const where = assigned ? 'WHERE assigned_staff_id = ?' : '';
-      const params = assigned ? [userId] : [];
+      const clauses: string[] = [];
+      const params: any[] = [];
+      if (assigned) {
+        clauses.push('assigned_staff_id = ?');
+        params.push(userId);
+      }
+      if (statusFilter) clauses.push(statusFilter);
+      const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
       return this.dataSource.query(
         `SELECT id, ${cols}, created_at ${extra} FROM ${table} ${where}`,
         params,
       ).then((rows: any[]) => rows.map((row) => ({ table, row, columns: ContactLogsService.NUMBER_COLUMNS[table] })));
     };
-    const [leads, agents, inbounds, assets] = await Promise.all([
+    const trackInbound = await this.hasInboundTracking(userId);
+    // Inbound is not departmental: access holders (Admin/Manager by default,
+    // Team Lead/Staff via toggle) track every ACTIVE inbound; everyone else
+    // keeps tracking only their assigned inbounds.
+    const inbounds = trackInbound
+      ? await selectFor('inbounds', '', false, INBOUND_ACTIVE_FILTER)
+      : await selectFor('inbounds', '', true);
+    const [leads, agents, assets] = await Promise.all([
       selectFor('leads', '', true),
       selectFor('agents', '', true),
-      selectFor('inbounds', '', true),
       selectFor('assets', '', true),
     ]);
     // HR candidates have no staff assignment — matched org-wide.
@@ -114,6 +132,29 @@ export class ContactLogsService {
       `SELECT id, mobile, whatsapp, createdAt AS created_at FROM hr_candidates`,
     ).then((rows: any[]) => rows.map((row) => ({ table: 'hr_candidates', row, columns: ContactLogsService.NUMBER_COLUMNS['hr_candidates'] })));
     return [...leads, ...agents, ...inbounds, ...assets, ...hr];
+  }
+
+  /**
+   * Inbound tracking access for device sync scoping. Mirrors
+   * PermissionsService.hasInboundTrackingAccess without importing it
+   * (keeps ContactLogsModule dependency-free): Admin / Super Admin /
+   * Manager by role, Team Lead / Staff via the explicit grant.
+   */
+  private async hasInboundTracking(userId: number): Promise<boolean> {
+    const user = await this.userRepo.findOne({
+      where: { id: userId },
+      relations: { role: true },
+    });
+    const roleName: string | undefined = (user as any)?.role?.name;
+    if (roleName === 'Admin' || roleName === 'Super Admin' || roleName === 'Manager') return true;
+    if (!user) return false;
+    const rows: any[] = await this.dataSource.query(
+      `SELECT up.user_id FROM user_permissions up
+       INNER JOIN permissions p ON p.id = up.permission_id AND p.name = ?
+       WHERE up.user_id = ? LIMIT 1`,
+      [INBOUND_TRACK_KEY, userId],
+    );
+    return (rows?.length ?? 0) > 0;
   }
 
   private matchCandidate(rows: { table: string; row: any; columns: string[] }[], phoneNumber: string):

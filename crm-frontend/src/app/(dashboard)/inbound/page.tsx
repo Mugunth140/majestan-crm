@@ -7,7 +7,7 @@ import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Plus, RefreshCw, Eye, Search, Filter, X } from "lucide-react";
+import { Edit, Trash2, Plus, RefreshCw, Eye, Search, Filter, X, Lock } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -23,6 +23,7 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { Device } from "@/components/shared/device";
 import { cn } from "@/lib/utils";
+import { canViewInboundContacts } from "@/lib/permissions";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -283,8 +284,17 @@ export default function InboundPage() {
     {
       id: "mobile",
       header: "Mobile Number",
-      
-      cell: ({ row }) => <span>{row.original.mobile_number || row.original.owner_mobile || "-"}</span>,
+
+      cell: ({ row }) => {
+        if (!canViewInboundContacts()) {
+          return (
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+              <Lock className="h-3 w-3" /> Restricted
+            </span>
+          );
+        }
+        return <span>{row.original.mobile_number || row.original.owner_mobile || "-"}</span>;
+      },
     },
     {
       id: "address",

@@ -4,8 +4,25 @@ import { Repository } from 'typeorm';
 import { Inbound } from '../../database/entities/inbound.entity';
 import { InboundFollowUp } from '../../database/entities/inbound-follow-up.entity';
 import { InboundContactLog } from '../../database/entities/inbound-contact-log.entity';
+import { PermissionsService } from '../permissions/permissions.service';
 import { S3Client } from 'bun';
 import { extname } from 'path';
+
+// Sensitive contact values masked for Team Lead / Staff without the
+// `inbounds.call_tracking` grant. Names, roles and the property address stay
+// visible — only reachable phone/email values are hidden.
+const INBOUND_CONTACT_KEYS = [
+  'mobile_number',
+  'whatsapp_number',
+  'email',
+  'alternate_contact',
+  'primary_contact_number',
+  'key_contact_number',
+  'manager_mobile',
+  'caretaker_mobile',
+  'security_contact',
+  'broker_mobile',
+] as const;
 
 @Injectable()
 export class InboundsService {
@@ -18,6 +35,7 @@ export class InboundsService {
     private followUpsRepository: Repository<InboundFollowUp>,
     @InjectRepository(InboundContactLog)
     private contactLogsRepository: Repository<InboundContactLog>,
+    private readonly permissionsService: PermissionsService,
   ) {}
 
   private get s3Client(): S3Client {
@@ -34,7 +52,7 @@ export class InboundsService {
   }
 
   async uploadImage(id: number, file: Express.Multer.File) {
-    const inbound = await this.findOne(id);
+    const inbound = await this.mustFindOne(id);
 
     if (file.size > 5 * 1024 * 1024) {
       throw new BadRequestException('Image size exceeds 5MB limit');
@@ -99,6 +117,23 @@ export class InboundsService {
     return savedInbound;
   }
 
+  private stripContacts<T extends Record<string, any>>(record: T): T {
+    const copy: Record<string, any> = { ...record };
+    for (const k of INBOUND_CONTACT_KEYS) delete copy[k];
+    return copy as T;
+  }
+
+  private async canSeeContacts(reqUser?: any): Promise<boolean> {
+    // req.user carries { id, role } where role is the role name string.
+    // Admin / Super Admin / Manager see everything by default; Team Lead /
+    // Staff need the explicit `inbounds.call_tracking` grant.
+    const role: string = reqUser?.role?.name || reqUser?.role || '';
+    if (role === 'Admin' || role === 'Super Admin' || role === 'Manager') return true;
+    const userId = Number(reqUser?.id);
+    if (!Number.isFinite(userId)) return false;
+    return this.permissionsService.hasInboundTrackingAccess(userId);
+  }
+
   async findAll(user?: any): Promise<any[]> {
     const whereClause: any = {};
     if (user && user.role === 'Staff') {
@@ -113,6 +148,7 @@ export class InboundsService {
       order: { created_at: 'DESC' }
     });
 
+    const canSee = await this.canSeeContacts(user);
     return inbounds.map(inbound => {
       let nextFollowUpDate = null;
       let lastFollowedUpDate = null;
@@ -133,7 +169,7 @@ export class InboundsService {
       }
 
       return {
-        ...inbound,
+        ...(canSee ? inbound : this.stripContacts(inbound)),
         nextFollowUpDate,
         lastFollowedUpDate
       };
@@ -141,6 +177,18 @@ export class InboundsService {
   }
 
   async findOne(id: number, user?: any): Promise<Inbound> {
+    const inbound = await this.mustFindOne(id);
+
+    if (user && user.role === 'Staff' && inbound.assigned_staff_id !== user.id) {
+      throw new NotFoundException(`Inbound with ID ${id} not found`);
+    }
+
+    const canSee = await this.canSeeContacts(user);
+    return canSee ? inbound : this.stripContacts(inbound);
+  }
+
+  /** Internal fetch without contact masking (for update/remove/logging flows). */
+  private async mustFindOne(id: number): Promise<Inbound> {
     const inbound = await this.inboundsRepository.findOne({
       where: { id },
       relations: {
@@ -162,15 +210,11 @@ export class InboundsService {
       throw new NotFoundException(`Inbound with ID ${id} not found`);
     }
 
-    if (user && user.role === 'Staff' && inbound.assigned_staff_id !== user.id) {
-      throw new NotFoundException(`Inbound with ID ${id} not found`);
-    }
-
     return inbound;
   }
 
   async update(id: number, updateInboundDto: Partial<Inbound>): Promise<Inbound> {
-    const inbound = await this.findOne(id);
+    const inbound = await this.mustFindOne(id);
     
     // update properties (TypeORM hooks will trigger on save)
     Object.assign(inbound, updateInboundDto);
@@ -180,7 +224,7 @@ export class InboundsService {
 
   
   async addContactLog(inboundId: number, payload: Partial<InboundContactLog>, userId: number): Promise<InboundContactLog> {
-    const inbound = await this.findOne(inboundId);
+    const inbound = await this.mustFindOne(inboundId);
     
     const contactLog = this.contactLogsRepository.create({
       ...payload,
@@ -192,7 +236,7 @@ export class InboundsService {
   }
 
   async addFollowUp(inboundId: number, body: any, userId: number): Promise<InboundFollowUp> {
-    const inbound = await this.findOne(inboundId);
+    const inbound = await this.mustFindOne(inboundId);
     
     const followUp = this.followUpsRepository.create({
       inbound_id: inboundId,
@@ -246,7 +290,7 @@ export class InboundsService {
   }
 
   async remove(id: number): Promise<void> {
-    const inbound = await this.findOne(id);
+    const inbound = await this.mustFindOne(id);
     await this.inboundsRepository.remove(inbound);
   }
 }
