@@ -1929,7 +1929,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
             {/* City */}
             <div className="space-y-2" id="pf-city">
-              <label className={labelClass}>City</label>
+              <label className={labelClass}>City *</label>
               <FormSelect
                 name="cityId"
                 placeholder="Select City"
@@ -1945,7 +1945,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
             {/* Locality */}
             <div className="space-y-2" id="pf-locality">
-              <label className={labelClass}>Locality</label>
+              <label className={labelClass}>Locality *</label>
               <FormSelect
                 name="sublocationId"
                 placeholder={cityId ? "Select Locality" : "Select a city first"}
