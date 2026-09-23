@@ -12,11 +12,19 @@ import { FormSelect } from "@/components/shared/form-select";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { ArrowLeft, User, Phone, MessageCircle, Mail, MapPin, Plus, FileText, Briefcase, Clock, Calendar, RefreshCw, Save, History, Shield, Loader2, CheckCircle, Edit, ChevronLeft } from "lucide-react";
+import { ArrowLeft, User, Phone, PhoneIncoming, Mail, MapPin, Plus, FileText, Briefcase, Clock, Calendar, RefreshCw, Save, History, Shield, Loader2, CheckCircle, Edit, ChevronLeft, MessageSquare } from "lucide-react";
 import dynamic from "next/dynamic";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { ContactModal } from "@/components/shared/contact-modal";
+import {
+  CONTACT_TYPE_STYLES,
+  CONTACT_TYPE_ICONS,
+  formatTimestamp,
+  formatDuration,
+  sortContactLogs,
+  countByType,
+  countCallDirections,
+} from "@/lib/contact-log-utils";
 
 const FollowUpPanel = dynamic(() => import("@/components/shared/follow-up-panel").then(mod => mod.FollowUpPanel), { ssr: false });
 
@@ -103,11 +111,11 @@ export default function HrDetail() {
   const [candidate, setCandidate] = useState<any>(null);
   
   const [isFollowUpOpen, setIsFollowUpOpen] = useState(false);
+  const [isContactLogsOpen, setIsContactLogsOpen] = useState(false);
   const [newFollowUp, setNewFollowUp] = useState<any>({});
   const [isSavingFu, setIsSavingFu] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState("");
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-  const [contactModal, setContactModal] = useState<{ open: boolean; type: string; to: string } | null>(null);
 
   // Keyboard shortcut for history slider
   useEffect(() => {
@@ -205,6 +213,11 @@ export default function HrDetail() {
   const badgeCls = STATUS_STYLES[selectedStatus || candidate.status] ?? "bg-gray-100 text-gray-800 border-gray-200";
   const formattedId = "HRC" + String(candidate.id).padStart(4, "0");
   const followUps = candidate.follow_ups || [];
+  // Device-synced call history (prismark call logger) + manual logs —
+  // same counting/sort contract as the leads detail page.
+  const contactCounts = countByType(candidate.contact_logs ?? []);
+  const contactLogs: any[] = sortContactLogs(candidate.contact_logs || []);
+  const callDirectionCounts = countCallDirections(contactLogs);
 
   return (
     <div className="flex flex-col md:h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -267,26 +280,6 @@ export default function HrDetail() {
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Mobile</p>
                   <p className="text-[14px] font-medium text-foreground flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-muted-foreground" /> {candidate.mobile || "—"}</p>
-                  {(candidate?.mobile || candidate?.phone) && (
-                    <div className="flex items-center gap-2 mt-2">
-                      <button
-                        type="button"
-                        onClick={() => setContactModal({ open: true, type: "call", to: candidate.mobile || candidate.phone || "" })}
-                        className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-border/60 bg-muted/40 hover:bg-muted text-foreground transition-all text-xs font-medium"
-                      >
-                        <Phone className="h-3.5 w-3.5" />
-                        Log Call
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setContactModal({ open: true, type: "whatsapp", to: candidate.mobile || candidate.phone || "" })}
-                        className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-border/60 bg-muted/40 hover:bg-muted text-foreground transition-all text-xs font-medium"
-                      >
-                        <MessageCircle className="h-3.5 w-3.5" />
-                        WhatsApp
-                      </button>
-                    </div>
-                  )}
                 </div>
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">WhatsApp</p>
@@ -465,6 +458,54 @@ export default function HrDetail() {
               </div>
             </div>
 
+            {/* Contact activity (device-synced call history, same as leads) */}
+            <div className="bg-card border rounded-2xl p-6 shadow-sm">
+              <div className="flex items-center justify-between border-b pb-3 mb-5">
+                <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" /> Contact activity
+                </h3>
+                <button
+                  onClick={() => setIsContactLogsOpen(true)}
+                  className="text-[13px] font-bold tracking-wide text-blue-400 flex items-center gap-2 bg-[#0052FF]/10 px-3 py-2 rounded-lg transition-colors hover:bg-[#0052FF]/20 outline-blue-600 outline-[1px]"
+                >
+                  <History className="h-3.5 w-3.5" /> View logs
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-y-6">
+                {/* Calls Primary Stat */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                    <PhoneIncoming className="h-3 w-3" /> Calls
+                  </div>
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-3xl font-medium text-foreground tracking-tighter leading-none">{contactCounts.call || 0}</span>
+                    {contactCounts.call > 0 && (
+                      <div className="flex gap-2 text-[10px] font-medium text-muted-foreground/80 uppercase tracking-wide">
+                        <span><strong className="text-yellow-300">{callDirectionCounts.incoming || 0}</strong> IN</span>
+                        <span><strong className="text-green-400">{callDirectionCounts.outgoing || 0}</strong> OUT</span>
+                        <span><strong className="text-red-400">{callDirectionCounts.missed || 0}</strong> MISS</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Secondary Stats */}
+                {(["whatsapp", "sms", "email"] as const).map((type) => (
+                  <div key={type} className="flex flex-col gap-1.5">
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                      {CONTACT_TYPE_ICONS[type]} {type}
+                    </div>
+                    <span className="text-3xl font-medium text-foreground tracking-tighter leading-none">{contactCounts[type] || 0}</span>
+                  </div>
+                ))}
+              </div>
+
+              {contactLogs.length === 0 && (
+                <p className="mt-5 text-center text-xs text-muted-foreground">No contact attempts recorded yet.</p>
+              )}
+            </div>
+
             {/* Job Details */}
             <div className="bg-card border rounded-2xl p-6 shadow-sm">
               <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
@@ -537,11 +578,10 @@ export default function HrDetail() {
               <div className="w-10 shrink-0" />
             </div>
           </div>
-          <div className="hidden md:block p-6 border-b shrink-0 bg-blue-50 dark:bg-blue-900/20">
-            <h2 className="text-lg font-bold text-[#0052FF] dark:text-blue-400">Follow Up Timeline</h2>
-            <p className="text-sm text-muted-foreground mt-1">Review the history for {candidate.name}</p>
-          </div>
-          <div className="flex-1 overflow-y-auto">
+          <SheetHeader className="hidden md:block p-6 border-b shrink-0">
+            <SheetTitle className="text-lg">Follow Up Timeline {followUps.length > 0 && `(${followUps.length})`}</SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 overflow-hidden relative">
             <FollowUpPanel
               entityId={candidate.id}
               entityType="hr"
@@ -552,17 +592,67 @@ export default function HrDetail() {
         </SheetContent>
       </Sheet>
 
-      {contactModal && (
-        <ContactModal
-          open={contactModal.open}
-          type={contactModal.type}
-          to={contactModal.to}
-          entityId={Number(id)}
-          entityType={"hr" as any}
-          onClose={() => setContactModal(null)}
-          onSent={() => setContactModal(null)}
-        />
-      )}
+      {/* ── Contact Logs Slider (Sheet, same as leads) ── */}
+      <Sheet open={isContactLogsOpen} onOpenChange={setIsContactLogsOpen}>
+        <SheetContent side="right" className="!w-full sm:!w-[450px] sm:!max-w-[450px] p-0 flex flex-col border-l [&>button[data-slot='sheet-close']]:hidden sm:[&>button[data-slot='sheet-close']]:flex">
+          <div className="md:hidden flex flex-col shrink-0 bg-background/90 backdrop-blur-xl border-b z-10">
+            <div className="h-[env(safe-area-inset-top)] w-full" />
+            <div className="flex items-center justify-between px-4 h-14">
+              <button
+                onClick={() => setIsContactLogsOpen(false)}
+                className="flex items-center text-[#007AFF] dark:text-[#0A84FF] active:opacity-70 -ml-2 shrink-0"
+              >
+                <ChevronLeft className="w-[28px] h-[28px]" strokeWidth={2.5} />
+                <span className="text-[17px] font-medium tracking-tight">Back</span>
+              </button>
+              <span className="absolute inset-x-0 text-center pointer-events-none text-[17px] font-semibold tracking-tight text-foreground truncate px-20">Contact logs</span>
+              <div className="w-10 shrink-0" />
+            </div>
+          </div>
+
+          <SheetHeader className="hidden md:block p-6 border-b shrink-0">
+            <SheetTitle className="text-lg">Contact logs {contactLogs.length > 0 && `(${contactLogs.length})`}</SheetTitle>
+            <SheetDescription>Calls, messages, and emails recorded for this candidate.</SheetDescription>
+          </SheetHeader>
+
+          <div className="flex-1 overflow-y-auto p-5">
+            {contactLogs.length === 0 ? (
+              <div className="py-16 text-center">
+                <Clock className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
+                <p className="text-sm font-medium text-foreground">No contact logs yet</p>
+                <p className="mt-1 text-xs text-muted-foreground">New calls and communication will appear here.</p>
+              </div>
+            ) : (
+              <div className="relative space-y-0">
+                <div className="absolute left-[19px] top-2 bottom-2 w-px bg-border" />
+                {contactLogs.map((log: any) => (
+                  <div key={log.id} className="relative flex gap-4 pb-5 last:pb-0">
+                    <div className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-background ${CONTACT_TYPE_STYLES[log.contact_type] || "bg-muted text-muted-foreground"}`}>
+                      {CONTACT_TYPE_ICONS[log.contact_type] || <MessageSquare className="h-3.5 w-3.5" />}
+                    </div>
+                    <div className="min-w-0 flex-1 rounded-xl border bg-card px-3.5 py-3 shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-[13px] font-semibold text-foreground">
+                          <span className="text-[#0052FF]">{log.sent_by?.name || "Staff"}</span>
+                          <span className="mx-1.5 text-muted-foreground/60">•</span>
+                          {log.contact_type === "call" ? (
+                            <>{log.call_direction || "Voice"} call <span className="font-normal text-muted-foreground whitespace-nowrap">({formatDuration(log.call_duration)})</span></>
+                          ) : (
+                            <span className="capitalize">{log.contact_type}</span>
+                          )}
+                        </p>
+                        <span className="shrink-0 text-[10px] leading-4 text-muted-foreground">{formatTimestamp(log.created_at)}</span>
+                      </div>
+                      {log.subject && <p className="mt-2 text-xs font-medium text-muted-foreground">Subject: {log.subject}</p>}
+                      {log.message && <p className="mt-2 rounded-lg bg-muted/50 px-2.5 py-2 text-[12px] leading-relaxed text-foreground/75">{log.message}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
 
     </div>
   );

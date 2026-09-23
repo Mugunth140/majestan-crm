@@ -284,7 +284,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   const [topography, setTopography] = useState(det?.topography ?? "");
   const [soilType, setSoilType] = useState(det?.soilType ?? "");
   const [irrigation, setIrrigation] = useState(det?.irrigation ?? "");
-  const [fencing, setFencing] = useState(det?.fencing ?? "");
+  const [fencing, setFencing] = useState(det?.fencing != null ? String(det.fencing) : "");
   const [cropSuitability, setCropSuitability] = useState(det?.cropSuitability ?? "");
   const [existingPlantation, setExistingPlantation] = useState(det?.existingPlantation ?? "");
   const [boreWell, setBoreWell] = useState<boolean>(det?.boreWell ?? false);

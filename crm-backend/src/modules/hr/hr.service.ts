@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { HrCandidate } from '../../database/entities/hr-candidate.entity';
 import { HrFollowUp } from '../../database/entities/hr-follow-up.entity';
+import { HrContactLog } from '../../database/entities/hr-contact-log.entity';
 import { CreateHrCandidateDto } from './dto/create-hr-candidate.dto';
 import { UpdateHrCandidateDto } from './dto/update-hr-candidate.dto';
 
@@ -13,6 +14,8 @@ export class HrService {
     private repo: Repository<HrCandidate>,
     @InjectRepository(HrFollowUp)
     private fuRepo: Repository<HrFollowUp>,
+    @InjectRepository(HrContactLog)
+    private contactLogRepo: Repository<HrContactLog>,
   ) {}
 
   async findAll() { 
@@ -46,6 +49,15 @@ export class HrService {
     if (candidate) {
       const followUps = await this.fuRepo.find({ where: { hr_candidate_id: id }, order: { created_at: 'DESC' } });
       (candidate as any).follow_ups = followUps;
+      // Device-synced call logs (prismark call logger) with staff relation.
+      // id DESC breaks created_at ties deterministically (bulk syncs share
+      // second precision) — same contract as leads.
+      const contactLogs = await this.contactLogRepo.find({
+        where: { hr_candidate_id: id },
+        relations: { sent_by: true },
+        order: { created_at: 'DESC', id: 'DESC' },
+      });
+      (candidate as any).contact_logs = contactLogs;
     }
     if (!candidate) {
       throw new NotFoundException(`Candidate with ID ${id} not found`);

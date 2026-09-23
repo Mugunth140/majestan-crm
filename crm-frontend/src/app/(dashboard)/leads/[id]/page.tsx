@@ -23,6 +23,15 @@ const LeadAttachments = dynamic(() => import("@/components/shared/lead-attachmen
 const EditRequirementModal = dynamic(() => import("@/components/shared/edit-requirement-modal").then(mod => mod.EditRequirementModal), { ssr: false });
 import { AssignLeadModal } from "@/components/shared/assign-lead-modal";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import {
+  CONTACT_TYPE_STYLES,
+  CONTACT_TYPE_ICONS,
+  formatTimestamp,
+  formatDuration,
+  sortContactLogs,
+  countByType,
+  countCallDirections,
+} from "@/lib/contact-log-utils";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft, Loader2, User, Phone, MapPin, Building2,
@@ -51,20 +60,6 @@ const STATUS_STYLES: Record<string, string> = {
   "Dropped":              "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/40 dark:text-red-400",
   "Lost":                 "bg-red-200 text-red-900 border-red-300 dark:bg-red-900/50 dark:text-red-300",
   "Future Follow-up":     "bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-800 dark:text-slate-300",
-};
-
-const CONTACT_TYPE_STYLES: Record<string, string> = {
-  email:    "bg-muted/30 text-muted-foreground border-border/60",
-  sms:      "bg-muted/30 text-muted-foreground border-border/60",
-  whatsapp: "bg-muted/30 text-emerald-600 dark:text-emerald-400 border-border/60",
-  call:     "bg-muted/30 text-blue-600 dark:text-blue-400 border-border/60",
-};
-
-const CONTACT_TYPE_ICONS: Record<string, React.ReactNode> = {
-  email:    <Mail className="h-3.5 w-3.5" />,
-  sms:      <MessageSquare className="h-3.5 w-3.5" />,
-  whatsapp: <Phone className="h-3.5 w-3.5" />,
-  call:     <PhoneIncoming className="h-3.5 w-3.5" />,
 };
 
 const PRIORITIES = [
@@ -96,20 +91,6 @@ const PREDEFINED_DROP_REASONS = [
   "Facing issue",
   "Floor mismatched"
 ];
-
-function formatTimestamp(ts: string) {
-  const d = new Date(ts);
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) +
-    " at " + d.toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true });
-}
-
-function formatDuration(totalSeconds: any): string {
-  const s = Number(totalSeconds) || 0;
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  const rest = s % 60;
-  return rest === 0 ? `${m}m` : `${m}m ${rest}s`;
-}
 
 // ── Loading Skeleton ─────────────────────────────────────────────────────────
 function PageSkeleton() {
@@ -436,10 +417,7 @@ export default function LeadViewPage() {
   };
 
   // Contact counts by type
-  const contactCounts = lead?.contact_logs?.reduce((acc: any, log: any) => {
-    acc[log.contact_type] = (acc[log.contact_type] || 0) + 1;
-    return acc;
-  }, {}) ?? {};
+  const contactCounts = countByType(lead?.contact_logs ?? []);
 
   if (isLoading) return <PageSkeleton />;
   if (!lead) return null;
@@ -449,16 +427,8 @@ export default function LeadViewPage() {
   const followUps: any[] = lead.follow_ups || [];
   // Defensive newest-first sort (created_at, id tiebreak) — backend orders
   // the same way, but bulk device syncs share second precision.
-  const contactLogs: any[] = [...(lead.contact_logs || [])].sort((a: any, b: any) =>
-    (new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) || ((b.id ?? 0) - (a.id ?? 0)),
-  );
-  const callDirectionCounts = contactLogs.reduce((counts: Record<string, number>, log: any) => {
-    if (log.contact_type === "call") {
-      const direction = (log.call_direction || "Unknown").toLowerCase();
-      counts[direction] = (counts[direction] || 0) + 1;
-    }
-    return counts;
-  }, {});
+  const contactLogs: any[] = sortContactLogs(lead?.contact_logs || []);
+  const callDirectionCounts = countCallDirections(contactLogs);
 
   // RNR Calculation
   let highestRnr = 0;
