@@ -111,6 +111,49 @@ const labelClass = "text-xs font-bold uppercase tracking-wider text-muted-foregr
 const inputClass = "h-12 rounded-xl bg-muted/30";
 const checkboxRowClass = "flex items-center space-x-3 bg-muted/10 border border-border/40 p-4 h-12 rounded-xl transition-colors hover:bg-muted/30";
 
+// Property types that are land-only (no BHK / no built-up unit details).
+const LAND_PROPERTY_TYPES = ["plot", "farmland"];
+// Buy shows every active master type. Rent excludes farmland (villas stay visible).
+const isRentHiddenType = (value: string) => value === "farmland";
+
+// Fixed dropdown options for plot / farmland fields (verbatim from reference images).
+const WATER_SOURCE_OPTIONS = [
+  { value: "24/7", label: "24/7" },
+  { value: "CORPORATION WATER", label: "CORPORATION WATER" },
+  { value: "BORE WATER", label: "BORE WATER" },
+  { value: "NO WATER FACILITY", label: "NO WATER FACILITY" },
+  { value: "COPORATION/BORE WATER MIXED", label: "COPORATION/BORE WATER MIXED" },
+];
+
+const LAND_TYPE_OPTIONS = [
+  { value: "AGRICULUTURE LAND", label: "AGRICULUTURE LAND" },
+  { value: "FARM LAND", label: "FARM LAND" },
+  { value: "CONVERTED LAND", label: "CONVERTED LAND" },
+  { value: "DRY LAND", label: "DRY LAND" },
+  { value: "WET LAND", label: "WET LAND" },
+  { value: "RESIDENTIAL LAND", label: "RESIDENTIAL LAND" },
+  { value: "COMMERCIAL LAND", label: "COMMERCIAL LAND" },
+];
+
+const TOPOGRAPHY_OPTIONS = [
+  { value: "FLAT LAND", label: "FLAT LAND" },
+  { value: "SLIGHTLY SLOPED LAND", label: "SLIGHTLY SLOPED LAND" },
+  { value: "MODERATELY SLOPED LAND", label: "MODERATELY SLOPED LAND" },
+  { value: "HILLY LAND", label: "HILLY LAND" },
+  { value: "STEEP LAND", label: "STEEP LAND" },
+  { value: "TERRACED LAND", label: "TERRACED LAND" },
+  { value: "RUGGED OR ROCKY LAND", label: "RUGGED OR ROCKY LAND" },
+  { value: "COASTAL OR WATERFRONT LAND", label: "COASTAL OR WATERFRONT LAND" },
+  { value: "WET LANDS OR LOW LYING LANDS", label: "WET LANDS OR LOW LYING LANDS" },
+];
+
+const SOIL_TYPE_OPTIONS = [
+  { value: "RED SOIL", label: "RED SOIL" },
+  { value: "BLACK SOIL", label: "BLACK SOIL" },
+  { value: "ALLUVIAL SOIL(MOST FERTILE)", label: "ALLUVIAL SOIL(MOST FERTILE)" },
+  { value: "LATERITE SOIL", label: "LATERITE SOIL" },
+];
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -808,6 +851,23 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
     ? formData.sublocations.filter((s) => subCityId(s) === cityId)
     : [];
 
+  // ---- Property types filtered by listing type ----
+  // Buy -> all active master types. Rent -> all except farmland (villas included).
+  const isLandType = LAND_PROPERTY_TYPES.includes(propertyType);
+  const filteredPropertyTypes =
+    listingType === "Rent"
+      ? (formData.propertyTypes || []).filter((t: any) => !isRentHiddenType(t?.value))
+      : (formData.propertyTypes || []);
+
+  // If listing type is Rent while farmland is selected (switch, edit legacy
+  // data, or draft restore), clear it. Hidden building fields keep their state
+  // and are stripped at submit, so switching back restores them.
+  useEffect(() => {
+    if (listingType === "Rent" && propertyType && isRentHiddenType(propertyType)) {
+      setPropertyType("");
+    }
+  }, [listingType, propertyType]);
+
   // ---- Locality text fallback for nearby-places when lat/lng are missing ----
   const selectedCityName = cityNameOf(
     formData.cities.find((c: any) => String(c.id) === cityId) ?? { cityName: "" }
@@ -987,6 +1047,8 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
     if (!title.trim()) errs.push({ field: "title", message: "Title is required." });
     if (!listingType) errs.push({ field: "listingType", message: "Listing type is required." });
     if (!propertyType) errs.push({ field: "propertyType", message: "Property type is required." });
+    if (listingType === "Rent" && propertyType && isRentHiddenType(propertyType))
+      errs.push({ field: "propertyType", message: "Farmland is not available for Rent. Please choose another type." });
     if (parseIndianCurrency(price) <= 0)
       errs.push({ field: "price", message: "Enter a valid price (e.g. 1.2 Cr, 50 L, 8000000)." });
     if (!cityId) errs.push({ field: "city", message: "City is required." });
@@ -1034,18 +1096,18 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         cityId: cityId ? Number(cityId) : undefined,
         sublocationId: sublocationId ? Number(sublocationId) : undefined,
 
-        // Basic Info extras
-        propertyCondition: propertyCondition.trim() || undefined,
+        // Basic Info extras — building/tenant-only fields are never submitted for land.
+        propertyCondition: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : propertyCondition.trim() || undefined,
         ownershipType: ownershipType.trim() || undefined,
         reraNumber: reraNumber.trim() || "Not Applicable",
-        projectName: projectName.trim() || undefined,
-        builderName: builderName.trim() || undefined,
-        transactionType: transactionType.trim() || undefined,
-        handoverDate: handoverDate.trim() || undefined,
+        projectName: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : projectName.trim() || undefined,
+        builderName: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : builderName.trim() || undefined,
+        transactionType: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : transactionType.trim() || undefined,
+        handoverDate: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : handoverDate.trim() || undefined,
         saleType: saleType.trim() || undefined,
         roadAccess: roadAccess.trim() || undefined,
         roadName: roadName.trim() || undefined,
-        tenantOccupied: tenantOccupied.trim() || undefined,
+        tenantOccupied: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : tenantOccupied.trim() || undefined,
 
         // Pricing — bookingAmount is a free-text varchar server-side
         // ("1.2 Cr", "50000"), so it MUST stay a string. Sending the parsed
@@ -1054,10 +1116,10 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         brokerageType: brokerageType.trim() || undefined,
         brokerageValue: brokerageValue.trim() || undefined,
         expectedSalePrice: expectedSalePrice ? parseIndianCurrency(expectedSalePrice) : undefined,
-        monthlyRent: monthlyRent ? parseIndianCurrency(monthlyRent) : undefined,
-        maintenanceCharges: maintenanceCharges.trim() || undefined,
-        securityDeposit: securityDeposit.trim() || undefined,
-        lockInPeriod: lockInPeriod.trim() || undefined,
+        monthlyRent: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : monthlyRent ? parseIndianCurrency(monthlyRent) : undefined,
+        maintenanceCharges: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : maintenanceCharges.trim() || undefined,
+        securityDeposit: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : securityDeposit.trim() || undefined,
+        lockInPeriod: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : lockInPeriod.trim() || undefined,
         taxes: taxes.trim() || undefined,
         registrationCharge: registrationCharge.trim() || undefined,
         modeOfPayment: modeOfPayment.trim() || undefined,
@@ -1075,29 +1137,33 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               }
             : undefined,
 
-        // Specs (common)
-        bedrooms: bedrooms ? Number(bedrooms) : undefined,
-        bathrooms: bathrooms ? Number(bathrooms) : undefined,
+        // Specs (common) — building-only fields have no meaning for plot / farmland, never submit them.
+        bedrooms: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : bedrooms ? Number(bedrooms) : undefined,
+        bathrooms: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : bathrooms ? Number(bathrooms) : undefined,
         areaSqft: areaSqft ? Number(areaSqft) : undefined,
         areaUnit,
-        furnished,
-        furnishingStatus: furnishingStatus.trim() || undefined,
+        furnished: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : furnished,
+        furnishingStatus: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : furnishingStatus.trim() || undefined,
         propertyFacing: propertyFacing.trim() || undefined,
-        floorFacing: floorFacing.trim() || undefined,
-        propertyAge: propertyAge.trim() || undefined,
-        possessionStatus: possessionStatus.trim() || undefined,
+        floorFacing: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : floorFacing.trim() || undefined,
+        propertyAge: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : propertyAge.trim() || undefined,
+        possessionStatus: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : possessionStatus.trim() || undefined,
         openSides: openSides ? Number(openSides) : undefined,
-        suitableFor: suitableFor.trim() || undefined,
-        floorNumber: floorNumber.trim() || undefined,
-        totalFloors: totalFloors ? Number(totalFloors) : undefined,
+        suitableFor: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : suitableFor.trim() || undefined,
+        floorNumber: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : floorNumber.trim() || undefined,
+        totalFloors: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : totalFloors ? Number(totalFloors) : undefined,
         guestParking,
         parkingType: parkingType.trim() || undefined,
         floorsOccupied: floorsOccupied.trim() ? floorsOccupied.split(",").map((s) => s.trim()) : undefined,
         hasRestroom,
-        roomDimensions: roomDimensions.filter((r) => r.name || r.dimensions).length > 0 ? roomDimensions : undefined,
+        roomDimensions: LAND_PROPERTY_TYPES.includes(propertyType)
+          ? undefined
+          : roomDimensions.filter((r) => r.name || r.dimensions).length > 0
+            ? roomDimensions
+            : undefined,
 
-        // Arrays
-        amenityIds: amenityIds.length > 0 ? amenityIds : undefined,
+        // Arrays — master amenities are hidden for land, never submit them.
+        amenityIds: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : amenityIds.length > 0 ? amenityIds : undefined,
         faqs: faqs.filter((f) => f.question && f.answer).length > 0 ? faqs : undefined,
         
         // Owner
@@ -1113,22 +1179,22 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         alternatePhone: alternatePhone.trim() || undefined,
         alternateEmail: alternateEmail.trim() || undefined,
 
-        // Documents
+        // Documents — rental/EB docs are hidden for land, never submit them.
         ownershipTitleVerified: ownershipTitleVerified.trim() || undefined,
         encumbranceCertificate: encumbranceCertificate.trim() || undefined,
-        rentalAgreementDraft: rentalAgreementDraft.trim() || undefined,
+        rentalAgreementDraft: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : rentalAgreementDraft.trim() || undefined,
         tslrFmb: tslrFmb.trim() || undefined,
         taxReceipt: taxReceipt.trim() || undefined,
-        ebReceipt: ebReceipt.trim() || undefined,
+        ebReceipt: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : ebReceipt.trim() || undefined,
         pattaChitta: pattaChitta.trim() || undefined,
         approvals: approvals.trim() || undefined,
         financeFacing: financeFacing.trim() || undefined,
         hypothecation: hypothecation.trim() || undefined,
         deviation: deviation.trim() || undefined,
 
-        // Market Analysis
+        // Market Analysis — rental yield is hidden for land, never submit it.
         comparativePrice: comparativePrice.trim() || undefined,
-        rentalYield: rentalYield.trim() || undefined,
+        rentalYield: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : rentalYield.trim() || undefined,
         marketPrice: marketPrice.trim() || undefined,
         demandArea: demandArea.trim() || undefined,
         remark: remark.trim() || undefined,
@@ -1197,6 +1263,9 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           plotType: plotType.trim() || undefined,
           sfNumber: sfNumber.trim() || undefined,
           landType: landType.trim() || undefined,
+          // Agri fields are UI-gated to farmland-only for new entries, but kept
+          // in the shared payload so legacy plots carrying these values don't
+          // silently lose them on the next edit-save.
           topography: topography.trim() || undefined,
           soilType: soilType.trim() || undefined,
           irrigation: irrigation.trim() || undefined,
@@ -1417,7 +1486,14 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   <button
                     key={type}
                     type="button"
-                    onClick={() => { setListingType(type); clearFieldError("listingType"); }}
+                    onClick={() => {
+                      setListingType(type);
+                      clearFieldError("listingType");
+                      // Rent excludes farmland — drop it immediately if selected.
+                      if (type === "Rent" && propertyType && isRentHiddenType(propertyType)) {
+                        setPropertyType("");
+                      }
+                    }}
                     className={`flex-1 h-12 rounded-xl border font-semibold text-sm transition-all ${
                       listingType === type
                         ? "bg-[#0052FF] text-white border-[#0052FF] shadow-md"
@@ -1437,9 +1513,12 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               <FormSelect
                 name="propertyType"
                 placeholder="Select Type"
-                options={formData.propertyTypes || []}
+                options={filteredPropertyTypes}
                 value={propertyType || null}
-                onValueChange={(v) => { setPropertyType(v); clearFieldError("propertyType"); }}
+                onValueChange={(v) => {
+                  setPropertyType(v);
+                  clearFieldError("propertyType");
+                }}
                 required
               />
               <FormErr field="propertyType" />
@@ -1506,21 +1585,23 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               </div>
             </div>
 
-            {/* Property Condition */}
-            <div className="space-y-2">
-              <label className={labelClass}>Property Condition</label>
-              <FormSelect
-                name="propertyCondition"
-                placeholder="Select Condition"
-                options={[
-                  { label: "New", value: "New" },
-                  { label: "Under Construction", value: "Under Construction" },
-                  { label: "Resale", value: "Resale" }
-                ]}
-                value={propertyCondition || null}
-                onValueChange={setPropertyCondition}
-              />
-            </div>
+            {/* Property Condition — hidden for plot / farmland */}
+            {!isLandType && (
+              <div className="space-y-2">
+                <label className={labelClass}>Property Condition</label>
+                <FormSelect
+                  name="propertyCondition"
+                  placeholder="Select Condition"
+                  options={[
+                    { label: "New", value: "New" },
+                    { label: "Under Construction", value: "Under Construction" },
+                    { label: "Resale", value: "Resale" }
+                  ]}
+                  value={propertyCondition || null}
+                  onValueChange={setPropertyCondition}
+                />
+              </div>
+            )}
 
             {/* Ownership Type */}
             <div className="space-y-2">
@@ -1537,47 +1618,55 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               />
             </div>
 
-            {/* Builder Name */}
-            <div className="space-y-2">
-              <label className={labelClass}>Builder Name</label>
-              <Input
-                value={builderName}
-                onChange={(e) => setBuilderName(e.target.value)}
-                placeholder="e.g. Sobha Developers"
-                className={inputClass}
-              />
-            </div>
+            {/* Builder Name — hidden for plot / farmland */}
+            {!isLandType && (
+              <div className="space-y-2">
+                <label className={labelClass}>Builder Name</label>
+                <Input
+                  value={builderName}
+                  onChange={(e) => setBuilderName(e.target.value)}
+                  placeholder="e.g. Sobha Developers"
+                  className={inputClass}
+                />
+              </div>
+            )}
 
-            {/* Project Name */}
-            <div className="space-y-2">
-              <label className={labelClass}>Project Name</label>
-              <Input
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                placeholder="e.g. Sobha City"
-                className={inputClass}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className={labelClass}>Transaction Type</label>
-              <Input
-                value={transactionType}
-                onChange={(e) => setTransactionType(e.target.value)}
-                placeholder="e.g. RESALE TENANT OCCUPIED"
-                className={inputClass}
-              />
-            </div>
+            {/* Project Name — hidden for plot / farmland */}
+            {!isLandType && (
+              <div className="space-y-2">
+                <label className={labelClass}>Project Name</label>
+                <Input
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  placeholder="e.g. Sobha City"
+                  className={inputClass}
+                />
+              </div>
+            )}
+            {!isLandType && (
+              <div className="space-y-2">
+                <label className={labelClass}>Transaction Type</label>
+                <Input
+                  value={transactionType}
+                  onChange={(e) => setTransactionType(e.target.value)}
+                  placeholder="e.g. RESALE TENANT OCCUPIED"
+                  className={inputClass}
+                />
+              </div>
+            )}
 
-            {/* Handover Date */}
-            <div className="space-y-2">
-              <label className={labelClass}>Handover Date</label>
-              <Input
-                value={handoverDate}
-                onChange={(e) => setHandoverDate(e.target.value)}
-                placeholder="e.g. Jan 2025"
-                className={inputClass}
-              />
-            </div>
+            {/* Handover Date — hidden for plot / farmland */}
+            {!isLandType && (
+              <div className="space-y-2">
+                <label className={labelClass}>Handover Date</label>
+                <Input
+                  value={handoverDate}
+                  onChange={(e) => setHandoverDate(e.target.value)}
+                  placeholder="e.g. Jan 2025"
+                  className={inputClass}
+                />
+              </div>
+            )}
 
             {/* Sale Type */}
             <div className="space-y-2">
@@ -1612,16 +1701,18 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               />
             </div>
 
-            {/* Tenant Occupied */}
-            <div className="space-y-2">
-              <label className={labelClass}>Tenant Occupied</label>
-              <Input
-                value={tenantOccupied}
-                onChange={(e) => setTenantOccupied(e.target.value)}
-                placeholder="e.g. Yes / No"
-                className={inputClass}
-              />
-            </div>
+            {/* Tenant Occupied — hidden for plot / farmland */}
+            {!isLandType && (
+              <div className="space-y-2">
+                <label className={labelClass}>Tenant Occupied</label>
+                <Input
+                  value={tenantOccupied}
+                  onChange={(e) => setTenantOccupied(e.target.value)}
+                  placeholder="e.g. Yes / No"
+                  className={inputClass}
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -1723,49 +1814,57 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               <FormErr field="expectedSalePrice" />
             </div>
 
-            {/* Monthly Rent */}
-            <div className="space-y-2" id="pf-monthlyRent">
-              <label className={labelClass}>Monthly Rent</label>
-              <PriceInput
-                value={monthlyRent}
-                onChange={(v) => { setMonthlyRent(v); clearFieldError("monthlyRent"); }}
-                placeholder="e.g. 25k"
-              />
-              <FormErr field="monthlyRent" />
-            </div>
+            {/* Monthly Rent — hidden for plot / farmland */}
+            {!isLandType && (
+              <div className="space-y-2" id="pf-monthlyRent">
+                <label className={labelClass}>Monthly Rent</label>
+                <PriceInput
+                  value={monthlyRent}
+                  onChange={(v) => { setMonthlyRent(v); clearFieldError("monthlyRent"); }}
+                  placeholder="e.g. 25k"
+                />
+                <FormErr field="monthlyRent" />
+              </div>
+            )}
 
-            {/* Maintenance Charges */}
-            <div className="space-y-2">
-              <label className={labelClass}>Maintenance Charges</label>
-              <Input
-                value={maintenanceCharges}
-                onChange={(e) => setMaintenanceCharges(e.target.value)}
-                placeholder="e.g. 2000/month"
-                className={inputClass}
-              />
-            </div>
+            {/* Maintenance Charges — hidden for plot / farmland */}
+            {!isLandType && (
+              <div className="space-y-2">
+                <label className={labelClass}>Maintenance Charges</label>
+                <Input
+                  value={maintenanceCharges}
+                  onChange={(e) => setMaintenanceCharges(e.target.value)}
+                  placeholder="e.g. 2000/month"
+                  className={inputClass}
+                />
+              </div>
+            )}
 
-            {/* Security Deposit */}
-            <div className="space-y-2">
-              <label className={labelClass}>Security Deposit</label>
-              <Input
-                value={securityDeposit}
-                onChange={(e) => setSecurityDeposit(e.target.value)}
-                placeholder="e.g. 3 months"
-                className={inputClass}
-              />
-            </div>
+            {/* Security Deposit — hidden for plot / farmland */}
+            {!isLandType && (
+              <div className="space-y-2">
+                <label className={labelClass}>Security Deposit</label>
+                <Input
+                  value={securityDeposit}
+                  onChange={(e) => setSecurityDeposit(e.target.value)}
+                  placeholder="e.g. 3 months"
+                  className={inputClass}
+                />
+              </div>
+            )}
 
-            {/* Lock In Period */}
-            <div className="space-y-2">
-              <label className={labelClass}>Lock In Period</label>
-              <Input
-                value={lockInPeriod}
-                onChange={(e) => setLockInPeriod(e.target.value)}
-                placeholder="e.g. 11 months"
-                className={inputClass}
-              />
-            </div>
+            {/* Lock In Period — hidden for plot / farmland */}
+            {!isLandType && (
+              <div className="space-y-2">
+                <label className={labelClass}>Lock In Period</label>
+                <Input
+                  value={lockInPeriod}
+                  onChange={(e) => setLockInPeriod(e.target.value)}
+                  placeholder="e.g. 11 months"
+                  className={inputClass}
+                />
+              </div>
+            )}
 
             {/* Taxes */}
             <div className="space-y-2">
@@ -1913,31 +2012,35 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Details</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
-            {/* Bedrooms */}
-            <div className="space-y-2">
-              <label className={labelClass}>Bedrooms</label>
-              <Input
-                type="number"
-                value={bedrooms}
-                onChange={(e) => setBedrooms(e.target.value)}
-                placeholder="e.g. 3"
-                min={0}
-                className={inputClass}
-              />
-            </div>
+            {/* Bedrooms (BHK) — hidden for plot / farmland */}
+            {!isLandType && (
+              <div className="space-y-2">
+                <label className={labelClass}>Bedrooms</label>
+                <Input
+                  type="number"
+                  value={bedrooms}
+                  onChange={(e) => setBedrooms(e.target.value)}
+                  placeholder="e.g. 3"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+            )}
 
-            {/* Bathrooms */}
-            <div className="space-y-2">
-              <label className={labelClass}>Bathrooms</label>
-              <Input
-                type="number"
-                value={bathrooms}
-                onChange={(e) => setBathrooms(e.target.value)}
-                placeholder="e.g. 2"
-                min={0}
-                className={inputClass}
-              />
-            </div>
+            {/* Bathrooms — hidden for plot / farmland */}
+            {!isLandType && (
+              <div className="space-y-2">
+                <label className={labelClass}>Bathrooms</label>
+                <Input
+                  type="number"
+                  value={bathrooms}
+                  onChange={(e) => setBathrooms(e.target.value)}
+                  placeholder="e.g. 2"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+            )}
 
             {/* Area */}
             <div className="space-y-2">
@@ -1967,32 +2070,36 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               </div>
             </div>
 
-            {/* Furnishing Status */}
-            <div className="space-y-2">
-              <label className={labelClass}>Furnishing Status</label>
-              <FormSelect
-                name="furnishingStatus"
-                placeholder="Select Furnishing"
-                options={FURNISHING_STATUS_OPTIONS}
-                value={furnishingStatus || null}
-                onValueChange={setFurnishingStatus}
-              />
-            </div>
-
-            {/* Furnished (boolean kept for backward compat) */}
-            <div className="space-y-2">
-              <label className={labelClass}>Furnished</label>
-              <div className={checkboxRowClass}>
-                <Checkbox
-                  id="furnished"
-                  checked={furnished}
-                  onCheckedChange={(checked) => setFurnished(!!checked)}
+            {/* Furnishing Status — hidden for plot / farmland */}
+            {!isLandType && (
+              <div className="space-y-2">
+                <label className={labelClass}>Furnishing Status</label>
+                <FormSelect
+                  name="furnishingStatus"
+                  placeholder="Select Furnishing"
+                  options={FURNISHING_STATUS_OPTIONS}
+                  value={furnishingStatus || null}
+                  onValueChange={setFurnishingStatus}
                 />
-                <label htmlFor="furnished" className="text-sm font-semibold cursor-pointer flex-1">
-                  Property is furnished
-                </label>
               </div>
-            </div>
+            )}
+
+            {/* Furnished (boolean kept for backward compat) — hidden for plot / farmland */}
+            {!isLandType && (
+              <div className="space-y-2">
+                <label className={labelClass}>Furnished</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="furnished"
+                    checked={furnished}
+                    onCheckedChange={(checked) => setFurnished(!!checked)}
+                  />
+                  <label htmlFor="furnished" className="text-sm font-semibold cursor-pointer flex-1">
+                    Property is furnished
+                  </label>
+                </div>
+              </div>
+            )}
 
             {/* Property Facing */}
             <div className="space-y-2">
@@ -2006,34 +2113,38 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               />
             </div>
 
-            {/* Floor Facing */}
-            <div className="space-y-2">
-              <label className={labelClass}>Floor Facing</label>
-              <FormSelect
-                name="floorFacing"
-                placeholder="Select Direction"
-                options={FACING_DIRECTION_OPTIONS}
-                value={floorFacing || null}
-                onValueChange={setFloorFacing}
-              />
-            </div>
+            {/* Floor Facing — hidden for plot / farmland */}
+            {!isLandType && (
+              <div className="space-y-2">
+                <label className={labelClass}>Floor Facing</label>
+                <FormSelect
+                  name="floorFacing"
+                  placeholder="Select Direction"
+                  options={FACING_DIRECTION_OPTIONS}
+                  value={floorFacing || null}
+                  onValueChange={setFloorFacing}
+                />
+              </div>
+            )}
 
-            {/* Possession Status */}
-            <div className="space-y-2">
-              <label className={labelClass}>Possession Status</label>
-              <FormSelect
-                name="possessionStatus"
-                placeholder="Select Status"
-                options={[
-                  { label: "Ready To Move", value: "Ready To Move" },
-                  { label: "Under Construction", value: "Under Construction" },
-                  { label: "Immediate", value: "Immediate" },
-                  { label: "Future Date", value: "Future Date" }
-                ]}
-                value={possessionStatus || null}
-                onValueChange={setPossessionStatus}
-              />
-            </div>
+            {/* Possession Status — hidden for plot / farmland */}
+            {!isLandType && (
+              <div className="space-y-2">
+                <label className={labelClass}>Possession Status</label>
+                <FormSelect
+                  name="possessionStatus"
+                  placeholder="Select Status"
+                  options={[
+                    { label: "Ready To Move", value: "Ready To Move" },
+                    { label: "Under Construction", value: "Under Construction" },
+                    { label: "Immediate", value: "Immediate" },
+                    { label: "Future Date", value: "Future Date" }
+                  ]}
+                  value={possessionStatus || null}
+                  onValueChange={setPossessionStatus}
+                />
+              </div>
+            )}
 
             {/* Open Sides */}
             <div className="space-y-2">
@@ -2049,51 +2160,59 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               />
             </div>
 
-            {/* Suitable For */}
-            <div className="space-y-2">
-              <label className={labelClass}>Suitable For</label>
-              <Input
-                value={suitableFor}
-                onChange={(e) => setSuitableFor(e.target.value)}
-                placeholder="e.g. Family, Bachelors"
-                className={inputClass}
-              />
-            </div>
+            {/* Suitable For — hidden for plot / farmland */}
+            {!isLandType && (
+              <div className="space-y-2">
+                <label className={labelClass}>Suitable For</label>
+                <Input
+                  value={suitableFor}
+                  onChange={(e) => setSuitableFor(e.target.value)}
+                  placeholder="e.g. Family, Bachelors"
+                  className={inputClass}
+                />
+              </div>
+            )}
 
-            {/* Age of Property */}
-            <div className="space-y-2">
-              <label className={labelClass}>Age of Property</label>
-              <Input
-                value={propertyAge}
-                onChange={(e) => setPropertyAge(e.target.value)}
-                placeholder="e.g. 5 years"
-                className={inputClass}
-              />
-            </div>
+            {/* Age of Property — hidden for plot / farmland */}
+            {!isLandType && (
+              <div className="space-y-2">
+                <label className={labelClass}>Age of Property</label>
+                <Input
+                  value={propertyAge}
+                  onChange={(e) => setPropertyAge(e.target.value)}
+                  placeholder="e.g. 5 years"
+                  className={inputClass}
+                />
+              </div>
+            )}
 
-            {/* Floor Number */}
-            <div className="space-y-2">
-              <label className={labelClass}>Floor Number</label>
-              <Input
-                value={floorNumber}
-                onChange={(e) => setFloorNumber(e.target.value)}
-                placeholder="e.g. 4"
-                className={inputClass}
-              />
-            </div>
+            {/* Floor Number — hidden for plot / farmland */}
+            {!isLandType && (
+              <div className="space-y-2">
+                <label className={labelClass}>Floor Number</label>
+                <Input
+                  value={floorNumber}
+                  onChange={(e) => setFloorNumber(e.target.value)}
+                  placeholder="e.g. 4"
+                  className={inputClass}
+                />
+              </div>
+            )}
 
-            {/* Total Floors */}
-            <div className="space-y-2">
-              <label className={labelClass}>Total Floors</label>
-              <Input
-                type="number"
-                value={totalFloors}
-                onChange={(e) => setTotalFloors(e.target.value)}
-                placeholder="e.g. 12"
-                min={0}
-                className={inputClass}
-              />
-            </div>
+            {/* Total Floors — hidden for plot / farmland */}
+            {!isLandType && (
+              <div className="space-y-2">
+                <label className={labelClass}>Total Floors</label>
+                <Input
+                  type="number"
+                  value={totalFloors}
+                  onChange={(e) => setTotalFloors(e.target.value)}
+                  placeholder="e.g. 12"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -2414,61 +2533,23 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
               <div className="space-y-2">
                 <label className={labelClass}>Land Type</label>
-                <Input
-                  value={landType}
-                  onChange={(e) => setLandType(e.target.value)}
-                  placeholder="e.g. Dry Land"
-                  className={inputClass}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className={labelClass}>Topography</label>
-                <Input
-                  value={topography}
-                  onChange={(e) => setTopography(e.target.value)}
-                  placeholder="e.g. Flat"
-                  className={inputClass}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className={labelClass}>Soil Type</label>
-                <Input
-                  value={soilType}
-                  onChange={(e) => setSoilType(e.target.value)}
-                  placeholder="e.g. Red Soil"
-                  className={inputClass}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className={labelClass}>Irrigation Facilities</label>
-                <Input
-                  value={irrigation}
-                  onChange={(e) => setIrrigation(e.target.value)}
-                  placeholder="e.g. Canal"
-                  className={inputClass}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className={labelClass}>Fencing</label>
-                <Input
-                  value={fencing}
-                  onChange={(e) => setFencing(e.target.value)}
-                  placeholder="e.g. Compound Wall"
-                  className={inputClass}
+                <FormSelect
+                  name="landType"
+                  placeholder="Select Land Type"
+                  options={LAND_TYPE_OPTIONS}
+                  value={landType || null}
+                  onValueChange={setLandType}
                 />
               </div>
 
               <div className="space-y-2">
                 <label className={labelClass}>Water Sources</label>
-                <Input
-                  value={waterSources}
-                  onChange={(e) => setWaterSources(e.target.value)}
-                  placeholder="e.g. Bore well, Canal"
-                  className={inputClass}
+                <FormSelect
+                  name="waterSources"
+                  placeholder="Select Water Source"
+                  options={WATER_SOURCE_OPTIONS}
+                  value={waterSources || null}
+                  onValueChange={setWaterSources}
                 />
               </div>
 
@@ -2510,9 +2591,57 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 </div>
               </div>
 
-              {/* Farmland-only fields */}
+              {/* Farmland-only agri fields */}
               {propertyType === "farmland" && (
                 <>
+                  <div className="space-y-2">
+                    <label className={labelClass}>Topography</label>
+                    <FormSelect
+                      name="topography"
+                      placeholder="Select Topography"
+                      options={TOPOGRAPHY_OPTIONS}
+                      value={topography || null}
+                      onValueChange={setTopography}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className={labelClass}>Soil Type</label>
+                    <FormSelect
+                      name="soilType"
+                      placeholder="Select Soil Type"
+                      options={SOIL_TYPE_OPTIONS}
+                      value={soilType || null}
+                      onValueChange={setSoilType}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className={labelClass}>Irrigation Facilities</label>
+                    <Input
+                      value={irrigation}
+                      onChange={(e) => setIrrigation(e.target.value)}
+                      placeholder="e.g. Canal"
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className={labelClass}>Fencing</label>
+                    <div className={checkboxRowClass}>
+                      <Checkbox
+                        id="fencing"
+                        checked={fencing.trim() !== ""}
+                        onCheckedChange={(checked) =>
+                          setFencing(checked ? (fencing.trim() || "Available") : "")
+                        }
+                      />
+                      <label htmlFor="fencing" className="text-sm font-semibold cursor-pointer flex-1">
+                        Fencing Available
+                      </label>
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
                     <label className={labelClass}>Crop Suitability</label>
                     <Input
@@ -3498,15 +3627,18 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               />
             </div>
 
-            <div className="space-y-2">
-              <label className={labelClass}>Rental Agreement Draft</label>
-              <Input
-                value={rentalAgreementDraft}
-                onChange={(e) => setRentalAgreementDraft(e.target.value)}
-                placeholder="e.g. Ready"
-                className={inputClass}
-              />
-            </div>
+            {/* Rental Agreement Draft — hidden for plot / farmland */}
+            {!isLandType && (
+              <div className="space-y-2">
+                <label className={labelClass}>Rental Agreement Draft</label>
+                <Input
+                  value={rentalAgreementDraft}
+                  onChange={(e) => setRentalAgreementDraft(e.target.value)}
+                  placeholder="e.g. Ready"
+                  className={inputClass}
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <label className={labelClass}>TSLR / FMB</label>
@@ -3528,15 +3660,18 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               />
             </div>
 
-            <div className="space-y-2">
-              <label className={labelClass}>EB Receipt</label>
-              <Input
-                value={ebReceipt}
-                onChange={(e) => setEbReceipt(e.target.value)}
-                placeholder="e.g. Available"
-                className={inputClass}
-              />
-            </div>
+            {/* EB Receipt — hidden for plot / farmland */}
+            {!isLandType && (
+              <div className="space-y-2">
+                <label className={labelClass}>EB Receipt</label>
+                <Input
+                  value={ebReceipt}
+                  onChange={(e) => setEbReceipt(e.target.value)}
+                  placeholder="e.g. Available"
+                  className={inputClass}
+                />
+              </div>
+            )}
 
             {["plot", "farmland"].includes(propertyType) && (
               <div className="space-y-2">
@@ -3607,15 +3742,18 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               />
             </div>
 
-            <div className="space-y-2">
-              <label className={labelClass}>Rental Yield</label>
-              <Input
-                value={rentalYield}
-                onChange={(e) => setRentalYield(e.target.value)}
-                placeholder="e.g. 4.5%"
-                className={inputClass}
-              />
-            </div>
+            {/* Rental Yield — hidden for plot / farmland */}
+            {!isLandType && (
+              <div className="space-y-2">
+                <label className={labelClass}>Rental Yield</label>
+                <Input
+                  value={rentalYield}
+                  onChange={(e) => setRentalYield(e.target.value)}
+                  placeholder="e.g. 4.5%"
+                  className={inputClass}
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <label className={labelClass}>Market Price</label>
@@ -3760,42 +3898,44 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           )}
         </div>
 
-        {/* ---- Master Amenities ---- */}
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Amenities</h3>
-          {formData.amenities.length === 0 ? (
-            <p className="text-sm text-muted-foreground italic">No amenities available in the master list.</p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {formData.amenities.map((amenity: any) => (
-                <label
-                  key={amenity.id}
-                  className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
-                    amenityIds.includes(amenity.id)
-                      ? "bg-[#0052FF]/5 border-[#0052FF]/30"
-                      : "bg-muted/10 border-border/40 hover:bg-muted/30"
-                  }`}
-                >
-                  <Checkbox
-                    checked={amenityIds.includes(amenity.id)}
-                    onCheckedChange={(checked) => {
-                      if (checked) setAmenityIds((prev) => [...prev, amenity.id]);
-                      else setAmenityIds((prev) => prev.filter((id) => id !== amenity.id));
-                    }}
-                  />
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-sm font-semibold text-foreground truncate" title={amenity.name}>
-                      {amenity.name}
-                    </span>
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">
-                      {amenity.category || "General"}
-                    </span>
-                  </div>
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* ---- Master Amenities — hidden for plot / farmland ---- */}
+        {!isLandType && (
+          <div className="bg-card border rounded-2xl p-8 shadow-sm">
+            <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Amenities</h3>
+            {formData.amenities.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">No amenities available in the master list.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {formData.amenities.map((amenity: any) => (
+                  <label
+                    key={amenity.id}
+                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                      amenityIds.includes(amenity.id)
+                        ? "bg-[#0052FF]/5 border-[#0052FF]/30"
+                        : "bg-muted/10 border-border/40 hover:bg-muted/30"
+                    }`}
+                  >
+                    <Checkbox
+                      checked={amenityIds.includes(amenity.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) setAmenityIds((prev) => [...prev, amenity.id]);
+                        else setAmenityIds((prev) => prev.filter((id) => id !== amenity.id));
+                      }}
+                    />
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-semibold text-foreground truncate" title={amenity.name}>
+                        {amenity.name}
+                      </span>
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">
+                        {amenity.category || "General"}
+                      </span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ---- Floor Plans & Rooms ---- */}
         {!["plot", "farmland"].includes(propertyType) && (
