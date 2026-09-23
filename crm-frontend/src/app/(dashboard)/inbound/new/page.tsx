@@ -132,6 +132,22 @@ const BHK_OPTIONS = [
 
 const BHK_APPLICABLE_TYPES = ["apartment", "villa", "independent_house"];
 
+// The backend AllExceptionsFilter responds with { success, error, reqId }
+// (no `message` field), and validation errors arrive as string arrays.
+// Surface the real reason instead of the generic fallback toast.
+function inboundErrorMessage(result: any): string | undefined {
+  const raw = result?.message ?? result?.error;
+  if (Array.isArray(raw)) {
+    const joined = raw.map(String).join(", ").trim();
+    return joined || undefined;
+  }
+  if (typeof raw === "string" && raw.trim()) return raw;
+  if (raw && typeof raw === "object" && typeof raw.message !== "undefined") {
+    return inboundErrorMessage(raw);
+  }
+  return undefined;
+}
+
 function InboundForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -357,10 +373,10 @@ function InboundForm() {
         body: JSON.stringify(payload),
       });
 
-      const result = await res.json();
+      const result = await res.json().catch(() => null);
 
       if (!res.ok) {
-        throw new Error(result.message || "Failed to save inbound");
+        throw new Error(inboundErrorMessage(result) || "Failed to save inbound");
       }
 
       // Handle Image Upload
