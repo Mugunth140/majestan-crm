@@ -51,6 +51,7 @@ import { AgentContactLog } from './database/entities/agent-contact-log.entity';
 import { Inbound } from './database/entities/inbound.entity';
 import { InboundFollowUp } from './database/entities/inbound-follow-up.entity';
 import { InboundContactLog } from './database/entities/inbound-contact-log.entity';
+import { InboundUnit } from './database/entities/inbound-unit.entity';
 import { HrCandidate } from './database/entities/hr-candidate.entity';
 import { HrFollowUp } from './database/entities/hr-follow-up.entity';
 import { HrContactLog } from './database/entities/hr-contact-log.entity';
@@ -98,7 +99,7 @@ import { CommunicationsModule } from './modules/communications/communications.mo
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('CRM_DB_NAME', 'majestan_crm'),
-        entities: [User, Role, Permission, RolePermission, UserPermission, Department, ActivityLog, LeadSource, PropertyType, Lead, LeadInquiry, LeadFollowUp, LeadDocument, ContactLog, Agent, AgentFollowUp, AgentContactLog, Inbound, InboundFollowUp, InboundContactLog, HrCandidate, HrFollowUp, HrContactLog, AssetLayout, Asset, AssetLocation, AssetFinancials, AssetFeature, AssetDocument, AssetContactLog, RoutingHistory, Notification, TaskTemplate, TaskMetricTarget, TaskMetricProgress, TaskActivityLog, TaskReceipt],
+        entities: [User, Role, Permission, RolePermission, UserPermission, Department, ActivityLog, LeadSource, PropertyType, Lead, LeadInquiry, LeadFollowUp, LeadDocument, ContactLog, Agent, AgentFollowUp, AgentContactLog, Inbound, InboundFollowUp, InboundContactLog, InboundUnit, HrCandidate, HrFollowUp, HrContactLog, AssetLayout, Asset, AssetLocation, AssetFinancials, AssetFeature, AssetDocument, AssetContactLog, RoutingHistory, Notification, TaskTemplate, TaskMetricTarget, TaskMetricProgress, TaskActivityLog, TaskReceipt],
         synchronize: false, // Migrations are used instead
         extra: {
           connectionLimit: configService.get<number>('DB_CONNECTION_LIMIT', 25),
