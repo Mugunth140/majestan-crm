@@ -139,6 +139,59 @@ const FLOOR_PRICING_TYPES = [
   "warehouse", "hotel", "restaurant",
 ];
 
+/**
+ * Normalize legacy stored values to the form's canonical vocabulary so edit
+ * mode shows the right selections and conditional sections. Older records
+ * carry display-style values ("Commercial", "Office Space") while the form
+ * works with keys ("commercial", "office"). Unknown values pass through
+ * untouched so nothing silently breaks. If the type belongs to a different
+ * category than stored, the type's category wins.
+ */
+function normalizeCategoryAndType(
+  rawCategory: string | null,
+  rawType: string | null,
+): { category: string | null; type: string | null } {
+  const clean = (v: string | null | undefined) => (v ?? "").trim();
+  const catLow = clean(rawCategory).toLowerCase();
+  const typeLow = clean(rawType).toLowerCase();
+  if (!catLow && !typeLow) return { category: null, type: null };
+
+  let category: string | null =
+    PROPERTY_CATEGORIES.find((c) => c.value === catLow || c.label.toLowerCase() === catLow)?.value ??
+    (catLow ? clean(rawCategory) : null);
+
+  // Own category first so same-named types resolve locally, then everything.
+  const orderedLists = (): { key: string; list: { label: string; value: string }[] }[] => {
+    const all = Object.entries(PROPERTY_TYPES_MAP).map(([key, list]) => ({ key, list }));
+    const ownIdx = category ? all.findIndex((e) => e.key === category) : -1;
+    if (ownIdx <= 0) return all;
+    const [own] = all.splice(ownIdx, 1);
+    return [own, ...all];
+  };
+  const findType = (needle: string) => {
+    for (const { key, list } of orderedLists()) {
+      const hit = list.find((t) => t.value === needle || t.label.toLowerCase() === needle);
+      if (hit) return { value: hit.value, category: key };
+    }
+    return null;
+  };
+
+  if (typeLow) {
+    const direct = findType(typeLow);
+    if (direct) return { category: direct.category, type: direct.value };
+    // Legacy "<type> Space" suffix (e.g. "Office Space" → "office") — only
+    // when the remainder exactly matches a known value/label, so genuinely
+    // distinct types like "Commercial Land" are never misguessed.
+    const m = typeLow.match(/^(.*)\s+space$/);
+    if (m) {
+      const unspaced = findType(m[1]);
+      if (unspaced) return { category: unspaced.category, type: unspaced.value };
+    }
+    return { category, type: clean(rawType) };
+  }
+  return { category, type: null };
+}
+
 // The backend AllExceptionsFilter responds with { success, error, reqId }
 // (no `message` field), and validation errors arrive as string arrays.
 // Surface the real reason instead of the generic fallback toast.
@@ -246,8 +299,12 @@ function InboundForm() {
           if (result) {
             const data = result;
             setInboundData(data);
-            setSelectedCategory(data.property_category || null);
-            setSelectedType(data.property_type || null);
+            // Normalize legacy display-style values ("Commercial",
+            // "Office Space") to canonical keys so selects and conditional
+            // sections (BHK, floors, commercial extras) work on edit.
+            const normalized = normalizeCategoryAndType(data.property_category || null, data.property_type || null);
+            setSelectedCategory(normalized.category);
+            setSelectedType(normalized.type);
             setSelectedPurpose(data.purpose || null);
             
             const specialPurposes = data.special_purpose ? data.special_purpose.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
