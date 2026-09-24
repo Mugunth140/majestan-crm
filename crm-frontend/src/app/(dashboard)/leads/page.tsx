@@ -349,13 +349,19 @@ export default function LeadsPage() {
         : "Date",
       cell: ({ row }) => {
         if (activeTab === "Action Required") {
-          if (todayViewMode === "completed" && row.original.lastFollowedUpDate) {
-            const dateStr = new Date(row.original.lastFollowedUpDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-            return <span>{dateStr}{row.original.lastFollowedUpTime ? ` ${row.original.lastFollowedUpTime.slice(0,5)}` : ''}</span>;
+          if (todayViewMode === "completed") {
+            if (row.original.lastFollowedUpDate) {
+              const dateStr = new Date(row.original.lastFollowedUpDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+              return <span>{dateStr}{row.original.lastFollowedUpTime ? ` ${row.original.lastFollowedUpTime.slice(0,5)}` : ''}</span>;
+            }
+            return <span className="text-muted-foreground italic">No record</span>;
           }
-          if (todayViewMode === "pending" && row.original.nextFollowUpDate) {
-            const dateStr = new Date(row.original.nextFollowUpDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-            return <span>{dateStr}{row.original.nextFollowUpTime ? ` ${row.original.nextFollowUpTime.slice(0,5)}` : ''}</span>;
+          if (todayViewMode === "pending") {
+            if (row.original.nextFollowUpDate) {
+              const dateStr = new Date(row.original.nextFollowUpDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+              return <span>{dateStr}{row.original.nextFollowUpTime ? ` ${row.original.nextFollowUpTime.slice(0,5)}` : ''}</span>;
+            }
+            return <span className="text-muted-foreground italic">Not Scheduled</span>;
           }
         }
         return <span>{row.original.date}</span>;
@@ -833,7 +839,7 @@ export default function LeadsPage() {
             })}
           </div>
           
-          <div className={`ml-auto flex items-center h-10 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+          <div className={`flex items-center h-10 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "opacity-0 pointer-events-none w-0 overflow-hidden"}`}>
             {[
               { id: "pending", label: "Follow Up" },
               { id: "completed", label: "Followed Up" }
@@ -983,7 +989,7 @@ export default function LeadsPage() {
             })}
           </div>
           
-          <div className={`flex items-center h-10 bg-black/5 dark:bg-white/10 p-1 rounded-xl relative transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+          <div className={`flex items-center h-10 bg-black/5 dark:bg-white/10 p-1 rounded-xl relative transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "opacity-0 pointer-events-none h-0 overflow-hidden"}`}>
             {[
               { id: "pending", label: "Follow Up" },
               { id: "completed", label: "Followed Up" }
