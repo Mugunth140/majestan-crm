@@ -636,20 +636,24 @@ export class LeadsService {
 
     // Action required filters
     if (query?.tab === 'Action Required' && query?.actionFilter) {
+       const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+       const yesterday = new Date(Date.now() - 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+       const tomorrow = new Date(Date.now() + 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
        if (query.actionFilter === 'Overdue') {
-         filterConds += ' AND latest_f.next_follow_up_date < CURDATE()';
+         filterConds += ` AND latest_f.next_follow_up_date < '${today}'`;
        } else if (query.actionFilter === 'Yesterday') {
-         filterConds += ' AND EXISTS (SELECT 1 FROM lead_follow_ups f WHERE f.lead_id = l.id AND DATE(f.follow_up_date) = SUBDATE(CURDATE(), 1))';
+         filterConds += ` AND EXISTS (SELECT 1 FROM lead_follow_ups f WHERE f.lead_id = l.id AND DATE(f.follow_up_date) = '${yesterday}')`;
        } else if (query.actionFilter === 'Today') {
          if (query.todayViewMode === 'completed') {
-           filterConds += ' AND EXISTS (SELECT 1 FROM lead_follow_ups f WHERE f.lead_id = l.id AND DATE(f.follow_up_date) = CURDATE())';
+           filterConds += ` AND EXISTS (SELECT 1 FROM lead_follow_ups f WHERE f.lead_id = l.id AND DATE(f.follow_up_date) = '${today}')`;
          } else {
-           filterConds += ' AND DATE(latest_f.next_follow_up_date) = CURDATE()';
+           filterConds += ` AND DATE(latest_f.next_follow_up_date) = '${today}'`;
          }
        } else if (query.actionFilter === 'Tomorrow') {
-         filterConds += ' AND DATE(latest_f.next_follow_up_date) = ADDDATE(CURDATE(), 1)';
+         filterConds += ` AND DATE(latest_f.next_follow_up_date) = '${tomorrow}'`;
        } else if (query.actionFilter === 'All Scheduled') {
-         filterConds += ' AND DATE(latest_f.next_follow_up_date) > ADDDATE(CURDATE(), 1)';
+         filterConds += ` AND DATE(latest_f.next_follow_up_date) > '${tomorrow}'`;
        }
     }
 
