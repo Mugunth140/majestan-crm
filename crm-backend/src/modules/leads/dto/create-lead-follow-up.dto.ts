@@ -1,25 +1,25 @@
-import { IsString, IsOptional, IsDateString, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsDateString, IsBoolean, IsNumber } from 'class-validator';
 
 export class CreateLeadFollowUpDto {
   @IsOptional()
   @IsDateString()
-  follow_up_date?: string;
+  followUpDate?: string;
 
   @IsOptional()
   @IsString()
-  follow_up_time?: string;
+  followUpTime?: string;
 
   @IsOptional()
   @IsString()
-  contacted_via?: string;
+  contactedVia?: string;
 
   @IsOptional()
   @IsDateString()
-  next_follow_up_date?: string;
+  nextFollowUpDate?: string;
 
   @IsOptional()
   @IsString()
-  next_follow_up_time?: string;
+  nextFollowUpTime?: string;
 
   @IsOptional()
   @IsString()
@@ -43,5 +43,9 @@ export class CreateLeadFollowUpDto {
 
   @IsOptional()
   @IsBoolean()
-  is_completed?: boolean;
+  isCompleted?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  createdById?: number;
 }
