@@ -23,8 +23,10 @@ import {
   TrendingUp,
   Target,
   UserPen,
-  PhoneIncoming
+  PhoneIncoming,
+  Megaphone
 } from "lucide-react";
+import { canViewAds } from "@/lib/ads-access";
 import Image from "next/image";
 
 const navigation = [
@@ -35,6 +37,7 @@ const navigation = [
   { name: "Agent Network", href: "/agent-network", icon: Network },
   { name: "Projects", href: "/projects", icon: Briefcase },
   { name: "Properties", href: "/properties", icon: Home },
+  { name: "Ads", href: "/ads", icon: Megaphone, adsAccess: true },
   { name: "Asset Inventory", href: "/asset-inventory", icon: Package },
   { name: "HR Panel", href: "/hr", icon: UserPen },
   { name: "Tasks", href: "/tasks", icon: Target },
@@ -64,6 +67,7 @@ export function Sidebar() {
   const searchParams = useSearchParams();
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [userDept, setUserDept] = useState<string>("");
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -72,6 +76,7 @@ export function Sidebar() {
       if (userStr) {
         const user = JSON.parse(userStr);
         setUserRole(user?.role?.name || user?.role || "");
+        setUserDept(((user?.department as any)?.name ?? user?.department ?? "") as string);
       }
     } catch (err) {
       console.error("FailLocationed to parse user from local storage");
@@ -134,6 +139,7 @@ export function Sidebar() {
           {navigation.map((item: any) => {
             if (item.adminOnly && !isAdmin) return null;
             if (item.adminOrManager && !canViewLogger) return null;
+            if ((item as any).adsAccess && !canViewAds({ role: userRole ?? "", department: userDept })) return null;
 
             const hasSub = item.subItems && item.subItems.length > 0;
             const isActive = item.href ? (pathname === item.href || pathname.startsWith(item.href + "/")) : (hasSub && item.subItems?.some((sub: any) => pathname.startsWith(sub.href)));
