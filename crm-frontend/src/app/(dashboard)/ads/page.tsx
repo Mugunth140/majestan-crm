@@ -107,11 +107,17 @@ export default function AdsPage() {
   const handleMove = async (index: number, dir: -1 | 1) => {
     const nextIndex = index + dir;
     if (nextIndex < 0 || nextIndex >= displayedAds.length || isReordering) return;
-    const swapped = [...displayedAds];
-    [swapped[index], swapped[nextIndex]] = [swapped[nextIndex], swapped[index]];
+    const current = displayedAds[index];
+    const neighbor = displayedAds[nextIndex];
+    if (!current || !neighbor) return;
+    const full = [...ads].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const fullIndex = full.findIndex((a) => a.id === current.id);
+    const fullNeighborIndex = full.findIndex((a) => a.id === neighbor.id);
+    if (fullIndex < 0 || fullNeighborIndex < 0) return;
+    [full[fullIndex], full[fullNeighborIndex]] = [full[fullIndex], full[fullNeighborIndex]];
     setIsReordering(true);
     try {
-      await adsApi.reorder(swapped.map((a) => a.id));
+      await adsApi.reorder(full.map((a) => a.id));
       toast.success("Ad order updated.");
       await fetchAds();
     } catch {
@@ -173,7 +179,8 @@ export default function AdsPage() {
       id: "thumbnail",
       header: "Thumbnail",
       cell: ({ row }) => {
-        const src = row.original.desktopImage;
+        const rawSrc = row.original.desktopImage;
+        const src = rawSrc && rawSrc.startsWith("http") ? rawSrc : null;
         return (
           <div className="flex items-center justify-center">
             {src ? (
