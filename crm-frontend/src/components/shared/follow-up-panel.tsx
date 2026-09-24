@@ -208,11 +208,12 @@ export function FollowUpPanel({ entityId, entityType, followUps, onRefresh }: Fo
 
               <div className="space-y-8">
                 {followUps.map((fu: any, idx: number) => {
-                  const timestamp = getFuDateObj(fu.follow_up_date, fu.follow_up_time || "00:00");
+                  const timestamp = getFuDateObj(fu.follow_up_date, fu.follow_up_time || "00:00") 
+                    || (fu.created_at ? new Date(fu.created_at) : undefined);
                   const relativeTime = timestamp ? formatDistanceToNow(timestamp, { addSuffix: true }) : "";
                   const absoluteDate = timestamp
                     ? format(timestamp, "d MMM yyyy")
-                    : formatFollowUpDate(fu.follow_up_date);
+                    : "—";
                   const absoluteTime = timestamp ? format(timestamp, "h:mm a") : "";
 
                   const viaStyle = fu.contacted_via ? CONTACTED_VIA_STYLES[fu.contacted_via] : null;
