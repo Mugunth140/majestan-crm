@@ -30,6 +30,7 @@ import { TasksModule } from './modules/tasks/tasks.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { PropertiesModule } from './modules/properties/properties.module';
 import { ProjectsModule } from './modules/projects/projects.module';
+import { AdsModule } from './modules/ads/ads.module';
 
 import { ActivityLog } from './database/entities/activity-log.entity';
 import { Department } from './database/entities/department.entity';
@@ -153,6 +154,7 @@ import { CommunicationsModule } from './modules/communications/communications.mo
     MetricsModule,
     PropertiesModule,
     ProjectsModule,
+    AdsModule,
     MailModule,
     CommunicationsModule,
   ],

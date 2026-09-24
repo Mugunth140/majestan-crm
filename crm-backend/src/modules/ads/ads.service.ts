@@ -36,4 +36,8 @@ export class AdsService {
     const q = new URLSearchParams({ fileName, fileType }).toString();
     return this.siteApi.get(`/admin/ads/presigned-url?${q}`);
   }
+
+  remove(id: number) {
+    return this.siteApi.del(`/admin/ads/${id}`);
+  }
 }
