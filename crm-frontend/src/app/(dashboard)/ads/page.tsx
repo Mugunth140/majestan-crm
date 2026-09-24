@@ -114,7 +114,7 @@ export default function AdsPage() {
     const fullIndex = full.findIndex((a) => a.id === current.id);
     const fullNeighborIndex = full.findIndex((a) => a.id === neighbor.id);
     if (fullIndex < 0 || fullNeighborIndex < 0) return;
-    [full[fullIndex], full[fullNeighborIndex]] = [full[fullIndex], full[fullNeighborIndex]];
+    [full[fullIndex], full[fullNeighborIndex]] = [full[fullNeighborIndex], full[fullIndex]];
     setIsReordering(true);
     try {
       await adsApi.reorder(full.map((a) => a.id));
