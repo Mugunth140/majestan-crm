@@ -342,7 +342,25 @@ export default function LeadsPage() {
         </Link>
       ),
     },
-    { accessorKey: "date", header: "Date" },
+    { 
+      accessorKey: "date", 
+      header: activeTab === "Action Required" 
+        ? (todayViewMode === "completed" ? "Followed Up" : "Next Follow Up") 
+        : "Date",
+      cell: ({ row }) => {
+        if (activeTab === "Action Required") {
+          if (todayViewMode === "completed" && row.original.lastFollowedUpDate) {
+            const dateStr = new Date(row.original.lastFollowedUpDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            return <span>{dateStr}{row.original.lastFollowedUpTime ? ` ${row.original.lastFollowedUpTime.slice(0,5)}` : ''}</span>;
+          }
+          if (todayViewMode === "pending" && row.original.nextFollowUpDate) {
+            const dateStr = new Date(row.original.nextFollowUpDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            return <span>{dateStr}{row.original.nextFollowUpTime ? ` ${row.original.nextFollowUpTime.slice(0,5)}` : ''}</span>;
+          }
+        }
+        return <span>{row.original.date}</span>;
+      }
+    },
     {
       accessorKey: "name",
       header: "Name",

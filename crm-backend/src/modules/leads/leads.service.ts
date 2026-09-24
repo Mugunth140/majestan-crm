@@ -454,15 +454,15 @@ export class LeadsService {
         }
 
         if (normalised.followUpDate || normalised.purpose || normalised.priority || normalised.notes || normalised.rnr) {
-          const followUp = manager.getRepository(LeadFollowUp).create({
-            lead_id: existingLead.id,
-            follow_up_date: normalised.followUpDate || null,
-            follow_up_time: normalised.followUpTime || null,
-            purpose: normalised.purpose || null,
-            priority: normalised.priority || null,
-            rnr: normalised.rnr || null,
-            notes: normalised.notes || null,
-          });
+        const followUp = manager.getRepository(LeadFollowUp).create({
+          lead_id: existingLead.id,
+          next_follow_up_date: normalised.followUpDate || null,
+          next_follow_up_time: normalised.followUpTime || null,
+          purpose: normalised.purpose || null,
+          priority: normalised.priority || null,
+          rnr: normalised.rnr || null,
+          notes: normalised.notes || null,
+        });
           await manager.save(followUp);
         }
 
@@ -525,8 +525,8 @@ export class LeadsService {
       if (normalised.followUpDate || normalised.purpose || normalised.priority || normalised.notes || normalised.rnr) {
         const followUp = manager.getRepository(LeadFollowUp).create({
           lead_id: savedLead.id,
-          follow_up_date: normalised.followUpDate || null,
-          follow_up_time: normalised.followUpTime || null,
+          next_follow_up_date: normalised.followUpDate || null,
+          next_follow_up_time: normalised.followUpTime || null,
           purpose: normalised.purpose || null,
           priority: normalised.priority || null,
           rnr: normalised.rnr || null,
@@ -644,7 +644,7 @@ export class LeadsService {
          if (query.todayViewMode === 'completed') {
            filterConds += ' AND DATE(latest_actual_f.follow_up_date) = CURDATE()';
          } else {
-           filterConds += ' AND DATE(latest_f.next_follow_up_date) = CURDATE()';
+           filterConds += ' AND (DATE(latest_f.next_follow_up_date) = CURDATE() OR (l.status = "New Lead" AND latest_f.next_follow_up_date IS NULL))';
          }
        } else if (query.actionFilter === 'Tomorrow') {
          filterConds += ' AND DATE(latest_f.next_follow_up_date) = ADDDATE(CURDATE(), 1)';
@@ -662,12 +662,12 @@ export class LeadsService {
         FROM lead_inquiries
       ) i ON i.lead_id = l.id AND i.rn = 1
       LEFT JOIN (
-        SELECT lead_id, next_follow_up_date, priority,
+        SELECT lead_id, next_follow_up_date, next_follow_up_time, priority,
                ROW_NUMBER() OVER(PARTITION BY lead_id ORDER BY created_at DESC) as rn
         FROM lead_follow_ups
       ) latest_f ON latest_f.lead_id = l.id AND latest_f.rn = 1
       LEFT JOIN (
-        SELECT lead_id, follow_up_date,
+        SELECT lead_id, follow_up_date, follow_up_time,
                ROW_NUMBER() OVER(PARTITION BY lead_id ORDER BY follow_up_date DESC) as rn
         FROM lead_follow_ups
         WHERE follow_up_date IS NOT NULL
@@ -700,8 +700,10 @@ export class LeadsService {
         i.property_type as propertyType, 
         i.property_category as propertyCategory,
         latest_f.next_follow_up_date as nextFollowUpDate,
+        latest_f.next_follow_up_time as nextFollowUpTime,
         latest_f.priority as priority,
-        latest_actual_f.follow_up_date as lastFollowedUpDate
+        latest_actual_f.follow_up_date as lastFollowedUpDate,
+        latest_actual_f.follow_up_time as lastFollowedUpTime
       FROM leads l
       ${joinClauses}
       WHERE 1=1 ${roleFilter} ${filterConds}
@@ -733,8 +735,10 @@ export class LeadsService {
       department: row.department ?? 'telecalling',
       notes: '',
       nextFollowUpDate: row.nextFollowUpDate || null,
+      nextFollowUpTime: row.nextFollowUpTime || null,
       priority: row.priority ?? '',
       lastFollowedUpDate: row.lastFollowedUpDate || null,
+      lastFollowedUpTime: row.lastFollowedUpTime || null,
       isUnqualified: Boolean(row.isUnqualified),
     }));
 
