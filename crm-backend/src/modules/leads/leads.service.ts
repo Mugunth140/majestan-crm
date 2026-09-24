@@ -639,12 +639,12 @@ export class LeadsService {
        if (query.actionFilter === 'Overdue') {
          filterConds += ' AND latest_f.next_follow_up_date < CURDATE()';
        } else if (query.actionFilter === 'Yesterday') {
-         filterConds += ' AND DATE(latest_actual_f.follow_up_date) = SUBDATE(CURDATE(), 1)';
+         filterConds += ' AND EXISTS (SELECT 1 FROM lead_follow_ups f WHERE f.lead_id = l.id AND DATE(f.follow_up_date) = SUBDATE(CURDATE(), 1))';
        } else if (query.actionFilter === 'Today') {
          if (query.todayViewMode === 'completed') {
-           filterConds += ' AND DATE(latest_actual_f.follow_up_date) = CURDATE()';
+           filterConds += ' AND EXISTS (SELECT 1 FROM lead_follow_ups f WHERE f.lead_id = l.id AND DATE(f.follow_up_date) = CURDATE())';
          } else {
-           filterConds += ' AND (DATE(latest_f.next_follow_up_date) = CURDATE() OR (l.status = "New Lead" AND latest_f.next_follow_up_date IS NULL))';
+           filterConds += ' AND DATE(latest_f.next_follow_up_date) = CURDATE()';
          }
        } else if (query.actionFilter === 'Tomorrow') {
          filterConds += ' AND DATE(latest_f.next_follow_up_date) = ADDDATE(CURDATE(), 1)';
