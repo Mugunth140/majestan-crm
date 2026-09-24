@@ -18,7 +18,9 @@ export const adsApi = {
     return apiJson(`${BASE}/presigned-url?${q}`);
   },
   uploadTemp: async (file: File): Promise<string> => {
-    const { url, key } = await adsApi.presignedUrl(file.name, file.type);
+    const { data } = await adsApi.presignedUrl(file.name, file.type);
+    const { url, key } = data ?? {};
+    if (!url || !key) throw new Error(`Upload failed for ${file.name}: missing presigned url/key`);
     const put = await fetch(url, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
     if (!put.ok) throw new Error(`Upload failed for ${file.name}`);
     return key as string;

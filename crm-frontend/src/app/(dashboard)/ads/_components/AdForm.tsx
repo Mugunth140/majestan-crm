@@ -104,8 +104,9 @@ export function AdForm({ mode, initial }: AdFormProps) {
         toast.error("Custom path is required when link is Custom.");
         return;
       }
-      if (!linkCustom.trim().startsWith("/")) {
-        toast.error("Custom path must start with “/”.");
+      const customPath = linkCustom.trim();
+      if (!/^\/[^/\s]/.test(customPath)) {
+        toast.error("Custom path must be an internal path starting with “/” (e.g. /offers/diwali).");
         return;
       }
     }
