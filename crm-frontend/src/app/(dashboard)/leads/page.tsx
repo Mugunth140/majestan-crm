@@ -819,8 +819,8 @@ export default function LeadsPage() {
       </div>
 
       {activeTab === "Action Required" && (
-        <div className="flex items-center gap-2 px-6 pt-5 min-h-[60px] animate-in slide-in-from-top-2 fade-in duration-200 flex-wrap">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 px-6 pb-0.5 min-h-[60px] animate-in slide-in-from-top-2 fade-in duration-200 flex-wrap">
+          <div className="flex h-10 items-center gap-2">
             {actionFilters.map((filter) => {
               const isActive = actionFilter === filter;
               let activeClass = "bg-primary/10 text-primary border-primary/30";
@@ -830,7 +830,7 @@ export default function LeadsPage() {
               return (
                 <button
                   key={filter}
-                  className={"h-10 flex items-center justify-center cursor-pointer px-5 rounded-full text-[13.5px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
+                  className={"h-10 shrink-0 flex items-center justify-center cursor-pointer px-5 rounded-full text-[13.5px] font-medium leading-none transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
                   onClick={() => setActionFilter(filter)}
                 >
                   {filter}
@@ -839,7 +839,7 @@ export default function LeadsPage() {
             })}
           </div>
           
-          <div className={`flex items-center h-10 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "opacity-0 pointer-events-none w-0 overflow-hidden"}`}>
+          <div className={`ml-auto flex h-10 shrink-0 self-center items-center bg-muted/60 p-0.5 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200oday ${actionFilter === "Today" ? "opacity-100" : "opacity-0 pointer-events-none w-0 overflow-hidden"}`}>
             {[
               { id: "pending", label: "Follow Up" },
               { id: "completed", label: "Followed Up" }
@@ -849,7 +849,7 @@ export default function LeadsPage() {
                 <button
                   key={mode.id}
                   onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
-                  className={`relative h-full flex items-center px-4 rounded-full text-[13px] font-bold transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
+                  className={`relative h-full flex items-center px-4 rounded-full text-[13px] font-bold leading-none transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
                 >
                   {isSelected && (
                     <motion.div
