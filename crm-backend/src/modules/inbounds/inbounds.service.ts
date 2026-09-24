@@ -8,6 +8,7 @@ import { InboundUnit } from '../../database/entities/inbound-unit.entity';
 import { PermissionsService } from '../permissions/permissions.service';
 import { S3Client } from 'bun';
 import { extname } from 'path';
+import { buildWatermarkedImageUrl } from '../../common/imgproxy-watermark';
 
 // Sensitive contact values masked for Team Lead / Staff without the
 // `inbounds.call_tracking` grant. Names, roles and the property address stay
@@ -76,9 +77,9 @@ export class InboundsService {
 
     const tempFileUrl = `${process.env.R2_PUBLIC_URL}/${tempFileKey}`;
 
-    // Process image via Imgproxy (WebP + Watermark)
+    // Process image via Imgproxy (WebP + Watermark, shared faint opacity)
     try {
-      const imgproxyUrl = `http://imgproxy:8080/insecure/watermark:1:ce:0:0:0.3/format:webp/plain/${tempFileUrl}`;
+      const imgproxyUrl = buildWatermarkedImageUrl(tempFileUrl);
       const response = await fetch(imgproxyUrl, {
         signal: AbortSignal.timeout(5000)
       });

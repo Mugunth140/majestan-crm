@@ -11,6 +11,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { TasksService } from '../tasks/tasks.service';
 import { S3Client } from 'bun';
 import { extname } from 'path';
+import { fetchWatermarkedImage, isImageMimetype } from '../../common/imgproxy-watermark';
 
 export interface CreateLeadResult {
   lead: Lead;
@@ -839,18 +840,44 @@ export class LeadsService {
     const fileName = `${leadDisplayId}_attachment${attachmentNum}${fileExt}`;
     const fileKey = `leads/${leadDisplayId}/attachments/${fileName}`;
 
-    await this.s3Client.write(fileKey, file.buffer, {
-      type: file.mimetype,
+    // Image attachments get the shared faint watermark baked in (temp →
+    // process → final webp). Non-image documents are stored untouched.
+    // Fail open: if imgproxy is unreachable, keep the original file.
+    let finalKey = fileKey;
+    let finalName = fileName;
+    let finalBuffer: Buffer | Uint8Array = file.buffer;
+    let finalType = file.mimetype;
+    if (isImageMimetype(file.mimetype)) {
+      const tempKey = `leads/${leadDisplayId}/attachments/temp_${Date.now()}${fileExt}`;
+      await this.s3Client.write(tempKey, file.buffer, {
+        type: file.mimetype,
+      });
+      try {
+        finalBuffer = await fetchWatermarkedImage(
+          `${process.env.R2_PUBLIC_URL}/${tempKey}`,
+        );
+        finalName = fileName.replace(/\.[^/.]+$/, '') + '.webp';
+        finalKey = `leads/${leadDisplayId}/attachments/${finalName}`;
+        finalType = 'image/webp';
+      } catch (e) {
+        console.error('Imgproxy watermark failed, using original:', e);
+      } finally {
+        this.s3Client.delete(tempKey).catch(() => {});
+      }
+    }
+
+    await this.s3Client.write(finalKey, finalBuffer, {
+      type: finalType,
     });
 
-    const fileUrl = `${process.env.R2_PUBLIC_URL}/${fileKey}`;
+    const fileUrl = `${process.env.R2_PUBLIC_URL}/${finalKey}`;
 
     const repo = this.dataSource.getRepository(LeadDocument);
     const doc = repo.create({
       lead_id: leadId,
-      file_name: fileName,
+      file_name: finalName,
       file_url: fileUrl,
-      file_key: fileKey,
+      file_key: finalKey,
     });
     return repo.save(doc);
   }

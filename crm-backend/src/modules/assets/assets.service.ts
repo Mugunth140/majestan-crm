@@ -9,6 +9,7 @@ import { AssetDocument } from '../../database/entities/asset-document.entity';
 import { AssetLayout } from '../../database/entities/asset-layout.entity';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 import { CreateAssetDto } from './dto/create-asset.dto';
+import { fetchWatermarkedImage } from '../../common/imgproxy-watermark';
 
 @Injectable()
 export class AssetsService {
@@ -204,8 +205,35 @@ export class AssetsService {
     const repo = this.dataSource.getRepository(AssetDocument);
     const uploadedDocs: any[] = [];
 
-    const processFile = async (file: Express.Multer.File, type: string, category: string, prefix: string) => {
+    const processFile = async (file: Express.Multer.File, type: string, category: string, prefix: string, watermark = false) => {
       const fileName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+      // Marketing photos get the shared faint watermark baked in via
+      // imgproxy (temp → process → final webp). Functional files (FMB
+      // sketches, barcodes, documents) are stored untouched so they stay
+      // machine-readable.
+      if (watermark) {
+        const tempKey = `asset-inventory/${assetId}/temp_${Date.now()}_${fileName}`;
+        await this.s3Client.write(tempKey, file.buffer, { type: file.mimetype });
+        try {
+          const processed = await fetchWatermarkedImage(
+            `${process.env.R2_PUBLIC_URL}/${tempKey}`,
+          );
+          const finalKey = `asset-inventory/${assetId}/${prefix}_${Date.now()}_${fileName.replace(/\.[^/.]+$/, '')}.webp`;
+          await this.s3Client.write(finalKey, processed, { type: 'image/webp' });
+          const saved = await repo.save(repo.create({
+            asset_id: assetId,
+            file_name: fileName,
+            file_url: `${process.env.R2_PUBLIC_URL}/${finalKey}`,
+            file_key: finalKey,
+            file_type: type,
+            document_category: category,
+          }));
+          uploadedDocs.push(saved);
+        } finally {
+          this.s3Client.delete(tempKey).catch(() => {});
+        }
+        return;
+      }
       const fileKey = `asset-inventory/${assetId}/${prefix}_${Date.now()}_${fileName}`;
       await this.s3Client.write(fileKey, file.buffer, { type: file.mimetype });
       const fileUrl = `${process.env.R2_PUBLIC_URL}/${fileKey}`;
@@ -235,11 +263,12 @@ export class AssetsService {
       await processFile(files.barcode[0], 'image', 'barcode', 'barcode');
     }
 
-    // Process Images (Max 4)
+    // Process Images (Max 4) — watermarked; FMB / barcode / document above
+    // stay untouched.
     if (files.images && files.images.length > 0) {
       const imagesToProcess = files.images.slice(0, 4); // enforce max 4 just in case
       for (const imgFile of imagesToProcess) {
-        await processFile(imgFile, 'image', 'general', 'img');
+        await processFile(imgFile, 'image', 'general', 'img', true);
       }
     }
 
