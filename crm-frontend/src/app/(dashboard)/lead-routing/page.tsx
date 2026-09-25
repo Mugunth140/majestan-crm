@@ -19,6 +19,7 @@ import { FormSelect } from "@/components/shared/form-select";
 import { DatePicker } from "@/components/shared/date-picker";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { Device } from "@/components/shared/device";
+import { canTakeLeadFromQueue } from "@/lib/lead-routing";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -541,7 +542,7 @@ export default function LeadRoutingPage() {
                   renderToolbarActions={(selectedRows, clearSelection) => {
                     return (
                       <>
-                        {role === "Staff" ? (
+                        {canTakeLeadFromQueue(role) && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -565,7 +566,8 @@ export default function LeadRoutingPage() {
                           >
                             Take Lead
                           </Button>
-                        ) : (
+                        )}
+                        {role !== "Staff" && (
                           <Button
                             variant="outline"
                             size="sm"
