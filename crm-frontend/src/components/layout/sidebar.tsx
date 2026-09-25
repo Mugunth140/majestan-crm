@@ -37,7 +37,7 @@ const navigation = [
   { name: "Agent Network", href: "/agent-network", icon: Network },
   { name: "Projects", href: "/projects", icon: Briefcase },
   { name: "Properties", href: "/properties", icon: Home },
-  { name: "Ads", href: "/ads", icon: Megaphone, adsAccess: true },
+  { name: "Advertisement", href: "/ads", icon: Megaphone, adsAccess: true },
   { name: "Asset Inventory", href: "/asset-inventory", icon: Package },
   { name: "HR Panel", href: "/hr", icon: UserPen },
   { name: "Tasks", href: "/tasks", icon: Target },

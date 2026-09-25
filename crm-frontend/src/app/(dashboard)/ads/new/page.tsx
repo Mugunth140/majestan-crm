@@ -12,7 +12,7 @@ function AdFormLoader() {
     <div className="flex h-[60vh] w-full items-center justify-center">
       <div className="flex flex-col items-center gap-4">
         <Loader2 className="h-8 w-8 animate-spin text-[#0052FF]" />
-        <p className="text-muted-foreground font-medium">Loading ad data...</p>
+        <p className="text-muted-foreground font-medium">Loading advertisement data...</p>
       </div>
     </div>
   );
@@ -35,12 +35,12 @@ function AdFormPage() {
         if (result && result.success !== false) {
           setInitialData(result.data ?? result);
         } else {
-          toast.error("Ad not found.");
+          toast.error("Advertisement not found.");
           router.push("/ads");
         }
       })
       .catch(() => {
-        toast.error("Failed to load ad.");
+        toast.error("Failed to load advertisement.");
         router.push("/ads");
       })
       .finally(() => setIsLoading(false));

@@ -147,11 +147,11 @@ export function AdForm({ mode, initial }: AdFormProps) {
       }
 
       if (result && result.success === false) {
-        toast.error(result.message ?? `Failed to ${mode === "create" ? "create" : "update"} ad.`);
+        toast.error(result.message ?? `Failed to ${mode === "create" ? "create" : "update"} advertisement.`);
         return;
       }
 
-      toast.success(mode === "create" ? "Ad created successfully!" : "Ad updated successfully!");
+      toast.success(mode === "create" ? "Advertisement created successfully!" : "Advertisement updated successfully!");
       router.push("/ads");
     } catch (err) {
       if (err instanceof ApiError) {
@@ -166,13 +166,13 @@ export function AdForm({ mode, initial }: AdFormProps) {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500 px-2.5 md:px-0 mt-2 md:mt-0 mb-20 md:mb-0">
-      <MobileHeader title={mode === "create" ? "Add Ad" : "Edit Ad"} showBack />
+      <MobileHeader title={mode === "create" ? "Add Advertisement" : "Edit Advertisement"} showBack />
 
       <div className="flex items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{mode === "create" ? "Add New Ad" : "Edit Ad"}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{mode === "create" ? "Add New Advertisement" : "Edit Advertisement"}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {mode === "create" ? "Upload both creatives for the hero carousel." : "Update this hero carousel ad."}
+            {mode === "create" ? "Upload both creatives for the hero carousel." : "Update this hero carousel advertisement."}
           </p>
         </div>
       </div>
@@ -285,7 +285,7 @@ export function AdForm({ mode, initial }: AdFormProps) {
         <div className="flex justify-end">
           <Button type="submit" disabled={isSaving} className="h-12 px-8 rounded-xl bg-[#0052FF] hover:bg-[#0052FF]/90">
             {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-            {isSaving ? "Saving..." : mode === "create" ? "Create Ad" : "Save Changes"}
+            {isSaving ? "Saving..." : mode === "create" ? "Create Advertisement" : "Save Changes"}
           </Button>
         </div>
       </form>

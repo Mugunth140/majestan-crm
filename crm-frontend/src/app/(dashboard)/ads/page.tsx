@@ -95,7 +95,7 @@ export default function AdsPage() {
     setIsTogglingId(ad.id);
     try {
       await adsApi.setStatus(ad.id, next);
-      toast.success(next ? "Ad activated." : "Ad deactivated.");
+      toast.success(next ? "Advertisement activated." : "Advertisement deactivated.");
       await fetchAds();
     } catch {
       toast.error("Failed to update ad status.");
@@ -118,7 +118,7 @@ export default function AdsPage() {
     setIsReordering(true);
     try {
       await adsApi.reorder(full.map((a) => a.id));
-      toast.success("Ad order updated.");
+      toast.success("Advertisement order updated.");
       await fetchAds();
     } catch {
       toast.error("Failed to reorder ads.");
@@ -187,7 +187,7 @@ export default function AdsPage() {
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={src}
-                alt={row.original.title || "Ad"}
+                alt={row.original.title || "Advertisement"}
                 className="h-10 w-20 rounded-md border border-border/60 object-cover bg-muted"
                 loading="lazy"
               />
@@ -390,7 +390,7 @@ export default function AdsPage() {
       </div>
       <Link href="/ads/new" className="flex h-11 w-full rounded-xl bg-[#0052FF] px-4 text-[14px] font-semibold text-white shadow-md hover:bg-[#0052FF]/90 items-center justify-center gap-2 transition-transform active:scale-95">
         <Plus size={18} />
-        Add Ad
+        Add Advertisement
       </Link>
       {pillTabs}
     </div>
@@ -398,15 +398,15 @@ export default function AdsPage() {
 
   return (
     <>
-      <MobileHeader title="Ads" />
+      <MobileHeader title="Advertisement" />
       <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:h-full">
         <Device
           mobile={null}
           desktop={
             <div className="flex items-center justify-between pr-[150px] min-h-[48px]">
               <div>
-                <h1 className="text-[28px] font-bold tracking-tight">Ads</h1>
-                <p className="text-muted-foreground text-sm mt-0.5">Manage your hero carousel ads</p>
+                <h1 className="text-[28px] font-bold tracking-tight">Advertisement</h1>
+                <p className="text-muted-foreground text-sm mt-0.5">Manage your hero carousel advertisements</p>
               </div>
               <div className="flex items-center gap-3">
                 <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={() => fetchAds()} title="Refresh">
@@ -414,7 +414,7 @@ export default function AdsPage() {
                 </Button>
                 <Link href="/ads/new" className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
                   <Plus size={18} />
-                  Add Ad
+                  Add Advertisement
                 </Link>
               </div>
             </div>
@@ -429,9 +429,9 @@ export default function AdsPage() {
       <Dialog open={bulkDeleteIds !== null} onOpenChange={(open) => { if (!open) setBulkDeleteIds(null); }}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Delete Ad{bulkDeleteIds && bulkDeleteIds.length > 1 ? "s" : ""}</DialogTitle>
+            <DialogTitle>Delete Advertisement{bulkDeleteIds && bulkDeleteIds.length > 1 ? "s" : ""}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete {bulkDeleteIds ? `${bulkDeleteIds.length} ad${bulkDeleteIds.length > 1 ? "s" : ""}` : "this ad"}? This action cannot be undone.
+              Are you sure you want to delete {bulkDeleteIds ? `${bulkDeleteIds.length} advertisement${bulkDeleteIds.length > 1 ? "s" : ""}` : "this advertisement"}? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-4">
