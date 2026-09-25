@@ -19,7 +19,7 @@ import { FormSelect } from "@/components/shared/form-select";
 import { DatePicker } from "@/components/shared/date-picker";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { Device } from "@/components/shared/device";
-import { canTakeLeadFromQueue } from "@/lib/lead-routing";
+import { canTakeLeadFromQueue, assignRoutingLeads } from "@/lib/lead-routing";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -97,7 +97,7 @@ export default function LeadRoutingPage() {
   const [historyDateTo, setHistoryDateTo] = useState<Date | undefined>(undefined);
 
   // Assign lead modal
-  const [assignLeadId, setAssignLeadId] = useState<number | null>(null);
+  const [assignLeadIds, setAssignLeadIds] = useState<number[]>([]);
   const [isAssigning, setIsAssigning] = useState(false);
 
   // Claim loading
@@ -213,7 +213,7 @@ export default function LeadRoutingPage() {
   };
 
   const handleAssignLead = async (toUserId: number) => {
-    if (!assignLeadId) return;
+    if (assignLeadIds.length === 0) return;
     setIsAssigning(true);
     try {
       let currentUserId = 0;
@@ -222,23 +222,23 @@ export default function LeadRoutingPage() {
         if (stored) currentUserId = JSON.parse(stored).id;
       } catch {}
 
-      const res = await apiFetch(`${API_URL}/lead-routing/assign/${assignLeadId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to_user_id: toUserId, actioned_by_id: currentUserId || null }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        toast.success("Lead assigned successfully");
-        fetchQueue();
-      } else {
-        toast.error(data.message || "Failed to assign lead");
-      }
+      const { assigned, failed } = await assignRoutingLeads(async (leadId) => {
+        const res = await apiFetch(`${API_URL}/lead-routing/assign/${leadId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ to_user_id: toUserId, actioned_by_id: currentUserId || null }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || "Failed to assign lead");
+      }, assignLeadIds);
+      if (assigned > 0) toast.success(`${assigned} lead(s) assigned successfully`);
+      if (failed > 0) toast.error(`Failed to assign ${failed} lead(s)`);
+      fetchQueue();
     } catch {
       toast.error("Failed to assign lead");
     } finally {
       setIsAssigning(false);
-      setAssignLeadId(null);
+      setAssignLeadIds([]);
     }
   };
 
@@ -574,8 +574,7 @@ export default function LeadRoutingPage() {
                             className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
                             onClick={() => {
                               if (selectedRows.length > 0) {
-                                // Just open assign for the first selected for now
-                                setAssignLeadId(selectedRows[0].id);
+                                setAssignLeadIds(selectedRows.map((r) => r.id));
                               }
                             }}
                           >
@@ -708,10 +707,10 @@ export default function LeadRoutingPage() {
 
       {/* Assign Lead Modal */}
       <AssignLeadModal
-        open={assignLeadId !== null}
-        onClose={() => setAssignLeadId(null)}
+        open={assignLeadIds.length > 0}
+        onClose={() => setAssignLeadIds([])}
         onConfirm={handleAssignLead}
-        leadId={assignLeadId ?? undefined}
+        leadId={assignLeadIds[0]}
         department={deptTab}
         isLoading={isAssigning}
       />
