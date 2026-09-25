@@ -21,6 +21,7 @@ import { Plus, RefreshCw, Search, Eye, Filter, X } from "lucide-react";
 import { motion } from "motion/react";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { Device } from "@/components/shared/device";
+import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -53,7 +54,7 @@ export default function AgentsPage() {
   const [filters, setFilters] = useState({ partnerType: "", status: "" });
 
   const tabs = ["All Agents", "Action Required"];
-  const actionFilters = ["Overdue", "Yesterday", "Today", "Tomorrow", "All Scheduled"];
+  const actionFilters = [...ACTION_FILTERS];
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -157,7 +158,7 @@ export default function AgentsPage() {
         if (actionFilter === "Today") {
           const isFollowedUpToday = !!(lDate && lDate.getTime() === today.getTime());
           if (todayViewMode === "completed") return isFollowedUpToday;
-          return !!(fDate && fDate.getTime() === today.getTime());
+          return !!(fDate && fDate.getTime() === today.getTime() && !isFollowedUpToday);
         }
         if (actionFilter === "Tomorrow") return !!(fDate && fDate.getTime() === tomorrow.getTime());
         if (actionFilter === "All Scheduled") return !!(fDate && fDate > tomorrow);
@@ -357,7 +358,7 @@ export default function AgentsPage() {
                   className={"h-9 shrink-0 flex items-center justify-center cursor-pointer px-4 rounded-full text-[13px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-card text-muted-foreground border-border hover:bg-muted hover:text-foreground")}
                   onClick={() => setActionFilter(filter)}
                 >
-                  {filter}
+                  {getActionFilterLabel(filter)}
                 </button>
               );
             })}
@@ -452,7 +453,7 @@ export default function AgentsPage() {
                   className={"h-9 shrink-0 flex items-center justify-center cursor-pointer px-4 rounded-full text-[13px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
                   onClick={() => setActionFilter(filter)}
                 >
-                  {filter}
+                  {getActionFilterLabel(filter)}
                 </button>
               );
             })}

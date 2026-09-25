@@ -55,7 +55,7 @@ describe('LeadsService', () => {
     const countQuery = queryMock.mock.calls[0][0];
     const params = queryMock.mock.calls[0][1];
     expect(countQuery).toContain('LOWER(latest_f.priority) = ?');
-    expect(countQuery).toContain('next_follow_up_date, priority,');
+    expect(countQuery).toContain('next_follow_up_date, next_follow_up_time, priority,');
     expect(params).toContain('high');
   });
 
@@ -75,5 +75,14 @@ describe('LeadsService', () => {
 
     const countQuery = queryMock.mock.calls[0][0];
     expect(countQuery).not.toContain('$.minBudget');
+  });
+
+  it('should exclude leads already followed up today from the Today follow-up queue', async () => {
+    await service.getLeads({ role: 'Admin', id: 99 }, { tab: 'Action Required', actionFilter: 'Today', todayViewMode: 'pending' });
+
+    const countQuery = queryMock.mock.calls[0][0];
+    expect(countQuery).toContain('DATE(latest_f.next_follow_up_date) =');
+    expect(countQuery).toContain('NOT EXISTS');
+    expect(countQuery).toContain('DATE(f.follow_up_date) =');
   });
 });

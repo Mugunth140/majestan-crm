@@ -26,6 +26,8 @@ import { MobileHeader } from "@/components/layout/mobile-header";
 import { MobileLeadList } from "@/components/leads/mobile-lead-list";
 import { Device } from "@/components/shared/device";
 import { LEAD_STATUS_STYLES as STATUS_STYLES } from "@/lib/lead-constants";
+import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
+import { resetPageIndex } from "@/lib/pagination";
 
 interface PendingImport {
   id: string;
@@ -135,10 +137,15 @@ export default function LeadsPage() {
   }, []);
 
   const tabs = ["All Leads", "Open Pipeline", "Action Required", "Unqualified"];
-  const actionFilters = ["Overdue", "Yesterday", "Today", "Tomorrow", "All Scheduled"];
+  const actionFilters = [...ACTION_FILTERS];
 
     const [totalCount, setTotalCount] = useState(0);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const resetPage = () => setPagination((prev) => (prev.pageIndex === 0 ? prev : resetPageIndex(prev)));
+  const updateFilters = (updater: (prev: typeof filters) => typeof filters) => {
+    setFilters(updater);
+    resetPage();
+  };
 
   const fetchLeads = useCallback(async () => {
     try {
@@ -594,7 +601,10 @@ export default function LeadsPage() {
 
   const activeFiltersCount = Object.values(filters).filter(v => v !== "").length;
 
-  const clearFilters = () => setFilters({ dateFrom: "", dateTo: "", category: "", type: "", staff: "", status: "", source: "", priority: "", minBudgetLakh: "", maxBudgetLakh: "" });
+  const clearFilters = () => {
+    setFilters({ dateFrom: "", dateTo: "", category: "", type: "", staff: "", status: "", source: "", priority: "", minBudgetLakh: "", maxBudgetLakh: "" });
+    resetPage();
+  };
 
   const deptPipelines: { label: string; value: "telecalling" | "sales" }[] = [
     { label: "Telecalling Pipeline", value: "telecalling" },
@@ -641,42 +651,42 @@ export default function LeadsPage() {
                 <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Created From</label>
-                    <Input type="date" value={filters.dateFrom} onChange={e => setFilters(f => ({...f, dateFrom: e.target.value}))} className="h-9 rounded-lg text-sm" />
+                    <Input type="date" value={filters.dateFrom} onChange={e => updateFilters(f => ({...f, dateFrom: e.target.value}))} className="h-9 rounded-lg text-sm" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Created To</label>
-                    <Input type="date" value={filters.dateTo} onChange={e => setFilters(f => ({...f, dateTo: e.target.value}))} className="h-9 rounded-lg text-sm" />
+                    <Input type="date" value={filters.dateTo} onChange={e => updateFilters(f => ({...f, dateTo: e.target.value}))} className="h-9 rounded-lg text-sm" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Status</label>
-                    <FormSelect name="status" options={uniqueStatuses.map(s => ({label: s, value: s}))} value={filters.status} onValueChange={v => setFilters(f => ({...f, status: v || ""}))} placeholder="All Statuses" />
+                    <FormSelect name="status" options={uniqueStatuses.map(s => ({label: s, value: s}))} value={filters.status} onValueChange={v => updateFilters(f => ({...f, status: v || ""}))} placeholder="All Statuses" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Staff</label>
-                    <FormSelect name="staff" options={uniqueStaff.map(s => ({label: s, value: s}))} value={filters.staff} onValueChange={v => setFilters(f => ({...f, staff: v || ""}))} placeholder="All Staff" />
+                    <FormSelect name="staff" options={uniqueStaff.map(s => ({label: s, value: s}))} value={filters.staff} onValueChange={v => updateFilters(f => ({...f, staff: v || ""}))} placeholder="All Staff" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Lead Source</label>
-                    <FormSelect name="source" options={uniqueSources.map(s => ({label: s, value: s}))} value={filters.source} onValueChange={v => setFilters(f => ({...f, source: v || ""}))} placeholder="All Sources" />
+                    <FormSelect name="source" options={uniqueSources.map(s => ({label: s, value: s}))} value={filters.source} onValueChange={v => updateFilters(f => ({...f, source: v || ""}))} placeholder="All Sources" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Property Category</label>
-                    <FormSelect name="category" options={uniqueCategories.map(s => ({label: s, value: s}))} value={filters.category} onValueChange={v => setFilters(f => ({...f, category: v || ""}))} placeholder="All Categories" />
+                    <FormSelect name="category" options={uniqueCategories.map(s => ({label: s, value: s}))} value={filters.category} onValueChange={v => updateFilters(f => ({...f, category: v || ""}))} placeholder="All Categories" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Property Type</label>
-                    <FormSelect name="type" options={uniqueTypes.map(s => ({label: s, value: s}))} value={filters.type} onValueChange={v => setFilters(f => ({...f, type: v || ""}))} placeholder="All Types" />
+                    <FormSelect name="type" options={uniqueTypes.map(s => ({label: s, value: s}))} value={filters.type} onValueChange={v => updateFilters(f => ({...f, type: v || ""}))} placeholder="All Types" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Priority</label>
-                    <FormSelect name="priority" options={[{label: "Low", value: "low"}, {label: "Medium", value: "medium"}, {label: "High", value: "high"}, {label: "Urgent", value: "urgent"}]} value={filters.priority} onValueChange={v => setFilters(f => ({...f, priority: v || ""}))} placeholder="All Priorities" />
+                    <FormSelect name="priority" options={[{label: "Low", value: "low"}, {label: "Medium", value: "medium"}, {label: "High", value: "high"}, {label: "Urgent", value: "urgent"}]} value={filters.priority} onValueChange={v => updateFilters(f => ({...f, priority: v || ""}))} placeholder="All Priorities" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Budget (₹ Lakh)</label>
                     <div className="flex items-center gap-2">
-                      <Input type="number" min="0" placeholder="Min" value={filters.minBudgetLakh} onChange={e => setFilters(f => ({...f, minBudgetLakh: e.target.value}))} className="h-9 rounded-lg text-sm" />
+                      <Input type="number" min="0" placeholder="Min" value={filters.minBudgetLakh} onChange={e => updateFilters(f => ({...f, minBudgetLakh: e.target.value}))} className="h-9 rounded-lg text-sm" />
                       <span className="text-muted-foreground text-xs shrink-0">—</span>
-                      <Input type="number" min="0" placeholder="Max" value={filters.maxBudgetLakh} onChange={e => setFilters(f => ({...f, maxBudgetLakh: e.target.value}))} className="h-9 rounded-lg text-sm" />
+                      <Input type="number" min="0" placeholder="Max" value={filters.maxBudgetLakh} onChange={e => updateFilters(f => ({...f, maxBudgetLakh: e.target.value}))} className="h-9 rounded-lg text-sm" />
                     </div>
                   </div>
                 </div>
@@ -766,7 +776,7 @@ export default function LeadsPage() {
           {tabs.map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => { setActiveTab(tab); resetPage(); }}
               className={"relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " + (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")}
             >
               {tab}
@@ -782,7 +792,7 @@ export default function LeadsPage() {
             {visiblePipelines.map((d) => (
               <button
                 key={d.value}
-                onClick={() => setDeptFilter(d.value)}
+                onClick={() => { setDeptFilter(d.value); resetPage(); }}
                 className={[
                   "h-9 px-4 rounded-full text-[13px] font-medium transition-all duration-200 border",
                   deptFilter === d.value
@@ -804,7 +814,7 @@ export default function LeadsPage() {
           <Input 
             placeholder="Search ID, Name, Phone, Email..." 
             value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
+            onChange={e => { setSearchQuery(e.target.value); resetPage(); }}
             className="pl-9 h-10 bg-muted/30 rounded-xl border-border/60 text-[13.5px]"
           />
         </div>
@@ -831,15 +841,15 @@ export default function LeadsPage() {
                 <button
                   key={filter}
                   className={"h-10 shrink-0 flex items-center justify-center cursor-pointer px-5 rounded-full text-[13.5px] font-medium leading-none transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
-                  onClick={() => setActionFilter(filter)}
+                  onClick={() => { setActionFilter(filter); resetPage(); }}
                 >
-                  {filter}
+                  {getActionFilterLabel(filter)}
                 </button>
               );
             })}
           </div>
           
-          <div className={`ml-auto flex h-10 shrink-0 self-center items-center bg-muted/60 p-0.5 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200oday ${actionFilter === "Today" ? "opacity-100" : "opacity-0 pointer-events-none w-0 overflow-hidden"}`}>
+          <div className={`ml-auto flex h-10 shrink-0 self-center items-center bg-muted/60 p-0.5 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "opacity-0 pointer-events-none w-0 overflow-hidden"}`}>
             {[
               { id: "pending", label: "Follow Up" },
               { id: "completed", label: "Followed Up" }
@@ -848,7 +858,7 @@ export default function LeadsPage() {
               return (
                 <button
                   key={mode.id}
-                  onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
+                  onClick={() => { setTodayViewMode(mode.id as "pending" | "completed"); resetPage(); }}
                   className={`relative h-full flex items-center px-4 rounded-full text-[13px] font-bold leading-none transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
                 >
                   {isSelected && (
@@ -918,11 +928,11 @@ export default function LeadsPage() {
           <Input 
             placeholder="Search leads..." 
             value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
+            onChange={e => { setSearchQuery(e.target.value); resetPage(); }}
             className="pl-11 h-12 bg-black/5 dark:bg-white/10 border-transparent rounded-2xl text-[16px] focus-visible:ring-1 focus-visible:ring-primary shadow-none"
           />
           {searchQuery && (
-            <button onClick={() => setSearchQuery("")} className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 bg-muted-foreground/20 rounded-full text-foreground hover:bg-muted-foreground/30">
+            <button onClick={() => { setSearchQuery(""); resetPage(); }} className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 bg-muted-foreground/20 rounded-full text-foreground hover:bg-muted-foreground/30">
               <X className="h-3 w-3" />
             </button>
           )}
@@ -937,7 +947,7 @@ export default function LeadsPage() {
           return (
             <button 
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => { setActiveTab(tab); resetPage(); }}
               className={cn(
                 "px-5 h-10 rounded-full text-[14px] font-semibold whitespace-nowrap transition-all border active:scale-95",
                 isActive ? "bg-foreground text-background border-foreground shadow-sm" : "bg-card text-muted-foreground border-border hover:bg-muted"
@@ -955,7 +965,7 @@ export default function LeadsPage() {
           {visiblePipelines.map((d) => (
             <button
               key={d.value}
-              onClick={() => setDeptFilter(d.value)}
+              onClick={() => { setDeptFilter(d.value); resetPage(); }}
               className={cn(
                 "px-4 h-9 rounded-full text-[13px] font-medium whitespace-nowrap transition-all border active:scale-95",
                 deptFilter === d.value ? "bg-[#0052FF] text-white border-[#0052FF] shadow-sm" : "bg-background text-muted-foreground border-border hover:bg-muted"
@@ -981,9 +991,9 @@ export default function LeadsPage() {
                 <button
                   key={filter}
                   className={"h-9 flex items-center justify-center cursor-pointer px-4 rounded-full text-[13px] font-medium transition-all ease-out active:scale-95 border whitespace-nowrap " + (isActive ? activeClass : "bg-card text-muted-foreground border-border hover:bg-muted")}
-                  onClick={() => setActionFilter(filter)}
+                  onClick={() => { setActionFilter(filter); resetPage(); }}
                 >
-                  {filter}
+                  {getActionFilterLabel(filter)}
                 </button>
               );
             })}
@@ -998,7 +1008,7 @@ export default function LeadsPage() {
               return (
                 <button
                   key={mode.id}
-                  onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
+                  onClick={() => { setTodayViewMode(mode.id as "pending" | "completed"); resetPage(); }}
                   className={`flex-1 relative h-full flex items-center justify-center rounded-lg text-[13px] font-bold transition-colors z-10 active:scale-[0.98] ${isSelected ? "text-foreground" : "text-muted-foreground"}`}
                 >
                   {isSelected && (

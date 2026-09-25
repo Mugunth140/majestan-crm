@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { Device } from "@/components/shared/device";
+import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -65,7 +66,7 @@ export default function HrPage() {
   });
 
   const tabs = ["All Candidates", "Action Required", "Rejected"];
-  const actionFilters = ["Overdue", "Yesterday", "Today", "Tomorrow", "All Scheduled"];
+  const actionFilters = [...ACTION_FILTERS];
 
   const fetchCandidates = () => {
     setIsLoading(true);
@@ -163,7 +164,7 @@ export default function HrPage() {
           if (todayViewMode === "completed") {
             matchesTimeFilter = isFollowedUpToday;
           } else {
-            matchesTimeFilter = !!(fDate && fDate.getTime() === today.getTime());
+            matchesTimeFilter = !!(fDate && fDate.getTime() === today.getTime() && !isFollowedUpToday);
           }
         } else if (actionFilter === "Tomorrow") {
           matchesTimeFilter = !!(fDate && fDate.getTime() === tomorrow.getTime());
@@ -342,7 +343,7 @@ export default function HrPage() {
                   className={"h-9 shrink-0 flex items-center justify-center cursor-pointer px-4 rounded-full text-[13px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-card text-muted-foreground border-border hover:bg-muted hover:text-foreground")}
                   onClick={() => setActionFilter(filter)}
                 >
-                  {filter}
+                  {getActionFilterLabel(filter)}
                 </button>
               );
             })}
@@ -437,7 +438,7 @@ export default function HrPage() {
                   className={"h-9 shrink-0 flex items-center justify-center cursor-pointer px-4 rounded-full text-[13px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
                   onClick={() => setActionFilter(filter)}
                 >
-                  {filter}
+                  {getActionFilterLabel(filter)}
                 </button>
               );
             })}
