@@ -162,9 +162,9 @@ export default function HrPage() {
         } else if (actionFilter === "Today") {
           const isFollowedUpToday = !!(lDate && lDate.getTime() === today.getTime());
           if (todayViewMode === "completed") {
-            matchesTimeFilter = isFollowedUpToday;
+            matchesTimeFilter = !!(isFollowedUpToday && !(fDate && fDate.getTime() === today.getTime()));
           } else {
-            matchesTimeFilter = !!(fDate && fDate.getTime() === today.getTime() && !isFollowedUpToday);
+            matchesTimeFilter = !!(fDate && fDate.getTime() === today.getTime());
           }
         } else if (actionFilter === "Tomorrow") {
           matchesTimeFilter = !!(fDate && fDate.getTime() === tomorrow.getTime());

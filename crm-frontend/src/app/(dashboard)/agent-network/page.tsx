@@ -157,8 +157,8 @@ export default function AgentsPage() {
         if (actionFilter === "Yesterday") return !!(lDate && lDate.getTime() === yesterday.getTime());
         if (actionFilter === "Today") {
           const isFollowedUpToday = !!(lDate && lDate.getTime() === today.getTime());
-          if (todayViewMode === "completed") return isFollowedUpToday;
-          return !!(fDate && fDate.getTime() === today.getTime() && !isFollowedUpToday);
+          if (todayViewMode === "completed") return !!(isFollowedUpToday && !(fDate && fDate.getTime() === today.getTime()));
+          return !!(fDate && fDate.getTime() === today.getTime());
         }
         if (actionFilter === "Tomorrow") return !!(fDate && fDate.getTime() === tomorrow.getTime());
         if (actionFilter === "All Scheduled") return !!(fDate && fDate > tomorrow);

@@ -77,12 +77,19 @@ describe('LeadsService', () => {
     expect(countQuery).not.toContain('$.minBudget');
   });
 
-  it('should exclude leads already followed up today from the Today follow-up queue', async () => {
+  it('keeps leads with an open same-day schedule in the Today follow-up queue', async () => {
     await service.getLeads({ role: 'Admin', id: 99 }, { tab: 'Action Required', actionFilter: 'Today', todayViewMode: 'pending' });
 
     const countQuery = queryMock.mock.calls[0][0];
     expect(countQuery).toContain('DATE(latest_f.next_follow_up_date) =');
-    expect(countQuery).toContain('NOT EXISTS');
+    expect(countQuery).not.toContain('NOT EXISTS');
+  });
+
+  it('excludes leads with an open same-day schedule from Today followed-up', async () => {
+    await service.getLeads({ role: 'Admin', id: 99 }, { tab: 'Action Required', actionFilter: 'Today', todayViewMode: 'completed' });
+
+    const countQuery = queryMock.mock.calls[0][0];
     expect(countQuery).toContain('DATE(f.follow_up_date) =');
+    expect(countQuery).toContain(`AND (latest_f.next_follow_up_date IS NULL OR DATE(latest_f.next_follow_up_date) !=`);
   });
 });
