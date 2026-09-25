@@ -343,9 +343,10 @@ export class LeadsService {
           status: 'New Lead',
           // Imported leads always enter the unassigned telecalling routing queue —
           // assignment happens exclusively through lead routing by admins/managers/team leads.
+          // NOTE: the bulk upload "Remarks" column is NOT a commission note — it is
+          // recorded as a follow-up note below, so commission_remarks stays null.
           department: 'telecalling',
           assigned_staff_id: null as unknown as number,
-          commission_remarks: row.commissionRemarks || null,
         });
         leadsToCreate.push({ mobile, lead });
       }
@@ -371,6 +372,12 @@ export class LeadsService {
         else existing++;
 
         for (const row of rows) {
+          // The bulk upload "Remarks" column is an import note, not a commission
+          // note: record it as a follow-up note on newly created leads. Existing
+          // leads are left untouched so a note row can never bury a live schedule
+          // in the Action Required views.
+          const isNewLead = savedByMobile.has(mobile);
+          const remarkNote = isNewLead ? row.commissionRemarks || null : null;
           if (row.purchaseType || row.propertyType || row.funder || row.project || row.propertyCategory) {
             inquiries.push(
               manager.getRepository(LeadInquiry).create({
@@ -390,7 +397,7 @@ export class LeadsService {
             );
           }
 
-          if (row.followUpDate || row.purpose || row.priority || row.notes || row.rnr) {
+          if (row.followUpDate || row.purpose || row.priority || row.notes || row.rnr || remarkNote) {
             followUps.push(
               manager.getRepository(LeadFollowUp).create({
                 lead_id: lead.id,
@@ -399,7 +406,7 @@ export class LeadsService {
                 purpose: row.purpose || null,
                 priority: row.priority || null,
                 rnr: row.rnr || null,
-                notes: row.notes || null,
+                notes: row.notes || remarkNote || null,
               })
             );
           }
