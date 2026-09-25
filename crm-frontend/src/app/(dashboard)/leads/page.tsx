@@ -27,6 +27,7 @@ import { MobileLeadList } from "@/components/leads/mobile-lead-list";
 import { Device } from "@/components/shared/device";
 import { LEAD_STATUS_STYLES as STATUS_STYLES } from "@/lib/lead-constants";
 import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
+import { getBulkImportDestination } from "@/lib/lead-import";
 import { resetPageIndex } from "@/lib/pagination";
 
 interface PendingImport {
@@ -577,9 +578,9 @@ export default function LeadsPage() {
            (existing > 0 ? `, ${existing} already existed — new requirements attached` : "") +
            "."
          );
-         setPendingImports([]);
-         setPagination(prev => ({ ...prev, pageIndex: 0 }));
-         setActiveTab("All Leads");
+          setPendingImports([]);
+          setPagination(prev => ({ ...prev, pageIndex: 0 }));
+          router.push(getBulkImportDestination());
       } else {
          const msg = Array.isArray(data.error) ? data.error.join(", ") : data.error || data.message || "Bulk insert failed";
          console.error("Bulk import failed:", data);
