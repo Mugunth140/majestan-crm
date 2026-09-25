@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { FormSelect } from "@/components/shared/form-select";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
+import { formatFollowUpDateTime } from "@/lib/follow-up-datetime";
 import {
   Loader2,
   CalendarClock,
@@ -68,14 +69,6 @@ const PRIORITY_STYLES: Record<string, string> = {
   high:   "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
   urgent: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function formatFollowUpDate(dateStr: string) {
-  if (!dateStr) return "—";
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -318,7 +311,7 @@ export function FollowUpPanel({ entityId, entityType, followUps, onRefresh }: Fo
                                 Next follow-up
                               </span>
                               <span className="text-[12px] text-[#0052FF]/70 dark:text-blue-400/70">
-                                {formatFollowUpDate(fu.next_follow_up_date)}
+                                {formatFollowUpDateTime(fu.next_follow_up_date, fu.next_follow_up_time)}
                               </span>
                             </div>
                           )}
