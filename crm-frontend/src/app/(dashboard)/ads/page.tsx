@@ -406,7 +406,7 @@ export default function AdsPage() {
             <div className="flex items-center justify-between pr-[150px] min-h-[48px]">
               <div>
                 <h1 className="text-[28px] font-bold tracking-tight">Advertisement</h1>
-                <p className="text-muted-foreground text-sm mt-0.5">Manage your hero carousel advertisements</p>
+                {/* <p className="text-muted-foreground text-sm mt-0.5">Manage your hero carousel advertisements</p> */}
               </div>
               <div className="flex items-center gap-3">
                 <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={() => fetchAds()} title="Refresh">

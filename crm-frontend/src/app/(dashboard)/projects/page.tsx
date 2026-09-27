@@ -388,7 +388,7 @@ export default function ProjectsPage() {
             <div className="flex h-[48px] items-center justify-between pr-[150px]">
               <div>
                 <h1 className="text-[28px] font-bold tracking-tight">Projects</h1>
-                <p className="text-muted-foreground text-sm mt-0.5">Manage your villa and apartment projects</p>
+                {/* <p className="text-muted-foreground text-sm mt-0.5">Manage your villa and apartment projects</p> */}
               </div>
               <div className="flex items-center gap-3">
                 <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={() => fetchProjects({ pagination, debouncedSearchQuery, activeTab, filters })} title="Refresh">
