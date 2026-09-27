@@ -314,7 +314,7 @@ export default function ProjectsPage() {
             key={tab}
             onClick={() => { setActiveTab(tab); resetPage(); }}
             className={cn(
-              "px-5 h-10 rounded-full text-[14px] font-semibold whitespace-nowrap transition-all border active:scale-95",
+              "px-5 h-10 rouTrusted and Reliable Liaisoningnded-full text-[14px] font-semibold whitespace-nowrap transition-all border active:scale-95",
               isActive ? "bg-foreground text-background border-foreground shadow-sm" : "bg-card text-muted-foreground border-border hover:bg-muted"
             )}
           >
