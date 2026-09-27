@@ -1,4 +1,5 @@
 'use client';
+import { Fragment } from 'react';
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 interface ActivityHeatmapProps {
@@ -22,8 +23,8 @@ export function ActivityHeatmap({ data, loading }: ActivityHeatmapProps) {
           {DAYS.map((d, di) => {
             const dow = di + 1;
             return (
-              <>
-                <div key={`lbl-${dow}`} className="text-[11px] font-medium text-muted-foreground flex items-center">{d}</div>
+              <Fragment key={`day-${dow}`}>
+                <div className="text-[11px] font-medium text-muted-foreground flex items-center">{d}</div>
                 {hours.map(h => {
                   const v = lookup.get(`${dow}-${h}`) ?? 0;
                   const alpha = v / max;
@@ -36,7 +37,7 @@ export function ActivityHeatmap({ data, loading }: ActivityHeatmapProps) {
                     />
                   );
                 })}
-              </>
+              </Fragment>
             );
           })}
         </div>
