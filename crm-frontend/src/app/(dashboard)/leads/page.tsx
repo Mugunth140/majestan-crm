@@ -477,12 +477,10 @@ export default function LeadsPage() {
             const name = String(row["Customer Name"] || "").trim();
             const rawMobile = String(row["Customer Number"] || "").trim();
             const mobile = normalizeIndianMobile(rawMobile);
-            const email = String(row["Email Id"] || "").trim();
             const source = String(row["Lead source"] || "").trim();
 
             if (!name) { toast.error(`Row ${i + 2} is missing Customer Name. Import aborted.`); setIsImporting(false); return; }
             if (!mobile) { toast.error(`Row ${i + 2} is missing Customer Number. Import aborted.`); setIsImporting(false); return; }
-            if (!email) { toast.error(`Row ${i + 2} is missing Email Id. Import aborted.`); setIsImporting(false); return; }
             if (!source) { toast.error(`Row ${i + 2} is missing Lead source. Import aborted.`); setIsImporting(false); return; }
 
             // Duplicate detection within the file (after normalization)
@@ -510,7 +508,7 @@ export default function LeadsPage() {
                     date: new Date().toLocaleDateString(),
                     name: String(row["Customer Name"]).trim(),
                     mobile: normalizeIndianMobile(String(row["Customer Number"]).trim()),
-                    email: String(row["Email Id"]).trim(),
+                    email: String(row["Email Id"] || "").trim(),
                     source: String(row["Lead source"]).trim(),
                     commissionRemarks: String(row["Remarks"] || "").trim(),
                     staff: "Unassigned",
@@ -553,7 +551,7 @@ export default function LeadsPage() {
         .map(p => ({
           name: p.name,
           mobile: p.mobile,
-          email: p.email,
+          email: p.email || undefined,
           source: p.source,
           commissionRemarks: p.commissionRemarks || undefined,
         }));
