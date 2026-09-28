@@ -67,7 +67,7 @@ export default function AdsPage() {
         res?.data?.items ?? res?.data?.data ?? (Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []);
       setAds(Array.isArray(items) ? items : []);
     } catch (err) {
-      toast.error(describeError(err, "Failed to load ads."));
+      toast.error(err instanceof Error ? err.message : "Failed to load ads.");
       setAds([]);
     } finally {
       setIsLoading(false);
