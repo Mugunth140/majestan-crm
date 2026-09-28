@@ -6,6 +6,7 @@ import { GetLeadsQueryDto } from './dto/get-leads-query.dto';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 import { BulkCreateLeadsDto } from './dto/bulk-create-leads.dto';
+import { BulkCheckMobilesDto } from './dto/bulk-check-mobiles.dto';
 import { UpdateLeadStatusDto } from './dto/update-lead-status.dto';
 import { UpdateLeadInquiryDto } from './dto/update-lead-inquiry.dto';
 import { CreateLeadContactLogDto } from './dto/create-lead-contact-log.dto';
@@ -29,6 +30,15 @@ export class LeadsController {
     return { success: true, data };
   }
 
+  @Get('check-mobile')
+  async checkMobile(@Query('mobile') mobile: string, @Query('excludeId') excludeId?: string) {
+    const data = await this.leadsService.checkMobileExists(
+      mobile ?? '',
+      excludeId ? Number(excludeId) : undefined,
+    );
+    return { success: true, ...data };
+  }
+
   @Get()
   async getLeads(@Request() req: any, @Query() query: GetLeadsQueryDto) {
     const result = await this.leadsService.getLeads(req.user, query);
@@ -44,6 +54,12 @@ export class LeadsController {
   @Post('bulk')
   async bulkCreateLeads(@Body() body: BulkCreateLeadsDto) {
     const result = await this.leadsService.bulkCreateLeads(body.leads);
+    return { success: true, ...result };
+  }
+
+  @Post('bulk/check')
+  async bulkCheckMobiles(@Body() body: BulkCheckMobilesDto) {
+    const result = await this.leadsService.bulkCheckMobiles(body.mobiles ?? []);
     return { success: true, ...result };
   }
 

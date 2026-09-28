@@ -27,7 +27,8 @@ import { MobileLeadList } from "@/components/leads/mobile-lead-list";
 import { Device } from "@/components/shared/device";
 import { LEAD_STATUS_STYLES as STATUS_STYLES } from "@/lib/lead-constants";
 import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
-import { getBulkImportDestination } from "@/lib/lead-import";
+import { getBulkImportDestination, partitionPendingImports } from "@/lib/lead-import";
+import type { DuplicateLeadInfo } from "@/lib/lead-import";
 import { resetPageIndex } from "@/lib/pagination";
 
 interface PendingImport {
@@ -81,6 +82,56 @@ export default function LeadsPage() {
   const [importProgress, setImportProgress] = useState(0);
   const [pendingImports, setPendingImports] = useState<PendingImport[]>([]);
   const [isInserting, setIsInserting] = useState(false);
+
+  // Pre-insert duplicate map: normalized mobile -> existing lead info
+  const [existingByMobile, setExistingByMobile] = useState<Record<string, DuplicateLeadInfo>>({});
+  const [isCheckingDupes, setIsCheckingDupes] = useState(false);
+  const [isDupeConfirmOpen, setIsDupeConfirmOpen] = useState(false);
+  const [dupeBypass, setDupeBypass] = useState(false);
+
+  // The review is showing when parsed rows await confirmation on Open Pipeline
+  const isReviewingImports = activeTab === "Open Pipeline" && pendingImports.length > 0;
+  const { dupes: dupeRows } = useMemo(
+    () => partitionPendingImports(pendingImports, existingByMobile),
+    [pendingImports, existingByMobile]
+  );
+
+  // Fresh review state resets the dupe map + bypass
+  useEffect(() => {
+    if (pendingImports.length === 0) {
+      setExistingByMobile({});
+      setDupeBypass(false);
+      setIsDupeConfirmOpen(false);
+    }
+  }, [pendingImports.length]);
+
+  const checkBulkDupes = async (rows: PendingImport[]) => {
+    const mobiles = [...new Set(rows.map((r) => r.mobile).filter(Boolean))];
+    if (mobiles.length === 0) {
+      setExistingByMobile({});
+      return;
+    }
+    setIsCheckingDupes(true);
+    try {
+      const res = await apiFetch(API_URL + "/leads/bulk/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mobiles }),
+      });
+      const data = await res.json();
+      if (data.success) setExistingByMobile(data.existing ?? {});
+    } catch {
+      // Non-fatal: insert-time merge still protects against real duplicates
+      setExistingByMobile({});
+    } finally {
+      setIsCheckingDupes(false);
+    }
+  };
+
+  const removePendingRow = (rawId?: string) => {
+    if (!rawId) return;
+    setPendingImports((prev) => prev.filter((p) => p.rawId !== rawId));
+  };
 
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -432,6 +483,43 @@ export default function LeadsPage() {
     },
   ];
 
+  // Pending-review extras: duplicate badge + per-row remove (Open Pipeline only)
+  const reviewColumn: ColumnDef<any> = {
+    id: "review",
+    header: "Review",
+    cell: ({ row }) => {
+      const p = row.original;
+      if (!p.isPendingImport) return null;
+      const ex = existingByMobile[p.mobile];
+      return (
+        <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
+          {ex ? (
+            <Badge className="font-medium shadow-sm border whitespace-nowrap bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800">
+              Exists • {ex.displayId}
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 whitespace-nowrap">
+              New
+            </Badge>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Remove this row"
+            className="h-7 w-7 rounded-full text-muted-foreground hover:bg-red-50 hover:text-red-500"
+            onClick={() => removePendingRow(p.rawId)}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      );
+    },
+    enableSorting: false,
+    enableHiding: false,
+  };
+
+  const visibleColumns = isReviewingImports ? [...columns, reviewColumn] : columns;
+
   // Strips +91 / 91 prefix so numbers are stored as consistent 10-digit format.
   // India-only system — the only country code in use is +91.
   const normalizeIndianMobile = (raw: string): string => {
@@ -521,15 +609,17 @@ export default function LeadsPage() {
              processed = nextChunk;
              setImportProgress(Math.floor((processed / total) * 100));
              
-             if (processed < total) {
-                 setTimeout(processChunk, 20); // allow UI to update
-             } else {
-                 setPendingImports(formattedData);
-                 setIsImporting(false);
-                 setIsImportOpen(false);
-                 setActiveTab("Open Pipeline");
-                 toast.success(`${formattedData.length} leads parsed. Please review and insert.`);
-             }
+              if (processed < total) {
+                  setTimeout(processChunk, 20); // allow UI to update
+              } else {
+                  setPendingImports(formattedData);
+                  setIsImporting(false);
+                  setDupeBypass(false);
+                  setIsImportOpen(false);
+                  setActiveTab("Open Pipeline");
+                  toast.success(`${formattedData.length} leads parsed. Please review and insert.`);
+                  checkBulkDupes(formattedData);
+              }
           };
           processChunk();
         } else {
@@ -544,10 +634,42 @@ export default function LeadsPage() {
     reader.readAsBinaryString(file);
   };
 
+  // Gate: if any pending row already exists in the CRM, ask staff to
+  // confirm (showing the existing lead IDs) instead of inserting blindly.
   const handleBulkInsert = async () => {
+    const { dupes } = partitionPendingImports(pendingImports, existingByMobile);
+    if (dupes.length > 0 && !dupeBypass) {
+      setIsDupeConfirmOpen(true);
+      return;
+    }
+    await doBulkInsert(pendingImports);
+  };
+
+  // "Insert all anyway" from the duplicate confirmation dialog
+  const insertAllAnyway = async () => {
+    setDupeBypass(true);
+    setIsDupeConfirmOpen(false);
+    await doBulkInsert(pendingImports);
+  };
+
+  // "Remove duplicates" from the dialog: drop dupe rows, insert the rest
+  const removeDupeRowsAndContinue = async () => {
+    const { dupes } = partitionPendingImports(pendingImports, existingByMobile);
+    const dupeIds = new Set(dupes.map((d) => d.row.rawId));
+    const remaining = pendingImports.filter((p) => !dupeIds.has(p.rawId));
+    setPendingImports(remaining);
+    setIsDupeConfirmOpen(false);
+    if (remaining.length === 0) {
+      toast.success(`${dupes.length} duplicate row${dupes.length === 1 ? "" : "s"} removed. Nothing left to insert.`);
+      return;
+    }
+    await doBulkInsert(remaining);
+  };
+
+  const doBulkInsert = async (rows: PendingImport[]) => {
     try {
       setIsInserting(true);
-      const payload = pendingImports
+      const payload = rows
         .map(p => ({
           name: p.name,
           mobile: p.mobile,
@@ -696,7 +818,7 @@ export default function LeadsPage() {
   
   const tableProps = {
     flush: true as const,
-    columns,
+    columns: visibleColumns,
     data: displayedLeads,
     showToolbar: true,
     showDeleteAction: role === "Admin" && activeTab !== "Open Pipeline",
@@ -885,10 +1007,18 @@ export default function LeadsPage() {
                    <div className="hidden sm:flex h-9 w-9 rounded-full bg-[#0052FF]/10 dark:bg-[#0052FF]/20 items-center justify-center shrink-0">
                       <FileSpreadsheet className="h-4 w-4 text-[#0052FF]" />
                    </div>
-                   <div>
-                      <h3 className="text-foreground font-semibold text-[15px]">Review Pending Imports</h3>
-                      <p className="text-muted-foreground text-sm mt-0.5">Please review <span className="font-semibold text-foreground">{pendingImports.length}</span> imported leads below. They have not been saved yet.</p>
-                   </div>
+                    <div>
+                       <h3 className="text-foreground font-semibold text-[15px]">Review Pending Imports</h3>
+                       <p className="text-muted-foreground text-sm mt-0.5">Please review <span className="font-semibold text-foreground">{pendingImports.length}</span> imported leads below. They have not been saved yet.</p>
+                       {isCheckingDupes && (
+                         <p className="text-muted-foreground text-sm mt-0.5">Checking for existing leads…</p>
+                       )}
+                       {!isCheckingDupes && dupeRows.length > 0 && (
+                         <p className="text-amber-700 dark:text-amber-300 text-sm mt-0.5 font-medium">
+                           {dupeRows.length} of {pendingImports.length} already exist — they will be merged unless removed.
+                         </p>
+                       )}
+                    </div>
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                    <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => setPendingImports([])}>Cancel Import</Button>
@@ -1128,10 +1258,15 @@ export default function LeadsPage() {
                        <div className="h-8 w-8 rounded-full bg-[#0052FF]/10 dark:bg-[#0052FF]/20 flex items-center justify-center shrink-0">
                           <FileSpreadsheet className="h-4 w-4 text-[#0052FF]" />
                        </div>
-                       <div className="flex-1 min-w-0">
-                          <h3 className="text-foreground font-semibold text-[14px]">Review Pending Imports</h3>
-                          <p className="text-muted-foreground text-xs mt-0.5">Please review <span className="font-semibold text-foreground">{pendingImports.length}</span> leads below. Not saved yet.</p>
-                       </div>
+                        <div className="flex-1 min-w-0">
+                           <h3 className="text-foreground font-semibold text-[14px]">Review Pending Imports</h3>
+                           <p className="text-muted-foreground text-xs mt-0.5">Please review <span className="font-semibold text-foreground">{pendingImports.length}</span> leads below. Not saved yet.</p>
+                           {!isCheckingDupes && dupeRows.length > 0 && (
+                             <p className="text-amber-700 dark:text-amber-300 text-xs mt-0.5 font-medium">
+                               {dupeRows.length} of {pendingImports.length} already exist.
+                             </p>
+                           )}
+                        </div>
                     </div>
                     <div className="flex items-center gap-2">
                        <Button variant="outline" size="sm" className="flex-1" onClick={() => setPendingImports([])}>Cancel</Button>
@@ -1152,11 +1287,61 @@ export default function LeadsPage() {
                   onCardClick={(lead) => { if (!lead.isPendingImport) router.push("/leads/" + lead.rawId); }}
                   onCall={(lead) => openMobileContact("call", lead)}
                   onWhatsApp={(lead) => openMobileContact("whatsapp", lead)}
+                  existingByMobile={isReviewingImports ? existingByMobile : undefined}
+                  onRemovePending={isReviewingImports ? removePendingRow : undefined}
                 />
               )}
             </div>
           }
         />
+      {/* Duplicate Confirmation Dialog */}
+      <Dialog open={isDupeConfirmOpen} onOpenChange={(open) => { if (!open) setIsDupeConfirmOpen(false); }}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Duplicates found</DialogTitle>
+            <DialogDescription>
+              {dupeRows.length} of {pendingImports.length} rows already exist in the CRM. Inserting will merge them
+              into the existing profiles instead of creating new leads.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[280px] overflow-y-auto rounded-xl border border-border/60 divide-y divide-border/50">
+            {dupeRows.map(({ row, existing }, i) => (
+              <div key={row.rawId ?? i} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground truncate">{i + 1}. {row.name}</p>
+                  <p className="text-xs text-muted-foreground">{row.mobile}</p>
+                </div>
+                <Link
+                  href={`/leads/${existing.id}`}
+                  className="shrink-0 text-xs font-bold text-[#0052FF] hover:underline whitespace-nowrap"
+                  title={`${existing.name} • ${existing.staff ?? "Unassigned"}`}
+                >
+                  {existing.displayId} ↗
+                </Link>
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="mt-4 flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setIsDupeConfirmOpen(false)} disabled={isInserting}>Back</Button>
+            <Button
+              variant="outline"
+              className="border-red-200 text-red-600 hover:bg-red-50"
+              onClick={removeDupeRowsAndContinue}
+              disabled={isInserting}
+            >
+              {isInserting ? "Working…" : `Remove ${dupeRows.length} duplicate${dupeRows.length === 1 ? "" : "s"}`}
+            </Button>
+            <Button
+              onClick={insertAllAnyway}
+              disabled={isInserting}
+              className="bg-[#0052FF] text-white hover:bg-[#0052FF]/90"
+            >
+              {isInserting ? "Inserting…" : "Insert all anyway"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteId !== null || bulkDeleteIds !== null} onOpenChange={(open) => {
         if (!open) {

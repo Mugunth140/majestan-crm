@@ -1,10 +1,11 @@
 "use client";
 
-import { Phone, MessageSquare } from "lucide-react";
+import { Phone, MessageSquare, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LEAD_STATUS_STYLES } from "@/lib/lead-constants";
 import { cn } from "@/lib/utils";
+import type { DuplicateLeadInfo } from "@/lib/lead-import";
 
 interface MobileLeadListProps {
   leads: any[];
@@ -12,9 +13,11 @@ interface MobileLeadListProps {
   onCardClick: (lead: any) => void;
   onCall: (lead: any) => void;
   onWhatsApp: (lead: any) => void;
+  existingByMobile?: Record<string, DuplicateLeadInfo>;
+  onRemovePending?: (rawId: string) => void;
 }
 
-export function MobileLeadList({ leads, isLoading, onCardClick, onCall, onWhatsApp }: MobileLeadListProps) {
+export function MobileLeadList({ leads, isLoading, onCardClick, onCall, onWhatsApp, existingByMobile, onRemovePending }: MobileLeadListProps) {
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -54,6 +57,8 @@ export function MobileLeadList({ leads, isLoading, onCardClick, onCall, onWhatsA
         const assigned = lead.staff && lead.staff !== "Unassigned" ? lead.staff : null;
         const initial = (lead.name || "?").charAt(0).toUpperCase();
         const canContact = !isPending && !!lead.mobile;
+        const pendingDupe = isPending ? existingByMobile?.[lead.mobile] : undefined;
+        const canRemove = isPending && !!onRemovePending;
 
         return (
           <div
@@ -109,6 +114,30 @@ export function MobileLeadList({ leads, isLoading, onCardClick, onCall, onWhatsA
                 </div>
               )}
             </div>
+
+            {/* Pending-review row: duplicate chip + remove */}
+            {(pendingDupe || canRemove) && (
+              <div className="flex items-center justify-between gap-2 -mt-1">
+                {pendingDupe ? (
+                  <span className="text-[12px] px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 font-semibold shadow-sm">
+                    Exists • {pendingDupe.displayId}
+                  </span>
+                ) : (
+                  <span className="text-[12px] px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-semibold shadow-sm">
+                    New
+                  </span>
+                )}
+                {canRemove && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onRemovePending!(lead.rawId); }}
+                    className="flex items-center gap-1 text-[13px] font-semibold text-red-500 active:scale-95 transition-transform px-2 py-1"
+                  >
+                    <X className="w-4 h-4" strokeWidth={2.5} />
+                    Remove
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Actions Row */}
             <div className="grid grid-cols-2 gap-3 pt-1">

@@ -19,6 +19,14 @@ export interface CreateLeadResult {
   existingStaff?: string;
 }
 
+export interface DuplicateLeadInfo {
+  id: number;
+  displayId: string;
+  name: string;
+  status: string;
+  staff: string;
+}
+
 @Injectable()
 export class LeadsService {
   private _s3Client: S3Client | null = null;
@@ -427,8 +435,57 @@ export class LeadsService {
     return summary;
   }
 
-  async createLead(body: any): Promise<CreateLeadResult> {
-    // Normalise: frontend sends 'mobile', legacy DTO used 'mobile_number'
+  // ── Duplicate pre-checks (warn before submit / insert) ────────────────────
+  // Same India-only +91 normalization used by bulkCreateLeads so a typed
+  // "+91 98765 43210" matches the stored 10-digit number.
+  private normalizeMobileForCheck(raw: unknown): string {
+    const digits = String(raw ?? '').replace(/\D/g, '');
+    if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+    if (digits.length === 13 && digits.startsWith('091')) return digits.slice(3);
+    return digits;
+  }
+
+  private toDuplicateLeadInfo(lead: Lead): DuplicateLeadInfo {
+    return {
+      id: lead.id,
+      displayId: `L${String(lead.id).padStart(5, '0')}`,
+      name: lead.name,
+      status: lead.status,
+      staff: lead.assigned_staff?.name ?? 'Unassigned',
+    };
+  }
+
+  async checkMobileExists(mobile: string, excludeId?: number) {
+    const normalized = this.normalizeMobileForCheck(mobile);
+    if (!normalized) return { exists: false, lead: null };
+    const lead = await this.dataSource.getRepository(Lead).findOne({
+      where: { mobile_number: normalized },
+      relations: { assigned_staff: true },
+    });
+    if (!lead || (excludeId != null && lead.id === Number(excludeId))) {
+      return { exists: false, lead: null };
+    }
+    return { exists: true, lead: this.toDuplicateLeadInfo(lead) };
+  }
+
+  async bulkCheckMobiles(mobiles: string[]) {
+    const normalized = [...new Set(
+      (mobiles ?? []).map((m) => this.normalizeMobileForCheck(m)).filter(Boolean),
+    )];
+    const existing: Record<string, DuplicateLeadInfo> = {};
+    if (normalized.length === 0) return { existing };
+    const rows = await this.dataSource.getRepository(Lead)
+      .createQueryBuilder('lead')
+      .leftJoinAndSelect('lead.assigned_staff', 'staff')
+      .where('lead.mobile_number IN (:...mobiles)', { mobiles: normalized })
+      .getMany();
+    for (const lead of rows) {
+      existing[lead.mobile_number] = this.toDuplicateLeadInfo(lead);
+    }
+    return { existing };
+  }
+
+  async createLead(body: any): Promise<CreateLeadResult> {    // Normalise: frontend sends 'mobile', legacy DTO used 'mobile_number'
     const mobile = (body.mobile ?? body.mobile_number ?? '').toString().trim();
     if (!mobile) {
       throw new BadRequestException('mobile is required');

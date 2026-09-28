@@ -3,7 +3,8 @@
 import { apiFetch } from "@/lib/api-fetch";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, useRef, useCallback, Suspense } from "react";
+import Link from "next/link";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,8 @@ import {
   PROPERTY_CATEGORIES, PROPERTY_TYPES_MAP, FUNDERS, PROJECTS 
 } from "@/lib/lead-constants";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { useDebounce } from "@/hooks/use-debounce";
+import type { DuplicateLeadInfo } from "@/lib/lead-import";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -58,6 +61,43 @@ function LeadForm() {
   const [isReferral, setIsReferral] = useState(false);
   
   const [followUpDateObj, setFollowUpDateObj] = useState<Date | undefined>(undefined);
+
+  // Live duplicate check on the mobile field (create mode only, warn-only)
+  const [mobileValue, setMobileValue] = useState("");
+  const debouncedMobile = useDebounce(mobileValue, 500);
+  const [mobileDupe, setMobileDupe] = useState<DuplicateLeadInfo | null>(null);
+  const [isCheckingMobile, setIsCheckingMobile] = useState(false);
+  const mobileCheckSeq = useRef(0);
+
+  const checkMobileDupe = useCallback(async (raw: string) => {
+    const digits = raw.replace(/\D/g, "");
+    let normalized = digits;
+    if (digits.length === 12 && digits.startsWith("91")) normalized = digits.slice(2);
+    if (digits.length === 13 && digits.startsWith("091")) normalized = digits.slice(3);
+    if (normalized.length < 10) {
+      mobileCheckSeq.current++;
+      setMobileDupe(null);
+      setIsCheckingMobile(false);
+      return;
+    }
+    const seq = ++mobileCheckSeq.current;
+    setIsCheckingMobile(true);
+    try {
+      const res = await apiFetch(`${API_URL}/leads/check-mobile?mobile=${encodeURIComponent(normalized)}`);
+      const data = await res.json();
+      if (mobileCheckSeq.current !== seq) return;
+      setMobileDupe(data.success && data.exists ? data.lead : null);
+    } catch {
+      if (mobileCheckSeq.current === seq) setMobileDupe(null);
+    } finally {
+      if (mobileCheckSeq.current === seq) setIsCheckingMobile(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (editId) return;
+    checkMobileDupe(debouncedMobile);
+  }, [debouncedMobile, editId, checkMobileDupe]);
 
   // User state for routing modal
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -330,7 +370,35 @@ function LeadForm() {
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Mobile Number</label>
-              <Input name="mobile" defaultValue={leadData?.mobile_number || ""} placeholder="+91 98765 43210" required className="h-12 rounded-xl bg-muted/30" />
+              <Input
+                name="mobile"
+                defaultValue={leadData?.mobile_number || ""}
+                placeholder="+91 98765 43210"
+                required
+                className="h-12 rounded-xl bg-muted/30"
+                onChange={(e) => setMobileValue(e.target.value)}
+                onBlur={(e) => { setMobileValue(e.target.value); checkMobileDupe(e.target.value); }}
+              />
+              {!editId && (
+                <div className="min-h-[20px]">
+                  {isCheckingMobile ? (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking…
+                    </p>
+                  ) : mobileDupe ? (
+                    <p
+                      className="text-xs font-medium text-amber-700 dark:text-amber-300 truncate"
+                      title={`${mobileDupe.name} • assigned to ${mobileDupe.staff ?? "Unassigned"}`}
+                    >
+                      Duplicate:{" "}
+                      <Link href={`/leads/${mobileDupe.id}`} className="font-bold underline underline-offset-2">
+                        {mobileDupe.displayId}
+                      </Link>{" "}
+                      {mobileDupe.name}
+                    </p>
+                  ) : null}
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Whatsapp Number</label>
