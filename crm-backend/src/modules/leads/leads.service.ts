@@ -232,18 +232,22 @@ export class LeadsService {
       const existingLead = await leadRepo.findOne({ where: { id } });
       if (!existingLead) throw new NotFoundException('Lead not found');
 
-      if (body.mobile && body.mobile !== existingLead.mobile_number) {
-        const conflict = await leadRepo.findOne({ where: { mobile_number: body.mobile } });
+      // Normalize like create/bulk so a "+91 …" edit matches stored numbers
+      // instead of false-conflicting or storing a second unnormalized form.
+      const normalizedMobile = body.mobile ? this.normalizeMobileForCheck(body.mobile) : undefined;
+      if (normalizedMobile && normalizedMobile !== existingLead.mobile_number) {
+        const conflict = await leadRepo.findOne({ where: { mobile_number: normalizedMobile } });
         if (conflict) throw new ConflictException('Mobile number already belongs to another lead');
       }
 
-      existingLead.name = body.name;
-      existingLead.mobile_number = body.mobile;
-      existingLead.email = body.email || null;
-      existingLead.whatsapp_number = body.whatsapp || null;
-      existingLead.city = body.city || null;
-      existingLead.address = body.address || null;
-      existingLead.lead_source = body.source || null;
+      // Absent keys leave stored values untouched (partial payloads must not blank fields).
+      if (body.name !== undefined) existingLead.name = body.name;
+      if (normalizedMobile) existingLead.mobile_number = normalizedMobile;
+      if (body.email !== undefined) existingLead.email = body.email || null;
+      if (body.whatsapp !== undefined) existingLead.whatsapp_number = body.whatsapp || null;
+      if (body.city !== undefined) existingLead.city = body.city || null;
+      if (body.address !== undefined) existingLead.address = body.address || null;
+      if (body.source !== undefined) existingLead.lead_source = body.source || null;
       existingLead.commission = body.commission !== undefined ? body.commission : existingLead.commission;
       if (body.isReferral !== undefined) existingLead.is_referral = body.isReferral;
       if (body.referredByName !== undefined) existingLead.referred_by_name = body.referredByName;

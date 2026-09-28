@@ -94,6 +94,25 @@ export default function LeadsPage() {
   const [isPendingAssignOpen, setIsPendingAssignOpen] = useState(false);
   const [pendingAssignTargets, setPendingAssignTargets] = useState<string[]>([]);
   const [pendingSelection, setPendingSelection] = useState<any[]>([]);
+  // Bumped per parse so the table remounts with fresh selection state;
+  // holds rows awaiting overwrite confirmation.
+  const [reviewEpoch, setReviewEpoch] = useState(0);
+  const [overwriteCandidate, setOverwriteCandidate] = useState<PendingImport[] | null>(null);
+
+  // Commits freshly parsed rows as the active review, clearing any state
+  // tied to a previous review (assignments/selection/dupe bypass).
+  const applyParsedImports = (formattedData: PendingImport[]) => {
+    setPendingImports(formattedData);
+    setDupeBypass(false);
+    setPendingAssignments({});
+    setPendingAssignTargets([]);
+    setPendingSelection([]);
+    setIsPendingAssignOpen(false);
+    setOverwriteCandidate(null);
+    setReviewEpoch((epoch) => epoch + 1);
+    toast.success(`${formattedData.length} leads parsed. Please review and insert.`);
+    checkBulkDupes(formattedData);
+  };
 
   const openPendingAssignFromSelection = () => {
     // Duplicates are merge-only: they cannot be pre-assigned
@@ -557,8 +576,13 @@ export default function LeadsPage() {
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    // Reset so picking the same file again still fires onChange
+    e.target.value = "";
     if (!file) return;
-    
+
+    // Snapshot: a completed parse must not silently discard this review
+    const hadPendingReview = pendingImports.length > 0;
+
     setIsImporting(true);
     setImportProgress(0);
     
@@ -638,13 +662,16 @@ export default function LeadsPage() {
               if (processed < total) {
                   setTimeout(processChunk, 20); // allow UI to update
               } else {
-                  setPendingImports(formattedData);
                   setIsImporting(false);
-                  setDupeBypass(false);
                   setIsImportOpen(false);
                   setActiveTab("Open Pipeline");
-                  toast.success(`${formattedData.length} leads parsed. Please review and insert.`);
-                  checkBulkDupes(formattedData);
+                  if (hadPendingReview) {
+                    // A review is already in progress — hold the new rows for
+                    // confirmation instead of silently discarding the old review
+                    setOverwriteCandidate(formattedData);
+                  } else {
+                    applyParsedImports(formattedData);
+                  }
               }
           };
           processChunk();
@@ -1080,7 +1107,7 @@ export default function LeadsPage() {
           </div>
         ) : (
           <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col">
-            {isLoading ? <TableSkeleton /> : <DataTable {...tableProps} />}
+            {isLoading ? <TableSkeleton /> : <DataTable key={isReviewingImports ? `review-${reviewEpoch}` : "leads"} {...tableProps} />}
           </div>
         )}
       </div>
@@ -1340,6 +1367,29 @@ export default function LeadsPage() {
             </div>
           }
         />
+      {/* Overwrite Confirmation Dialog (new parse while a review is active) */}
+      <Dialog open={overwriteCandidate !== null} onOpenChange={(open) => { if (!open) setOverwriteCandidate(null); }}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Replace current review?</DialogTitle>
+            <DialogDescription>
+              You have {pendingImports.length} unsaved row{pendingImports.length === 1 ? "" : "s"} under review
+              {Object.keys(pendingAssignments).length > 0 ? " (including staff assignments)" : ""}. Importing this
+              file will discard {pendingImports.length === 1 ? "it" : "them"}.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => { setOverwriteCandidate(null); toast.info("Kept the current review."); }}>Keep current</Button>
+            <Button
+              className="bg-[#0052FF] text-white hover:bg-[#0052FF]/90"
+              onClick={() => { if (overwriteCandidate) applyParsedImports(overwriteCandidate); }}
+            >
+              Replace
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Duplicate Confirmation Dialog */}
       <Dialog open={isDupeConfirmOpen} onOpenChange={(open) => { if (!open) setIsDupeConfirmOpen(false); }}>
         <DialogContent className="sm:max-w-[520px]">
