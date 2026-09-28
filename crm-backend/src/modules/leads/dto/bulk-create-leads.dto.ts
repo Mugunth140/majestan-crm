@@ -1,4 +1,4 @@
-import { IsArray, ValidateNested, IsOptional, IsString, IsBoolean, IsNumber, ArrayMaxSize } from 'class-validator';
+import { IsArray, ValidateNested, IsOptional, IsString, IsBoolean, IsNumber, IsInt, ArrayMaxSize } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 
 const toTrimmedString = ({ value }: { value: any }) => {
@@ -135,6 +135,13 @@ export class BulkLeadDto {
   @Transform(toTrimmedString)
   @IsString()
   notes?: string;
+
+  // Open Pipeline assign-on-insert: staff user id chosen during review.
+  // Unknown ids are ignored (lead stays unassigned → routing queue).
+  @IsOptional()
+  @Transform(toNumber)
+  @IsInt()
+  assignedStaffId?: number;
 }
 
 export class BulkCreateLeadsDto {

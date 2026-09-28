@@ -20,13 +20,15 @@ interface StaffMember {
 interface AssignLeadModalProps {
   open: boolean;
   onClose: () => void;
-  onConfirm: (toUserId: number) => void;
+  onConfirm: (toUserId: number, staff?: StaffMember) => void;
   leadId?: number;
   department?: string;
   isLoading?: boolean;
+  title?: string;
+  description?: string;
 }
 
-export function AssignLeadModal({ open, onClose, onConfirm, department, isLoading }: AssignLeadModalProps) {
+export function AssignLeadModal({ open, onClose, onConfirm, department, isLoading, title, description }: AssignLeadModalProps) {
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [isFetching, setIsFetching] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -53,7 +55,7 @@ export function AssignLeadModal({ open, onClose, onConfirm, department, isLoadin
 
   const handleConfirm = () => {
     if (!selectedId) return toast.error("Please select a staff member");
-    onConfirm(selectedId);
+    onConfirm(selectedId, staffList.find((s) => s.id === selectedId));
   };
 
   const handleClose = () => {
@@ -65,9 +67,9 @@ export function AssignLeadModal({ open, onClose, onConfirm, department, isLoadin
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Assign Lead</DialogTitle>
+          <DialogTitle>{title ?? "Assign Lead"}</DialogTitle>
           <DialogDescription>
-            Select a team member to assign this lead to.
+            {description ?? "Select a team member to assign this lead to."}
           </DialogDescription>
         </DialogHeader>
 
@@ -94,7 +96,9 @@ export function AssignLeadModal({ open, onClose, onConfirm, department, isLoadin
                   <User className="h-4 w-4 text-blue-700 dark:text-blue-300" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground truncate">{s.name}</p>
+                  <p className="text-sm font-semibold text-foreground truncate">
+                    <span className="text-muted-foreground font-medium">#{s.id}</span> {s.name}
+                  </p>
                   {s.department?.name && (
                     <p className="text-xs text-muted-foreground">{s.department.name}</p>
                   )}

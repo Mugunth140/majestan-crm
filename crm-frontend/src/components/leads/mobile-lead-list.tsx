@@ -15,9 +15,11 @@ interface MobileLeadListProps {
   onWhatsApp: (lead: any) => void;
   existingByMobile?: Record<string, DuplicateLeadInfo>;
   onRemovePending?: (rawId: string) => void;
+  pendingAssignments?: Record<string, { id: number; name: string }>;
+  onAssignPending?: (rawId: string) => void;
 }
 
-export function MobileLeadList({ leads, isLoading, onCardClick, onCall, onWhatsApp, existingByMobile, onRemovePending }: MobileLeadListProps) {
+export function MobileLeadList({ leads, isLoading, onCardClick, onCall, onWhatsApp, existingByMobile, onRemovePending, pendingAssignments, onAssignPending }: MobileLeadListProps) {
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -59,6 +61,8 @@ export function MobileLeadList({ leads, isLoading, onCardClick, onCall, onWhatsA
         const canContact = !isPending && !!lead.mobile;
         const pendingDupe = isPending ? existingByMobile?.[lead.mobile] : undefined;
         const canRemove = isPending && !!onRemovePending;
+        const pendingAssignee = isPending && lead.rawId ? pendingAssignments?.[lead.rawId] : undefined;
+        const canAssign = isPending && !!lead.rawId && !!onAssignPending && !pendingDupe;
 
         return (
           <div
@@ -115,9 +119,10 @@ export function MobileLeadList({ leads, isLoading, onCardClick, onCall, onWhatsA
               )}
             </div>
 
-            {/* Pending-review row: duplicate chip + remove */}
-            {(pendingDupe || canRemove) && (
+            {/* Pending-review row: duplicate chip + assignee + remove */}
+            {(pendingDupe || canRemove || canAssign || pendingAssignee) && (
               <div className="flex items-center justify-between gap-2 -mt-1">
+                <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                 {pendingDupe ? (
                   <span className="text-[12px] px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 font-semibold shadow-sm">
                     Exists • {pendingDupe.displayId}
@@ -126,6 +131,21 @@ export function MobileLeadList({ leads, isLoading, onCardClick, onCall, onWhatsA
                   <span className="text-[12px] px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-semibold shadow-sm">
                     New
                   </span>
+                )}
+                {pendingAssignee && (
+                  <span className="text-[12px] px-2.5 py-1 rounded-lg bg-[#0052FF]/10 border border-[#0052FF]/30 text-[#0052FF] font-semibold shadow-sm">
+                    → {pendingAssignee.name}
+                  </span>
+                )}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                {canAssign && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onAssignPending!(lead.rawId); }}
+                    className="text-[13px] font-semibold text-[#0052FF] active:scale-95 transition-transform px-2 py-1"
+                  >
+                    Assign
+                  </button>
                 )}
                 {canRemove && (
                   <button
@@ -136,6 +156,7 @@ export function MobileLeadList({ leads, isLoading, onCardClick, onCall, onWhatsA
                     Remove
                   </button>
                 )}
+                </div>
               </div>
             )}
 

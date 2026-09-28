@@ -143,3 +143,6 @@ prod-config
 .mimosa/
 .env
 .env.*
+
+# Vitest JSON reporter output (regenerated every run)
+crm-frontend/.vitest/

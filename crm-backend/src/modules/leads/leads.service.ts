@@ -1,6 +1,6 @@
 import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, In } from 'typeorm';
 import { Lead } from '../../database/entities/lead.entity';
 import { LeadFollowUp } from '../../database/entities/lead-follow-up.entity';
 import { LeadInquiry } from '../../database/entities/lead-inquiry.entity';
@@ -292,8 +292,8 @@ export class LeadsService {
     return inquiryRepo.save(inquiry);
   }
 
-  async bulkCreateLeads(leads: any[]) {
-    if (!leads || leads.length === 0) return { count: 0, created: 0, existing: 0 };
+  async bulkCreateLeads(leads: any[], actionedBy?: any) {
+    if (!leads || leads.length === 0) return { count: 0, created: 0, existing: 0, assigned: 0 };
 
     // Strip +91 / 91 prefix so numbers are stored as consistent 10-digit strings.
     // India-only system — +91 is the only country code in use.
@@ -314,7 +314,15 @@ export class LeadsService {
     .map(l => ({ ...l, mobile: normalizeIndianMobile(String(l.mobile).trim()) }))
     .filter(l => l.mobile !== '');
 
-    if (normalizedLeads.length === 0) return { count: 0, created: 0, existing: 0 };
+    // Pre-assignment is a non-Staff privilege (mirrors the frontend gate):
+    // a Staff caller cannot skip the routing queue via direct API call.
+    const requesterRole = actionedBy?.role?.name ?? actionedBy?.role;
+    const canPreAssign = requesterRole !== 'Staff';
+    if (!canPreAssign) {
+      for (const l of normalizedLeads) delete l.assignedStaffId;
+    }
+
+    if (normalizedLeads.length === 0) return { count: 0, created: 0, existing: 0, assigned: 0 };
 
     const summary = await this.dataSource.transaction(async (manager: EntityManager) => {
       // Group rows by normalized mobile so duplicates within the same file
@@ -338,25 +346,58 @@ export class LeadsService {
       const existingMap = new Map<string, Lead>();
       existingLeads.forEach(l => existingMap.set(l.mobile_number, l));
 
+      // Open Pipeline assign-on-insert: resolve the distinct staff ids chosen
+      // during review in one go (with departments) so new leads land directly
+      // owned + in the right pipeline instead of the routing queue.
+      // Unknown ids — or staff with no department link — are ignored:
+      // those rows import unassigned (routing queue) instead of guessing.
+      const normalizeDeptName = (name: unknown): 'sales' | 'telecalling' | null => {
+        if (name == null || String(name).trim() === '') return null;
+        const n = String(name).toLowerCase().replace(' department', '').trim();
+        return n === 'sales' ? 'sales' : 'telecalling';
+      };
+      const assigneeIds = [...new Set(
+        [...rowsByMobile.values()]
+          .map((rows) => rows[0]?.assignedStaffId)
+          .filter((v): v is number => typeof v === 'number' && Number.isInteger(v)),
+      )];
+      const deptByUserId = new Map<number, 'sales' | 'telecalling'>();
+      if (assigneeIds.length > 0) {
+        const assignees = await manager.getRepository(User).find({
+          where: { id: In(assigneeIds) },
+          relations: { department: true },
+        });
+        for (const u of assignees) {
+          const dept = normalizeDeptName((u as any).department?.name);
+          if (dept) deptByUserId.set(u.id, dept);
+        }
+      }
+
       // Build one lead entity per new mobile (first row provides base data)
-      const leadsToCreate: { mobile: string; lead: Lead }[] = [];
+      const leadsToCreate: { mobile: string; lead: Lead; assigneeId: number | null }[] = [];
       for (const [mobile, rows] of rowsByMobile) {
         if (existingMap.has(mobile)) continue;
         const row = rows[0];
+        // Duplicate-mobile rows never reach here (merged below), so a chosen
+        // assignee on a dupe row is simply ignored.
+        const assigneeId = typeof row.assignedStaffId === 'number' && deptByUserId.has(row.assignedStaffId)
+          ? row.assignedStaffId
+          : null;
         const lead = manager.getRepository(Lead).create({
           name: row.name,
           mobile_number: mobile,
           email: row.email || null,
           lead_source: row.source || null,
           status: 'New Lead',
-          // Imported leads always enter the unassigned telecalling routing queue —
-          // assignment happens exclusively through lead routing by admins/managers/team leads.
+          // Imported leads enter the unassigned telecalling routing queue unless
+          // a staff member was chosen during review — then they land directly
+          // assigned in that staff member's department pipeline.
           // NOTE: the bulk upload "Remarks" column is NOT a commission note — it is
           // recorded as a follow-up note below, so commission_remarks stays null.
-          department: 'telecalling',
-          assigned_staff_id: null as unknown as number,
+          department: assigneeId != null ? (deptByUserId.get(assigneeId) as string) : 'telecalling',
+          assigned_staff_id: assigneeId as unknown as number,
         });
-        leadsToCreate.push({ mobile, lead });
+        leadsToCreate.push({ mobile, lead, assigneeId });
       }
 
       // Batch insert new leads
@@ -371,12 +412,17 @@ export class LeadsService {
       const followUps = [];
       let created = 0;
       let existing = 0;
+      let assigned = 0;
+      const assigneeByMobile = new Map(leadsToCreate.map((item) => [item.mobile, item.assigneeId] as const));
 
       for (const [mobile, rows] of rowsByMobile) {
         const lead = savedByMobile.get(mobile) ?? existingMap.get(mobile);
         if (!lead) continue;
 
-        if (savedByMobile.has(mobile)) created++;
+        if (savedByMobile.has(mobile)) {
+          created++;
+          if (assigneeByMobile.get(mobile) != null) assigned++;
+        }
         else existing++;
 
         for (const row of rows) {
@@ -429,7 +475,7 @@ export class LeadsService {
         await manager.save(LeadFollowUp, followUps, { chunk: 1000 });
       }
 
-      return { count: created, created, existing };
+      return { count: created, created, existing, assigned };
     });
 
     return summary;

@@ -89,6 +89,11 @@ export default function LeadsPage() {
   const [isDupeConfirmOpen, setIsDupeConfirmOpen] = useState(false);
   const [dupeBypass, setDupeBypass] = useState(false);
 
+  // Pre-assign during review: pending rawId -> chosen staff (applied at insert)
+  const [pendingAssignments, setPendingAssignments] = useState<Record<string, { id: number; name: string }>>({});
+  const [isPendingAssignOpen, setIsPendingAssignOpen] = useState(false);
+  const [pendingAssignTargets, setPendingAssignTargets] = useState<string[]>([]);
+
   // The review is showing when parsed rows await confirmation on Open Pipeline
   const isReviewingImports = activeTab === "Open Pipeline" && pendingImports.length > 0;
   const { dupes: dupeRows } = useMemo(
@@ -96,12 +101,15 @@ export default function LeadsPage() {
     [pendingImports, existingByMobile]
   );
 
-  // Fresh review state resets the dupe map + bypass
+  // Fresh review state resets the dupe map + bypass + pre-assignments
   useEffect(() => {
     if (pendingImports.length === 0) {
       setExistingByMobile({});
       setDupeBypass(false);
       setIsDupeConfirmOpen(false);
+      setPendingAssignments({});
+      setIsPendingAssignOpen(false);
+      setPendingAssignTargets([]);
     }
   }, [pendingImports.length]);
 
@@ -491,6 +499,7 @@ export default function LeadsPage() {
       const p = row.original;
       if (!p.isPendingImport) return null;
       const ex = existingByMobile[p.mobile];
+      const assignee = p.rawId ? pendingAssignments[p.rawId] : undefined;
       return (
         <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
           {ex ? (
@@ -500,6 +509,11 @@ export default function LeadsPage() {
           ) : (
             <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 whitespace-nowrap">
               New
+            </Badge>
+          )}
+          {assignee && !ex && (
+            <Badge variant="outline" className="bg-[#0052FF]/10 text-[#0052FF] border-[#0052FF]/30 whitespace-nowrap" title={`Assigned to ${assignee.name} on insert`}>
+              → {assignee.name}
             </Badge>
           )}
           <Button
@@ -676,6 +690,7 @@ export default function LeadsPage() {
           email: p.email || undefined,
           source: p.source,
           commissionRemarks: p.commissionRemarks || undefined,
+          assignedStaffId: (p.rawId ? pendingAssignments[p.rawId]?.id : undefined) ?? undefined,
         }));
 
       if (payload.length === 0) {
@@ -693,9 +708,11 @@ export default function LeadsPage() {
       if (res.ok && data.success) {
          const created = data.created ?? data.count ?? 0;
          const existing = data.existing ?? 0;
+         const assigned = data.assigned ?? 0;
          toast.success(
            `Imported ${created} new lead${created === 1 ? "" : "s"}` +
            (existing > 0 ? `, ${existing} already existed — new requirements attached` : "") +
+           (assigned > 0 ? `, ${assigned} assigned directly` : "") +
            "."
          );
           setPendingImports([]);
@@ -880,6 +897,29 @@ export default function LeadsPage() {
               </Button>
             )
           )}
+
+          {/* Open Pipeline review: pre-assign selected pending rows (applied at insert) */}
+          {role !== "Staff" && selectedRows.some((r: any) => r.isPendingImport) && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+              onClick={() => {
+                // Duplicates are merge-only: they cannot be pre-assigned
+                const targets = selectedRows
+                  .filter((r: any) => r.isPendingImport && r.rawId && !existingByMobile[r.mobile])
+                  .map((r: any) => r.rawId);
+                if (targets.length === 0) {
+                  toast.info("Selected rows already exist — nothing to assign.");
+                  return;
+                }
+                setPendingAssignTargets(targets);
+                setIsPendingAssignOpen(true);
+              }}
+            >
+              Assign to staff
+            </Button>
+          )}
         </>
       );
     },
@@ -1002,27 +1042,25 @@ export default function LeadsPage() {
       {/* Table Content */}
       <div className="w-full md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col">
         {pendingImports.length > 0 && activeTab === "Open Pipeline" && (
-             <div className="mb-6 mx-6 mt-4 p-4 sm:p-5 bg-card border border-border rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
-                <div className="flex items-start gap-3">
-                   <div className="hidden sm:flex h-9 w-9 rounded-full bg-[#0052FF]/10 dark:bg-[#0052FF]/20 items-center justify-center shrink-0">
-                      <FileSpreadsheet className="h-4 w-4 text-[#0052FF]" />
+             <div className="mx-6 mt-3 px-4 py-2.5 bg-card border border-border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 shadow-sm">
+                <div className="flex items-center gap-2.5 min-w-0">
+                   <div className="hidden sm:flex h-7 w-7 rounded-full bg-[#0052FF]/10 dark:bg-[#0052FF]/20 items-center justify-center shrink-0">
+                      <FileSpreadsheet className="h-3.5 w-3.5 text-[#0052FF]" />
                    </div>
-                    <div>
-                       <h3 className="text-foreground font-semibold text-[15px]">Review Pending Imports</h3>
-                       <p className="text-muted-foreground text-sm mt-0.5">Please review <span className="font-semibold text-foreground">{pendingImports.length}</span> imported leads below. They have not been saved yet.</p>
-                       {isCheckingDupes && (
-                         <p className="text-muted-foreground text-sm mt-0.5">Checking for existing leads…</p>
-                       )}
-                       {!isCheckingDupes && dupeRows.length > 0 && (
-                         <p className="text-amber-700 dark:text-amber-300 text-sm mt-0.5 font-medium">
-                           {dupeRows.length} of {pendingImports.length} already exist — they will be merged unless removed.
-                         </p>
-                       )}
-                    </div>
+                   <p className="text-[13.5px] truncate">
+                      <span className="text-foreground font-semibold">Review {pendingImports.length} pending import{pendingImports.length === 1 ? "" : "s"}</span>
+                      <span className="text-muted-foreground"> — not saved yet.</span>
+                      {isCheckingDupes && (
+                        <span className="text-muted-foreground"> Checking…</span>
+                      )}
+                      {!isCheckingDupes && dupeRows.length > 0 && (
+                        <span className="text-amber-700 dark:text-amber-300 font-medium"> {dupeRows.length} exist.</span>
+                      )}
+                   </p>
                 </div>
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                   <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => setPendingImports([])}>Cancel Import</Button>
-                   <Button onClick={handleBulkInsert} disabled={isInserting} className="flex-1 sm:flex-none bg-[#0052FF] text-white hover:bg-[#0052FF]/90 shadow-md px-6">
+                <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                   <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={() => setPendingImports([])}>Cancel Import</Button>
+                   <Button size="sm" onClick={handleBulkInsert} disabled={isInserting} className="flex-1 sm:flex-none bg-[#0052FF] text-white hover:bg-[#0052FF]/90 shadow-md">
                      {isInserting ? "Inserting…" : "Confirm & Insert All"}
                    </Button>
                 </div>
@@ -1289,6 +1327,11 @@ export default function LeadsPage() {
                   onWhatsApp={(lead) => openMobileContact("whatsapp", lead)}
                   existingByMobile={isReviewingImports ? existingByMobile : undefined}
                   onRemovePending={isReviewingImports ? removePendingRow : undefined}
+                  pendingAssignments={isReviewingImports ? pendingAssignments : undefined}
+                  onAssignPending={isReviewingImports && role !== "Staff" ? (rawId) => {
+                    setPendingAssignTargets([rawId]);
+                    setIsPendingAssignOpen(true);
+                  } : undefined}
                 />
               )}
             </div>
@@ -1379,6 +1422,29 @@ export default function LeadsPage() {
         leadId={assignLeadId ?? undefined}
         department={deptFilter}
         isLoading={isAssigning}
+      />
+
+      {/* Pre-assign Modal (Open Pipeline review: stored, applied at insert) */}
+      <AssignLeadModal
+        open={isPendingAssignOpen}
+        onClose={() => {
+          setIsPendingAssignOpen(false);
+          setPendingAssignTargets([]);
+        }}
+        onConfirm={(toUserId, staff) => {
+          const name = staff?.name ?? `Staff #${toUserId}`;
+          setPendingAssignments((prev) => {
+            const next = { ...prev };
+            for (const rawId of pendingAssignTargets) next[rawId] = { id: toUserId, name };
+            return next;
+          });
+          setIsPendingAssignOpen(false);
+          setPendingAssignTargets([]);
+          toast.success(`${pendingAssignTargets.length} row${pendingAssignTargets.length === 1 ? "" : "s"} will be assigned to ${name} on insert.`);
+        }}
+        department={deptFilter}
+        title="Assign to staff"
+        description="Selected rows will be created directly assigned to this team member instead of entering the routing queue."
       />
 
       {/* Return to Queue Modal */}
