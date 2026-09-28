@@ -22,6 +22,7 @@ const ContactModal = dynamic(() => import("@/components/shared/contact-modal").t
 
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { cn } from "@/lib/utils";
+import { formatIndianCurrencyWords } from "@/lib/indian-currency";
 import { canViewInboundContacts } from "@/lib/permissions";
 import {
   ArrowLeft, Loader2, User, Phone, MapPin, Building2,
@@ -479,7 +480,14 @@ export default function InboundViewPage() {
               {inbound.purpose === "Rent" && (
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Total Rent</p>
-                  <p className="text-[14px] font-medium text-foreground">{inbound.total_rent ? `₹${Number(inbound.total_rent).toLocaleString()}` : "\u2014"}</p>
+                  <p className="text-[14px] font-medium text-foreground">{inbound.total_rent ? `₹${Number(inbound.total_rent).toLocaleString()}` : "—"}</p>
+                </div>
+              )}
+              {inbound.sale_price != null && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Sale Price</p>
+                  <p className="text-[14px] font-medium text-foreground">₹{Number(inbound.sale_price).toLocaleString()}</p>
+                  <p className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 mt-0.5">{formatIndianCurrencyWords(Number(inbound.sale_price))}</p>
                 </div>
               )}
               {inbound.advance && (

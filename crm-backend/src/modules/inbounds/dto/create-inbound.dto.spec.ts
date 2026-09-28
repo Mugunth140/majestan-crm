@@ -115,4 +115,21 @@ describe('CreateInboundDto (inbound form contract)', () => {
     });
     expect(errors.some((e) => e.property === 'units')).toBe(true);
   });
+
+  it('accepts a residential sale payload with a numeric sale_price', async () => {
+    const errors = await pipeValidate(CreateInboundDto, {
+      ...staffRentPayload(7),
+      purpose: 'Sale',
+      sale_price: 8500000,
+    });
+    expect(errors).toEqual([]);
+  });
+
+  it('rejects a non-numeric sale_price', async () => {
+    const errors = await pipeValidate(CreateInboundDto, {
+      mobile_number: '+91 98765 43210',
+      sale_price: 'eighty-five lakhs',
+    });
+    expect(errors.some((e) => e.property === 'sale_price')).toBe(true);
+  });
 });

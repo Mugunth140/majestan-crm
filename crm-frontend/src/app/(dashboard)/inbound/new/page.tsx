@@ -424,6 +424,15 @@ function InboundForm() {
         payload.rent_per_sqft = formData.get("rent_per_sqft") ? parseFloat(formData.get("rent_per_sqft") as string) : null;
       }
 
+      // Residential sale price ("85 Lakhs"/"1.2Cr" parsed to rupees).
+      // Cleared whenever the listing is not a residential sale so no stale value lingers.
+      if (selectedPurpose === "Sale" && selectedCategory === "residential") {
+        const saleRaw = String(formData.get("sale_price") || "").trim();
+        payload.sale_price = saleRaw ? (parseIndianCurrency(saleRaw) || null) : null;
+      } else {
+        payload.sale_price = null;
+      }
+
       payload.floor_number = formData.get("floor_number") || null;
       // Per-floor rows (commercial only) — rows without a floor label are dropped.
       if (showFloorPricing) {
@@ -676,6 +685,13 @@ function InboundForm() {
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Total Rent</label>
                 <PriceInput type="number" name="total_rent" defaultValue={inboundData?.total_rent || ""} placeholder="e.g. 15000" />
+              </div>
+            )}
+
+            {selectedCategory === "residential" && selectedPurpose === "Sale" && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Sale Price</label>
+                <PriceInput name="sale_price" defaultValue={inboundData?.sale_price || ""} placeholder="e.g. 85 Lakhs" />
               </div>
             )}
             

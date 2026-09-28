@@ -62,6 +62,10 @@ export class Inbound {
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   rent_per_sqft: number;
 
+  // Sale Details (residential sale inbounds)
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  sale_price: number;
+
   @Column({ type: 'varchar', nullable: true })
   floor_number: string;
 

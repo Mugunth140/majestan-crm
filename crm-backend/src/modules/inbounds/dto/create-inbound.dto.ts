@@ -69,6 +69,11 @@ export class CreateInboundDto {
   @IsNumber()
   rent_per_sqft?: number;
 
+  // Residential sale price in rupees (form parses "85 Lakhs"/"1.2Cr" first).
+  @IsOptional()
+  @IsNumber()
+  sale_price?: number;
+
   @IsOptional()
   @IsString()
   floor_number?: string;
