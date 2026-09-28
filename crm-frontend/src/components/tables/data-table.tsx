@@ -12,7 +12,7 @@ import {
   getFilteredRowModel,
   RowSelectionState,
 } from "@tanstack/react-table";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   Table,
@@ -43,6 +43,7 @@ interface DataTableProps<TData, TValue> {
     pageSize: number;
   };
   onPaginationChange?: (updater: any) => void;
+  onSelectionChange?: (selectedRows: TData[]) => void;
 }
 
 export function DataTable<TData, TValue>({
@@ -60,6 +61,7 @@ export function DataTable<TData, TValue>({
   pageCount,
   pagination,
   onPaginationChange,
+  onSelectionChange,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -90,6 +92,14 @@ export function DataTable<TData, TValue>({
       onPaginationChange,
     })
   });
+
+  // Lift selection up when a parent needs it (e.g. review banner actions)
+  const selectionKey = Object.keys(rowSelection).sort().join(",");
+  useEffect(() => {
+    if (!onSelectionChange) return;
+    onSelectionChange(table.getFilteredSelectedRowModel().rows.map((r) => r.original));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectionKey]);
 
   return (
     <div className="space-y-4 md:space-y-0 md:flex md:flex-col md:flex-1 md:h-full md:min-h-0 md:gap-4 w-full min-w-0 max-w-full">

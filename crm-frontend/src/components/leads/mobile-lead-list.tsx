@@ -56,13 +56,13 @@ export function MobileLeadList({ leads, isLoading, onCardClick, onCall, onWhatsA
       {leads.map((lead) => {
         const isPending = lead.isPendingImport === true;
         const statusCls = LEAD_STATUS_STYLES[lead.status] ?? "bg-gray-100 text-gray-800 border-gray-200";
-        const assigned = lead.staff && lead.staff !== "Unassigned" ? lead.staff : null;
         const initial = (lead.name || "?").charAt(0).toUpperCase();
         const canContact = !isPending && !!lead.mobile;
         const pendingDupe = isPending ? existingByMobile?.[lead.mobile] : undefined;
         const canRemove = isPending && !!onRemovePending;
         const pendingAssignee = isPending && lead.rawId ? pendingAssignments?.[lead.rawId] : undefined;
         const canAssign = isPending && !!lead.rawId && !!onAssignPending && !pendingDupe;
+        const assigned = pendingAssignee?.name ?? (lead.staff && lead.staff !== "Unassigned" ? lead.staff : null);
 
         return (
           <div
@@ -119,8 +119,8 @@ export function MobileLeadList({ leads, isLoading, onCardClick, onCall, onWhatsA
               )}
             </div>
 
-            {/* Pending-review row: duplicate chip + assignee + remove */}
-            {(pendingDupe || canRemove || canAssign || pendingAssignee) && (
+            {/* Pending-review row: duplicate chip + assign/remove */}
+            {(pendingDupe || canRemove || canAssign) && (
               <div className="flex items-center justify-between gap-2 -mt-1">
                 <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                 {pendingDupe ? (
@@ -130,11 +130,6 @@ export function MobileLeadList({ leads, isLoading, onCardClick, onCall, onWhatsA
                 ) : (
                   <span className="text-[12px] px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-semibold shadow-sm">
                     New
-                  </span>
-                )}
-                {pendingAssignee && (
-                  <span className="text-[12px] px-2.5 py-1 rounded-lg bg-[#0052FF]/10 border border-[#0052FF]/30 text-[#0052FF] font-semibold shadow-sm">
-                    → {pendingAssignee.name}
                   </span>
                 )}
                 </div>

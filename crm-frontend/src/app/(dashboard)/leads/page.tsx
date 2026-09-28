@@ -93,6 +93,20 @@ export default function LeadsPage() {
   const [pendingAssignments, setPendingAssignments] = useState<Record<string, { id: number; name: string }>>({});
   const [isPendingAssignOpen, setIsPendingAssignOpen] = useState(false);
   const [pendingAssignTargets, setPendingAssignTargets] = useState<string[]>([]);
+  const [pendingSelection, setPendingSelection] = useState<any[]>([]);
+
+  const openPendingAssignFromSelection = () => {
+    // Duplicates are merge-only: they cannot be pre-assigned
+    const targets = pendingSelection
+      .filter((r: any) => r.isPendingImport && r.rawId && !existingByMobile[r.mobile])
+      .map((r: any) => r.rawId);
+    if (targets.length === 0) {
+      toast.info("Selected rows already exist — nothing to assign.");
+      return;
+    }
+    setPendingAssignTargets(targets);
+    setIsPendingAssignOpen(true);
+  };
 
   // The review is showing when parsed rows await confirmation on Open Pipeline
   const isReviewingImports = activeTab === "Open Pipeline" && pendingImports.length > 0;
@@ -110,6 +124,7 @@ export default function LeadsPage() {
       setPendingAssignments({});
       setIsPendingAssignOpen(false);
       setPendingAssignTargets([]);
+      setPendingSelection([]);
     }
   }, [pendingImports.length]);
 
@@ -458,10 +473,13 @@ export default function LeadsPage() {
       id: "assigned",
       header: "Assigned",
       cell: ({ row }) => {
-        const assignedStaff = row.original.staff;
+        const p = row.original;
+        // Pending review rows show their pre-assigned staff here (applied at insert)
+        const preAssignee = p.isPendingImport && p.rawId ? pendingAssignments[p.rawId]?.name : undefined;
+        const assignedStaff = preAssignee ?? p.staff;
         if (assignedStaff && assignedStaff !== "Unassigned") {
           return (
-            <div className="flex items-center justify-center gap-1.5">
+            <div className="flex items-center justify-center gap-1.5" title={preAssignee ? "Assigned on insert" : undefined}>
               <div className="h-5 w-5 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center font-bold text-[10px] text-blue-900 dark:text-blue-300 shrink-0">
                 {assignedStaff.charAt(0).toUpperCase()}
               </div>
@@ -499,7 +517,6 @@ export default function LeadsPage() {
       const p = row.original;
       if (!p.isPendingImport) return null;
       const ex = existingByMobile[p.mobile];
-      const assignee = p.rawId ? pendingAssignments[p.rawId] : undefined;
       return (
         <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
           {ex ? (
@@ -509,11 +526,6 @@ export default function LeadsPage() {
           ) : (
             <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 whitespace-nowrap">
               New
-            </Badge>
-          )}
-          {assignee && !ex && (
-            <Badge variant="outline" className="bg-[#0052FF]/10 text-[#0052FF] border-[#0052FF]/30 whitespace-nowrap" title={`Assigned to ${assignee.name} on insert`}>
-              → {assignee.name}
             </Badge>
           )}
           <Button
@@ -837,7 +849,8 @@ export default function LeadsPage() {
     flush: true as const,
     columns: visibleColumns,
     data: displayedLeads,
-    showToolbar: true,
+    showToolbar: !isReviewingImports,
+    onSelectionChange: setPendingSelection,
     showDeleteAction: role === "Admin" && activeTab !== "Open Pipeline",
     onDeleteSelected: (rows: any[]) => setBulkDeleteIds(rows.map(r => r.rawId)),
     renderToolbarActions: (selectedRows: any[], clearSelection: any) => {
@@ -898,28 +911,6 @@ export default function LeadsPage() {
             )
           )}
 
-          {/* Open Pipeline review: pre-assign selected pending rows (applied at insert) */}
-          {role !== "Staff" && selectedRows.some((r: any) => r.isPendingImport) && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
-              onClick={() => {
-                // Duplicates are merge-only: they cannot be pre-assigned
-                const targets = selectedRows
-                  .filter((r: any) => r.isPendingImport && r.rawId && !existingByMobile[r.mobile])
-                  .map((r: any) => r.rawId);
-                if (targets.length === 0) {
-                  toast.info("Selected rows already exist — nothing to assign.");
-                  return;
-                }
-                setPendingAssignTargets(targets);
-                setIsPendingAssignOpen(true);
-              }}
-            >
-              Assign to staff
-            </Button>
-          )}
         </>
       );
     },
@@ -968,7 +959,8 @@ export default function LeadsPage() {
         )}
       </div>
 
-      {/* Search & Filters Row */}
+      {/* Search & Filters Row (hidden during import review — it only filters saved leads) */}
+      {!isReviewingImports && (
       <div className="flex flex-wrap items-center gap-3 px-6 py-4 border-b bg-background">
         <div className="relative flex-1 min-w-[240px] max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -988,6 +980,7 @@ export default function LeadsPage() {
           </Button>
         )}
       </div>
+      )}
 
       {activeTab === "Action Required" && (
         <div className="flex items-center gap-2 px-6 pb-0.5 min-h-[60px] animate-in slide-in-from-top-2 fade-in duration-200 flex-wrap">
@@ -1042,7 +1035,7 @@ export default function LeadsPage() {
       {/* Table Content */}
       <div className="w-full md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col">
         {pendingImports.length > 0 && activeTab === "Open Pipeline" && (
-             <div className="mx-6 mt-3 px-4 py-2.5 bg-card border border-border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 shadow-sm">
+             <div className="px-4 sm:px-6 py-2.5 bg-card border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
                 <div className="flex items-center gap-2.5 min-w-0">
                    <div className="hidden sm:flex h-7 w-7 rounded-full bg-[#0052FF]/10 dark:bg-[#0052FF]/20 items-center justify-center shrink-0">
                       <FileSpreadsheet className="h-3.5 w-3.5 text-[#0052FF]" />
@@ -1059,6 +1052,14 @@ export default function LeadsPage() {
                    </p>
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                   {pendingSelection.length > 0 && role !== "Staff" && (
+                     <>
+                       <span className="text-[13px] font-medium text-[#0052FF] whitespace-nowrap hidden sm:inline">{pendingSelection.length} selected</span>
+                       <Button size="sm" variant="outline" className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10" onClick={openPendingAssignFromSelection}>
+                         Assign to staff
+                       </Button>
+                     </>
+                   )}
                    <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={() => setPendingImports([])}>Cancel Import</Button>
                    <Button size="sm" onClick={handleBulkInsert} disabled={isInserting} className="flex-1 sm:flex-none bg-[#0052FF] text-white hover:bg-[#0052FF]/90 shadow-md">
                      {isInserting ? "Inserting…" : "Confirm & Insert All"}
@@ -1088,7 +1089,8 @@ export default function LeadsPage() {
 
   const mobileFilters = (
     <div className="px-4 pb-2 space-y-4">
-      {/* iOS Search Bar & Filter */}
+      {/* iOS Search Bar & Filter (hidden during import review — it only filters saved leads) */}
+      {!isReviewingImports && (
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -1106,6 +1108,7 @@ export default function LeadsPage() {
         </div>
         {renderFilterPopover(true)}
       </div>
+      )}
 
       {/* Pill Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 -mx-4 px-4">
