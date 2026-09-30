@@ -1,8 +1,8 @@
 "use client";
 
-import { apiFetch } from "@/lib/api-fetch";
+import { apiFetch, apiJson } from "@/lib/api-fetch";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -28,20 +28,13 @@ import { Device } from "@/components/shared/device";
 import { LEAD_STATUS_STYLES as STATUS_STYLES } from "@/lib/lead-constants";
 import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
 import { getBulkImportDestination, mapImportSheetRow, normalizeIndianMobile, partitionPendingImports, resolveStaffAssignments } from "@/lib/lead-import";
-import type { DuplicateLeadInfo, StaffOption } from "@/lib/lead-import";
+import type { DuplicateLeadInfo, PendingImportRow, StaffOption } from "@/lib/lead-import";
 import { resetPageIndex } from "@/lib/pagination";
 
-interface PendingImport {
-  id: string;
-  rawId?: string;
-  date?: string;
-  name: string;
-  mobile: string;
-  email?: string;
-  source?: string;
-  commissionRemarks?: string;
-  staffId?: number;
-  
+// The row shape produced by mapImportSheetRow, plus the legacy optional fields
+// this page still reads (or older rows still carry) from imported leads. Aliasing
+// the exported row type keeps producer and consumer linked by the compiler.
+type PendingImport = PendingImportRow & {
   // Legacy fields (optional)
   whatsapp?: string;
   city?: string;
@@ -59,12 +52,7 @@ interface PendingImport {
   qualificationPurpose?: string;
   decisionMaker?: string;
   notes?: string;
-  
-  staff?: string;
-  status?: string;
-  isPendingImport?: boolean;
-  rawData?: any;
-}
+};
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -103,9 +91,14 @@ export default function LeadsPage() {
   const [reviewEpoch, setReviewEpoch] = useState(0);
   const [overwriteCandidate, setOverwriteCandidate] = useState<PendingImport[] | null>(null);
 
+  // Bumped per parse so a seed fetch that resolves late cannot write the
+  // previous file's import-0..N keys over the new file's rows.
+  const seedGenerationRef = useRef(0);
+
   // Commits freshly parsed rows as the active review, clearing any state
   // tied to a previous review (assignments/selection/dupe bypass).
   const applyParsedImports = (formattedData: PendingImport[]) => {
+    seedGenerationRef.current += 1;
     setPendingImports(formattedData);
     setDupeBypass(false);
     setPendingAssignments({});
@@ -125,14 +118,30 @@ export default function LeadsPage() {
   // re-pick writes to the same map and therefore wins. Unresolved ids are
   // kept for the insert toast; their rows import unassigned.
   const seedStaffAssignmentsFromSheet = async (rows: PendingImport[]) => {
+    // Staff cannot pre-assign at all: the backend strips assignedStaffId for
+    // that role, yet getStaffList still hands them the full assignable list, so
+    // seeding here would show an assignee the server then discards. Say so in
+    // the UI instead — same gate as the toolbar and per-row assign button.
+    if (role === "Staff") {
+      if (rows.some((r) => typeof r.staffId === "number")) {
+        toast.info("Staff ID column ignored — your role cannot pre-assign; leads go to the routing queue.");
+      }
+      return;
+    }
     if (!rows.some((r) => typeof r.staffId === "number")) return;
+    const generation = seedGenerationRef.current;
     try {
-      const res = await apiFetch(API_URL + "/lead-routing/staff-list?department=all");
-      const data = await res.json();
-      const raw = data?.data ?? data;
+      // apiJson, not a bare res.json(): a non-JSON error body (proxy 500, HTML
+      // gateway page) would throw a parse SyntaxError, and a 401 JSON body is
+      // an object rather than an array — both read as "no staff at all".
+      const data = await apiJson<{ data?: StaffOption[] }>(API_URL + "/lead-routing/staff-list?department=all");
+      const raw = data?.data ?? [];
       const list: StaffOption[] = Array.isArray(raw)
         ? raw.map((u: any) => ({ id: Number(u.id), name: String(u.name ?? `Staff #${u.id}`) }))
         : [];
+      // A newer parse started while this fetch was in flight — its rawIds reuse
+      // import-0..N, so writing now would cross-assign the next file's leads.
+      if (seedGenerationRef.current !== generation) return;
       const { assignments, unresolved } = resolveStaffAssignments(rows, list);
       if (Object.keys(assignments).length > 0) {
         setPendingAssignments((prev) => ({ ...assignments, ...prev }));
@@ -141,6 +150,7 @@ export default function LeadsPage() {
     } catch {
       // A staff-directory failure must not block the import: treat every id as
       // unresolved so the reviewer sees no assignee rather than a wrong one.
+      if (seedGenerationRef.current !== generation) return;
       setUnresolvedStaffIds([...new Set(rows.map((r) => r.staffId).filter((v): v is number => typeof v === "number"))]);
     }
   };
@@ -527,6 +537,15 @@ export default function LeadsPage() {
         const p = row.original;
         // Pending review rows show their pre-assigned staff here (applied at insert)
         const preAssignee = p.isPendingImport && p.rawId ? pendingAssignments[p.rawId]?.name : undefined;
+        // A sheet id that survived seeding unresolved, so the reviewer sees the
+        // row carries an id nobody can honour before inserting. Keyed off
+        // unresolvedStaffIds rather than "no assignee in the map" so a Staff
+        // reviewer — whose seeding is skipped entirely — is never told a
+        // perfectly valid id is unknown.
+        const unresolvedSheetId =
+          p.isPendingImport && typeof p.staffId === "number" && unresolvedStaffIds.includes(p.staffId)
+            ? p.staffId
+            : undefined;
         const assignedStaff = preAssignee ?? p.staff;
         if (assignedStaff && assignedStaff !== "Unassigned") {
           return (
@@ -538,12 +557,22 @@ export default function LeadsPage() {
             </div>
           );
         }
-        // Unassigned
+        // Unassigned — flag an unresolvable sheet id in place of the plain badge
         return (
           <div className="flex items-center justify-center">
-            <Badge variant="outline" className="bg-muted/40 text-muted-foreground border-border/60">
-              Unassigned
-            </Badge>
+            {unresolvedSheetId !== undefined ? (
+              <Badge
+                variant="outline"
+                className="bg-muted/40 text-muted-foreground border-dashed border-border/60"
+                title="Staff ID not matched in your assignable list — this lead will import unassigned"
+              >
+                Unknown (#{unresolvedSheetId})
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="bg-muted/40 text-muted-foreground border-border/60">
+                Unassigned
+              </Badge>
+            )}
           </div>
         );
       },
@@ -656,33 +685,32 @@ export default function LeadsPage() {
           const total = data.length;
           let processed = 0;
           const chunkSize = Math.max(10, Math.floor(total / 20));
-          const formattedData: any[] = [];
-          
+          const formattedData: PendingImportRow[] = [];
+
           const processChunk = () => {
-             const nextChunk = Math.min(processed + chunkSize, total);
-             
-             for (let i = processed; i < nextChunk; i++) {
-                 const row = data[i];
-                 formattedData.push(mapImportSheetRow(row, i));
-             }
-             
-             processed = nextChunk;
-             setImportProgress(Math.floor((processed / total) * 100));
-             
-              if (processed < total) {
-                  setTimeout(processChunk, 20); // allow UI to update
+            const nextChunk = Math.min(processed + chunkSize, total);
+
+            for (let i = processed; i < nextChunk; i++) {
+              formattedData.push(mapImportSheetRow(data[i], i));
+            }
+
+            processed = nextChunk;
+            setImportProgress(Math.floor((processed / total) * 100));
+
+            if (processed < total) {
+              setTimeout(processChunk, 20); // allow UI to update
+            } else {
+              setIsImporting(false);
+              setIsImportOpen(false);
+              setActiveTab("Open Pipeline");
+              if (hadPendingReview) {
+                // A review is already in progress — hold the new rows for
+                // confirmation instead of silently discarding the old review
+                setOverwriteCandidate(formattedData);
               } else {
-                  setIsImporting(false);
-                  setIsImportOpen(false);
-                  setActiveTab("Open Pipeline");
-                  if (hadPendingReview) {
-                    // A review is already in progress — hold the new rows for
-                    // confirmation instead of silently discarding the old review
-                    setOverwriteCandidate(formattedData);
-                  } else {
-                    applyParsedImports(formattedData);
-                  }
+                applyParsedImports(formattedData);
               }
+            }
           };
           processChunk();
         } else {
@@ -759,11 +787,13 @@ export default function LeadsPage() {
          const existing = data.existing ?? 0;
          const assigned = data.assigned ?? 0;
          // Counted in distinct staff ids, not rows — several rows can share one
-         // unknown id, and the reviewer is being told which ids were not found.
+         // id that the assignable list does not cover (a Team Lead's view is
+         // their own department only) or that the directory fetch could not
+         // confirm. Neither means the id is invalid, so the note stays neutral.
          const unknownIds = [...new Set(unresolvedStaffIds)];
          const unresolvedNote =
            unknownIds.length > 0
-             ? `, ${unknownIds.length} staff id${unknownIds.length === 1 ? "" : "s"} not found (imported unassigned)`
+             ? `, ${unknownIds.length} staff id${unknownIds.length === 1 ? "" : "s"} not in your assignable list (imported unassigned)`
              : "";
          toast.success(
            `Imported ${created} new lead${created === 1 ? "" : "s"}` +
