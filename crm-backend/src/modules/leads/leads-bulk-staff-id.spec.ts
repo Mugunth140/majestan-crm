@@ -174,6 +174,11 @@ describe('LeadsService.bulkCreateLeads bulk-import Staff ID column', () => {
   // ── Rule 3: a Staff caller cannot skip the routing queue ─────────────────
   describe('Staff-role importer', () => {
     it('strips the Staff ID when actionedBy.role is the role name', async () => {
+      // Seeded so the field assertions below discriminate: if the strip were
+      // removed, user 12 resolves to the sales pipeline and every one of them
+      // fails. The strip happens first, so the seed is never consumed.
+      findUsersImpl.mockResolvedValue([{ id: 12, department: { name: 'Sales Department' } }]);
+
       const result = await service.bulkCreateLeads(
         [{ name: 'Staff Buyer', mobile: '9810000007', source: 'Website', assignedStaffId: 12 }],
         { id: 2, role: 'Staff' },
@@ -187,6 +192,9 @@ describe('LeadsService.bulkCreateLeads bulk-import Staff ID column', () => {
     });
 
     it('strips the Staff ID when actionedBy.role is the loaded role relation', async () => {
+      // Same seed as above, reached through actionedBy.role.name.
+      findUsersImpl.mockResolvedValue([{ id: 12, department: { name: 'Sales Department' } }]);
+
       const result = await service.bulkCreateLeads(
         [{ name: 'Staff Buyer 2', mobile: '9810000008', source: 'Website', assignedStaffId: 12 }],
         { id: 2, role: { name: 'Staff' } },
@@ -269,10 +277,12 @@ describe('LeadsService.bulkCreateLeads bulk-import Staff ID column', () => {
       { name: 'E', mobile: '9810000105', source: 'Website' },
     ], { id: 1, role: 'Admin' });
 
-    // Every Staff ID in the file is resolved in one users lookup.
+    // Every Staff ID in the file is resolved in one users lookup, which must
+    // eager-load departments or every row would fall back to the routing queue.
+    // Relations-only check: pinning `where.id` would also match In([]), so it
+    // would prove nothing about the ids actually queried.
     expect(findUsersImpl).toHaveBeenCalledTimes(1);
     expect(findUsersImpl.mock.calls[0][0]).toMatchObject({
-      where: { id: expect.anything() },
       relations: { department: true },
     });
 
