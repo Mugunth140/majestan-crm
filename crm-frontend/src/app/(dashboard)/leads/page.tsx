@@ -786,11 +786,17 @@ export default function LeadsPage() {
          const created = data.created ?? data.count ?? 0;
          const existing = data.existing ?? 0;
          const assigned = data.assigned ?? 0;
-         // Counted in distinct staff ids, not rows — several rows can share one
-         // id that the assignable list does not cover (a Team Lead's view is
-         // their own department only) or that the directory fetch could not
-         // confirm. Neither means the id is invalid, so the note stays neutral.
-         const unknownIds = [...new Set(unresolvedStaffIds)];
+         // Derived from the rows actually being sent, not from the parse-time
+         // list: a reviewer who manually re-assigns an unresolved row has fixed
+         // it, and saying "imported unassigned" for that row would contradict
+         // the "assigned directly" count above. Counted in distinct staff ids.
+         const unknownIds = [
+           ...new Set(
+             rows
+               .filter((p) => typeof p.staffId === "number" && !(p.rawId && pendingAssignments[p.rawId]))
+               .map((p) => p.staffId as number),
+           ),
+         ];
          const unresolvedNote =
            unknownIds.length > 0
              ? `, ${unknownIds.length} staff id${unknownIds.length === 1 ? "" : "s"} not in your assignable list (imported unassigned)`
