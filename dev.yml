@@ -38,6 +38,9 @@ services:
       - SITE_API_BASE_URL=${SITE_API_BASE_URL:-http://site-backend:5000/api/v1}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      # SITE_API_BASE_URL defaults to http://site-backend:5000, which only
+      # resolves with this entry (the site backend runs on the host).
+      - "site-backend:host-gateway"
     networks:
       - majestan_network
     restart: unless-stopped
