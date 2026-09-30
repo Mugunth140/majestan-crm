@@ -787,7 +787,7 @@ export class LeadsService {
       ) latest_f ON latest_f.lead_id = l.id AND latest_f.rn = 1
       LEFT JOIN (
         SELECT lead_id, follow_up_date, follow_up_time, notes,
-               ROW_NUMBER() OVER(PARTITION BY lead_id ORDER BY follow_up_date DESC) as rn
+               ROW_NUMBER() OVER(PARTITION BY lead_id ORDER BY follow_up_date DESC, created_at DESC, id DESC) as rn
         FROM lead_follow_ups
         WHERE follow_up_date IS NOT NULL
       ) latest_actual_f ON latest_actual_f.lead_id = l.id AND latest_actual_f.rn = 1

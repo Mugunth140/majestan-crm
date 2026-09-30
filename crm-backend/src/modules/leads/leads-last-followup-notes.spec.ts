@@ -70,6 +70,16 @@ describe('LeadsService.getLeads — last follow-up notes', () => {
     expect(sql).toContain('next_follow_up_date, next_follow_up_time, priority,');
   });
 
+  it('breaks same-date ties by recency so the tooltip shows the newest notes', async () => {
+    await service.getLeads();
+
+    // Two follow-ups logged on the same day would otherwise be ordered
+    // arbitrarily, so the "Last Followup" column could surface the wrong notes.
+    expect(latestActualSubSelect(dataSql()!)).toContain(
+      'ORDER BY follow_up_date DESC, created_at DESC, id DESC',
+    );
+  });
+
   it('maps lastFollowedUpNotes onto every row', async () => {
     queryMock.mockReset();
     queryMock
