@@ -27,8 +27,8 @@ import { MobileLeadList } from "@/components/leads/mobile-lead-list";
 import { Device } from "@/components/shared/device";
 import { LEAD_STATUS_STYLES as STATUS_STYLES } from "@/lib/lead-constants";
 import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
-import { getBulkImportDestination, partitionPendingImports } from "@/lib/lead-import";
-import type { DuplicateLeadInfo } from "@/lib/lead-import";
+import { getBulkImportDestination, partitionPendingImports, normalizeStaffId, resolveStaffAssignments } from "@/lib/lead-import";
+import type { DuplicateLeadInfo, StaffOption } from "@/lib/lead-import";
 import { resetPageIndex } from "@/lib/pagination";
 
 interface PendingImport {
@@ -95,6 +95,9 @@ export default function LeadsPage() {
   const [isPendingAssignOpen, setIsPendingAssignOpen] = useState(false);
   const [pendingAssignTargets, setPendingAssignTargets] = useState<string[]>([]);
   const [pendingSelection, setPendingSelection] = useState<any[]>([]);
+  // Distinct sheet-supplied staff ids that are not in the staff directory;
+  // surfaced in the insert toast. Their rows import unassigned.
+  const [unresolvedStaffIds, setUnresolvedStaffIds] = useState<number[]>([]);
   // Bumped per parse so the table remounts with fresh selection state;
   // holds rows awaiting overwrite confirmation.
   const [reviewEpoch, setReviewEpoch] = useState(0);
@@ -110,9 +113,36 @@ export default function LeadsPage() {
     setPendingSelection([]);
     setIsPendingAssignOpen(false);
     setOverwriteCandidate(null);
+    setUnresolvedStaffIds([]);
     setReviewEpoch((epoch) => epoch + 1);
     toast.success(`${formattedData.length} leads parsed. Please review and insert.`);
     checkBulkDupes(formattedData);
+    seedStaffAssignmentsFromSheet(formattedData);
+  };
+
+  // Sheet-supplied "Staff ID" values pre-fill the Assigned column so the
+  // reviewer sees who each lead will land with before inserting. A manual
+  // re-pick writes to the same map and therefore wins. Unresolved ids are
+  // kept for the insert toast; their rows import unassigned.
+  const seedStaffAssignmentsFromSheet = async (rows: PendingImport[]) => {
+    if (!rows.some((r) => typeof r.staffId === "number")) return;
+    try {
+      const res = await apiFetch(API_URL + "/lead-routing/staff-list?department=all");
+      const data = await res.json();
+      const raw = data?.data ?? data;
+      const list: StaffOption[] = Array.isArray(raw)
+        ? raw.map((u: any) => ({ id: Number(u.id), name: String(u.name ?? `Staff #${u.id}`) }))
+        : [];
+      const { assignments, unresolved } = resolveStaffAssignments(rows, list);
+      if (Object.keys(assignments).length > 0) {
+        setPendingAssignments((prev) => ({ ...assignments, ...prev }));
+      }
+      setUnresolvedStaffIds(unresolved);
+    } catch {
+      // A staff-directory failure must not block the import: treat every id as
+      // unresolved so the reviewer sees no assignee rather than a wrong one.
+      setUnresolvedStaffIds([...new Set(rows.map((r) => r.staffId).filter((v): v is number => typeof v === "number"))]);
+    }
   };
 
   const openPendingAssignFromSelection = () => {
@@ -142,6 +172,7 @@ export default function LeadsPage() {
       setDupeBypass(false);
       setIsDupeConfirmOpen(false);
       setPendingAssignments({});
+      setUnresolvedStaffIds([]);
       setIsPendingAssignOpen(false);
       setPendingAssignTargets([]);
       setPendingSelection([]);
@@ -650,6 +681,9 @@ export default function LeadsPage() {
                     email: String(row["Email Id"] || "").trim(),
                     source: String(row["Lead source"]).trim(),
                     commissionRemarks: String(row["Remarks"] || "").trim(),
+                    // Optional column — a malformed or absent cell leaves the
+                    // lead unassigned rather than aborting the file.
+                    staffId: normalizeStaffId(row["Staff ID"]),
                     staff: "Unassigned",
                     status: "NEW",
                     isPendingImport: true,
@@ -749,13 +783,22 @@ export default function LeadsPage() {
          const created = data.created ?? data.count ?? 0;
          const existing = data.existing ?? 0;
          const assigned = data.assigned ?? 0;
+         // Counted in distinct staff ids, not rows — several rows can share one
+         // unknown id, and the reviewer is being told which ids were not found.
+         const unknownIds = [...new Set(unresolvedStaffIds)];
+         const unresolvedNote =
+           unknownIds.length > 0
+             ? `, ${unknownIds.length} staff id${unknownIds.length === 1 ? "" : "s"} not found (imported unassigned)`
+             : "";
          toast.success(
            `Imported ${created} new lead${created === 1 ? "" : "s"}` +
            (existing > 0 ? `, ${existing} already existed — new requirements attached` : "") +
            (assigned > 0 ? `, ${assigned} assigned directly` : "") +
+           unresolvedNote +
            "."
          );
           setPendingImports([]);
+          setUnresolvedStaffIds([]);
           setPagination(prev => ({ ...prev, pageIndex: 0 }));
           router.push(getBulkImportDestination());
       } else {
@@ -1230,14 +1273,16 @@ export default function LeadsPage() {
 
   const downloadTemplate = async () => {
     const XLSX = await import("xlsx");
-    // Strictly 5 columns as requested
+    // 5 required columns + 1 optional
     const headers = [
       {
         "Customer Name": "John Doe",
         "Customer Number": "9876543210",
         "Email Id": "john@example.com",
         "Lead source": "Website",
-        "Remarks": "Looking for 3BHK"
+        "Remarks": "Looking for 3BHK",
+        // Optional: numeric users.id. Leave blank to import unassigned.
+        "Staff ID": 12
       }
     ];
     

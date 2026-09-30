@@ -79,4 +79,15 @@ describe('resolveStaffAssignments', () => {
     expect(res.assignments).toEqual({ 'import-1': { id: 15, name: 'Anita' } });
     expect(res.unresolved).toEqual([]);
   });
+
+  // A blank staff name is a directory-data problem, not an unknown id: the row
+  // must still import assigned so the lead is not silently orphaned.
+  it('resolves a known id whose staff name is an empty string', () => {
+    const res = resolveStaffAssignments(
+      [{ rawId: 'import-0', staffId: 7 }],
+      [{ id: 7, name: '' }],
+    );
+    expect(res.assignments).toEqual({ 'import-0': { id: 7, name: '' } });
+    expect(res.unresolved).toEqual([]);
+  });
 });

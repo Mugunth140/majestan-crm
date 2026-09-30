@@ -72,9 +72,11 @@ export function resolveStaffAssignments(
 
   for (const row of rows) {
     if (!row.rawId || typeof row.staffId !== 'number') continue;
-    const name = byId.get(row.staffId);
-    if (name) {
-      assignments[row.rawId] = { id: row.staffId, name };
+    // Test map presence, not truthiness: a staff record with a blank name is a
+    // directory-data problem, and the row must still import assigned rather than
+    // be reported as an unknown id.
+    if (byId.has(row.staffId)) {
+      assignments[row.rawId] = { id: row.staffId, name: byId.get(row.staffId)! };
     } else if (!unresolved.includes(row.staffId)) {
       unresolved.push(row.staffId);
     }
