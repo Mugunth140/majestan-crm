@@ -24,6 +24,7 @@ import { AssignLeadModal } from "@/components/shared/assign-lead-modal";
 import { ContactModal } from "@/components/shared/contact-modal";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { MobileLeadList } from "@/components/leads/mobile-lead-list";
+import { LastFollowupCell } from "./last-followup-column";
 import { Device } from "@/components/shared/device";
 import { LEAD_STATUS_STYLES as STATUS_STYLES } from "@/lib/lead-constants";
 import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
@@ -576,6 +577,14 @@ export default function LeadsPage() {
           </div>
         );
       },
+    },
+    {
+      id: "lastFollowup",
+      header: "Last Followup",
+      // Sorting here is client-side over the current page only, so offering it
+      // would reorder just the loaded rows and mislead the user.
+      enableSorting: false,
+      cell: ({ row }) => <LastFollowupCell row={row.original} />,
     },
     { accessorKey: "source", header: "Lead Source" },
     {
