@@ -2,8 +2,8 @@
 
 import { apiFetch } from "@/lib/api-fetch";
 
-import { useEffect, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState, useCallback, Suspense } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,7 @@ import {
   countCallDirections,
 } from "@/lib/contact-log-utils";
 import { cn } from "@/lib/utils";
+import { shouldAutoOpenFollowUps, wantsFollowUps } from "@/lib/follow-up-deep-link";
 import {
   ArrowLeft, Loader2, User, Phone, MapPin, Building2,
   Briefcase, Mail, MessageSquare, Plus, ArrowUpRight,
@@ -186,9 +187,10 @@ function PageSkeleton() {
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 
-export default function LeadViewPage() {
+function LeadDetail() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params.id as string;
 
   const [lead, setLead] = useState<any>(null);
@@ -198,6 +200,7 @@ export default function LeadViewPage() {
   // Modals / Sliders
   const [contactModal, setContactModal] = useState<{ open: boolean; type: string; to: string }>({ open: false, type: "", to: "" });
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [autoOpenedFollowUps, setAutoOpenedFollowUps] = useState(false);
   const [isContactLogsOpen, setIsContactLogsOpen] = useState(false);
   const [isAutoMatchOpen, setIsAutoMatchOpen] = useState(false);
   const [autoMatchResults, setAutoMatchResults] = useState<any[]>([]);
@@ -353,6 +356,22 @@ export default function LeadViewPage() {
   }, [id, router]);
 
   useEffect(() => { fetchLead(); }, [fetchLead]);
+
+  // Deep link from the Leads table's "Last Followup" cell (?tab=followups):
+  // open the timeline once the lead and its follow-ups are in hand, otherwise
+  // the fetch above can win the race and the sheet opens empty. The param stays
+  // in the URL so a refresh keeps the sheet open, and the latch means closing
+  // it afterwards is not undone by the next render.
+  useEffect(() => {
+    if (!shouldAutoOpenFollowUps({
+      wantsFollowUps: wantsFollowUps(searchParams.get("tab")),
+      isLoading,
+      hasLead: !!lead,
+      alreadyOpened: autoOpenedFollowUps,
+    })) return;
+    setIsHistoryOpen(true);
+    setAutoOpenedFollowUps(true);
+  }, [searchParams, isLoading, lead, autoOpenedFollowUps]);
 
   const openContact = (type: string, to: string) => setContactModal({ open: true, type, to });
 
@@ -1286,5 +1305,16 @@ export default function LeadViewPage() {
         isLoading={isAssigning}
       />
     </div>
+  );
+}
+
+// useSearchParams opts the subtree out of prerendering up to the nearest
+// Suspense boundary, which a production build requires. The fallback is the
+// same skeleton the loading state renders, so the handover is invisible.
+export default function LeadViewPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <LeadDetail />
+    </Suspense>
   );
 }
