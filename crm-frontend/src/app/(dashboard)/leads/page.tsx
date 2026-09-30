@@ -27,7 +27,7 @@ import { MobileLeadList } from "@/components/leads/mobile-lead-list";
 import { Device } from "@/components/shared/device";
 import { LEAD_STATUS_STYLES as STATUS_STYLES } from "@/lib/lead-constants";
 import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
-import { getBulkImportDestination, partitionPendingImports, normalizeStaffId, resolveStaffAssignments } from "@/lib/lead-import";
+import { getBulkImportDestination, mapImportSheetRow, normalizeIndianMobile, partitionPendingImports, resolveStaffAssignments } from "@/lib/lead-import";
 import type { DuplicateLeadInfo, StaffOption } from "@/lib/lead-import";
 import { resetPageIndex } from "@/lib/pagination";
 
@@ -597,15 +597,6 @@ export default function LeadsPage() {
 
   const visibleColumns = isReviewingImports ? [...columns, reviewColumn] : columns;
 
-  // Strips +91 / 91 prefix so numbers are stored as consistent 10-digit format.
-  // India-only system — the only country code in use is +91.
-  const normalizeIndianMobile = (raw: string): string => {
-    const digits = raw.replace(/\D/g, ''); // drop spaces, dashes, parens, etc.
-    if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
-    if (digits.length === 13 && digits.startsWith('091')) return digits.slice(3);
-    return digits; // already 10-digit or unknown format — pass through
-  };
-
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     // Reset so picking the same file again still fires onChange
@@ -671,24 +662,8 @@ export default function LeadsPage() {
              const nextChunk = Math.min(processed + chunkSize, total);
              
              for (let i = processed; i < nextChunk; i++) {
-                const row = data[i];
-                formattedData.push({
-                    rawId: `import-${i}`,
-                    id: `IMPORT-${i+1}`,
-                    date: new Date().toLocaleDateString(),
-                    name: String(row["Customer Name"]).trim(),
-                    mobile: normalizeIndianMobile(String(row["Customer Number"]).trim()),
-                    email: String(row["Email Id"] || "").trim(),
-                    source: String(row["Lead source"]).trim(),
-                    commissionRemarks: String(row["Remarks"] || "").trim(),
-                    // Optional column — a malformed or absent cell leaves the
-                    // lead unassigned rather than aborting the file.
-                    staffId: normalizeStaffId(row["Staff ID"]),
-                    staff: "Unassigned",
-                    status: "NEW",
-                    isPendingImport: true,
-                    rawData: row
-                });
+                 const row = data[i];
+                 formattedData.push(mapImportSheetRow(row, i));
              }
              
              processed = nextChunk;
@@ -1273,7 +1248,7 @@ export default function LeadsPage() {
 
   const downloadTemplate = async () => {
     const XLSX = await import("xlsx");
-    // 5 required columns + 1 optional
+    // 4 required columns + optional Remarks + optional Staff ID
     const headers = [
       {
         "Customer Name": "John Doe",

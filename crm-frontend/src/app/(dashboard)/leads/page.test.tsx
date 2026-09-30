@@ -1,46 +1,51 @@
 import { describe, expect, it } from "vitest";
-import { normalizeStaffId } from "@/lib/lead-import";
+import { mapImportSheetRow } from "@/lib/lead-import";
 
-// Mirrors the row mapping in handleFileUpload (page.tsx:642-657) for the
-// optional Staff ID column.
-function buildRow(row: Record<string, unknown>) {
-  return {
-    rawId: "import-0",
-    name: String(row["Customer Name"]).trim(),
-    mobile: String(row["Customer Number"]).trim(),
-    source: String(row["Lead source"]).trim(),
-    staffId: normalizeStaffId(row["Staff ID"]),
-  };
-}
+const baseRow = {
+  "Customer Name": "Asha",
+  "Customer Number": "9876543210",
+  "Email Id": "asha@example.com",
+  "Lead source": "Website",
+};
 
 describe("bulk import Staff ID column", () => {
   it("is optional — a file without the column parses with no assignee", () => {
-    const parsed = buildRow({
-      "Customer Name": "Asha",
-      "Customer Number": "9876543210",
-      "Lead source": "Website",
-    });
+    const parsed = mapImportSheetRow({ ...baseRow }, 0);
     expect(parsed.staffId).toBeUndefined();
+    expect(parsed.staff).toBe("Unassigned");
+    expect(parsed.rawId).toBe("import-0");
+    expect(parsed.id).toBe("IMPORT-1");
   });
 
   it("reads a numeric staff id when present", () => {
-    const parsed = buildRow({
-      "Customer Name": "Asha",
-      "Customer Number": "9876543210",
-      "Lead source": "Website",
-      "Staff ID": 12,
-    });
+    const parsed = mapImportSheetRow({ ...baseRow, "Staff ID": 12 }, 3);
     expect(parsed.staffId).toBe(12);
+    expect(parsed.rawId).toBe("import-3");
+    expect(parsed.id).toBe("IMPORT-4");
   });
 
   it("does not abort the file on a malformed staff id", () => {
-    const parsed = buildRow({
-      "Customer Name": "Asha",
-      "Customer Number": "9876543210",
-      "Lead source": "Website",
-      "Staff ID": "not-a-number",
-    });
+    const parsed = mapImportSheetRow({ ...baseRow, "Staff ID": "not-a-number" }, 0);
     expect(parsed.staffId).toBeUndefined();
     expect(parsed.name).toBe("Asha");
+    expect(parsed.isPendingImport).toBe(true);
+  });
+
+  it("normalizes the mobile and defaults the optional text columns", () => {
+    const parsed = mapImportSheetRow(
+      {
+        "Customer Name": "  Asha  ",
+        "Customer Number": "+91 98765-43210",
+        "Email Id": "",
+        "Lead source": "  Website  ",
+      },
+      0,
+    );
+    expect(parsed.mobile).toBe("9876543210");
+    expect(parsed.name).toBe("Asha");
+    expect(parsed.source).toBe("Website");
+    expect(parsed.email).toBe("");
+    expect(parsed.commissionRemarks).toBe("");
+    expect(parsed.status).toBe("NEW");
   });
 });

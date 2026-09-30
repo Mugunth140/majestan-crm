@@ -84,3 +84,55 @@ export function resolveStaffAssignments(
 
   return { assignments, unresolved };
 }
+
+// Strips +91 / 91 prefix so numbers are stored as consistent 10-digit format.
+// India-only system — the only country code in use is +91.
+export function normalizeIndianMobile(raw: string): string {
+  const digits = raw.replace(/\D/g, ''); // drop spaces, dashes, parens, etc.
+  if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+  if (digits.length === 13 && digits.startsWith('091')) return digits.slice(3);
+  return digits; // already 10-digit or unknown format — pass through
+}
+
+export interface ImportSheetRow {
+  [header: string]: unknown;
+}
+
+export interface PendingImportRow {
+  rawId: string;
+  id: string;
+  date: string;
+  name: string;
+  mobile: string;
+  email: string;
+  source: string;
+  commissionRemarks: string;
+  staffId?: number;
+  staff: string;
+  status: string;
+  isPendingImport: boolean;
+  rawData: unknown;
+}
+
+// Maps one raw spreadsheet row from the import template to the pending-import
+// row shape used by the review table. Extracted so the optional Staff ID column
+// is covered by the real mapping rather than a test-local copy.
+export function mapImportSheetRow(row: ImportSheetRow, index: number): PendingImportRow {
+  return {
+    rawId: `import-${index}`,
+    id: `IMPORT-${index + 1}`,
+    date: new Date().toLocaleDateString(),
+    name: String(row["Customer Name"]).trim(),
+    mobile: normalizeIndianMobile(String(row["Customer Number"]).trim()),
+    email: String(row["Email Id"] || "").trim(),
+    source: String(row["Lead source"]).trim(),
+    commissionRemarks: String(row["Remarks"] || "").trim(),
+    // Optional column — a malformed or absent cell leaves the
+    // lead unassigned rather than aborting the file.
+    staffId: normalizeStaffId(row["Staff ID"]),
+    staff: "Unassigned",
+    status: "NEW",
+    isPendingImport: true,
+    rawData: row,
+  };
+}
