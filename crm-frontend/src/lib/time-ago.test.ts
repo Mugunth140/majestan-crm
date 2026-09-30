@@ -11,6 +11,12 @@ describe("timeAgo", () => {
     expect(timeAgo("")).toBe("");
   });
 
+  it("returns an empty string for an unparseable date", () => {
+    // Without the guard these fall through every comparison and render "NaNd ago".
+    expect(timeAgo("not-a-date")).toBe("");
+    expect(timeAgo("2026-13-45")).toBe("");
+  });
+
   it("reads 'just now' under a minute", () => {
     expect(timeAgo(at(0))).toBe("just now");
     expect(timeAgo(at(59 * S))).toBe("just now");
