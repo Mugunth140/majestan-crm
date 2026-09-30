@@ -62,7 +62,10 @@ describe('LeadsService.getLeads — last follow-up notes', () => {
     expect(sql).toBeDefined();
     // The notes must ride on the same partition that picks the last follow-up.
     expect(sql).toContain('latest_actual_f.notes as lastFollowedUpNotes');
-    expect(sql).toContain('WHERE follow_up_date IS NOT NULL');
+    // Pinned inside the sub-select: this is the partition that defines "last
+    // follow-up", so a predicate hoisted to the outer WHERE would change which
+    // rows qualify.
+    expect(latestActualSubSelect(sql!)).toContain('WHERE follow_up_date IS NOT NULL');
     // `notes` must also be projected by the sub-select itself, otherwise
     // MySQL rejects latest_actual_f.notes as an unknown column.
     expect(latestActualSubSelect(sql!)).toContain('follow_up_time, notes');
@@ -105,7 +108,10 @@ describe('LeadsService.getLeads — last follow-up notes', () => {
     expect(result.data[0].lastFollowedUpNotes).toBe('Spoke to owner, wants a viewing.');
     // Null when the join yields nothing (or the notes column is empty).
     expect(result.data[1].lastFollowedUpNotes).toBeNull();
-    // The lead-level notes field is unrelated to follow-ups and stays empty.
+    // The lead-level notes field is unrelated to follow-ups and stays empty —
+    // asserted on the row that HAS follow-up notes, so repointing `notes` at
+    // the follow-up value would fail here rather than silently ship.
     expect(result.data[1].notes).toBe('');
+    expect(result.data[0].notes).toBe('');
   });
 });
