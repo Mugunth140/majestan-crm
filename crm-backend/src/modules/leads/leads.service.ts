@@ -786,7 +786,7 @@ export class LeadsService {
         FROM lead_follow_ups
       ) latest_f ON latest_f.lead_id = l.id AND latest_f.rn = 1
       LEFT JOIN (
-        SELECT lead_id, follow_up_date, follow_up_time,
+        SELECT lead_id, follow_up_date, follow_up_time, notes,
                ROW_NUMBER() OVER(PARTITION BY lead_id ORDER BY follow_up_date DESC) as rn
         FROM lead_follow_ups
         WHERE follow_up_date IS NOT NULL
@@ -822,7 +822,8 @@ export class LeadsService {
         latest_f.next_follow_up_time as nextFollowUpTime,
         latest_f.priority as priority,
         latest_actual_f.follow_up_date as lastFollowedUpDate,
-        latest_actual_f.follow_up_time as lastFollowedUpTime
+        latest_actual_f.follow_up_time as lastFollowedUpTime,
+        latest_actual_f.notes as lastFollowedUpNotes
       FROM leads l
       ${joinClauses}
       WHERE 1=1 ${roleFilter} ${filterConds}
@@ -858,6 +859,7 @@ export class LeadsService {
       priority: row.priority ?? '',
       lastFollowedUpDate: row.lastFollowedUpDate || null,
       lastFollowedUpTime: row.lastFollowedUpTime || null,
+lastFollowedUpNotes: row.lastFollowedUpNotes || null,
       isUnqualified: Boolean(row.isUnqualified),
     }));
 
