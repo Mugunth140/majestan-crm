@@ -859,7 +859,7 @@ export class LeadsService {
       priority: row.priority ?? '',
       lastFollowedUpDate: row.lastFollowedUpDate || null,
       lastFollowedUpTime: row.lastFollowedUpTime || null,
-lastFollowedUpNotes: row.lastFollowedUpNotes || null,
+      lastFollowedUpNotes: row.lastFollowedUpNotes || null,
       isUnqualified: Boolean(row.isUnqualified),
     }));
 

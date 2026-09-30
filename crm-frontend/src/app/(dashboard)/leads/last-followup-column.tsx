@@ -37,7 +37,7 @@ export function LastFollowupCell({ row }: { row: LastFollowupRow }) {
         />
         <TooltipContent
           side="top"
-          className="max-w-[300px] text-sm break-words whitespace-normal p-3 border-border/50 shadow-xl bg-background text-foreground relative z-50"
+          className="max-w-[300px] max-h-64 overflow-y-auto text-sm break-words whitespace-normal p-3 border-border/50 shadow-xl bg-background text-foreground relative z-50"
         >
           {view.notes ?? "No notes recorded"}
         </TooltipContent>
