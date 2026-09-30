@@ -40,6 +40,7 @@ interface PendingImport {
   email?: string;
   source?: string;
   commissionRemarks?: string;
+  staffId?: number;
   
   // Legacy fields (optional)
   whatsapp?: string;
