@@ -191,6 +191,7 @@ function LeadDetail() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const tab = searchParams.get("tab");
   const id = params.id as string;
 
   const [lead, setLead] = useState<any>(null);
@@ -364,14 +365,16 @@ function LeadDetail() {
   // it afterwards is not undone by the next render.
   useEffect(() => {
     if (!shouldAutoOpenFollowUps({
-      wantsFollowUps: wantsFollowUps(searchParams.get("tab")),
+      wantsFollowUps: wantsFollowUps(tab),
       isLoading,
       hasLead: !!lead,
       alreadyOpened: autoOpenedFollowUps,
     })) return;
     setIsHistoryOpen(true);
     setAutoOpenedFollowUps(true);
-  }, [searchParams, isLoading, lead, autoOpenedFollowUps]);
+    // `tab` rather than `searchParams`: the param value is the actual
+    // dependency, so a fresh object identity can't re-run this effect.
+  }, [tab, isLoading, lead, autoOpenedFollowUps]);
 
   const openContact = (type: string, to: string) => setContactModal({ open: true, type, to });
 
