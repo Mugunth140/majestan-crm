@@ -4,7 +4,9 @@ import { timeAgo } from "./time-ago";
 
 export type LastFollowupRow = {
   rawId: number | string;
-  lastFollowedUpDate: string | null;
+  // Raw SQL returns a MySQL DATE, which mysql2 may hand back as a Date rather
+  // than a string — both shapes are accepted.
+  lastFollowedUpDate: string | Date | null;
   lastFollowedUpTime?: string | null;
   lastFollowedUpNotes?: string | null;
 };
@@ -32,10 +34,21 @@ function localStamp(at: Date): { date: string; time: string } {
  * back to "no follow-up" instead of rendering "NaNd ago".
  */
 export function followUpTimestamp(
-  date: string | null | undefined,
+  date: string | Date | null | undefined,
   time: string | null | undefined,
 ): Date | null {
   if (!date) return null;
+
+  // The value arrives from a raw SQL query, so mysql2's default applies and a
+  // MySQL DATE may be a Date instance rather than a string. Coercing with
+  // String() would yield "Fri Sep 25", parse to NaN, and silently collapse
+  // every follow-up to "no follow-up" — so handle the instance explicitly.
+  if (date instanceof Date) {
+    if (Number.isNaN(date.getTime())) return null;
+    const at = new Date(date.getTime());
+    applyTime(at, time);
+    return at;
+  }
 
   // A bare "YYYY-MM-DD" is read by the Date constructor as UTC midnight, which
   // is the previous day for anyone west of Greenwich. Build the local date the
@@ -52,16 +65,19 @@ export function followUpTimestamp(
     return null;
   }
 
-  const match = time ? TIME_RE.exec(String(time).trim()) : null;
-  if (match) {
-    const hours = Number(match[1]);
-    const minutes = Number(match[2]);
-    // An out-of-range time is treated as absent rather than as a rollover, the
-    // same way formatFollowUpTime drops it.
-    if (hours <= 23 && minutes <= 59) at.setHours(hours, minutes, 0, 0);
-  }
+  applyTime(at, time);
 
   return at;
+}
+
+function applyTime(at: Date, time: string | null | undefined): void {
+  const match = time ? TIME_RE.exec(String(time).trim()) : null;
+  if (!match) return;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  // An out-of-range time is treated as absent rather than as a rollover, the
+  // same way formatFollowUpTime drops it.
+  if (hours <= 23 && minutes <= 59) at.setHours(hours, minutes, 0, 0);
 }
 
 export type LastFollowupView =

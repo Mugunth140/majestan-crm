@@ -69,6 +69,27 @@ describe("followUpTimestamp", () => {
     expect(followUpTimestamp("2026-09-25", "25:00")!.getHours()).toBe(0);
     expect(followUpTimestamp("2026-09-25", "10:99")!.getHours()).toBe(0);
   });
+
+  it("accepts a Date instance as the stored date", () => {
+    // The value arrives from a raw SQL query, so mysql2 may hand back a Date
+    // rather than a string. String() on one yields "Fri Sep 25", which parses
+    // to NaN — the column would read as "no follow-up" for every lead.
+    const at = followUpTimestamp(new Date(2026, 8, 25, 10, 30), null);
+    expect(at).not.toBeNull();
+    expect(at!.getFullYear()).toBe(2026);
+    expect(at!.getMonth()).toBe(8);
+    expect(at!.getDate()).toBe(25);
+  });
+
+  it("applies the stored time onto a Date instance", () => {
+    const at = followUpTimestamp(new Date(2026, 8, 25, 10, 30), "14:45:00");
+    expect(at!.getHours()).toBe(14);
+    expect(at!.getMinutes()).toBe(45);
+  });
+
+  it("returns null for an invalid Date instance", () => {
+    expect(followUpTimestamp(new Date("nonsense"), null)).toBeNull();
+  });
 });
 
 describe("lastFollowupView", () => {
@@ -141,5 +162,21 @@ describe("lastFollowupView", () => {
   it("links to the lead's follow-up tab", () => {
     expect(ready().href).toBe("/leads/42?tab=followups");
     expect(ready({ rawId: "import-7" }).href).toBe("/leads/import-7?tab=followups");
+  });
+
+  it("still builds a full view when the date arrives as a Date", () => {
+    // The failure this guards is total and silent: every follow-up cell would
+    // render as "—" while the tooltip, the title and the link all disappeared.
+    const view = ready({
+      lastFollowedUpDate: new Date(2026, 8, 25),
+      lastFollowedUpTime: "14:30:00",
+      lastFollowedUpNotes: "Owner wants a viewing.",
+    });
+    expect(view.state).toBe("ready");
+    expect(view).toMatchObject({
+      absolute: "25 Sept 2026 · 2:30 PM",
+      notes: "Owner wants a viewing.",
+      href: "/leads/42?tab=followups",
+    });
   });
 });
