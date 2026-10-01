@@ -53,4 +53,15 @@ describe("recordNotInterested", () => {
     ).rejects.toThrow();
     expect(calls).toEqual(["/api/v1/leads/42/follow-ups"]);
   });
+
+  it("says the reason row already exists when only the status fails", async () => {
+    const fetchFn = vi.fn(async (url: string) => {
+      if (url.endsWith("/status")) return { json: async () => ({ success: false }) };
+      return okJson();
+    });
+
+    await expect(
+      recordNotInterested(fetchFn as never, "/api/v1", 42, "Busy", "2026-09-30"),
+    ).rejects.toThrow("Reason recorded, but status update failed");
+  });
 });

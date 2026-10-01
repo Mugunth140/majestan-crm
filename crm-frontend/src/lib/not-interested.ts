@@ -41,5 +41,7 @@ export async function recordNotInterested(
       body: JSON.stringify({ status_name: "Not Interested" }),
     })
   ).json();
-  if (!status.success) throw new Error("Failed to update status");
+  // The reason row above already exists at this point: say so, so a retry
+  // (which would record a second identical row) is a conscious choice.
+  if (!status.success) throw new Error("Reason recorded, but status update failed — please retry.");
 }

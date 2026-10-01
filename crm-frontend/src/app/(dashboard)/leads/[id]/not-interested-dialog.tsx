@@ -29,8 +29,14 @@ type NotInterestedDialogProps = {
 export function NotInterestedDialog({ open, onClose, onConfirm, busy }: NotInterestedDialogProps) {
   const [reason, setReason] = useState("");
 
+  // Never carry a stale reason across openings: reset on every exit.
+  const close = () => {
+    setReason("");
+    onClose();
+  };
+
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(o) => !o && close()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Lead Not Interested Reason</DialogTitle>
@@ -66,11 +72,14 @@ export function NotInterestedDialog({ open, onClose, onConfirm, busy }: NotInter
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>
+          <Button variant="outline" onClick={close} disabled={busy}>
             Cancel
           </Button>
           <Button
-            onClick={() => onConfirm(reason)}
+            onClick={() => {
+              onConfirm(reason);
+              setReason("");
+            }}
             disabled={busy || !reason.trim()}
             className="bg-red-600 text-white hover:bg-red-700"
           >
