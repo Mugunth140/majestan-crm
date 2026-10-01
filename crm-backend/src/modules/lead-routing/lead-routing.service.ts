@@ -5,6 +5,7 @@ import { Lead } from '../../database/entities/lead.entity';
 import { User } from '../../database/entities/user.entity';
 import { RoutingHistory } from '../../database/entities/routing-history.entity';
 import { NotificationsService } from '../notifications/notifications.service';
+import { NON_QUEUEABLE_LEAD_STATUSES } from '../leads/lead-statuses';
 
 @Injectable()
 export class LeadRoutingService {
@@ -22,6 +23,7 @@ export class LeadRoutingService {
       .createQueryBuilder('lead')
       .where('lead.assigned_staff_id IS NULL')
       .andWhere('lead.department = :department', { department })
+      .andWhere('lead.status NOT IN (:...excluded)', { excluded: NON_QUEUEABLE_LEAD_STATUSES })
       .orderBy('lead.created_at', 'DESC')
       .skip(skip)
       .take(limit)

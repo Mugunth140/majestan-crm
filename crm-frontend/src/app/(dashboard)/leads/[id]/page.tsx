@@ -1,6 +1,8 @@
 "use client";
 
 import { apiFetch } from "@/lib/api-fetch";
+import { recordNotInterested } from "@/lib/not-interested";
+import { NotInterestedDialog } from "./not-interested-dialog";
 
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -225,6 +227,8 @@ function LeadDetail() {
   const [isDroppedOpen, setIsDroppedOpen] = useState(false);
   const [dropReason, setDropReason] = useState("");
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  // Not Interested Reason Modal
+  const [isNotInterestedOpen, setIsNotInterestedOpen] = useState(false);
 
   // Edit Requirement
   const [editInquiry, setEditInquiry] = useState<any>(null);
@@ -684,6 +688,10 @@ function LeadDetail() {
                         if (!v) return;
                         if (v === "Dropped") {
                           setIsDroppedOpen(true);
+                          return;
+                        }
+                        if (v === "Not Interested") {
+                          setIsNotInterestedOpen(true);
                           return;
                         }
                         try {
@@ -1220,6 +1228,28 @@ function LeadDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Not Interested Reason Dialog ── */}
+      <NotInterestedDialog
+        open={isNotInterestedOpen}
+        onClose={() => setIsNotInterestedOpen(false)}
+        busy={isUpdatingStatus}
+        onConfirm={async (reason) => {
+          setIsUpdatingStatus(true);
+          try {
+            // IST day, matching the backend's queue day boundaries.
+            const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+            await recordNotInterested((url, init) => apiFetch(url, init), API_URL, id, reason, today);
+            toast.success("Lead marked as Not Interested.");
+            setIsNotInterestedOpen(false);
+            fetchLead(true);
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Failed to update status");
+          } finally {
+            setIsUpdatingStatus(false);
+          }
+        }}
+      />
 
       {/* ── Contact Modal ── */}
       <ContactModal

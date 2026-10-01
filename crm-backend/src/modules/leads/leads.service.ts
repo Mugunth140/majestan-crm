@@ -7,6 +7,7 @@ import { LeadInquiry } from '../../database/entities/lead-inquiry.entity';
 import { ContactLog } from '../../database/entities/contact-log.entity';
 import { User } from '../../database/entities/user.entity';
 import { LeadDocument } from '../../database/entities/lead-document.entity';
+import { NON_QUEUEABLE_LEAD_STATUSES } from './lead-statuses';
 import { NotificationsService } from '../notifications/notifications.service';
 import { TasksService } from '../tasks/tasks.service';
 import { S3Client } from 'bun';
@@ -117,6 +118,8 @@ export class LeadsService {
     followUp.purpose = body.purpose || null;
     followUp.priority = body.priority || null;
     followUp.rnr = body.rnr || null;
+    followUp.outcome = body.outcome || null;
+    followUp.is_completed = body.isCompleted ?? false;
     followUp.notes = body.notes || null;
     followUp.created_by_id = body.createdById || null;
     const saved = await repo.save(followUp);
@@ -770,6 +773,13 @@ export class LeadsService {
        } else if (query.actionFilter === 'All Scheduled') {
          filterConds += ` AND DATE(latest_f.next_follow_up_date) > '${tomorrow}'`;
        }
+    }
+
+    // Closed leads never queue for action — but an explicit status filter
+    // always wins, so staff can still list them on purpose.
+    if (!query?.status && (query?.tab === 'Action Required' || query?.actionFilter)) {
+      filterConds += ` AND l.status NOT IN (${NON_QUEUEABLE_LEAD_STATUSES.map(() => '?').join(', ')})`;
+      params.push(...NON_QUEUEABLE_LEAD_STATUSES);
     }
 
     // Because action required relies on follow_up subqueries, we need them in count query as well.
