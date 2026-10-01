@@ -254,6 +254,11 @@ export function FollowUpPanel({ entityId, entityType, followUps, onRefresh }: Fo
 
                             {/* Badges */}
                             <div className="flex items-center gap-1.5 flex-wrap justify-end shrink-0">
+                              {fu.outcome === "Not Interested" && (
+                                <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                                  Not Interested
+                                </span>
+                              )}
                               {viaStyle && ViaIcon && (
                                 <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${viaStyle.className}`}>
                                   <ViaIcon className="h-3 w-3" />
