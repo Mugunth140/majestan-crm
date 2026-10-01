@@ -10,6 +10,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { FormSelect } from "@/components/shared/form-select";
 import { DatePicker } from "@/components/shared/date-picker";
 import { format } from "date-fns";
+import {
+  FAQ_SECTIONS,
+  displaySectionOf,
+  hasFaqSections,
+} from "@/lib/faq-sections";
 import { PriceInput } from "@/components/shared/price-input";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { apiFetch, ApiError } from "@/lib/api-fetch";
@@ -249,6 +254,9 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   // ---- Arrays: Amenities, FAQs, Connectivity, Rooms ----
   const [amenityIds, setAmenityIds] = useState<number[]>(d?.amenityIds ?? []);
   const [faqs, setFaqs] = useState<{ question: string; answer: string; section?: string }[]>(d?.faqs ?? []);
+  // Active tab of the per-section FAQ editor. Only used for multi-page
+  // types; single-page types render the one flat list.
+  const [faqTab, setFaqTab] = useState("overview");
   const [connectivity, setConnectivity] = useState<{ icon: string; label: string; detail: string }[]>(loc0?.localityData?.connectivity ?? []);
   const [categories, setCategories] = useState<LocalityCategory[]>(loc0?.localityData?.categories ?? []);
   const [isFetchingPlaces, setIsFetchingPlaces] = useState(false);
@@ -854,6 +862,14 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   // ---- Property types filtered by listing type ----
   // Buy -> all active master types. Rent -> all except farmland (villas included).
   const isLandType = LAND_PROPERTY_TYPES.includes(propertyType);
+
+  // Multi-page types curate FAQs per sub-page tab; every other type edits
+  // the one flat list. Rows keep their real indices so tabbed edits and
+  // deletes hit the right row; unknown sections display under overview.
+  const showFaqTabs = hasFaqSections(propertyType);
+  const visibleFaqs = faqs
+    .map((faq, idx) => ({ faq, idx }))
+    .filter(({ faq }) => !showFaqTabs || displaySectionOf(faq) === faqTab);
   const filteredPropertyTypes =
     listingType === "Rent"
       ? (formData.propertyTypes || []).filter((t: any) => !isRentHiddenType(t?.value))
@@ -4104,8 +4120,35 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         {/* ---- FAQs ---- */}
         <div className="bg-card border rounded-2xl p-8 shadow-sm">
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">FAQs</h3>
+          {showFaqTabs && (
+            <>
+              <p className="text-sm text-muted-foreground mb-4">
+                Add specific FAQs for each page section.
+              </p>
+              <div className="flex flex-wrap gap-2 mb-6">
+                {FAQ_SECTIONS.map((tab) => {
+                  const count = faqs.filter((f) => displaySectionOf(f) === tab.id).length;
+                  const active = faqTab === tab.id;
+                  return (
+                    <Button
+                      key={tab.id}
+                      type="button"
+                      variant={active ? "default" : "outline"}
+                      onClick={() => setFaqTab(tab.id)}
+                      className="h-8 px-3 text-xs"
+                    >
+                      {tab.label}
+                      <span className="ml-1.5 rounded-full bg-muted px-1.5 text-[11px]">
+                        {count}
+                      </span>
+                    </Button>
+                  );
+                })}
+              </div>
+            </>
+          )}
           <div className="space-y-4">
-            {faqs.map((faq, idx) => (
+            {visibleFaqs.map(({ faq, idx }) => (
               <div key={idx} className="flex gap-4 items-start p-4 border rounded-xl bg-muted/5 relative">
                 <div className="flex-1 space-y-4">
                   <Input
@@ -4147,7 +4190,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             <Button
               type="button"
               variant="outline"
-              onClick={() => setFaqs([...faqs, { question: "", answer: "", section: "overview" }])}
+              onClick={() => setFaqs([...faqs, { question: "", answer: "", section: showFaqTabs ? faqTab : "overview" }])}
               className="w-full border-dashed border-2 h-12"
             >
               <Plus className="h-4 w-4 mr-2" /> Add FAQ
