@@ -28,6 +28,12 @@ export interface DuplicateLeadInfo {
   staff: string;
 }
 
+export function pickPropertyLink(inquiries?: Array<{ id: number; property_id?: number | null; [key: string]: any }> | null) {
+  const linked = (inquiries ?? []).filter((i) => i.property_id);
+  if (linked.length === 0) return null;
+  return linked.sort((a, b) => b.id - a.id)[0];
+}
+
 @Injectable()
 export class LeadsService {
   private _s3Client: S3Client | null = null;
@@ -83,7 +89,39 @@ export class LeadsService {
       order: { created_at: 'DESC', id: 'DESC' },
     });
 
-    return { ...lead, follow_ups: followUps, contact_logs: contactLogs };
+    const link: any = pickPropertyLink(lead.inquiries as any[]);
+    let interestedProperty: {
+      id: number; title: string; code: string | null; slug: string | null;
+      price: string | number | null; propertyType: string | null; status: string | null; city: string | null;
+    } | null = null;
+    if (link) {
+      const rows: any[] = await this.siteDataSource.query(
+        'SELECT id, title, property_code AS code, slug, price, property_type AS propertyType, status, city FROM properties WHERE id = ? LIMIT 1',
+        [link.property_id],
+      );
+      let p = rows[0];
+      if (!p && link.property_code) {
+        const byCode: any[] = await this.siteDataSource.query(
+          'SELECT id, title, property_code AS code, slug, price, property_type AS propertyType, status, city FROM properties WHERE property_code = ? LIMIT 1',
+          [link.property_code],
+        );
+        p = byCode[0];
+      }
+      if (p) {
+        interestedProperty = {
+          id: p.id, title: p.title, code: p.code ?? null, slug: p.slug ?? null,
+          price: p.price ?? null, propertyType: p.propertyType ?? null,
+          status: p.status ?? null, city: p.city ?? null,
+        };
+      }
+    }
+
+    const visit =
+      link?.visit_date != null
+        ? { date: link.visit_date, slot: link.visit_slot ?? null, intent: link.intent ?? 'enquiry' }
+        : null;
+
+    return { ...lead, follow_ups: followUps, contact_logs: contactLogs, interestedProperty, visit };
   }
 
   // ── Contact Log ────────────────────────────────────────────────────────────
