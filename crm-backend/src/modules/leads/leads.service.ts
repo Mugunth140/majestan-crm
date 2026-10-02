@@ -552,7 +552,7 @@ export class LeadsService {
       });
 
       if (existingLead) {
-        if (normalised.purchaseType || normalised.propertyType || normalised.funder || normalised.project || normalised.propertyCategory) {
+        if (normalised.purchaseType || normalised.propertyType || normalised.funder || normalised.project || normalised.propertyCategory || normalised.propertyId) {
           const inquiry = manager.getRepository(LeadInquiry).create({
             lead_id: existingLead.id,
             project_list: normalised.project || null,
@@ -566,20 +566,26 @@ export class LeadsService {
             purchase_timeline: normalised.purchaseTimeline || null,
             qualification_purpose: normalised.qualificationPurpose || null,
             decision_maker: normalised.decisionMaker || null,
+            property_id: normalised.propertyId ?? null,
+            property_code: normalised.propertyCode ?? null,
+            property_slug: normalised.propertySlug ?? null,
+            intent: normalised.intent ?? 'enquiry',
+            visit_date: normalised.visitDate ?? null,
+            visit_slot: normalised.visitSlot ?? null,
           });
           await manager.save(inquiry);
         }
 
-        if (normalised.followUpDate || normalised.purpose || normalised.priority || normalised.notes || normalised.rnr) {
-        const followUp = manager.getRepository(LeadFollowUp).create({
-          lead_id: existingLead.id,
-          next_follow_up_date: normalised.followUpDate || null,
-          next_follow_up_time: normalised.followUpTime || null,
-          purpose: normalised.purpose || null,
-          priority: normalised.priority || null,
-          rnr: normalised.rnr || null,
-          notes: normalised.notes || null,
-        });
+        if (normalised.followUpDate || normalised.purpose || normalised.priority || normalised.notes || normalised.rnr || normalised.visitDate) {
+          const followUp = manager.getRepository(LeadFollowUp).create({
+            lead_id: existingLead.id,
+            next_follow_up_date: normalised.followUpDate || normalised.visitDate || null,
+            next_follow_up_time: normalised.followUpTime || normalised.visitSlot || null,
+            purpose: normalised.purpose || (normalised.intent === 'site_visit' ? 'Site Visit' : null),
+            priority: normalised.priority || null,
+            rnr: normalised.rnr || null,
+            notes: normalised.notes || null,
+          });
           await manager.save(followUp);
         }
 
@@ -605,7 +611,7 @@ export class LeadsService {
         city: normalised.city || null,
         address: normalised.address || null,
         lead_source: normalised.source || null,
-        status: 'New Lead',
+        status: normalised.intent === 'site_visit' ? 'Site Visit Scheduled' : 'New Lead',
         assigned_staff_id: assignedStaffId,
         commission: normalised.commission || null,
         is_referral: normalised.isReferral || false,
@@ -621,7 +627,7 @@ export class LeadsService {
         });
       }
 
-      if (normalised.purchaseType || normalised.propertyType || normalised.funder || normalised.project || normalised.propertyCategory) {
+      if (normalised.purchaseType || normalised.propertyType || normalised.funder || normalised.project || normalised.propertyCategory || normalised.propertyId) {
         const inquiry = manager.getRepository(LeadInquiry).create({
           lead_id: savedLead.id,
           project_list: normalised.project || null,
@@ -635,16 +641,22 @@ export class LeadsService {
           purchase_timeline: normalised.purchaseTimeline || null,
           qualification_purpose: normalised.qualificationPurpose || null,
           decision_maker: normalised.decisionMaker || null,
+          property_id: normalised.propertyId ?? null,
+          property_code: normalised.propertyCode ?? null,
+          property_slug: normalised.propertySlug ?? null,
+          intent: normalised.intent ?? 'enquiry',
+          visit_date: normalised.visitDate ?? null,
+          visit_slot: normalised.visitSlot ?? null,
         });
         await manager.save(inquiry);
       }
 
-      if (normalised.followUpDate || normalised.purpose || normalised.priority || normalised.notes || normalised.rnr) {
+      if (normalised.followUpDate || normalised.purpose || normalised.priority || normalised.notes || normalised.rnr || normalised.visitDate) {
         const followUp = manager.getRepository(LeadFollowUp).create({
           lead_id: savedLead.id,
-          next_follow_up_date: normalised.followUpDate || null,
-          next_follow_up_time: normalised.followUpTime || null,
-          purpose: normalised.purpose || null,
+          next_follow_up_date: normalised.followUpDate || normalised.visitDate || null,
+          next_follow_up_time: normalised.followUpTime || normalised.visitSlot || null,
+          purpose: normalised.purpose || (normalised.intent === 'site_visit' ? 'Site Visit' : null),
           priority: normalised.priority || null,
           rnr: normalised.rnr || null,
           notes: normalised.notes || null,
