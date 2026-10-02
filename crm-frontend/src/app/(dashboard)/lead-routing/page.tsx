@@ -20,11 +20,12 @@ import { DatePicker } from "@/components/shared/date-picker";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { Device } from "@/components/shared/device";
 import { canTakeLeadFromQueue, assignRoutingLeads } from "@/lib/lead-routing";
+import { timeAgo } from "@/lib/time-ago";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
-type MainTab = "queue" | "history";
+type MainTab = "queue" | "enquiry" | "history";
 type DeptTab = "telecalling" | "sales";
 
 interface QueueLead {
@@ -38,6 +39,24 @@ interface QueueLead {
   release_reason?: string;
   days_in_queue?: number;
   department?: { name: string };
+}
+
+interface EnquiryLead {
+  id: number;
+  display_id: string;
+  name: string;
+  mobile_number: string;
+  status: string;
+  type: "New" | "Repeat";
+  repeat_count: number;
+  last_enquiry_at: string;
+  property_code: string | null;
+  property_title: string | null;
+  intent: string;
+  visit_date: string | null;
+  visit_slot: string | null;
+  assigned_staff_id: number | null;
+  assigned_staff_name: string | null;
 }
 
 interface HistoryEntry {
@@ -87,6 +106,12 @@ export default function LeadRoutingPage() {
   const [queueTotal, setQueueTotal] = useState(0);
   const LIMIT = 10;
 
+  // Enquiry queue state
+  const [enquiry, setEnquiry] = useState<EnquiryLead[]>([]);
+  const [enquiryLoading, setEnquiryLoading] = useState(false);
+  const [enquiryPage, setEnquiryPage] = useState(1);
+  const [enquiryTotal, setEnquiryTotal] = useState(0);
+
   // History state
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -102,6 +127,9 @@ export default function LeadRoutingPage() {
 
   // Claim loading
   const [claimingId, setClaimingId] = useState<number | null>(null);
+
+  // Acknowledge loading
+  const [acknowledgingId, setAcknowledgingId] = useState<number | null>(null);
 
   // Delete loading
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -148,6 +176,28 @@ export default function LeadRoutingPage() {
     }
   }, [deptTab, queuePage]);
 
+  const fetchEnquiry = useCallback(async () => {
+    setEnquiryLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: String(enquiryPage),
+        limit: String(LIMIT),
+      });
+      const res = await apiFetch(`${API_URL}/lead-routing/enquiry-queue?${params}`);
+      const data = await res.json();
+      if (data.success) {
+        setEnquiry(data.data?.items || data.data || []);
+        setEnquiryTotal(data.data?.total || data.total || 0);
+      } else {
+        toast.error("Failed to load enquiry queue");
+      }
+    } catch {
+      toast.error("Failed to load enquiry queue");
+    } finally {
+      setEnquiryLoading(false);
+    }
+  }, [enquiryPage]);
+
   const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
@@ -178,6 +228,10 @@ export default function LeadRoutingPage() {
   }, [mainTab, fetchQueue]);
 
   useEffect(() => {
+    if (mainTab === "enquiry") fetchEnquiry();
+  }, [mainTab, fetchEnquiry]);
+
+  useEffect(() => {
     if (mainTab === "history") fetchHistory();
   }, [mainTab, fetchHistory]);
 
@@ -201,7 +255,8 @@ export default function LeadRoutingPage() {
       const data = await res.json();
       if (data.success) {
         toast.success("Lead claimed successfully");
-        fetchQueue();
+        if (mainTab === "enquiry") fetchEnquiry();
+        else fetchQueue();
       } else {
         toast.error(data.message || "Failed to claim lead");
       }
@@ -233,12 +288,31 @@ export default function LeadRoutingPage() {
       }, assignLeadIds);
       if (assigned > 0) toast.success(`${assigned} lead(s) assigned successfully`);
       if (failed > 0) toast.error(`Failed to assign ${failed} lead(s)`);
-      fetchQueue();
+      if (mainTab === "enquiry") fetchEnquiry();
+      else fetchQueue();
     } catch {
       toast.error("Failed to assign lead");
     } finally {
       setIsAssigning(false);
       setAssignLeadIds([]);
+    }
+  };
+
+  const handleAcknowledge = async (leadId: number) => {
+    setAcknowledgingId(leadId);
+    try {
+      const res = await apiFetch(`${API_URL}/leads/${leadId}/acknowledge-enquiry`, { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Enquiry acknowledged");
+        fetchEnquiry();
+      } else {
+        toast.error(data.message || "Failed to acknowledge enquiry");
+      }
+    } catch {
+      toast.error("Failed to acknowledge enquiry");
+    } finally {
+      setAcknowledgingId(null);
     }
   };
 
@@ -372,6 +446,138 @@ export default function LeadRoutingPage() {
     },
   ], [role, router]);
 
+  const enquiryColumns = useMemo<ColumnDef<EnquiryLead>[]>(() => [
+    {
+      accessorKey: "display_id",
+      header: "Lead ID",
+      cell: ({ row }) => (
+        <span
+          onClick={() => router.push(`/leads/${row.original.id}`)}
+          className="font-mono text-[13px] text-[#0052FF] font-medium cursor-pointer hover:underline"
+        >
+          {row.original.display_id}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "name",
+      header: "Name",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <div className="h-7 w-7 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center font-bold text-xs text-blue-900 dark:text-blue-300 shrink-0">
+            {row.original.name?.charAt(0)?.toUpperCase() ?? "?"}
+          </div>
+          <span className="font-medium">{row.original.name}</span>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "mobile_number",
+      header: "Mobile",
+      cell: ({ row }) => <span>{row.original.mobile_number || "—"}</span>,
+    },
+    {
+      accessorKey: "type",
+      header: "Type",
+      cell: ({ row }) => {
+        const isRepeat = row.original.type === "Repeat";
+        return (
+          <Badge className={`border text-xs ${isRepeat ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-blue-100 text-blue-700 border-blue-200"}`}>
+            {row.original.type}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: "repeat_count",
+      header: "Repeat Enquiries",
+      cell: ({ row }) => (
+        <span className="font-mono text-sm block text-center">{row.original.repeat_count}</span>
+      ),
+    },
+    {
+      accessorKey: "last_enquiry_at",
+      header: "Last Enquiry",
+      cell: ({ row }) => (
+        <span className="text-sm" title={formatDateTime(row.original.last_enquiry_at)}>
+          {timeAgo(row.original.last_enquiry_at) || "—"}
+        </span>
+      ),
+    },
+    {
+      id: "property",
+      header: "Property",
+      cell: ({ row }) => {
+        const lead = row.original;
+        if (!lead.property_title) return <span>—</span>;
+        const slot = lead.intent === "site_visit" && lead.visit_slot ? ` ${lead.visit_slot.slice(0, 5)}` : "";
+        return (
+          <div className="flex flex-col">
+            <span className="text-sm font-medium">{lead.property_title}{slot}</span>
+            {lead.property_code && (
+              <span className="text-xs text-muted-foreground font-mono">{lead.property_code}</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      id: "assigned",
+      header: "Assigned",
+      cell: ({ row }) => row.original.assigned_staff_name ? (
+        <span className="text-sm">{row.original.assigned_staff_name}</span>
+      ) : (
+        <Badge variant="outline" className="text-xs whitespace-nowrap">
+          Unassigned
+        </Badge>
+      ),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const lead = row.original;
+        const unassigned = lead.assigned_staff_id == null;
+        return (
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            {canTakeLeadFromQueue(role) && unassigned && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+                disabled={claimingId === lead.id}
+                onClick={() => handleClaim(lead.id)}
+              >
+                {claimingId === lead.id ? <Loader2 size={14} className="animate-spin" /> : "Take"}
+              </Button>
+            )}
+            {role !== "Staff" && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+                onClick={() => setAssignLeadIds([lead.id])}
+              >
+                Assign
+              </Button>
+            )}
+            {!unassigned && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-green-500/30 text-green-600 hover:bg-green-500/10"
+                disabled={acknowledgingId === lead.id}
+                onClick={() => handleAcknowledge(lead.id)}
+              >
+                {acknowledgingId === lead.id ? <Loader2 size={14} className="animate-spin" /> : "Acknowledge"}
+              </Button>
+            )}
+          </div>
+        );
+      },
+    },
+  ], [role, router, claimingId, acknowledgingId]);
+
   const historyColumns = useMemo<ColumnDef<HistoryEntry>[]>(() => [
     {
       accessorKey: "created_at",
@@ -450,6 +656,7 @@ export default function LeadRoutingPage() {
     : deptTabs;
 
   const totalQueuePages = Math.max(1, Math.ceil(queueTotal / LIMIT));
+  const totalEnquiryPages = Math.max(1, Math.ceil(enquiryTotal / LIMIT));
   const totalHistoryPages = Math.max(1, Math.ceil(historyTotal / LIMIT));
 
   return (
@@ -465,10 +672,10 @@ export default function LeadRoutingPage() {
                 variant="outline"
                 size="icon"
                 className="h-10 w-10 rounded-full border-border/60"
-                onClick={() => mainTab === "queue" ? fetchQueue() : fetchHistory()}
+                onClick={() => mainTab === "queue" ? fetchQueue() : mainTab === "enquiry" ? fetchEnquiry() : fetchHistory()}
                 title="Refresh"
               >
-                <RefreshCw size={16} className={(queueLoading || historyLoading) ? "animate-spin" : ""} />
+                <RefreshCw size={16} className={(queueLoading || enquiryLoading || historyLoading) ? "animate-spin" : ""} />
               </Button>
             </div>
           }
@@ -477,8 +684,8 @@ export default function LeadRoutingPage() {
         <div className="bg-card border-y md:border md:rounded-xl overflow-hidden shadow-sm md:flex md:flex-col md:flex-1 md:min-h-0">
         <div className="flex flex-col xl:flex-row xl:items-center justify-between px-4 md:px-6 border-b bg-muted/10 pt-4 gap-4">
           <div className="flex items-center gap-8">
-            {(["queue", "history"] as MainTab[]).map((tab) => {
-              const labels = { queue: "Routing Queue", history: "Routing History" };
+            {(["queue", "enquiry", "history"] as MainTab[]).map((tab) => {
+              const labels = { queue: "Routing Queue", enquiry: "Enquiry Queue", history: "Routing History" };
               return (
                 <button
                   key={tab}
@@ -605,6 +812,53 @@ export default function LeadRoutingPage() {
                         size="sm"
                         onClick={() => setQueuePage((p) => Math.min(totalQueuePages, p + 1))}
                         disabled={queuePage >= totalQueuePages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Enquiry Tab */}
+        {mainTab === "enquiry" && (
+          <div className="w-full md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col p-4 md:p-0">
+            {enquiryLoading ? (
+              <TableSkeleton />
+            ) : (
+              <>
+                <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col pt-2">
+                <DataTable
+                  flush={true}
+                  hidePagination={true}
+                  pageSize={100}
+                  columns={enquiryColumns}
+                  data={enquiry}
+                />
+                {/* Server-side pagination */}
+                {true && (
+                  <div className="flex items-center justify-between px-6 pb-24 pt-4 md:py-4 border-t border-border/40 mt-auto sticky bottom-0 bg-card z-30 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none">
+                    <span className="text-sm text-muted-foreground">
+                      Showing {enquiryTotal > 0 ? Math.min((enquiryPage - 1) * LIMIT + 1, enquiryTotal) : 0} to {Math.min(enquiryPage * LIMIT, enquiryTotal)} of {enquiryTotal} entries
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEnquiryPage((p) => Math.max(1, p - 1))}
+                        disabled={enquiryPage <= 1}
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEnquiryPage((p) => Math.min(totalEnquiryPages, p + 1))}
+                        disabled={enquiryPage >= totalEnquiryPages}
                       >
                         Next
                       </Button>
