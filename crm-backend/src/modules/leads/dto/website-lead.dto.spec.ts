@@ -65,6 +65,23 @@ describe('WebsiteLeadDto whitelist', () => {
     );
   });
 
+  it('rejects a full ISO datetime visitDate', async () => {
+    // @IsDateString() alone accepts 'YYYY-MM-DDTHH:MM:SSZ'. MySQL 8 strict
+    // mode refuses that for a DATE column, so the insert fails — and the site
+    // forwards fire-and-forget, which would lose the lead silently. Pin the
+    // exact calendar-date shape here so no caller can put a datetime in it.
+    const errors = await captureErrors({
+      name: 'Rahul',
+      mobile: '9876543210',
+      intent: 'site_visit',
+      visitDate: '2026-10-05T10:00:00Z',
+      visitSlot: '11:00',
+    });
+
+    expect(errors).not.toBeNull();
+    expect(errors).toEqual(expect.arrayContaining([expect.stringContaining('visitDate')]));
+  });
+
   // Guards the two tests above from passing vacuously: if an undeclared key
   // survived the pipe, "declared fields survive" would prove nothing.
   it('strips a key the DTO does not declare', async () => {

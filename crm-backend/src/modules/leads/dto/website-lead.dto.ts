@@ -72,9 +72,14 @@ export class WebsiteLeadDto {
   @IsIn(['enquiry', 'site_visit'])
   intent?: string;
 
-  // ISO date string; the site normalises to YYYY-MM-DD before forwarding.
+  // Calendar date, exactly 'YYYY-MM-DD'. The site normalises to this shape
+  // before forwarding, but @IsDateString() alone also accepts a full ISO
+  // datetime ('2026-10-05T10:00:00Z'), which MySQL 8 strict mode rejects for a
+  // DATE column. The site forward is fire-and-forget, so that insert failure
+  // would lose the lead silently — pin the format at this boundary too.
   @IsOptional()
   @IsDateString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
   visitDate?: string;
 
   // HH:MM shape only. Slot membership is enforced by the site service, so a
