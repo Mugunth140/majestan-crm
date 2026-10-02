@@ -78,9 +78,12 @@ export class LeadRoutingController {
 
   // ── POST /claim/:leadId ────────────────────────────────────────────────────
   @Post('claim/:leadId')
-  async claimLead(@Param('leadId') leadId: string, @Body() body: any, @Req() req: any) {
-    const requestingUserId: number = body?.actioned_by_id || req.user.sub;
-    const data = await this.leadRoutingService.claimLead(Number(leadId), requestingUserId);
+  async claimLead(@Param('leadId') leadId: string, @Req() req: any) {
+    const data = await this.leadRoutingService.claimLead(
+      Number(leadId),
+      req.user.sub,
+      req.user.role,
+    );
     return { success: true, data };
   }
 
@@ -88,14 +91,14 @@ export class LeadRoutingController {
   @Post('assign/:leadId')
   async assignLead(
     @Param('leadId') leadId: string,
-    @Body() body: AssignLeadDto & { actioned_by_id?: number },
+    @Body() body: AssignLeadDto,
     @Req() req: any,
   ) {
-    const actionedById: number | null = body.actioned_by_id || req.user.sub || null;
     const data = await this.leadRoutingService.assignLead(
       Number(leadId),
       body.to_user_id,
-      actionedById,
+      req.user.sub ?? null,
+      req.user.role,
       body.feedback,
     );
     return { success: true, data };

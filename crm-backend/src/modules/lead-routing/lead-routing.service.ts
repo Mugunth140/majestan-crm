@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { Lead } from '../../database/entities/lead.entity';
@@ -174,7 +174,12 @@ export class LeadRoutingService {
   }
 
   // ── Claim ──────────────────────────────────────────────────────────────────
-  async claimLead(leadId: number, requestingUserId: number) {
+  // Role gate is fail-open on a missing role (preserves behavior for any
+  // missed internal caller) and fail-closed on a present-but-wrong role.
+  async claimLead(leadId: number, requestingUserId: number, requestingRole?: string) {
+    if (requestingRole && !['Staff', 'Team Lead', 'Manager'].includes(requestingRole)) {
+      throw new ForbiddenException('Your role cannot claim leads');
+    }
     await this.dataSource.transaction(async (manager) => {
       const result = await manager.query(
         'UPDATE leads SET assigned_staff_id = ? WHERE id = ? AND assigned_staff_id IS NULL',
@@ -194,6 +199,14 @@ export class LeadRoutingService {
         department: lead?.department,
       });
       await manager.save(rh);
+
+      // Acknowledge this lead's open website enquiries: claiming removes it
+      // from the Enquiry Queue.
+      await manager.query(
+        `UPDATE lead_inquiries SET acknowledged_at = NOW(6)
+         WHERE lead_id = ? AND source = 'website' AND acknowledged_at IS NULL`,
+        [leadId],
+      );
 
       const claimingUser = await manager.getRepository(User).findOne({ 
         where: { id: requestingUserId }, 
@@ -233,7 +246,12 @@ export class LeadRoutingService {
     return { success: true };
   }
 
-  async assignLead(leadId: number, toUserId: number, actionedById: number | null, feedback?: string) {
+  // Role gate is fail-open on a missing role (preserves behavior for any
+  // missed internal caller) and fail-closed on a present-but-wrong role.
+  async assignLead(leadId: number, toUserId: number, actionedById: number | null, actionedRole?: string, feedback?: string) {
+    if (actionedRole && !['Team Lead', 'Manager', 'Admin'].includes(actionedRole)) {
+      throw new ForbiddenException('Your role cannot assign leads');
+    }
     const leadRepo = this.dataSource.getRepository(Lead);
     const lead = await leadRepo.findOne({ where: { id: leadId } });
     if (!lead) throw new NotFoundException('Lead not found');
@@ -253,6 +271,14 @@ export class LeadRoutingService {
       department: lead.department,
     });
     await this.dataSource.getRepository(RoutingHistory).save(rh);
+
+    // Acknowledge this lead's open website enquiries: assigning removes it
+    // from the Enquiry Queue.
+    await this.dataSource.query(
+      `UPDATE lead_inquiries SET acknowledged_at = NOW(6)
+       WHERE lead_id = ? AND source = 'website' AND acknowledged_at IS NULL`,
+      [leadId],
+    );
 
     // Notify assigned staff
     await this.notificationsService.createNotification(
