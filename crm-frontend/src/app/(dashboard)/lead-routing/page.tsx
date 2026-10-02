@@ -98,6 +98,7 @@ export default function LeadRoutingPage() {
 
   const [mainTab, setMainTab] = useState<MainTab>("queue");
   const [deptTab, setDeptTab] = useState<DeptTab>("telecalling");
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
   // Queue state
   const [queue, setQueue] = useState<QueueLead[]>([]);
@@ -142,6 +143,7 @@ export default function LeadRoutingPage() {
         const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
         const roleName = user?.role?.name || user?.role || "";
         const deptName = (user?.department?.name || user?.department || "").toLowerCase();
+        if (user?.id != null) setCurrentUserId(Number(user.id));
         setRole(roleName);
         setUserDept(deptName);
         if (roleName === "Staff") {
@@ -258,7 +260,7 @@ export default function LeadRoutingPage() {
         if (mainTab === "enquiry") fetchEnquiry();
         else fetchQueue();
       } else {
-        toast.error(data.message || "Failed to claim lead");
+        toast.error(data.message || data.error || "Failed to claim lead");
       }
     } catch {
       toast.error("Failed to claim lead");
@@ -307,7 +309,7 @@ export default function LeadRoutingPage() {
         toast.success("Enquiry acknowledged");
         fetchEnquiry();
       } else {
-        toast.error(data.message || "Failed to acknowledge enquiry");
+        toast.error(data.message || data.error || "Failed to acknowledge enquiry");
       }
     } catch {
       toast.error("Failed to acknowledge enquiry");
@@ -448,6 +450,31 @@ export default function LeadRoutingPage() {
 
   const enquiryColumns = useMemo<ColumnDef<EnquiryLead>[]>(() => [
     {
+      id: "select",
+      header: ({ table }) => (
+        <div className="flex items-center justify-center">
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected()}
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Select all"
+            className="data-[state=checked]:bg-[#0052FF] data-[state=checked]:border-[#0052FF]"
+          />
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label="Select row"
+            className="data-[state=checked]:bg-[#0052FF] data-[state=checked]:border-[#0052FF]"
+          />
+        </div>
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
       accessorKey: "display_id",
       header: "Lead ID",
       cell: ({ row }) => (
@@ -538,6 +565,7 @@ export default function LeadRoutingPage() {
       cell: ({ row }) => {
         const lead = row.original;
         const unassigned = lead.assigned_staff_id == null;
+        const isOwner = currentUserId != null && Number(lead.assigned_staff_id) === currentUserId;
         return (
           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
             {canTakeLeadFromQueue(role) && unassigned && (
@@ -558,10 +586,10 @@ export default function LeadRoutingPage() {
                 className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
                 onClick={() => setAssignLeadIds([lead.id])}
               >
-                Assign
+                {unassigned ? "Assign" : "Reassign"}
               </Button>
             )}
-            {!unassigned && (
+            {!unassigned && isOwner && (
               <Button
                 variant="outline"
                 size="sm"
@@ -576,7 +604,7 @@ export default function LeadRoutingPage() {
         );
       },
     },
-  ], [role, router, claimingId, acknowledgingId]);
+  ], [role, router, claimingId, acknowledgingId, currentUserId]);
 
   const historyColumns = useMemo<ColumnDef<HistoryEntry>[]>(() => [
     {
@@ -838,6 +866,57 @@ export default function LeadRoutingPage() {
                   pageSize={100}
                   columns={enquiryColumns}
                   data={enquiry}
+                  showToolbar={true}
+                  renderToolbarActions={(selectedRows, clearSelection) => {
+                    if (selectedRows.length === 0) return null;
+                    return (
+                      <>
+                        {canTakeLeadFromQueue(role) && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+                            onClick={async () => {
+                              // Bulk Take: only unassigned rows are claimable.
+                              const takeable = selectedRows.filter((r: EnquiryLead) => r.assigned_staff_id == null);
+                              if (takeable.length === 0) {
+                                toast.error("Selected enquiries are already assigned");
+                                return;
+                              }
+                              try {
+                                const promises = takeable.map(r =>
+                                  apiFetch(`${API_URL}/lead-routing/claim/${r.id}`, {
+                                    method: "POST", headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ actioned_by_id: null })
+                                  })
+                                );
+                                await Promise.all(promises);
+                                toast.success(`${takeable.length} lead(s) claimed successfully`);
+                                fetchEnquiry();
+                                clearSelection();
+                              } catch {
+                                toast.error("Failed to claim leads");
+                              }
+                            }}
+                          >
+                            Take Selected
+                          </Button>
+                        )}
+                        {role !== "Staff" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+                            onClick={() => {
+                              setAssignLeadIds(selectedRows.map((r: EnquiryLead) => r.id));
+                            }}
+                          >
+                            Assign Selected
+                          </Button>
+                        )}
+                      </>
+                    );
+                  }}
                 />
                 {/* Server-side pagination */}
                 {true && (
