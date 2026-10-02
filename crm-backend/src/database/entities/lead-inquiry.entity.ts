@@ -50,6 +50,20 @@ export class LeadInquiry {
   @Column({ name: 'visit_slot', type: 'time', nullable: true })
   visit_slot: string | null;
 
+  // Website-enquiry provenance + queue state. Mirrors migration
+  // infra/migrations/025_add_inquiry_source_and_ack.sql — synchronize is
+  // false, so the migration is the authority and these must agree with it
+  // name for name. `source` is 'website' only for public-website forwards;
+  // manual edits and Excel imports leave it NULL and never enter the queue.
+  @Column({ name: 'source', type: 'varchar', length: 32, nullable: true })
+  source: string | null;
+
+  @Column({ name: 'is_new_lead', type: 'boolean', default: false })
+  is_new_lead: boolean;
+
+  @Column({ name: 'acknowledged_at', type: 'datetime', precision: 6, nullable: true })
+  acknowledged_at: Date | null;
+
   @Column({ nullable: true })
   funder: string;
 
