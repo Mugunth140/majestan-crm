@@ -927,6 +927,50 @@ function LeadDetail() {
           </div>
         </div>
 
+        {/* ── Row 3.4: Interested In (property enquiry link) ── */}
+        {(lead.interestedProperty || lead.visit) && (
+          <div className="bg-card border rounded-2xl p-6 shadow-sm">
+            <h3 className="text-base font-bold text-foreground border-b pb-3 mb-4 flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-[#0052FF]" /> Interested in
+              {lead.visit && (
+                <span className="ml-auto text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Site visit{lead.visit.date ? ` · ${String(lead.visit.date).slice(0, 10)}` : ""}{lead.visit.slot ? ` ${String(lead.visit.slot).slice(0, 5)}` : ""}
+                </span>
+              )}
+            </h3>
+            {lead.interestedProperty ? (
+              <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
+                {/* TODO: move site URL to NEXT_PUBLIC_SITE_URL once added to .env */}
+                <a
+                  href={`${process.env.NEXT_PUBLIC_SITE_URL || "https://majestan.in"}/properties/${lead.interestedProperty.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-[#0052FF] hover:underline flex items-center gap-1"
+                >
+                  {lead.interestedProperty.title}
+                  <ArrowUpRight className="h-3.5 w-3.5 shrink-0" />
+                </a>
+                {lead.interestedProperty.code && (
+                  <span className="text-muted-foreground">ID: {lead.interestedProperty.code}</span>
+                )}
+                {lead.interestedProperty.propertyType && (
+                  <span className="text-muted-foreground">{lead.interestedProperty.propertyType}</span>
+                )}
+                {lead.interestedProperty.city && (
+                  <span className="text-muted-foreground">{lead.interestedProperty.city}</span>
+                )}
+                {lead.interestedProperty.price != null && (
+                  <span className="font-medium">
+                    {new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(Number(lead.interestedProperty.price))}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">Property details not available.</p>
+            )}
+          </div>
+        )}
+
         {/* ── Row 3.5: Requirements & Preferences ── */}
         <div className="space-y-6 mt-6">
           {(!lead.inquiries || lead.inquiries.length === 0) ? (
