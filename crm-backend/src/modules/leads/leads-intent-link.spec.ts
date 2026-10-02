@@ -62,6 +62,10 @@ describe('createLead intent mapping', () => {
     expect(saved.LeadInquiry[0]).toEqual(expect.objectContaining({
       property_id: 18, property_code: 'AP018', property_slug: 'some-villa-ap018', intent: 'enquiry',
     }));
+    expect(saved.LeadInquiry[0]).toEqual(expect.objectContaining({
+      source: 'website',
+      is_new_lead: true,
+    }));
     expect(saved.LeadFollowUp).toEqual([]);
   });
 
@@ -74,6 +78,10 @@ describe('createLead intent mapping', () => {
     expect(saved.Lead[0]).toEqual(expect.objectContaining({ status: 'Site Visit Scheduled' }));
     expect(saved.LeadFollowUp[0]).toEqual(expect.objectContaining({
       next_follow_up_date: '2026-10-05', next_follow_up_time: '11:00', purpose: 'Site Visit',
+    }));
+    expect(saved.LeadInquiry[0]).toEqual(expect.objectContaining({
+      source: 'website',
+      is_new_lead: true,
     }));
   });
 
@@ -114,5 +122,19 @@ describe('createLead intent mapping', () => {
     // An inquiry must still have been appended
     expect(saved.LeadInquiry).toHaveLength(1);
     expect(saved.LeadInquiry[0]).toEqual(expect.objectContaining({ property_id: 55, intent: 'site_visit' }));
+  });
+
+  it('stamps repeat enquiries with source website and is_new_lead false', async () => {
+    const body = {
+      name: 'Rahul', mobile: '9999999999', source: 'Website – Property page',
+      propertyType: 'villa', propertyId: 19, intent: 'enquiry',
+    } as any;
+    await service.createLead(body);
+    await service.createLead({ ...body, propertyId: 20 });
+    expect(saved.LeadInquiry[1]).toEqual(expect.objectContaining({
+      source: 'website',
+      is_new_lead: false,
+      property_id: 20,
+    }));
   });
 });

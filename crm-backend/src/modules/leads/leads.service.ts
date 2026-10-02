@@ -615,6 +615,8 @@ export class LeadsService {
             intent: normalised.intent ?? 'enquiry',
             visit_date: normalised.visitDate ?? null,
             visit_slot: normalised.visitSlot ?? null,
+            source: 'website',
+            is_new_lead: false,
           });
           await manager.save(inquiry);
         }
@@ -690,6 +692,8 @@ export class LeadsService {
           intent: normalised.intent ?? 'enquiry',
           visit_date: normalised.visitDate ?? null,
           visit_slot: normalised.visitSlot ?? null,
+          source: 'website',
+          is_new_lead: true,
         });
         await manager.save(inquiry);
       }
