@@ -374,7 +374,9 @@ function LeadDetail() {
       try {
         const stored = localStorage.getItem("crm_user");
         const currentUserId = stored ? JSON.parse(stored).id : null;
-        if (!currentUserId || currentUserId !== lead.assigned_staff?.id) return;
+        // Numeric comparison: localStorage id may be a string while the API
+        // returns a number — strict !== would silently never fire the beacon.
+        if (!currentUserId || Number(currentUserId) !== Number(lead.assigned_staff?.id)) return;
         const res = await apiFetch(`${API_URL}/leads/${id}/acknowledge-enquiry`, { method: "POST" });
         if (!cancelled && res.ok) {
           const data = await res.json().catch(() => null);
