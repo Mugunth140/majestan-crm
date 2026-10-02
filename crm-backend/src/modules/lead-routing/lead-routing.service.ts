@@ -100,7 +100,7 @@ export class LeadRoutingService {
                WHERE ia.lead_id = l.id AND ia.source = 'website') AS repeat_count,
               (SELECT MAX(ia.is_new_lead) FROM lead_inquiries ia
                WHERE ia.lead_id = l.id AND ia.source = 'website') AS has_new_lead_flag,
-              MAX(i.created_at) AS last_enquiry_at,
+              MAX(i.created_at) AS last_enquiry_at
        FROM leads l
        JOIN lead_inquiries i ON i.lead_id = l.id
          AND i.source = 'website' AND i.acknowledged_at IS NULL
