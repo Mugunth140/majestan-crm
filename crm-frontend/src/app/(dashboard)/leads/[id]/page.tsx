@@ -362,6 +362,31 @@ function LeadDetail() {
 
   useEffect(() => { fetchLead(); }, [fetchLead]);
 
+  // Acknowledge open website enquiries: opening the lead IS seeing them
+  // (the Interested In card is on this page). The server only honours this
+  // for the assigned staff member; everyone else gets a silent no-op.
+  // NOTE: the detail response nests the owner as `assigned_staff.id`
+  // (there is no flat `assigned_staff_id` on this payload).
+  useEffect(() => {
+    if (!id || !lead) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const stored = localStorage.getItem("crm_user");
+        const currentUserId = stored ? JSON.parse(stored).id : null;
+        if (!currentUserId || currentUserId !== lead.assigned_staff?.id) return;
+        const res = await apiFetch(`${API_URL}/leads/${id}/acknowledge-enquiry`, { method: "POST" });
+        if (!cancelled && res.ok) {
+          const data = await res.json().catch(() => null);
+          if (data?.success && Number(data?.data?.acknowledged) > 0) fetchLead(true);
+        }
+      } catch {
+        // Beacon must never break the page. Swallow everything.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [id, lead, fetchLead]);
+
   // Deep link from the Leads table's "Last Followup" cell (?tab=followups):
   // open the timeline once the lead and its follow-ups are in hand, otherwise
   // the fetch above can win the race and the sheet opens empty. The param stays
