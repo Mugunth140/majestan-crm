@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { lightboxStep } from "@/lib/image-lightbox";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { propertiesApi } from "@/lib/properties-api";
 import { canViewPropertyContacts } from "@/lib/permissions";
@@ -31,6 +33,9 @@ import {
   HelpCircle,
   Sparkles,
   Layers,
+  ChevronLeft,
+  ChevronRight,
+  X,
 } from "lucide-react";
 
 function PageSkeleton() {
@@ -106,6 +111,21 @@ export default function PropertyViewPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [role, setRole] = useState<string>("");
   const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
+  // Gallery lightbox: index into images, null when closed.
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (lightboxIndex === null || !property) return;
+    const total = (property.propertyImages ?? property.images ?? []).length;
+    if (total === 0) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightboxIndex(null);
+      else if (e.key === "ArrowRight") setLightboxIndex((i) => (i === null ? i : lightboxStep(i, total, 1)));
+      else if (e.key === "ArrowLeft") setLightboxIndex((i) => (i === null ? i : lightboxStep(i, total, -1)));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightboxIndex, property]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -586,12 +606,12 @@ export default function PropertyViewPage() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {images.map((img: any, idx: number) => (
-                <a
+                <button
                   key={img.id ?? idx}
-                  href={img.imageUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block relative aspect-video border rounded-xl overflow-hidden hover:opacity-90 transition-opacity"
+                  type="button"
+                  onClick={() => setLightboxIndex(idx)}
+                  className="block relative aspect-video border rounded-xl overflow-hidden hover:opacity-90 transition-opacity cursor-pointer"
+                  aria-label={`View image ${idx + 1}`}
                 >
                   <img src={img.imageUrl} alt={`Property image ${idx + 1}`} className="w-full h-full object-cover" />
                   {img.isPrimary && (
@@ -599,11 +619,57 @@ export default function PropertyViewPage() {
                       Primary
                     </span>
                   )}
-                </a>
+                </button>
               ))}
             </div>
           )}
         </div>
+
+        {/* Image lightbox */}
+        <Dialog open={lightboxIndex !== null} onOpenChange={(o) => !o && setLightboxIndex(null)}>
+          <DialogContent className="sm:max-w-4xl p-0 overflow-hidden bg-black/95 border-black">
+            {lightboxIndex !== null && images[lightboxIndex] && (
+              <div className="relative">
+                <img
+                  src={images[lightboxIndex].imageUrl}
+                  alt={`Property image ${lightboxIndex + 1}`}
+                  className="w-full max-h-[80vh] object-contain"
+                />
+                <button
+                  type="button"
+                  onClick={() => setLightboxIndex(null)}
+                  aria-label="Close"
+                  className="absolute top-3 right-3 h-9 w-9 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+                {images.length > 1 && (
+                  <>
+                    <span className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/50 text-white text-xs font-medium tabular-nums">
+                      {lightboxIndex + 1} / {images.length}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setLightboxIndex((i) => (i === null ? i : lightboxStep(i, images.length, -1)))}
+                      aria-label="Previous image"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLightboxIndex((i) => (i === null ? i : lightboxStep(i, images.length, 1)))}
+                      aria-label="Next image"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Documents */}
         {documents.length > 0 && (
