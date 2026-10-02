@@ -627,13 +627,16 @@ export default function PropertyViewPage() {
 
         {/* Image lightbox */}
         <Dialog open={lightboxIndex !== null} onOpenChange={(o) => !o && setLightboxIndex(null)}>
-          <DialogContent className="sm:max-w-4xl p-0 overflow-hidden bg-black/95 border-black">
+          <DialogContent
+            showCloseButton={false}
+            className="w-screen! max-w-none! h-[100dvh]! p-0! gap-0! rounded-none! border-0! bg-black/95!"
+          >
             {lightboxIndex !== null && images[lightboxIndex] && (
-              <div className="relative">
+              <div className="relative w-full h-full">
                 <img
                   src={images[lightboxIndex].imageUrl}
                   alt={`Property image ${lightboxIndex + 1}`}
-                  className="w-full max-h-[80vh] object-contain"
+                  className="w-full h-[100dvh] object-contain"
                 />
                 <button
                   type="button"
