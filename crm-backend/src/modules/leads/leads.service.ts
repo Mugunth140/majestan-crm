@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { Lead } from '../../database/entities/lead.entity';
@@ -127,6 +127,27 @@ export class LeadsService {
         : null;
 
     return { ...lead, follow_ups: followUps, contact_logs: contactLogs, interestedProperty, visit };
+  }
+
+  // Acknowledge a lead's open website enquiries. Only the assigned staff
+  // member can do this, so an admin browsing around cannot clear someone
+  // else's Enquiry Queue item. Idempotent: acknowledging twice is a no-op.
+  // Unassigned leads (assigned_staff_id NULL) can never satisfy the numeric
+  // check below, so their rows stay until claimed/assigned — intended.
+  async acknowledgeEnquiry(leadId: number, requestingUserId: number) {
+    const lead = await this.dataSource.getRepository(Lead).findOne({
+      where: { id: leadId },
+    });
+    if (!lead) throw new NotFoundException('Lead not found');
+    if (Number(lead.assigned_staff_id) !== Number(requestingUserId)) {
+      throw new ForbiddenException('Only the assigned staff member can acknowledge this lead');
+    }
+    const result = await this.dataSource.query(
+      `UPDATE lead_inquiries SET acknowledged_at = NOW(6)
+       WHERE lead_id = ? AND source = 'website' AND acknowledged_at IS NULL`,
+      [leadId],
+    );
+    return { acknowledged: Number(result?.affectedRows || 0) };
   }
 
   // ── Contact Log ────────────────────────────────────────────────────────────

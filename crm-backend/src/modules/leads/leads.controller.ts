@@ -122,6 +122,12 @@ export class LeadsController {
     return { success: true, data };
   }
 
+  @Post(':id/acknowledge-enquiry')
+  async acknowledgeEnquiry(@Param('id') id: string, @Request() req: any) {
+    const data = await this.leadsService.acknowledgeEnquiry(Number(id), req.user.sub);
+    return { success: true, data };
+  }
+
   @Put(':id/follow-ups/:followUpId')
   async updateFollowUp(
     @Param('id') id: string,
