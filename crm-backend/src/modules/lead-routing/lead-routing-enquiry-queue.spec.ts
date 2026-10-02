@@ -48,6 +48,9 @@ describe('LeadRoutingService enquiry queue', () => {
     expect(sql).toContain("i.source = 'website'");
     expect(sql).toContain('acknowledged_at IS NULL');
     expect(sql).toContain('ORDER BY last_enquiry_at DESC');
+    // repeat_count must count ALL website enquiries (acknowledged or not),
+    // while membership (the JOIN) sees only unacknowledged rows.
+    expect(sql).toContain('ia.source = \'website\') AS repeat_count');
   });
 
   it('marks a single-website-enquiry new lead as New, everything else as Repeat', async () => {

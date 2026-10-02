@@ -93,9 +93,14 @@ export class LeadRoutingService {
       `SELECT l.id, l.name, l.mobile_number, l.email, l.status, l.department,
               l.lead_source, l.created_at, l.assigned_staff_id,
               s.name AS assigned_staff_name,
-              COUNT(i.id) AS repeat_count,
+              -- All-time website enquiries for this lead (acknowledged or not):
+              -- the repeat count must survive acknowledgement, while membership
+              -- (the JOIN above) only sees unacknowledged rows.
+              (SELECT COUNT(*) FROM lead_inquiries ia
+               WHERE ia.lead_id = l.id AND ia.source = 'website') AS repeat_count,
+              (SELECT MAX(ia.is_new_lead) FROM lead_inquiries ia
+               WHERE ia.lead_id = l.id AND ia.source = 'website') AS has_new_lead_flag,
               MAX(i.created_at) AS last_enquiry_at,
-              MAX(i.is_new_lead) AS has_new_lead_flag
        FROM leads l
        JOIN lead_inquiries i ON i.lead_id = l.id
          AND i.source = 'website' AND i.acknowledged_at IS NULL
