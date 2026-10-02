@@ -31,6 +31,10 @@ describe('LeadRoutingService queue', () => {
           useValue: { getRepository: jest.fn().mockReturnValue({ createQueryBuilder: jest.fn().mockReturnValue(qb) }) },
         },
         {
+          provide: getDataSourceToken('site'),
+          useValue: { query: jest.fn().mockResolvedValue([]) },
+        },
+        {
           provide: NotificationsService,
           useValue: {},
         },

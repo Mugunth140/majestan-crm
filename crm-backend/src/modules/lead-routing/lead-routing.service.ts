@@ -11,6 +11,7 @@ import { NON_QUEUEABLE_LEAD_STATUSES } from '../leads/lead-statuses';
 export class LeadRoutingService {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
+    @InjectDataSource('site') private readonly siteDataSource: DataSource,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -69,6 +70,107 @@ export class LeadRoutingService {
     });
 
     return { items: enriched, total, page, limit };
+  }
+
+  // ── Enquiry Queue ──────────────────────────────────────────────────────────
+  // One row per lead with >= 1 unacknowledged website enquiry, newest first.
+  // Type rule: 'New' only when the lead has exactly one website inquiry and
+  // it created the lead; everything else with an open enquiry is 'Repeat'.
+  async getEnquiryQueue(page: number, limit: number) {
+    const skip = (page - 1) * limit;
+
+    const countRows: Array<{ total: number }> = await this.dataSource.query(
+      `SELECT COUNT(DISTINCT l.id) AS total
+       FROM leads l
+       JOIN lead_inquiries i ON i.lead_id = l.id
+         AND i.source = 'website' AND i.acknowledged_at IS NULL
+       WHERE l.status NOT IN ('Not Interested', 'Dropped')`,
+    );
+    const total = Number(countRows[0]?.total || 0);
+    if (total === 0) return { items: [], total, page, limit };
+
+    const rows: any[] = await this.dataSource.query(
+      `SELECT l.id, l.name, l.mobile_number, l.email, l.status, l.department,
+              l.lead_source, l.created_at, l.assigned_staff_id,
+              s.name AS assigned_staff_name,
+              COUNT(i.id) AS repeat_count,
+              MAX(i.created_at) AS last_enquiry_at,
+              MAX(i.is_new_lead) AS has_new_lead_flag
+       FROM leads l
+       JOIN lead_inquiries i ON i.lead_id = l.id
+         AND i.source = 'website' AND i.acknowledged_at IS NULL
+       LEFT JOIN users s ON s.id = l.assigned_staff_id
+       WHERE l.status NOT IN ('Not Interested', 'Dropped')
+       GROUP BY l.id
+       ORDER BY last_enquiry_at DESC
+       LIMIT ? OFFSET ?`,
+      [limit, skip],
+    );
+
+    // Batch-resolve the latest website-enquiry property per lead (best effort:
+    // a site-DB outage yields nulls, never a 500 — same contract as getLeadById).
+    const leadIds = rows.map((r: any) => r.id);
+    let latestByLead: Record<number, any> = {};
+    try {
+      const latest: any[] = await this.dataSource.query(
+        `SELECT i.lead_id, i.property_id, i.property_code, i.property_slug,
+                i.intent, i.visit_date, i.visit_slot
+         FROM lead_inquiries i
+         JOIN (SELECT lead_id, MAX(id) AS max_id FROM lead_inquiries
+               WHERE lead_id IN (?) AND source = 'website' AND acknowledged_at IS NULL
+               GROUP BY lead_id) m ON m.max_id = i.id`,
+        [leadIds],
+      );
+      for (const row of latest) latestByLead[row.lead_id] = row;
+    } catch {
+      latestByLead = {};
+    }
+
+    let propertiesById: Record<number, any> = {};
+    const propertyIds = [...new Set(
+      Object.values(latestByLead).map((r: any) => r.property_id).filter(Boolean),
+    )];
+    if (propertyIds.length > 0) {
+      try {
+        const props: any[] = await this.siteDataSource.query(
+          'SELECT id, title, property_code AS code FROM properties WHERE id IN (?)',
+          [propertyIds],
+        );
+        for (const p of props) propertiesById[p.id] = p;
+      } catch {
+        propertiesById = {};
+      }
+    }
+
+    const items = rows.map((r: any) => {
+      const repeatCount = Number(r.repeat_count);
+      const latest = latestByLead[r.id] ?? {};
+      const prop = latest.property_id ? propertiesById[latest.property_id] : null;
+      return {
+        id: r.id,
+        display_id: `L${String(r.id).padStart(5, '0')}`,
+        name: r.name,
+        mobile_number: r.mobile_number,
+        email: r.email,
+        status: r.status,
+        department: r.department,
+        lead_source: r.lead_source,
+        created_at: r.created_at,
+        assigned_staff_id: r.assigned_staff_id,
+        assigned_staff_name: r.assigned_staff_name ?? null,
+        type: repeatCount === 1 && Number(r.has_new_lead_flag) === 1 ? 'New' : 'Repeat',
+        repeat_count: repeatCount,
+        last_enquiry_at: r.last_enquiry_at,
+        property_code: latest.property_code ?? null,
+        property_title: prop?.title ?? null,
+        intent: latest.intent ?? 'enquiry',
+        visit_date: latest.visit_date ?? null,
+        // visit_slot is SQL TIME: mysql2 returns 'HH:MM:SS'; Task 7 slices it.
+        visit_slot: latest.visit_slot ?? null,
+      };
+    });
+
+    return { items, total, page, limit };
   }
 
   // ── Claim ──────────────────────────────────────────────────────────────────

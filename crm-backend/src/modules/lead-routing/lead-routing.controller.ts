@@ -25,6 +25,19 @@ export class LeadRoutingController {
     return { success: true, data };
   }
 
+  // ── GET /enquiry-queue ───────────────────────────────────────────────────
+  @Get('enquiry-queue')
+  async getEnquiryQueue(
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '25',
+  ) {
+    const data = await this.leadRoutingService.getEnquiryQueue(
+      Number(page),
+      Number(limit),
+    );
+    return { success: true, data };
+  }
+
   // ── GET /history ───────────────────────────────────────────────────────────
   @Get('history')
   async getHistory(
