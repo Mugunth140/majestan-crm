@@ -92,4 +92,27 @@ describe('createLead intent mapping', () => {
     // status was set once by the first call and never rewritten:
     expect(saved.Lead[0].status).toBe('Site Visit Scheduled');
   });
+
+  it('does not overwrite an advanced status when a repeat mobile books a visit', async () => {
+    // Pre-seed a lead already at 'Negotiation' so findOne returns it on the very first call.
+    const existingLead = {
+      id: 1, _entityKey: 'Lead',
+      name: 'Priya', mobile_number: '8888888888', status: 'Negotiation',
+    };
+    saved.Lead.push(existingLead);
+
+    await service.createLead({
+      name: 'Priya', mobile: '8888888888', source: 'Website – Property page',
+      propertyType: 'apartment', propertyId: 55, propertyCode: 'AP055', intent: 'site_visit',
+      visitDate: '2026-10-10', visitSlot: '14:00',
+    } as any);
+
+    // Dedupe branch: no new Lead should have been created
+    expect(saved.Lead).toHaveLength(1);
+    // Status must remain untouched — dedupe branch never writes lead.status
+    expect(saved.Lead[0].status).toBe('Negotiation');
+    // An inquiry must still have been appended
+    expect(saved.LeadInquiry).toHaveLength(1);
+    expect(saved.LeadInquiry[0]).toEqual(expect.objectContaining({ property_id: 55, intent: 'site_visit' }));
+  });
 });

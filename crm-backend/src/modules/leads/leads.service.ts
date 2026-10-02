@@ -94,30 +94,35 @@ export class LeadsService {
       id: number; title: string; code: string | null; slug: string | null;
       price: string | number | null; propertyType: string | null; status: string | null; city: string | null;
     } | null = null;
-    if (link) {
-      const rows: any[] = await this.siteDataSource.query(
-        'SELECT id, title, property_code AS code, slug, price, property_type AS propertyType, status, city FROM properties WHERE id = ? LIMIT 1',
-        [link.property_id],
-      );
-      let p = rows[0];
-      if (!p && link.property_code) {
-        const byCode: any[] = await this.siteDataSource.query(
-          'SELECT id, title, property_code AS code, slug, price, property_type AS propertyType, status, city FROM properties WHERE property_code = ? LIMIT 1',
-          [link.property_code],
+    try {
+      if (link) {
+        const rows: any[] = await this.siteDataSource.query(
+          'SELECT id, title, property_code AS code, slug, price, property_type AS propertyType, status, city FROM properties WHERE id = ? LIMIT 1',
+          [link.property_id],
         );
-        p = byCode[0];
+        let p = rows[0];
+        if (!p && link.property_code) {
+          const byCode: any[] = await this.siteDataSource.query(
+            'SELECT id, title, property_code AS code, slug, price, property_type AS propertyType, status, city FROM properties WHERE property_code = ? LIMIT 1',
+            [link.property_code],
+          );
+          p = byCode[0];
+        }
+        if (p) {
+          interestedProperty = {
+            id: p.id, title: p.title, code: p.code ?? null, slug: p.slug ?? null,
+            price: p.price ?? null, propertyType: p.propertyType ?? null,
+            status: p.status ?? null, city: p.city ?? null,
+          };
+        }
       }
-      if (p) {
-        interestedProperty = {
-          id: p.id, title: p.title, code: p.code ?? null, slug: p.slug ?? null,
-          price: p.price ?? null, propertyType: p.propertyType ?? null,
-          status: p.status ?? null, city: p.city ?? null,
-        };
-      }
+    } catch (err) {
+      console.warn('[LeadsService] site-DB unavailable for lead detail; interestedProperty will be null:', (err as Error)?.message);
     }
 
     const visit =
       link?.visit_date != null
+        // visit_slot is SQL TIME: mysql2 returns 'HH:MM:SS'; Task 12 (crm-fe) slices to 'HH:MM'
         ? { date: link.visit_date, slot: link.visit_slot ?? null, intent: link.intent ?? 'enquiry' }
         : null;
 
