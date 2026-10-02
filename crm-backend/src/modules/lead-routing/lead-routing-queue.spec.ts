@@ -51,4 +51,14 @@ describe('LeadRoutingService queue', () => {
       excluded: expect.arrayContaining(['Not Interested', 'Dropped']),
     });
   });
+
+  it('excludes website-source leads from the routing queue', async () => {
+    await service.getQueue('telecalling', 1, 10);
+
+    const websiteClause = andWhereMock.mock.calls.find(([clause]) =>
+      String(clause).includes('lead.lead_source'),
+    );
+    expect(websiteClause).toBeDefined();
+    expect(websiteClause[1]).toMatchObject({ websiteSource: 'Website – Property page' });
+  });
 });

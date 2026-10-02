@@ -24,6 +24,7 @@ export class LeadRoutingService {
       .where('lead.assigned_staff_id IS NULL')
       .andWhere('lead.department = :department', { department })
       .andWhere('lead.status NOT IN (:...excluded)', { excluded: NON_QUEUEABLE_LEAD_STATUSES })
+      .andWhere('(lead.lead_source IS NULL OR lead.lead_source != :websiteSource)', { websiteSource: 'Website – Property page' })
       .orderBy('lead.created_at', 'DESC')
       .skip(skip)
       .take(limit)
