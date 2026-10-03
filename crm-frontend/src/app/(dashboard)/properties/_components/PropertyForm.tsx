@@ -1610,7 +1610,6 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   placeholder="Select Condition"
                   options={[
                     { label: "New", value: "New" },
-                    { label: "Under Construction", value: "Under Construction" },
                     { label: "Resale", value: "Resale" }
                   ]}
                   value={propertyCondition || null}
