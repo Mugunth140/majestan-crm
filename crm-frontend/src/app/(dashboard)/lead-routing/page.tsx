@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Trash2, RefreshCw, Filter, ChevronDown } from "lucide-react";
+import { Loader2, Trash2, RefreshCw, Filter, ChevronDown, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "motion/react";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
@@ -42,13 +42,16 @@ interface QueueLead {
 }
 
 interface EnquiryLead {
-  id: number;
+  id: number | null;
   display_id: string;
   enquiry_id: number;
   enquiry_at: string;
   name: string;
   mobile_number: string;
+  email: string | null;
   status: string;
+  assigned_staff_id: number | null;
+  assigned_staff_name: string | null;
   type: "New" | "Repeat";
   repeat_count: number;
   property_code: string | null;
@@ -56,8 +59,6 @@ interface EnquiryLead {
   intent: string;
   visit_date: string | null;
   visit_slot: string | null;
-  assigned_staff_id: number | null;
-  assigned_staff_name: string | null;
 }
 
 interface HistoryEntry {
@@ -74,10 +75,13 @@ interface HistoryEntry {
 const EVENT_TYPE_OPTIONS = [
   { label: "All Events", value: "" },
   { label: "Assigned", value: "Assigned" },
-  { label: "Claimed", value: "Claimed" },
   { label: "Auto-transferred", value: "Auto-transferred" },
   { label: "Auto-unassigned", value: "Auto-unassigned" },
+  { label: "Claimed", value: "Claimed" },
   { label: "Converted", value: "Converted" },
+  { label: "Enquiry Acknowledged", value: "Enquiry Acknowledged" },
+  { label: "Enquiry Attached", value: "Enquiry Attached" },
+  { label: "Queued", value: "Queued" },
 ];
 
 function formatDate(d?: string) {
@@ -92,6 +96,130 @@ function formatDateTime(d?: string) {
     " " + dt.toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
+function PurposeBadge({ intent }: { intent: string }) {
+  const isVisit = intent === "site_visit";
+  return (
+    <Badge className={`border text-xs whitespace-nowrap ${isVisit ? "bg-violet-100 text-violet-700 border-violet-200" : "bg-slate-100 text-slate-600 border-slate-200"}`}>
+      {isVisit ? "Site Visit" : "Enquiry"}
+    </Badge>
+  );
+}
+
+// ── Matched-lead decision dialog ─────────────────────────────────────────────
+// Review step for the ✓ action on a matched event: shows the matched lead
+// (owner, status, existing property interest) next to the incoming event.
+// Accept attaches the event to the lead's Interested In; Acknowledge dismisses
+// it. A 409 means someone else already decided the event — the dialog stays
+// open and shows who handled it.
+function MatchedLeadDialog({
+  event,
+  lead,
+  loading,
+  conflict,
+  busy,
+  onAccept,
+  onAcknowledge,
+  onClose,
+}: {
+  event: EnquiryLead | null;
+  lead: any;
+  loading: boolean;
+  conflict: string | null;
+  busy: "accept" | "ack" | null;
+  onAccept: () => void;
+  onAcknowledge: () => void;
+  onClose: () => void;
+}) {
+  const visitBits = event && event.intent === "site_visit"
+    ? [event.visit_date ? String(event.visit_date).slice(0, 10) : null, event.visit_slot ? event.visit_slot.slice(0, 5) : null].filter(Boolean).join(" · ")
+    : null;
+  return (
+    <Dialog open={event != null} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Review matched enquiry</DialogTitle>
+          <DialogDescription>
+            This enquiry matches an existing lead. Add it to their Interested In, or acknowledge it to dismiss.
+          </DialogDescription>
+        </DialogHeader>
+        {loading ? (
+          <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+            <Loader2 size={16} className="animate-spin" /> Loading lead…
+          </div>
+        ) : (
+          <div className="space-y-4 py-1">
+            <div className="rounded-lg border border-border/60 p-3 space-y-1.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Matched lead</p>
+              <p className="font-semibold">{lead?.name || event?.name || "—"}</p>
+              <p className="text-sm text-muted-foreground">{lead?.mobile_number || event?.mobile_number || "—"}{lead?.email ? ` · ${lead.email}` : event?.email ? ` · ${event.email}` : ""}</p>
+              <div className="flex items-center gap-2 pt-1">
+                <Badge variant="outline" className="text-xs whitespace-nowrap">{lead?.status || event?.status || "—"}</Badge>
+                {lead?.assigned_staff?.name ? (
+                  <span className="text-xs text-muted-foreground">Owner: {lead.assigned_staff.name}</span>
+                ) : (
+                  <Badge variant="outline" className="text-xs whitespace-nowrap">Unassigned</Badge>
+                )}
+              </div>
+              <div className="pt-1 text-sm">
+                <span className="text-muted-foreground">Interested in: </span>
+                {lead?.interestedProperty ? (
+                  <span className="font-medium">{lead.interestedProperty.title}{lead.interestedProperty.code ? ` (${lead.interestedProperty.code})` : ""}</span>
+                ) : (
+                  <span className="italic text-muted-foreground">none</span>
+                )}
+              </div>
+            </div>
+            <div className="rounded-lg border border-border/60 p-3 space-y-1.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Incoming enquiry</p>
+              <div className="flex items-center gap-2">
+                <PurposeBadge intent={event?.intent || ""} />
+                <span className="text-sm text-muted-foreground" title={event ? formatDateTime(event.enquiry_at) : undefined}>
+                  {event ? (timeAgo(event.enquiry_at) || "—") : "—"}
+                </span>
+              </div>
+              <p className="text-sm font-medium">
+                {event?.property_title || "—"}
+                {event?.property_code ? <span className="ml-1 font-mono text-xs text-muted-foreground">{event.property_code}</span> : null}
+              </p>
+              {visitBits ? <p className="text-xs text-muted-foreground">Visit: {visitBits}</p> : null}
+            </div>
+            {conflict && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">{conflict}</p>
+            )}
+          </div>
+        )}
+        <DialogFooter className="mt-2 gap-2 sm:gap-2">
+          <Button
+            variant="outline"
+            className="border-green-500/30 text-green-600 hover:bg-green-500/10"
+            disabled={busy != null || loading}
+            onClick={onAccept}
+          >
+            {busy === "accept" ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+            Add to Interested In
+          </Button>
+          <Button
+            variant="outline"
+            className="border-border/60"
+            disabled={busy != null || loading}
+            onClick={onAcknowledge}
+          >
+            {busy === "ack" ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+            Acknowledge
+          </Button>
+          <button
+            type="button"
+            className="text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function LeadRoutingPage() {
   const router = useRouter();
   const [role, setRole] = useState<string>("");
@@ -99,7 +227,6 @@ export default function LeadRoutingPage() {
 
   const [mainTab, setMainTab] = useState<MainTab>("queue");
   const [deptTab, setDeptTab] = useState<DeptTab>("telecalling");
-  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
   // Queue state
   const [queue, setQueue] = useState<QueueLead[]>([]);
@@ -138,11 +265,19 @@ export default function LeadRoutingPage() {
   const [assignLeadIds, setAssignLeadIds] = useState<number[]>([]);
   const [isAssigning, setIsAssigning] = useState(false);
 
-  // Claim loading
-  const [claimingId, setClaimingId] = useState<number | null>(null);
+  // Enquiry groups: expand/collapse + selection (tracked by enquiry_id)
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [selectedEnquiryIds, setSelectedEnquiryIds] = useState<number[]>([]);
+  const [convertingEnquiryId, setConvertingEnquiryId] = useState<number | null>(null);
+  const [ackEnquiryId, setAckEnquiryId] = useState<number | null>(null);
+  const [enquiryBulkBusy, setEnquiryBulkBusy] = useState(false);
 
-  // Acknowledge loading
-  const [acknowledgingId, setAcknowledgingId] = useState<number | null>(null);
+  // Matched-lead decision dialog
+  const [dialogEvent, setDialogEvent] = useState<EnquiryLead | null>(null);
+  const [dialogLead, setDialogLead] = useState<any>(null);
+  const [dialogLoading, setDialogLoading] = useState(false);
+  const [dialogConflict, setDialogConflict] = useState<string | null>(null);
+  const [dialogBusy, setDialogBusy] = useState<"accept" | "ack" | null>(null);
 
   // Delete loading
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -155,7 +290,6 @@ export default function LeadRoutingPage() {
         const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
         const roleName = user?.role?.name || user?.role || "";
         const deptName = (user?.department?.name || user?.department || "").toLowerCase();
-        if (user?.id != null) setCurrentUserId(Number(user.id));
         setRole(roleName);
         setUserDept(deptName);
         if (roleName === "Staff") {
@@ -241,6 +375,12 @@ export default function LeadRoutingPage() {
     }
   }, [historyPage, historyEventFilter, historyDateFrom, historyDateTo]);
 
+  // Selection/expansion are per result-set; drop them when page/filters change.
+  useEffect(() => {
+    setSelectedEnquiryIds([]);
+    setExpandedGroups({});
+  }, [enquiryPage, enquiryTypeFilter, enquiryIntentFilter, enquiryDateFrom, enquiryDateTo]);
+
   useEffect(() => {
     if (mainTab === "queue") fetchQueue();
   }, [mainTab, fetchQueue]);
@@ -258,31 +398,151 @@ export default function LeadRoutingPage() {
     setQueuePage(1);
   }, [deptTab]);
 
-  const handleClaim = async (leadId: number) => {
-    setClaimingId(leadId);
-    try {
-      let currentUserId = 0;
-      const stored = localStorage.getItem("crm_user");
-      if (stored) currentUserId = JSON.parse(stored).id;
+  // ── Enquiry queue: event decisions ─────────────────────────────────────────
+  // Unmatched event → Convert creates an UNASSIGNED lead (lands in the
+  // Routing Queue, not with the clicker). Matched events → Accept attaches
+  // to the lead's Interested In; Acknowledge dismisses (one click by design,
+  // the dialog is the review step for ✓).
 
-      const res = await apiFetch(`${API_URL}/lead-routing/claim/${leadId}`, { 
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ actioned_by_id: currentUserId || null })
-      });
+  const handleConvertEvent = async (ev: EnquiryLead) => {
+    setConvertingEnquiryId(ev.enquiry_id);
+    try {
+      const res = await apiFetch(`${API_URL}/lead-routing/enquiry-queue/convert/${ev.enquiry_id}`, { method: "POST" });
       const data = await res.json();
       if (data.success) {
-        toast.success("Lead claimed successfully");
-        if (mainTab === "enquiry") fetchEnquiry();
-        else fetchQueue();
+        toast.success("Converted — lead queued in Routing");
+        fetchEnquiry();
       } else {
-        toast.error(data.message || data.error || "Failed to claim lead");
+        toast.error(data.message || data.error || "Failed to convert enquiry");
       }
     } catch {
-      toast.error("Failed to claim lead");
+      toast.error("Failed to convert enquiry");
     } finally {
-      setClaimingId(null);
+      setConvertingEnquiryId(null);
     }
+  };
+
+  const handleAckEvent = async (ev: EnquiryLead) => {
+    setAckEnquiryId(ev.enquiry_id);
+    try {
+      const res = await apiFetch(`${API_URL}/lead-routing/enquiry-queue/acknowledge/${ev.enquiry_id}`, { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Enquiry acknowledged");
+        fetchEnquiry();
+      } else {
+        toast.error(data.message || data.error || "Failed to acknowledge enquiry");
+      }
+    } catch {
+      toast.error("Failed to acknowledge enquiry");
+    } finally {
+      setAckEnquiryId(null);
+    }
+  };
+
+  const openMatchedDialog = async (ev: EnquiryLead) => {
+    if (ev.id == null) return;
+    setDialogEvent(ev);
+    setDialogConflict(null);
+    setDialogLead(null);
+    setDialogLoading(true);
+    try {
+      const res = await apiFetch(`${API_URL}/leads/${ev.id}`);
+      const data = await res.json();
+      if (data.success) setDialogLead(data.data);
+      else toast.error("Failed to load lead details");
+    } catch {
+      toast.error("Failed to load lead details");
+    } finally {
+      setDialogLoading(false);
+    }
+  };
+
+  const closeMatchedDialog = () => {
+    if (dialogBusy) return;
+    setDialogEvent(null);
+    setDialogLead(null);
+    setDialogConflict(null);
+  };
+
+  const handleDialogAction = async (kind: "accept" | "ack") => {
+    if (!dialogEvent) return;
+    setDialogBusy(kind);
+    try {
+      const res = await apiFetch(`${API_URL}/lead-routing/enquiry-queue/${kind}/${dialogEvent.enquiry_id}`, { method: "POST" });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success) {
+        toast.success(kind === "accept" ? "Enquiry added to Interested In" : "Enquiry acknowledged");
+        setDialogEvent(null);
+        setDialogLead(null);
+        setDialogConflict(null);
+        fetchEnquiry();
+      } else if (res.status === 409) {
+        const who = data?.handledBy != null ? ` (handled by #${data.handledBy})` : "";
+        setDialogConflict(`${data?.message || "This enquiry was already handled"}${who}`);
+      } else if (res.status === 403) {
+        toast.error(data?.message || "Not allowed");
+        setDialogEvent(null);
+        setDialogLead(null);
+        setDialogConflict(null);
+      } else {
+        toast.error(data?.message || `Failed to ${kind === "accept" ? "accept" : "acknowledge"} enquiry`);
+      }
+    } catch {
+      toast.error(`Failed to ${kind === "accept" ? "accept" : "acknowledge"} enquiry`);
+    } finally {
+      setDialogBusy(null);
+    }
+  };
+
+  const handleBulkConvert = async () => {
+    const selected = enquiry.filter((e) => selectedEnquiryIds.includes(e.enquiry_id));
+    const unmatched = selected.filter((e) => e.id == null);
+    const skipped = selected.length - unmatched.length;
+    if (unmatched.length === 0) {
+      toast.error("No unmatched enquiries selected");
+      return;
+    }
+    setEnquiryBulkBusy(true);
+    let done = 0;
+    for (const ev of unmatched) {
+      try {
+        const res = await apiFetch(`${API_URL}/lead-routing/enquiry-queue/convert/${ev.enquiry_id}`, { method: "POST" });
+        const data = await res.json();
+        if (data.success) done++;
+      } catch {
+        // counted as not done
+      }
+    }
+    setEnquiryBulkBusy(false);
+    toast.success(`Converted ${done} — lead(s) queued in Routing${skipped > 0 ? ` (skipped ${skipped} matched)` : ""}`);
+    fetchEnquiry();
+    setSelectedEnquiryIds([]);
+  };
+
+  const handleBulkMatched = async (kind: "accept" | "ack") => {
+    const selected = enquiry.filter((e) => selectedEnquiryIds.includes(e.enquiry_id));
+    const matched = selected.filter((e) => e.id != null);
+    const skipped = selected.length - matched.length;
+    if (matched.length === 0) {
+      toast.error("No matched enquiries selected");
+      return;
+    }
+    setEnquiryBulkBusy(true);
+    let done = 0;
+    for (const ev of matched) {
+      try {
+        const res = await apiFetch(`${API_URL}/lead-routing/enquiry-queue/${kind}/${ev.enquiry_id}`, { method: "POST" });
+        const data = await res.json();
+        if (data.success) done++;
+      } catch {
+        // counted as not done
+      }
+    }
+    setEnquiryBulkBusy(false);
+    toast.success(`${kind === "accept" ? "Accepted" : "Acknowledged"} ${done} enquir${done === 1 ? "y" : "ies"}${skipped > 0 ? ` (skipped ${skipped} unmatched)` : ""}`);
+    fetchEnquiry();
+    setSelectedEnquiryIds([]);
   };
 
   const handleAssignLead = async (toUserId: number) => {
@@ -313,24 +573,6 @@ export default function LeadRoutingPage() {
     } finally {
       setIsAssigning(false);
       setAssignLeadIds([]);
-    }
-  };
-
-  const handleAcknowledge = async (leadId: number) => {
-    setAcknowledgingId(leadId);
-    try {
-      const res = await apiFetch(`${API_URL}/leads/${leadId}/acknowledge-enquiry`, { method: "POST" });
-      const data = await res.json();
-      if (data.success) {
-        toast.success("Enquiry acknowledged");
-        fetchEnquiry();
-      } else {
-        toast.error(data.message || data.error || "Failed to acknowledge enquiry");
-      }
-    } catch {
-      toast.error("Failed to acknowledge enquiry");
-    } finally {
-      setAcknowledgingId(null);
     }
   };
 
@@ -464,175 +706,48 @@ export default function LeadRoutingPage() {
     },
   ], [role, router]);
 
-  const enquiryColumns = useMemo<ColumnDef<EnquiryLead>[]>(() => [
-    {
-      id: "select",
-      header: ({ table }) => (
-        <div className="flex items-center justify-center">
-          <Checkbox
-            checked={table.getIsAllPageRowsSelected()}
-            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-            aria-label="Select all"
-            className="data-[state=checked]:bg-[#0052FF] data-[state=checked]:border-[#0052FF]"
-          />
-        </div>
-      ),
-      cell: ({ row }) => (
-        <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={(value) => row.toggleSelected(!!value)}
-            aria-label="Select row"
-            className="data-[state=checked]:bg-[#0052FF] data-[state=checked]:border-[#0052FF]"
-          />
-        </div>
-      ),
-      enableSorting: false,
-      enableHiding: false,
-    },
-    {
-      accessorKey: "display_id",
-      header: "Lead ID",
-      cell: ({ row }) => (
-        <span
-          onClick={() => router.push(`/leads/${row.original.id}`)}
-          className="font-mono text-[13px] text-[#0052FF] font-medium cursor-pointer hover:underline"
-        >
-          {row.original.display_id}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "name",
-      header: "Name",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center font-bold text-xs text-blue-900 dark:text-blue-300 shrink-0">
-            {row.original.name?.charAt(0)?.toUpperCase() ?? "?"}
-          </div>
-          <span className="font-medium">{row.original.name}</span>
-        </div>
-      ),
-    },
-    {
-      accessorKey: "mobile_number",
-      header: "Mobile",
-      cell: ({ row }) => <span>{row.original.mobile_number || "—"}</span>,
-    },
-    {
-      accessorKey: "type",
-      header: "Type",
-      cell: ({ row }) => {
-        const isRepeat = row.original.type === "Repeat";
-        return (
-          <Badge className={`border text-xs ${isRepeat ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-blue-100 text-blue-700 border-blue-200"}`}>
-            {row.original.type}
-          </Badge>
-        );
-      },
-    },
-    {
-      accessorKey: "intent",
-      header: "Purpose",
-      cell: ({ row }) => {
-        const isVisit = row.original.intent === "site_visit";
-        return (
-          <Badge className={`border text-xs whitespace-nowrap ${isVisit ? "bg-violet-100 text-violet-700 border-violet-200" : "bg-slate-100 text-slate-600 border-slate-200"}`}>
-            {isVisit ? "Site Visit" : "Enquiry"}
-          </Badge>
-        );
-      },
-    },
-    {
-      accessorKey: "repeat_count",
-      header: "Repeat Enquiries",
-      cell: ({ row }) => (
-        <span className="font-mono text-sm block text-center">{row.original.repeat_count}</span>
-      ),
-    },
-    {
-      accessorKey: "enquiry_at",
-      header: "Enquired On",
-      cell: ({ row }) => (
-        <span className="text-sm" title={formatDateTime(row.original.enquiry_at)}>
-          {timeAgo(row.original.enquiry_at) || "—"}
-        </span>
-      ),
-    },
-    {
-      id: "property",
-      header: "Property",
-      cell: ({ row }) => {
-        const lead = row.original;
-        if (!lead.property_title) return <span>—</span>;
-        const slot = lead.intent === "site_visit" && lead.visit_slot ? ` ${lead.visit_slot.slice(0, 5)}` : "";
-        return (
-          <div className="flex flex-col">
-            <span className="text-sm font-medium">{lead.property_title}{slot}</span>
-            {lead.property_code && (
-              <span className="text-xs text-muted-foreground font-mono">{lead.property_code}</span>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      id: "assigned",
-      header: "Assigned",
-      cell: ({ row }) => row.original.assigned_staff_name ? (
-        <span className="text-sm">{row.original.assigned_staff_name}</span>
-      ) : (
-        <Badge variant="outline" className="text-xs whitespace-nowrap">
-          Unassigned
-        </Badge>
-      ),
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }) => {
-        const lead = row.original;
-        const unassigned = lead.assigned_staff_id == null;
-        const isOwner = currentUserId != null && Number(lead.assigned_staff_id) === currentUserId;
-        return (
-          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-            {canTakeLeadFromQueue(role) && unassigned && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
-                disabled={claimingId === lead.id}
-                onClick={() => handleClaim(lead.id)}
-              >
-                {claimingId === lead.id ? <Loader2 size={14} className="animate-spin" /> : "Take"}
-              </Button>
-            )}
-            {role !== "Staff" && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
-                onClick={() => setAssignLeadIds([lead.id])}
-              >
-                {unassigned ? "Assign" : "Reassign"}
-              </Button>
-            )}
-            {!unassigned && isOwner && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-green-500/30 text-green-600 hover:bg-green-500/10"
-                disabled={acknowledgingId === lead.id}
-                onClick={() => handleAcknowledge(lead.id)}
-              >
-                {acknowledgingId === lead.id ? <Loader2 size={14} className="animate-spin" /> : "Acknowledge"}
-              </Button>
-            )}
-          </div>
-        );
-      },
-    },
-  ], [role, router, claimingId, acknowledgingId, currentUserId]);
+  // ── Enquiry queue: client-side grouping ────────────────────────────────────
+  // One row per open event; groups keyed by matched lead (L<id>) or by mobile
+  // for unmatched events. Groups render collapsed by default, one tap expands.
+  interface EnquiryGroup {
+    key: string;
+    matched: boolean;
+    leadId: number | null;
+    rows: EnquiryLead[];
+  }
+
+  const enquiryGroups = useMemo<EnquiryGroup[]>(() => {
+    const map = new Map<string, EnquiryLead[]>();
+    for (const e of enquiry) {
+      const key = e.id != null ? `L${e.id}` : `MOBILE:${e.mobile_number}`;
+      const arr = map.get(key);
+      if (arr) arr.push(e);
+      else map.set(key, [e]);
+    }
+    return [...map.entries()].map(([key, rows]) => ({
+      key,
+      matched: rows[0].id != null,
+      leadId: rows[0].id,
+      rows,
+    }));
+  }, [enquiry]);
+
+  const toggleGroup = (key: string) =>
+    setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  const toggleEventSelection = (enquiryId: number) =>
+    setSelectedEnquiryIds((prev) =>
+      prev.includes(enquiryId) ? prev.filter((id) => id !== enquiryId) : [...prev, enquiryId]
+    );
+
+  const toggleGroupSelection = (group: EnquiryGroup) => {
+    const ids = group.rows.map((r) => r.enquiry_id);
+    setSelectedEnquiryIds((prev) => {
+      const allSelected = ids.every((id) => prev.includes(id));
+      if (allSelected) return prev.filter((id) => !ids.includes(id));
+      return [...new Set([...prev, ...ids])];
+    });
+  };
 
   const historyColumns = useMemo<ColumnDef<HistoryEntry>[]>(() => [
     {
@@ -989,65 +1104,185 @@ export default function LeadRoutingPage() {
               <TableSkeleton />
             ) : (
               <>
-                <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col pt-2">
-                <DataTable
-                  flush={true}
-                  hidePagination={true}
-                  pageSize={100}
-                  columns={enquiryColumns}
-                  data={enquiry}
-                  showToolbar={true}
-                  renderToolbarActions={(selectedRows, clearSelection) => {
-                    if (selectedRows.length === 0) return null;
-                    return (
+                <div className="flex-1 min-h-0 overflow-y-auto w-full h-full flex flex-col pt-2">
+                {/* Bulk toolbar */}
+                {selectedEnquiryIds.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap px-4 md:px-6 pb-3">
+                    <span className="text-sm text-muted-foreground">{selectedEnquiryIds.length} selected</span>
+                    {canTakeLeadFromQueue(role) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+                        disabled={enquiryBulkBusy}
+                        onClick={handleBulkConvert}
+                      >
+                        Convert Selected
+                      </Button>
+                    )}
+                    {role !== "Staff" && (
                       <>
-                        {canTakeLeadFromQueue(role) && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
-                            onClick={async () => {
-                              // Bulk Take: only unassigned rows are claimable.
-                              const takeable = selectedRows.filter((r: EnquiryLead) => r.assigned_staff_id == null);
-                              if (takeable.length === 0) {
-                                toast.error("Selected enquiries are already assigned");
-                                return;
-                              }
-                              try {
-                                const promises = takeable.map(r =>
-                                  apiFetch(`${API_URL}/lead-routing/claim/${r.id}`, {
-                                    method: "POST", headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ actioned_by_id: null })
-                                  })
-                                );
-                                await Promise.all(promises);
-                                toast.success(`${takeable.length} lead(s) claimed successfully`);
-                                fetchEnquiry();
-                                clearSelection();
-                              } catch {
-                                toast.error("Failed to claim leads");
-                              }
-                            }}
-                          >
-                            Take Selected
-                          </Button>
-                        )}
-                        {role !== "Staff" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
-                            onClick={() => {
-                              setAssignLeadIds(selectedRows.map((r: EnquiryLead) => r.id));
-                            }}
-                          >
-                            Assign Selected
-                          </Button>
-                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-green-500/30 text-green-600 hover:bg-green-500/10"
+                          disabled={enquiryBulkBusy}
+                          onClick={() => handleBulkMatched("accept")}
+                        >
+                          Accept Selected
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-border/60"
+                          disabled={enquiryBulkBusy}
+                          onClick={() => handleBulkMatched("ack")}
+                        >
+                          Acknowledge Selected
+                        </Button>
                       </>
-                    );
-                  }}
-                />
+                    )}
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedEnquiryIds([])}>
+                      Clear
+                    </Button>
+                  </div>
+                )}
+                {/* Grouped open events */}
+                {enquiryGroups.length === 0 ? (
+                  <p className="px-4 md:px-6 py-8 text-sm text-muted-foreground text-center">No open enquiries.</p>
+                ) : (
+                  <div className="divide-y divide-border/40">
+                    {enquiryGroups.map((group) => {
+                      const first = group.rows[0];
+                      const expanded = !!expandedGroups[group.key];
+                      const ids = group.rows.map((r) => r.enquiry_id);
+                      const selectedCount = ids.filter((id) => selectedEnquiryIds.includes(id)).length;
+                      const isRepeat = first.type === "Repeat";
+                      return (
+                        <div key={group.key}>
+                          <div
+                            className="flex items-center gap-2 sm:gap-3 px-4 md:px-6 py-3 cursor-pointer hover:bg-muted/40"
+                            onClick={() => toggleGroup(group.key)}
+                          >
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <Checkbox
+                                checked={selectedCount === ids.length}
+                                indeterminate={selectedCount > 0 && selectedCount < ids.length}
+                                onCheckedChange={() => toggleGroupSelection(group)}
+                                aria-label={`Select ${first.name}`}
+                                className="data-[state=checked]:bg-[#0052FF] data-[state=checked]:border-[#0052FF]"
+                              />
+                            </div>
+                            <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`} />
+                            <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center font-bold text-xs text-blue-900 dark:text-blue-300 shrink-0">
+                              {first.name?.charAt(0)?.toUpperCase() ?? "?"}
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-medium truncate">{first.name}</span>
+                              <span className="text-xs text-muted-foreground">{first.mobile_number}</span>
+                            </div>
+                            {group.matched ? (
+                              <span
+                                onClick={(e) => { e.stopPropagation(); router.push(`/leads/${group.leadId}`); }}
+                                className="font-mono text-[13px] text-[#0052FF] font-medium cursor-pointer hover:underline shrink-0"
+                              >
+                                {first.display_id}
+                              </span>
+                            ) : (
+                              <span className="font-mono text-[13px] text-muted-foreground shrink-0">{first.display_id}</span>
+                            )}
+                            <Badge className={`border text-xs shrink-0 ${isRepeat ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-blue-100 text-blue-700 border-blue-200"}`}>
+                              {first.type}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground whitespace-nowrap" title="Open events for this lead">
+                              ×{first.repeat_count}
+                            </span>
+                            {first.assigned_staff_name ? (
+                              <span className="text-xs truncate hidden sm:inline">{first.assigned_staff_name}</span>
+                            ) : (
+                              <Badge variant="outline" className="text-xs whitespace-nowrap hidden sm:inline-flex">
+                                Unassigned
+                              </Badge>
+                            )}
+                            <span className="ml-auto text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                              {group.rows.length} event{group.rows.length === 1 ? "" : "s"}
+                            </span>
+                          </div>
+                          {expanded && (
+                            <div className="bg-muted/20">
+                              {group.rows.map((ev) => (
+                                <div
+                                  key={ev.enquiry_id}
+                                  className="flex items-center gap-2 sm:gap-3 pl-11 md:pl-14 pr-4 md:pr-6 py-2.5 border-t border-border/30"
+                                  title={ev.id != null && role === "Staff" ? "Only team leads and above can action matched enquiries" : undefined}
+                                >
+                                  <Checkbox
+                                    checked={selectedEnquiryIds.includes(ev.enquiry_id)}
+                                    onCheckedChange={() => toggleEventSelection(ev.enquiry_id)}
+                                    aria-label="Select enquiry"
+                                    className="data-[state=checked]:bg-[#0052FF] data-[state=checked]:border-[#0052FF] shrink-0"
+                                  />
+                                  <span className="text-sm whitespace-nowrap shrink-0" title={formatDateTime(ev.enquiry_at)}>
+                                    {timeAgo(ev.enquiry_at) || "—"}
+                                  </span>
+                                  <div className="flex flex-col min-w-0 flex-1">
+                                    <span className="text-sm font-medium truncate">
+                                      {ev.property_title || "—"}
+                                      {ev.intent === "site_visit" && ev.visit_slot ? ` ${ev.visit_slot.slice(0, 5)}` : ""}
+                                    </span>
+                                    {ev.property_code && (
+                                      <span className="text-xs text-muted-foreground font-mono">{ev.property_code}</span>
+                                    )}
+                                  </div>
+                                  <PurposeBadge intent={ev.intent} />
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {ev.id == null ? (
+                                      canTakeLeadFromQueue(role) ? (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+                                          disabled={convertingEnquiryId === ev.enquiry_id}
+                                          onClick={() => handleConvertEvent(ev)}
+                                        >
+                                          {convertingEnquiryId === ev.enquiry_id ? <Loader2 size={14} className="animate-spin" /> : "Convert"}
+                                        </Button>
+                                      ) : null
+                                    ) : role !== "Staff" ? (
+                                      <>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-8 w-8 text-green-600 hover:bg-green-500/10"
+                                          aria-label="Add to Interested In"
+                                          title="Add to Interested In"
+                                          onClick={() => openMatchedDialog(ev)}
+                                        >
+                                          <Check size={16} />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-8 w-8 text-muted-foreground hover:text-red-500"
+                                          aria-label="Acknowledge"
+                                          title="Acknowledge"
+                                          disabled={ackEnquiryId === ev.enquiry_id}
+                                          onClick={() => handleAckEvent(ev)}
+                                        >
+                                          {ackEnquiryId === ev.enquiry_id ? <Loader2 size={14} className="animate-spin" /> : <X size={16} />}
+                                        </Button>
+                                      </>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 {/* Server-side pagination */}
                 {true && (
                   <div className="flex items-center justify-between px-6 pb-24 pt-4 md:py-4 border-t border-border/40 mt-auto sticky bottom-0 bg-card z-30 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none">
@@ -1176,6 +1411,18 @@ export default function LeadRoutingPage() {
         leadId={assignLeadIds[0]}
         department={deptTab}
         isLoading={isAssigning}
+      />
+
+      {/* Matched-lead decision dialog */}
+      <MatchedLeadDialog
+        event={dialogEvent}
+        lead={dialogLead}
+        loading={dialogLoading}
+        conflict={dialogConflict}
+        busy={dialogBusy}
+        onAccept={() => handleDialogAction("accept")}
+        onAcknowledge={() => handleDialogAction("ack")}
+        onClose={closeMatchedDialog}
       />
 
       {/* Delete Confirmation Dialog */}
