@@ -297,4 +297,54 @@ describe('enquiry events: convert/accept/acknowledge', () => {
     saved.WebsiteEnquiryEvent.push(openEvent({ matched_lead_id: 1 }));
     await expect(service.acknowledgeEvent(1, 10, 'Staff')).rejects.toBeInstanceOf(ForbiddenException);
   });
+
+  it('acknowledge on an UNMATCHED event succeeds with no inquiry row, no history, no notification', async () => {
+    saved.WebsiteEnquiryEvent.push(openEvent({ matched_lead_id: null }));
+
+    const result = await service.acknowledgeEvent(1, 30, 'Manager');
+
+    expect(result).toEqual({ leadId: null, acknowledged: 1 });
+    expect(saved.LeadInquiry).toEqual([]);
+    expect(saved.LeadFollowUp).toEqual([]);
+    expect(saved.RoutingHistory).toEqual([]);
+    expect(saved.WebsiteEnquiryEvent[0]).toEqual(expect.objectContaining({
+      status: 'acknowledged',
+      resolved_lead_id: null,
+      decided_by: 30,
+    }));
+    expect(notifyMock).not.toHaveBeenCalled();
+  });
+
+  it('accept 409s when the event is already attached, naming the decider', async () => {
+    saved.User.push({ id: 7, name: 'Meera' });
+    saved.WebsiteEnquiryEvent.push(openEvent({ matched_lead_id: 1, status: 'attached', decided_by: 7 }));
+
+    const err = await service.acceptEvent(1, 30, 'Team Lead').catch((e) => e);
+    expect(err).toBeInstanceOf(ConflictException);
+    expect(err.getResponse()).toEqual(expect.objectContaining({ handledBy: 7 }));
+    expect(JSON.stringify(err.getResponse())).toContain('Meera');
+  });
+
+  it('accept sends no owner notification when the decider IS the owner', async () => {
+    saved.Lead.push({ id: 1, name: 'Priya', mobile_number: '8888888888', status: 'New Lead', department: 'telecalling', assigned_staff_id: 30 });
+    saved.WebsiteEnquiryEvent.push(openEvent({ mobile_number: '8888888888', matched_lead_id: 1 }));
+
+    const result = await service.acceptEvent(1, 30, 'Team Lead');
+
+    expect(result).toEqual({ leadId: 1, inquiryId: 1 });
+    expect(saved.WebsiteEnquiryEvent[0]).toEqual(expect.objectContaining({
+      status: 'attached',
+      resolved_lead_id: 1,
+    }));
+    expect(notifyMock).not.toHaveBeenCalled();
+  });
+
+  it('accept is fail-open with an undefined role', async () => {
+    saved.Lead.push({ id: 1, name: 'Priya', mobile_number: '8888888888', status: 'New Lead', department: 'telecalling', assigned_staff_id: 20 });
+    saved.WebsiteEnquiryEvent.push(openEvent({ mobile_number: '8888888888', matched_lead_id: 1 }));
+
+    const result = await service.acceptEvent(1, 30, undefined);
+
+    expect(result).toEqual({ leadId: 1, inquiryId: 1 });
+  });
 });

@@ -645,7 +645,6 @@ export class LeadRoutingService {
           ...event,
           status: 'attached',
           resolved_lead_id: meanwhile.id,
-          migrated_inquiry_id: inquiry.id,
           decided_by: requestingUserId,
           decided_at: new Date(),
         });
@@ -675,13 +674,12 @@ export class LeadRoutingService {
 
       let converted = 0;
       for (const sibling of siblings) {
-        const inquiry = await this.inquiryFromEvent(manager, lead.id, sibling, true);
+        await this.inquiryFromEvent(manager, lead.id, sibling, true);
         await this.visitFollowUp(manager, lead.id, sibling);
         await eventRepo.save({
           ...sibling,
           status: 'converted',
           resolved_lead_id: lead.id,
-          migrated_inquiry_id: inquiry.id,
           decided_by: requestingUserId,
           decided_at: new Date(),
         });
@@ -713,7 +711,6 @@ export class LeadRoutingService {
         ...event,
         status: 'attached',
         resolved_lead_id: lead.id,
-        migrated_inquiry_id: inquiry.id,
         decided_by: requestingUserId,
         decided_at: new Date(),
       });
@@ -731,35 +728,39 @@ export class LeadRoutingService {
   }
 
   // ── Acknowledge ── no inquiry row; records that staff saw and dismissed it.
+  // Works on ANY open event, including junk new enquiries with no matched
+  // lead: with no lead there is no history row to attach and no owner to
+  // notify, so both are skipped.
   async acknowledgeEvent(eventId: number, requestingUserId: number, requestingRole?: string) {
     this.assertDeciderRole(requestingRole);
     return this.dataSource.transaction(async (manager) => {
       const event = await this.lockOpenEvent(manager, eventId);
-      if (!event.matched_lead_id) {
-        throw new BadRequestException('only matched enquiries can be acknowledged — convert the others');
-      }
-      const lead = await manager.getRepository(Lead).findOne({
-        where: { id: event.matched_lead_id },
-      });
-      if (!lead) throw new NotFoundException('Matched lead not found');
+      const lead = event.matched_lead_id
+        ? await manager.getRepository(Lead).findOne({
+            where: { id: event.matched_lead_id },
+          })
+        : null;
+      if (event.matched_lead_id && !lead) throw new NotFoundException('Matched lead not found');
 
       await manager.getRepository(WebsiteEnquiryEvent).save({
         ...event,
         status: 'acknowledged',
-        resolved_lead_id: lead.id,
+        resolved_lead_id: lead ? lead.id : null,
         decided_by: requestingUserId,
         decided_at: new Date(),
       });
-      await this.writeEventHistory(manager, lead, 'Enquiry Acknowledged', requestingUserId, true);
-      const label = event.property_code ?? event.property_slug ?? `#${event.property_id ?? 'N/A'}`;
-      await this.notifyLeadOwner(
-        lead,
-        requestingUserId,
-        'Website enquiry acknowledged',
-        `Website enquiry for property ${label} acknowledged on Lead #${lead.id}`,
-        'lead_enquiry_acknowledged',
-      );
-      return { leadId: lead.id, acknowledged: 1 };
+      if (event.matched_lead_id && lead) {
+        await this.writeEventHistory(manager, lead, 'Enquiry Acknowledged', requestingUserId, true);
+        const label = event.property_code ?? event.property_slug ?? `#${event.property_id ?? 'N/A'}`;
+        await this.notifyLeadOwner(
+          lead,
+          requestingUserId,
+          'Website enquiry acknowledged',
+          `Website enquiry for property ${label} acknowledged on Lead #${lead.id}`,
+          'lead_enquiry_acknowledged',
+        );
+      }
+      return { leadId: lead ? lead.id : null, acknowledged: 1 };
     });
   }
 
