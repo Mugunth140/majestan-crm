@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Trash2, RefreshCw, Filter } from "lucide-react";
+import { Loader2, Trash2, RefreshCw, Filter, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "motion/react";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
@@ -119,6 +119,10 @@ export default function LeadRoutingPage() {
   const enquiryHasFilters =
     enquiryTypeFilter !== "" || enquiryIntentFilter !== "" ||
     enquiryDateFrom !== undefined || enquiryDateTo !== undefined;
+  const enquiryActiveFilterCount =
+    (enquiryTypeFilter !== "" ? 1 : 0) + (enquiryIntentFilter !== "" ? 1 : 0) +
+    (enquiryDateFrom !== undefined ? 1 : 0) + (enquiryDateTo !== undefined ? 1 : 0);
+  const [enquiryFilterOpen, setEnquiryFilterOpen] = useState(false);
 
   // History state
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -780,65 +784,104 @@ export default function LeadRoutingPage() {
           )}
 
           {mainTab === "enquiry" && (
-            <div className="flex items-center gap-2 pb-3 sm:pb-4 flex-wrap">
-              <div className="w-40">
-                <FormSelect
-                  name="enquiryPropertyType"
-                  options={[
-                    { label: "Apartment", value: "apartment" },
-                    { label: "Villa", value: "villa" },
-                    { label: "Individual House", value: "individual_portion" },
-                    { label: "Plot", value: "plot" },
-                    { label: "Commercial", value: "commercial" },
-                    { label: "Farmland", value: "farmland" },
-                  ]}
-                  value={enquiryTypeFilter}
-                  onValueChange={(v) => { setEnquiryTypeFilter(v || ""); setEnquiryPage(1); }}
-                  placeholder="All Types"
-                />
-              </div>
-              <div className="w-36">
-                <FormSelect
-                  name="enquiryIntent"
-                  options={[
-                    { label: "Enquiry", value: "enquiry" },
-                    { label: "Site Visit", value: "site_visit" },
-                  ]}
-                  value={enquiryIntentFilter}
-                  onValueChange={(v) => { setEnquiryIntentFilter(v || ""); setEnquiryPage(1); }}
-                  placeholder="All Purposes"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <DatePicker
-                  value={enquiryDateFrom}
-                  onChange={(d) => { setEnquiryDateFrom(d); setEnquiryPage(1); }}
-                  placeholder="From date"
-                  className="w-36"
-                />
-                <span className="text-muted-foreground text-sm">to</span>
-                <DatePicker
-                  value={enquiryDateTo}
-                  onChange={(d) => { setEnquiryDateTo(d); setEnquiryPage(1); }}
-                  placeholder="To date"
-                  className="w-36"
-                />
-              </div>
-              {enquiryHasFilters && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-9 text-muted-foreground hover:text-red-500"
-                  onClick={() => {
-                    setEnquiryTypeFilter("");
-                    setEnquiryIntentFilter("");
-                    setEnquiryDateFrom(undefined);
-                    setEnquiryDateTo(undefined);
-                    setEnquiryPage(1);
-                  }}
-                >
-                  Clear
-                </Button>
+            <div className="relative pb-3 sm:pb-4">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 gap-2 border-border/60"
+                onClick={() => setEnquiryFilterOpen((o) => !o)}
+              >
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                Filters
+                {enquiryActiveFilterCount > 0 && (
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#0052FF] text-[11px] font-semibold text-white">
+                    {enquiryActiveFilterCount}
+                  </span>
+                )}
+                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${enquiryFilterOpen ? "rotate-180" : ""}`} />
+              </Button>
+
+              {enquiryFilterOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setEnquiryFilterOpen(false)}
+                  />
+                  <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-border bg-card p-4 shadow-lg space-y-4">
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Property Type</p>
+                      <FormSelect
+                        name="enquiryPropertyType"
+                        options={[
+                          { label: "Apartment", value: "apartment" },
+                          { label: "Villa", value: "villa" },
+                          { label: "Individual House", value: "individual_portion" },
+                          { label: "Plot", value: "plot" },
+                          { label: "Commercial", value: "commercial" },
+                          { label: "Farmland", value: "farmland" },
+                        ]}
+                        value={enquiryTypeFilter}
+                        onValueChange={(v) => { setEnquiryTypeFilter(v || ""); setEnquiryPage(1); }}
+                        placeholder="All Types"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Purpose</p>
+                      <FormSelect
+                        name="enquiryIntent"
+                        options={[
+                          { label: "Enquiry", value: "enquiry" },
+                          { label: "Site Visit", value: "site_visit" },
+                        ]}
+                        value={enquiryIntentFilter}
+                        onValueChange={(v) => { setEnquiryIntentFilter(v || ""); setEnquiryPage(1); }}
+                        placeholder="All Purposes"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Enquiry Date</p>
+                      <div className="flex items-center gap-2">
+                        <DatePicker
+                          value={enquiryDateFrom}
+                          onChange={(d) => { setEnquiryDateFrom(d); setEnquiryPage(1); }}
+                          placeholder="From date"
+                          className="w-full"
+                        />
+                        <span className="text-muted-foreground text-sm shrink-0">to</span>
+                        <DatePicker
+                          value={enquiryDateTo}
+                          onChange={(d) => { setEnquiryDateTo(d); setEnquiryPage(1); }}
+                          placeholder="To date"
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between pt-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-muted-foreground hover:text-red-500"
+                        disabled={!enquiryHasFilters}
+                        onClick={() => {
+                          setEnquiryTypeFilter("");
+                          setEnquiryIntentFilter("");
+                          setEnquiryDateFrom(undefined);
+                          setEnquiryDateTo(undefined);
+                          setEnquiryPage(1);
+                        }}
+                      >
+                        Clear all
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="h-8"
+                        onClick={() => setEnquiryFilterOpen(false)}
+                      >
+                        Done
+                      </Button>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           )}
