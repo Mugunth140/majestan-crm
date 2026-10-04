@@ -73,11 +73,12 @@ export class LeadRoutingService {
   }
 
   // ── Enquiry Queue ──────────────────────────────────────────────────────────
-  // One row per lead with >= 1 unacknowledged website enquiry, newest first.
-  // Type rule: 'New' only when the lead has exactly one website inquiry and
-  // it created the lead; everything else with an open enquiry is 'Repeat'.
-  // Optional filters apply to the LATEST open website enquiry (the same row
-  // the Purpose badge and Last Enquiry time are drawn from).
+  // One row per OPEN website enquiry (not per lead), newest first — so an
+  // enquiry for property A stays visible after one for property B arrives.
+  // Type/repeat_count are lead-level (shared by that lead's rows); everything
+  // else (property, intent, visit, date) is the row's own enquiry.
+  // Type rule: 'New' = lead still unassigned and born from the website.
+  // Optional filters apply to each row's own enquiry.
   async getEnquiryQueue(
     page: number,
     limit: number,
@@ -85,51 +86,45 @@ export class LeadRoutingService {
   ) {
     const skip = (page - 1) * limit;
 
-    // Latest open website enquiry per lead (ROW_NUMBER pattern, as in getLeads).
-    const latestJoin = `LEFT JOIN (
-      SELECT lead_id, property_type, intent, created_at,
-             ROW_NUMBER() OVER (PARTITION BY lead_id ORDER BY id DESC) AS rn
-      FROM lead_inquiries WHERE source = 'website' AND acknowledged_at IS NULL
-    ) lw ON lw.lead_id = l.id AND lw.rn = 1`;
-
     let filterConds = '';
     const filterParams: any[] = [];
     if (filters?.propertyType) {
-      filterConds += ' AND lw.property_type = ?';
+      filterConds += ' AND i.property_type = ?';
       filterParams.push(filters.propertyType);
     }
     if (filters?.intent === 'enquiry' || filters?.intent === 'site_visit') {
-      filterConds += ' AND lw.intent = ?';
+      filterConds += ' AND i.intent = ?';
       filterParams.push(filters.intent);
     }
     if (filters?.dateFrom) {
-      filterConds += ' AND DATE(lw.created_at) >= ?';
+      filterConds += ' AND DATE(i.created_at) >= ?';
       filterParams.push(filters.dateFrom);
     }
     if (filters?.dateTo) {
-      filterConds += ' AND DATE(lw.created_at) <= ?';
+      filterConds += ' AND DATE(i.created_at) <= ?';
       filterParams.push(filters.dateTo);
     }
 
     const countRows: Array<{ total: number }> = await this.dataSource.query(
-      `SELECT COUNT(DISTINCT l.id) AS total
-       FROM leads l
-       JOIN lead_inquiries i ON i.lead_id = l.id
-         AND i.source = 'website' AND i.acknowledged_at IS NULL
-       ${latestJoin}
-       WHERE l.status NOT IN ('Not Interested', 'Dropped')${filterConds}`,
+      `SELECT COUNT(*) AS total
+       FROM lead_inquiries i
+       JOIN leads l ON l.id = i.lead_id
+       WHERE i.source = 'website' AND i.acknowledged_at IS NULL
+         AND l.status NOT IN ('Not Interested', 'Dropped')${filterConds}`,
       filterParams,
     );
     const total = Number(countRows[0]?.total || 0);
     if (total === 0) return { items: [], total, page, limit };
 
     const rows: any[] = await this.dataSource.query(
-      `SELECT l.id, l.name, l.mobile_number, l.email, l.status, l.department,
+      `SELECT i.id AS enquiry_id, i.created_at AS enquiry_at,
+              i.property_id, i.property_code, i.property_slug, i.property_type,
+              i.intent, i.visit_date, i.visit_slot,
+              l.id, l.name, l.mobile_number, l.email, l.status, l.department,
               l.lead_source, l.created_at, l.assigned_staff_id,
               s.name AS assigned_staff_name,
               -- All-time website enquiries for this lead (acknowledged or not):
-              -- the repeat count must survive acknowledgement, while membership
-              -- (the JOIN above) only sees unacknowledged rows.
+              -- the repeat count must survive acknowledgement.
               (SELECT COUNT(*) FROM lead_inquiries ia
                WHERE ia.lead_id = l.id AND ia.source = 'website') AS repeat_count,
               -- Earliest website enquiry: a visit booking writes its enquiry
@@ -137,42 +132,22 @@ export class LeadRoutingService {
               -- this lead was born from the website.
               (SELECT ia.is_new_lead FROM lead_inquiries ia
                WHERE ia.lead_id = l.id AND ia.source = 'website'
-               ORDER BY ia.id ASC LIMIT 1) AS first_is_new_lead,
-              MAX(i.created_at) AS last_enquiry_at
-       FROM leads l
-       JOIN lead_inquiries i ON i.lead_id = l.id
-         AND i.source = 'website' AND i.acknowledged_at IS NULL
+               ORDER BY ia.id ASC LIMIT 1) AS first_is_new_lead
+       FROM lead_inquiries i
+       JOIN leads l ON l.id = i.lead_id
        LEFT JOIN users s ON s.id = l.assigned_staff_id
-       ${latestJoin}
-       WHERE l.status NOT IN ('Not Interested', 'Dropped')${filterConds}
-       GROUP BY l.id
-       ORDER BY last_enquiry_at DESC
+       WHERE i.source = 'website' AND i.acknowledged_at IS NULL
+         AND l.status NOT IN ('Not Interested', 'Dropped')${filterConds}
+       ORDER BY i.id DESC
        LIMIT ? OFFSET ?`,
       [...filterParams, limit, skip],
     );
 
-    // Batch-resolve the latest website-enquiry property per lead (best effort:
+    // Batch-resolve property titles for the page's rows (best effort:
     // a site-DB outage yields nulls, never a 500 — same contract as getLeadById).
-    const leadIds = rows.map((r: any) => r.id);
-    let latestByLead: Record<number, any> = {};
-    try {
-      const latest: any[] = await this.dataSource.query(
-        `SELECT i.lead_id, i.property_id, i.property_code, i.property_slug,
-                i.intent, i.visit_date, i.visit_slot
-         FROM lead_inquiries i
-         JOIN (SELECT lead_id, MAX(id) AS max_id FROM lead_inquiries
-               WHERE lead_id IN (?) AND source = 'website' AND acknowledged_at IS NULL
-               GROUP BY lead_id) m ON m.max_id = i.id`,
-        [leadIds],
-      );
-      for (const row of latest) latestByLead[row.lead_id] = row;
-    } catch {
-      latestByLead = {};
-    }
-
     let propertiesById: Record<number, any> = {};
     const propertyIds = [...new Set(
-      Object.values(latestByLead).map((r: any) => r.property_id).filter(Boolean),
+      rows.map((r: any) => r.property_id).filter(Boolean),
     )];
     if (propertyIds.length > 0) {
       try {
@@ -188,11 +163,13 @@ export class LeadRoutingService {
 
     const items = rows.map((r: any) => {
       const repeatCount = Number(r.repeat_count);
-      const latest = latestByLead[r.id] ?? {};
-      const prop = latest.property_id ? propertiesById[latest.property_id] : null;
+      const prop = r.property_id ? propertiesById[r.property_id] : null;
       return {
         id: r.id,
         display_id: `L${String(r.id).padStart(5, '0')}`,
+        // This row's own enquiry (one row per open website enquiry).
+        enquiry_id: r.enquiry_id,
+        enquiry_at: r.enquiry_at,
         name: r.name,
         mobile_number: r.mobile_number,
         email: r.email,
@@ -207,13 +184,12 @@ export class LeadRoutingService {
         // (enquiry + visit), so a count-based rule would mislabel it Repeat.
         type: r.assigned_staff_id == null && Number(r.first_is_new_lead) === 1 ? 'New' : 'Repeat',
         repeat_count: repeatCount,
-        last_enquiry_at: r.last_enquiry_at,
-        property_code: latest.property_code ?? null,
+        property_code: r.property_code ?? null,
         property_title: prop?.title ?? null,
-        intent: latest.intent ?? 'enquiry',
-        visit_date: latest.visit_date ?? null,
-        // visit_slot is SQL TIME: mysql2 returns 'HH:MM:SS'; Task 7 slices it.
-        visit_slot: latest.visit_slot ?? null,
+        intent: r.intent ?? 'enquiry',
+        visit_date: r.visit_date ?? null,
+        // visit_slot is SQL TIME: mysql2 returns 'HH:MM:SS'; the frontend slices it.
+        visit_slot: r.visit_slot ?? null,
       };
     });
 

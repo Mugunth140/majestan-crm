@@ -44,12 +44,13 @@ interface QueueLead {
 interface EnquiryLead {
   id: number;
   display_id: string;
+  enquiry_id: number;
+  enquiry_at: string;
   name: string;
   mobile_number: string;
   status: string;
   type: "New" | "Repeat";
   repeat_count: number;
-  last_enquiry_at: string;
   property_code: string | null;
   property_title: string | null;
   intent: string;
@@ -550,11 +551,11 @@ export default function LeadRoutingPage() {
       ),
     },
     {
-      accessorKey: "last_enquiry_at",
-      header: "Last Enquiry",
+      accessorKey: "enquiry_at",
+      header: "Enquired On",
       cell: ({ row }) => (
-        <span className="text-sm" title={formatDateTime(row.original.last_enquiry_at)}>
-          {timeAgo(row.original.last_enquiry_at) || "—"}
+        <span className="text-sm" title={formatDateTime(row.original.enquiry_at)}>
+          {timeAgo(row.original.enquiry_at) || "—"}
         </span>
       ),
     },
