@@ -516,6 +516,18 @@ export default function LeadRoutingPage() {
       },
     },
     {
+      accessorKey: "intent",
+      header: "Purpose",
+      cell: ({ row }) => {
+        const isVisit = row.original.intent === "site_visit";
+        return (
+          <Badge className={`border text-xs whitespace-nowrap ${isVisit ? "bg-violet-100 text-violet-700 border-violet-200" : "bg-slate-100 text-slate-600 border-slate-200"}`}>
+            {isVisit ? "Site Visit" : "Enquiry"}
+          </Badge>
+        );
+      },
+    },
+    {
       accessorKey: "repeat_count",
       header: "Repeat Enquiries",
       cell: ({ row }) => (
