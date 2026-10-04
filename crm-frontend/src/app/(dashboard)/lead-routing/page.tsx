@@ -112,6 +112,13 @@ export default function LeadRoutingPage() {
   const [enquiryLoading, setEnquiryLoading] = useState(false);
   const [enquiryPage, setEnquiryPage] = useState(1);
   const [enquiryTotal, setEnquiryTotal] = useState(0);
+  const [enquiryTypeFilter, setEnquiryTypeFilter] = useState("");
+  const [enquiryIntentFilter, setEnquiryIntentFilter] = useState("");
+  const [enquiryDateFrom, setEnquiryDateFrom] = useState<Date | undefined>(undefined);
+  const [enquiryDateTo, setEnquiryDateTo] = useState<Date | undefined>(undefined);
+  const enquiryHasFilters =
+    enquiryTypeFilter !== "" || enquiryIntentFilter !== "" ||
+    enquiryDateFrom !== undefined || enquiryDateTo !== undefined;
 
   // History state
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -185,6 +192,10 @@ export default function LeadRoutingPage() {
         page: String(enquiryPage),
         limit: String(LIMIT),
       });
+      if (enquiryTypeFilter) params.set("propertyType", enquiryTypeFilter);
+      if (enquiryIntentFilter) params.set("intent", enquiryIntentFilter);
+      if (enquiryDateFrom) params.set("dateFrom", format(enquiryDateFrom, "yyyy-MM-dd"));
+      if (enquiryDateTo) params.set("dateTo", format(enquiryDateTo, "yyyy-MM-dd"));
       const res = await apiFetch(`${API_URL}/lead-routing/enquiry-queue?${params}`);
       const data = await res.json();
       if (data.success) {
@@ -198,7 +209,7 @@ export default function LeadRoutingPage() {
     } finally {
       setEnquiryLoading(false);
     }
-  }, [enquiryPage]);
+  }, [enquiryPage, enquiryTypeFilter, enquiryIntentFilter, enquiryDateFrom, enquiryDateTo]);
 
   const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -765,6 +776,70 @@ export default function LeadRoutingPage() {
                   {d.label}
                 </button>
               ))}
+            </div>
+          )}
+
+          {mainTab === "enquiry" && (
+            <div className="flex items-center gap-2 pb-3 sm:pb-4 flex-wrap">
+              <div className="w-40">
+                <FormSelect
+                  name="enquiryPropertyType"
+                  options={[
+                    { label: "Apartment", value: "apartment" },
+                    { label: "Villa", value: "villa" },
+                    { label: "Individual House", value: "individual_portion" },
+                    { label: "Plot", value: "plot" },
+                    { label: "Commercial", value: "commercial" },
+                    { label: "Farmland", value: "farmland" },
+                  ]}
+                  value={enquiryTypeFilter}
+                  onValueChange={(v) => { setEnquiryTypeFilter(v || ""); setEnquiryPage(1); }}
+                  placeholder="All Types"
+                />
+              </div>
+              <div className="w-36">
+                <FormSelect
+                  name="enquiryIntent"
+                  options={[
+                    { label: "Enquiry", value: "enquiry" },
+                    { label: "Site Visit", value: "site_visit" },
+                  ]}
+                  value={enquiryIntentFilter}
+                  onValueChange={(v) => { setEnquiryIntentFilter(v || ""); setEnquiryPage(1); }}
+                  placeholder="All Purposes"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <DatePicker
+                  value={enquiryDateFrom}
+                  onChange={(d) => { setEnquiryDateFrom(d); setEnquiryPage(1); }}
+                  placeholder="From date"
+                  className="w-36"
+                />
+                <span className="text-muted-foreground text-sm">to</span>
+                <DatePicker
+                  value={enquiryDateTo}
+                  onChange={(d) => { setEnquiryDateTo(d); setEnquiryPage(1); }}
+                  placeholder="To date"
+                  className="w-36"
+                />
+              </div>
+              {enquiryHasFilters && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 text-muted-foreground hover:text-red-500"
+                  onClick={() => {
+                    setEnquiryTypeFilter("");
+                    setEnquiryIntentFilter("");
+                    setEnquiryDateFrom(undefined);
+                    setEnquiryDateTo(undefined);
+                    setEnquiryPage(1);
+                  }}
+                >
+                  Clear
+                </Button>
+              )}
             </div>
           )}
         </div>

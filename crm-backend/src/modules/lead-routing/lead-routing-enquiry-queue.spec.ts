@@ -65,4 +65,35 @@ describe('LeadRoutingService enquiry queue', () => {
     expect(byId[7]).toBe('New');
     expect(byId[8]).toBe('Repeat');
   });
+
+  it('applies propertyType/intent/date filters to the latest open enquiry', async () => {
+    queryMock
+      .mockResolvedValueOnce([{ total: 1 }])
+      .mockResolvedValueOnce([
+        { id: 7, repeat_count: '2', has_new_lead_flag: 1 },
+      ]);
+    await service.getEnquiryQueue(1, 10, {
+      propertyType: 'villa',
+      intent: 'site_visit',
+      dateFrom: '2026-10-01',
+      dateTo: '2026-10-04',
+    });
+    const [, params] = queryMock.mock.calls[0];
+    const [sql, rowsParams] = queryMock.mock.calls[1];
+    expect(sql).toContain('lw.property_type = ?');
+    expect(sql).toContain('lw.intent = ?');
+    expect(sql).toContain('DATE(lw.created_at) >= ?');
+    expect(sql).toContain('DATE(lw.created_at) <= ?');
+    expect(rowsParams).toEqual(['villa', 'site_visit', '2026-10-01', '2026-10-04', 10, 0]);
+    expect(params).toEqual(['villa', 'site_visit', '2026-10-01', '2026-10-04']);
+  });
+
+  it('ignores an intent value outside enquiry/site_visit', async () => {
+    queryMock
+      .mockResolvedValueOnce([{ total: 0 }]);
+    await service.getEnquiryQueue(1, 10, { intent: 'callback' });
+    const [sql, params] = queryMock.mock.calls[0];
+    expect(sql).not.toContain('lw.intent = ?');
+    expect(params).toEqual([]);
+  });
 });

@@ -30,10 +30,20 @@ export class LeadRoutingController {
   async getEnquiryQueue(
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '25',
+    @Query('propertyType') propertyType?: string,
+    @Query('intent') intent?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
   ) {
     const data = await this.leadRoutingService.getEnquiryQueue(
       Number(page),
       Number(limit),
+      {
+        propertyType: propertyType || undefined,
+        intent: intent || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      },
     );
     return { success: true, data };
   }

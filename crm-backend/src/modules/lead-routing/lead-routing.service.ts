@@ -76,15 +76,49 @@ export class LeadRoutingService {
   // One row per lead with >= 1 unacknowledged website enquiry, newest first.
   // Type rule: 'New' only when the lead has exactly one website inquiry and
   // it created the lead; everything else with an open enquiry is 'Repeat'.
-  async getEnquiryQueue(page: number, limit: number) {
+  // Optional filters apply to the LATEST open website enquiry (the same row
+  // the Purpose badge and Last Enquiry time are drawn from).
+  async getEnquiryQueue(
+    page: number,
+    limit: number,
+    filters?: { propertyType?: string; intent?: string; dateFrom?: string; dateTo?: string },
+  ) {
     const skip = (page - 1) * limit;
+
+    // Latest open website enquiry per lead (ROW_NUMBER pattern, as in getLeads).
+    const latestJoin = `LEFT JOIN (
+      SELECT lead_id, property_type, intent, created_at,
+             ROW_NUMBER() OVER (PARTITION BY lead_id ORDER BY id DESC) AS rn
+      FROM lead_inquiries WHERE source = 'website' AND acknowledged_at IS NULL
+    ) lw ON lw.lead_id = l.id AND lw.rn = 1`;
+
+    let filterConds = '';
+    const filterParams: any[] = [];
+    if (filters?.propertyType) {
+      filterConds += ' AND lw.property_type = ?';
+      filterParams.push(filters.propertyType);
+    }
+    if (filters?.intent === 'enquiry' || filters?.intent === 'site_visit') {
+      filterConds += ' AND lw.intent = ?';
+      filterParams.push(filters.intent);
+    }
+    if (filters?.dateFrom) {
+      filterConds += ' AND DATE(lw.created_at) >= ?';
+      filterParams.push(filters.dateFrom);
+    }
+    if (filters?.dateTo) {
+      filterConds += ' AND DATE(lw.created_at) <= ?';
+      filterParams.push(filters.dateTo);
+    }
 
     const countRows: Array<{ total: number }> = await this.dataSource.query(
       `SELECT COUNT(DISTINCT l.id) AS total
        FROM leads l
        JOIN lead_inquiries i ON i.lead_id = l.id
          AND i.source = 'website' AND i.acknowledged_at IS NULL
-       WHERE l.status NOT IN ('Not Interested', 'Dropped')`,
+       ${latestJoin}
+       WHERE l.status NOT IN ('Not Interested', 'Dropped')${filterConds}`,
+      filterParams,
     );
     const total = Number(countRows[0]?.total || 0);
     if (total === 0) return { items: [], total, page, limit };
@@ -105,11 +139,12 @@ export class LeadRoutingService {
        JOIN lead_inquiries i ON i.lead_id = l.id
          AND i.source = 'website' AND i.acknowledged_at IS NULL
        LEFT JOIN users s ON s.id = l.assigned_staff_id
-       WHERE l.status NOT IN ('Not Interested', 'Dropped')
+       ${latestJoin}
+       WHERE l.status NOT IN ('Not Interested', 'Dropped')${filterConds}
        GROUP BY l.id
        ORDER BY last_enquiry_at DESC
        LIMIT ? OFFSET ?`,
-      [limit, skip],
+      [...filterParams, limit, skip],
     );
 
     // Batch-resolve the latest website-enquiry property per lead (best effort:
