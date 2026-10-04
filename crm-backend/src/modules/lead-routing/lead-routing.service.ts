@@ -78,13 +78,21 @@ export class LeadRoutingService {
     return { items: enriched, total, page, limit };
   }
 
-  // ── Enquiry Queue ──────────────────────────────────────────────────────────
-  // One row per OPEN website enquiry (not per lead), newest first — so an
-  // enquiry for property A stays visible after one for property B arrives.
-  // Type/repeat_count are lead-level (shared by that lead's rows); everything
-  // else (property, intent, visit, date) is the row's own enquiry.
-  // Type rule: 'New' = lead still unassigned and born from the website.
-  // Optional filters apply to each row's own enquiry.
+  // ── Enquiry Queue (event-sourced) ───────────────────────────────────────────
+  // One row per OPEN website_enquiry_event, newest first. With hold-everything
+  // intake, new activity lands as events, so the queue reads open events —
+  // not acknowledged inquiry rows.
+  // Type rule: per-event — matched_lead_id IS NULL ? 'New' : 'Repeat'.
+  // repeat_count answers "how many pending items for this person": the number
+  // of OPEN events sharing this event's mobile_number (the queue's working
+  // set — not an all-time lead counter).
+  // Visibility: dead/converted leads' events stay visible (attach-keeps-status
+  // rule) — only Dropped/Not Interested matched leads are excluded; unmatched
+  // events (no lead) always show. Optional filters apply to each row's event.
+  // Item shape: `id` is the matched lead id (null when unmatched — the
+  // frontend uses `enquiry_id` for event endpoints and `id` to tell Convert
+  // (null) from Accept (non-null) rows); `display_id` is L+lead when matched,
+  // EQ+event when unmatched; `created_at` is the event's timestamp.
   async getEnquiryQueue(
     page: number,
     limit: number,
@@ -95,56 +103,51 @@ export class LeadRoutingService {
     let filterConds = '';
     const filterParams: any[] = [];
     if (filters?.propertyType) {
-      filterConds += ' AND i.property_type = ?';
+      filterConds += ' AND e.property_type = ?';
       filterParams.push(filters.propertyType);
     }
     if (filters?.intent === 'enquiry' || filters?.intent === 'site_visit') {
-      filterConds += ' AND i.intent = ?';
+      filterConds += ' AND e.intent = ?';
       filterParams.push(filters.intent);
     }
     if (filters?.dateFrom) {
-      filterConds += ' AND DATE(i.created_at) >= ?';
+      filterConds += ' AND DATE(e.created_at) >= ?';
       filterParams.push(filters.dateFrom);
     }
     if (filters?.dateTo) {
-      filterConds += ' AND DATE(i.created_at) <= ?';
+      filterConds += ' AND DATE(e.created_at) <= ?';
       filterParams.push(filters.dateTo);
     }
 
     const countRows: Array<{ total: number }> = await this.dataSource.query(
       `SELECT COUNT(*) AS total
-       FROM lead_inquiries i
-       JOIN leads l ON l.id = i.lead_id
-       WHERE i.source = 'website' AND i.acknowledged_at IS NULL
-         AND l.status NOT IN ('Not Interested', 'Dropped')${filterConds}`,
+       FROM website_enquiry_events e
+       LEFT JOIN leads l ON l.id = e.matched_lead_id
+       WHERE e.status = 'open'
+         AND (l.id IS NULL OR l.status NOT IN ('Not Interested', 'Dropped'))${filterConds}`,
       filterParams,
     );
     const total = Number(countRows[0]?.total || 0);
     if (total === 0) return { items: [], total, page, limit };
 
     const rows: any[] = await this.dataSource.query(
-      `SELECT i.id AS enquiry_id, i.created_at AS enquiry_at,
-              i.property_id, i.property_code, i.property_slug, i.property_type,
-              i.intent, i.visit_date, i.visit_slot,
-              l.id, l.name, l.mobile_number, l.email, l.status, l.department,
-              l.lead_source, l.created_at, l.assigned_staff_id,
+      `SELECT e.id AS enquiry_id, e.created_at AS enquiry_at, e.name AS event_name,
+              e.mobile_number, e.email, e.property_id, e.property_code, e.property_slug,
+              e.property_type, e.intent, e.visit_date, e.visit_slot,
+              e.matched_lead_id, e.status,
+              l.id, l.name, l.mobile_number AS lead_mobile, l.email AS lead_email,
+              l.status AS lead_status, l.department, l.lead_source,
+              l.assigned_staff_id,
               s.name AS assigned_staff_name,
-              -- All-time website enquiries for this lead (acknowledged or not):
-              -- the repeat count must survive acknowledgement.
-              (SELECT COUNT(*) FROM lead_inquiries ia
-               WHERE ia.lead_id = l.id AND ia.source = 'website') AS repeat_count,
-              -- Earliest website enquiry: a visit booking writes its enquiry
-              -- row first, so MAX() would mislead — the first row tells whether
-              -- this lead was born from the website.
-              (SELECT ia.is_new_lead FROM lead_inquiries ia
-               WHERE ia.lead_id = l.id AND ia.source = 'website'
-               ORDER BY ia.id ASC LIMIT 1) AS first_is_new_lead
-       FROM lead_inquiries i
-       JOIN leads l ON l.id = i.lead_id
+              -- Open events for this person: the queue's pending working set.
+              (SELECT COUNT(*) FROM website_enquiry_events
+               WHERE mobile_number = e.mobile_number AND status = 'open') AS repeat_count
+       FROM website_enquiry_events e
+       LEFT JOIN leads l ON l.id = e.matched_lead_id
        LEFT JOIN users s ON s.id = l.assigned_staff_id
-       WHERE i.source = 'website' AND i.acknowledged_at IS NULL
-         AND l.status NOT IN ('Not Interested', 'Dropped')${filterConds}
-       ORDER BY i.id DESC
+       WHERE e.status = 'open'
+         AND (l.id IS NULL OR l.status NOT IN ('Not Interested', 'Dropped'))${filterConds}
+       ORDER BY e.id DESC
        LIMIT ? OFFSET ?`,
       [...filterParams, limit, skip],
     );
@@ -170,25 +173,28 @@ export class LeadRoutingService {
     const items = rows.map((r: any) => {
       const repeatCount = Number(r.repeat_count);
       const prop = r.property_id ? propertiesById[r.property_id] : null;
+      const matched = r.matched_lead_id != null;
       return {
-        id: r.id,
-        display_id: `L${String(r.id).padStart(5, '0')}`,
-        // This row's own enquiry (one row per open website enquiry).
+        // Matched lead id, or null for unmatched events (frontend uses
+        // enquiry_id for event endpoints; null id => Convert, id => Accept).
+        id: matched ? r.matched_lead_id : null,
+        display_id: matched
+          ? `L${String(r.id).padStart(5, '0')}`
+          : `EQ${String(r.enquiry_id).padStart(5, '0')}`,
+        // This row's own event (one row per open event).
         enquiry_id: r.enquiry_id,
         enquiry_at: r.enquiry_at,
-        name: r.name,
-        mobile_number: r.mobile_number,
-        email: r.email,
-        status: r.status,
-        department: r.department,
-        lead_source: r.lead_source,
-        created_at: r.created_at,
-        assigned_staff_id: r.assigned_staff_id,
+        name: r.event_name ?? r.name ?? null,
+        mobile_number: r.mobile_number ?? r.lead_mobile ?? null,
+        email: r.email ?? r.lead_email ?? null,
+        status: r.lead_status ?? '—',
+        department: r.department ?? null,
+        lead_source: r.lead_source ?? null,
+        created_at: r.enquiry_at,
+        assigned_staff_id: r.assigned_staff_id ?? null,
         assigned_staff_name: r.assigned_staff_name ?? null,
-        // New = still unassigned and born from the website (its earliest
-        // website enquiry created it). A first-time visit writes two rows
-        // (enquiry + visit), so a count-based rule would mislabel it Repeat.
-        type: r.assigned_staff_id == null && Number(r.first_is_new_lead) === 1 ? 'New' : 'Repeat',
+        // Per-event typing: unmatched => New, matched => Repeat.
+        type: matched ? 'Repeat' : 'New',
         repeat_count: repeatCount,
         property_code: r.property_code ?? null,
         property_title: prop?.title ?? null,
