@@ -840,14 +840,13 @@ export default function LeadRoutingPage() {
                     </div>
                     <div className="space-y-1.5">
                       <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Enquiry Date</p>
-                      <div className="flex items-center gap-2">
+                      <div className="space-y-2">
                         <DatePicker
                           value={enquiryDateFrom}
                           onChange={(d) => { setEnquiryDateFrom(d); setEnquiryPage(1); }}
                           placeholder="From date"
                           className="w-full"
                         />
-                        <span className="text-muted-foreground text-sm shrink-0">to</span>
                         <DatePicker
                           value={enquiryDateTo}
                           onChange={(d) => { setEnquiryDateTo(d); setEnquiryPage(1); }}
