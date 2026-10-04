@@ -86,6 +86,39 @@ export class LeadRoutingController {
     return { success: true, data };
   }
 
+  // ── POST /enquiry-queue/* ──────────────────────────────────────────────────
+  // Declared before the :param routes below. Static-prefixed so they cannot
+  // collide with claim/:leadId etc., but declaration order is the backstop.
+  @Post('enquiry-queue/convert/:eventId')
+  async convertEvent(@Param('eventId') eventId: string, @Req() req: any) {
+    const data = await this.leadRoutingService.convertEvent(
+      Number(eventId),
+      req.user.sub,
+      req.user.role,
+    );
+    return { success: true, data };
+  }
+
+  @Post('enquiry-queue/accept/:eventId')
+  async acceptEvent(@Param('eventId') eventId: string, @Req() req: any) {
+    const data = await this.leadRoutingService.acceptEvent(
+      Number(eventId),
+      req.user.sub,
+      req.user.role,
+    );
+    return { success: true, data };
+  }
+
+  @Post('enquiry-queue/acknowledge/:eventId')
+  async acknowledgeEvent(@Param('eventId') eventId: string, @Req() req: any) {
+    const data = await this.leadRoutingService.acknowledgeEvent(
+      Number(eventId),
+      req.user.sub,
+      req.user.role,
+    );
+    return { success: true, data };
+  }
+
   // ── POST /claim/:leadId ────────────────────────────────────────────────────
   @Post('claim/:leadId')
   async claimLead(@Param('leadId') leadId: string, @Req() req: any) {

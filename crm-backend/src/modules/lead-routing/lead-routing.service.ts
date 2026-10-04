@@ -1,9 +1,12 @@
-import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { Lead } from '../../database/entities/lead.entity';
 import { User } from '../../database/entities/user.entity';
 import { RoutingHistory } from '../../database/entities/routing-history.entity';
+import { LeadInquiry } from '../../database/entities/lead-inquiry.entity';
+import { LeadFollowUp } from '../../database/entities/lead-follow-up.entity';
+import { WebsiteEnquiryEvent } from '../../database/entities/website-enquiry-event.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NON_QUEUEABLE_LEAD_STATUSES } from '../leads/lead-statuses';
 
@@ -493,6 +496,271 @@ export class LeadRoutingService {
         );
       }
     }
+  }
+
+  // ── Website Enquiry Events (decide-first intake) ────────────────────────────
+  // Convert grants no ownership — it only queues the enquiry into routing —
+  // so every known staff role may call it. Like claim/assign, the gate is
+  // fail-open on a missing role (missed internal caller) and fail-closed on
+  // a present-but-unknown role.
+  private assertConvertRole(requestingRole?: string) {
+    if (requestingRole && !['Staff', 'Team Lead', 'Manager', 'Admin'].includes(requestingRole)) {
+      throw new ForbiddenException('Your role cannot convert enquiries');
+    }
+  }
+
+  // Accept/Acknowledge decide another lead's fate, so they need Team
+  // Lead/Manager/Admin. Same fail-open/fail-closed convention.
+  private assertDeciderRole(requestingRole?: string) {
+    if (requestingRole && !['Team Lead', 'Manager', 'Admin'].includes(requestingRole)) {
+      throw new ForbiddenException('Your role cannot decide enquiries');
+    }
+  }
+
+  // Row-lock the event, 404 when missing, 409 (with handledBy) when another
+  // staff member already resolved it. The decider-name lookup is best effort:
+  // a missing user row falls back to 'another staff member', never a 500.
+  private async lockOpenEvent(manager: EntityManager, eventId: number) {
+    const rows: any[] = await manager.query(
+      'SELECT * FROM website_enquiry_events WHERE id = ? FOR UPDATE',
+      [eventId],
+    );
+    const event = Array.isArray(rows) ? rows[0] : rows;
+    if (!event) throw new NotFoundException('Enquiry event not found');
+    if (event.status !== 'open') {
+      let name = 'another staff member';
+      if (event.decided_by) {
+        try {
+          const decider = await manager.getRepository(User).findOne({
+            where: { id: event.decided_by },
+          });
+          if (decider?.name) name = decider.name;
+        } catch {
+          // Best effort only — keep the fallback name.
+        }
+      }
+      throw new ConflictException({
+        message: `Enquiry already handled by ${name}`,
+        handledBy: event.decided_by ?? null,
+      });
+    }
+    return event;
+  }
+
+  // One inquiry row per event — field mapping mirrors createLead's new-lead
+  // branch (property link, intent, source website), except the double-write:
+  // an event already carries its own intent, so visit fields land only on
+  // site_visit rows, never as a duplicated base enquiry.
+  private async inquiryFromEvent(
+    manager: EntityManager,
+    leadId: number,
+    event: any,
+    isNewLead: boolean,
+  ) {
+    const repo = manager.getRepository(LeadInquiry);
+    return repo.save(
+      repo.create({
+        lead_id: leadId,
+        property_id: event.property_id ?? null,
+        property_code: event.property_code ?? null,
+        property_slug: event.property_slug ?? null,
+        property_type: event.property_type ?? null,
+        intent: event.intent ?? 'enquiry',
+        visit_date: event.intent === 'site_visit' ? (event.visit_date ?? null) : null,
+        visit_slot: event.intent === 'site_visit' ? (event.visit_slot ?? null) : null,
+        preferences: event.preferences ?? null,
+        source: 'website',
+        is_new_lead: isNewLead,
+      }),
+    );
+  }
+
+  // Visit follow-up fallback mirrors createLead: a booked visit always needs
+  // its Site Visit follow-up, dated from the visit itself.
+  private async visitFollowUp(manager: EntityManager, leadId: number, event: any) {
+    if (event.intent !== 'site_visit') return null;
+    const repo = manager.getRepository(LeadFollowUp);
+    return repo.save(
+      repo.create({
+        lead_id: leadId,
+        next_follow_up_date: event.visit_date ?? null,
+        next_follow_up_time: event.visit_slot ?? null,
+        purpose: 'Site Visit',
+      }),
+    );
+  }
+
+  // History shape mirrors assignLead (from/to/actioned_by) with to_user_id
+  // null for queue-level events; attach/acknowledge point at the current
+  // owner so the trail shows whose lead was touched.
+  private async writeEventHistory(
+    manager: EntityManager,
+    lead: any,
+    eventType: string,
+    actionedById: number,
+    toOwner: boolean,
+  ) {
+    const repo = manager.getRepository(RoutingHistory);
+    return repo.save(
+      repo.create({
+        lead_id: lead.id,
+        event_type: eventType,
+        from_user_id: null,
+        to_user_id: toOwner ? (lead.assigned_staff_id ?? null) : null,
+        actioned_by_id: actionedById,
+        department: lead.department ?? null,
+      }),
+    );
+  }
+
+  private async notifyLeadOwner(lead: any, deciderId: number, title: string, message: string, type: string) {
+    if (lead.assigned_staff_id && lead.assigned_staff_id !== deciderId) {
+      await this.notificationsService.createNotification(
+        lead.assigned_staff_id,
+        title,
+        message,
+        type,
+        lead.id,
+        'lead',
+      );
+    }
+  }
+
+  // ── Convert ── fresh mobile → unassigned lead, meanwhile-created mobile →
+  // attach (kills the duplicate instead of creating a second lead).
+  async convertEvent(eventId: number, requestingUserId: number, requestingRole?: string) {
+    this.assertConvertRole(requestingRole);
+    return this.dataSource.transaction(async (manager) => {
+      const event = await this.lockOpenEvent(manager, eventId);
+      const leadRepo = manager.getRepository(Lead);
+      const eventRepo = manager.getRepository(WebsiteEnquiryEvent);
+
+      const meanwhile = await leadRepo.findOne({
+        where: { mobile_number: event.mobile_number },
+      });
+      if (meanwhile) {
+        const inquiry = await this.inquiryFromEvent(manager, meanwhile.id, event, false);
+        await this.visitFollowUp(manager, meanwhile.id, event);
+        await eventRepo.save({
+          ...event,
+          status: 'attached',
+          resolved_lead_id: meanwhile.id,
+          migrated_inquiry_id: inquiry.id,
+          decided_by: requestingUserId,
+          decided_at: new Date(),
+        });
+        await this.writeEventHistory(manager, meanwhile, 'Enquiry Attached', requestingUserId, true);
+        return { leadId: meanwhile.id, converted: 1 };
+      }
+
+      // Status rule copied from createLead's new-lead branch.
+      const lead = await leadRepo.save(
+        leadRepo.create({
+          name: event.name || 'Unknown',
+          mobile_number: event.mobile_number,
+          email: event.email ?? null,
+          whatsapp_number: event.whatsapp_number ?? null,
+          city: event.city ?? null,
+          lead_source: 'Website – Property page',
+          status: event.intent === 'site_visit' ? 'Site Visit Scheduled' : 'New Lead',
+        }),
+      );
+
+      // Resolve the triggering event plus every other open same-mobile event
+      // (a second property enquiry may have landed while this one waited).
+      const siblings: any[] = await eventRepo.find({
+        where: { mobile_number: event.mobile_number, status: 'open' },
+      });
+      if (!siblings.some((e) => e.id === event.id)) siblings.unshift(event);
+
+      let converted = 0;
+      for (const sibling of siblings) {
+        const inquiry = await this.inquiryFromEvent(manager, lead.id, sibling, true);
+        await this.visitFollowUp(manager, lead.id, sibling);
+        await eventRepo.save({
+          ...sibling,
+          status: 'converted',
+          resolved_lead_id: lead.id,
+          migrated_inquiry_id: inquiry.id,
+          decided_by: requestingUserId,
+          decided_at: new Date(),
+        });
+        converted += 1;
+      }
+      await this.writeEventHistory(manager, lead, 'Queued', requestingUserId, false);
+      return { leadId: lead.id, converted };
+    });
+  }
+
+  // ── Accept (attach) ── matched enquiries only; lead status untouched.
+  async acceptEvent(eventId: number, requestingUserId: number, requestingRole?: string) {
+    this.assertDeciderRole(requestingRole);
+    return this.dataSource.transaction(async (manager) => {
+      const event = await this.lockOpenEvent(manager, eventId);
+      if (!event.matched_lead_id) {
+        throw new BadRequestException('only matched enquiries can be attached — convert the others');
+      }
+      const lead = await manager.getRepository(Lead).findOne({
+        where: { id: event.matched_lead_id },
+      });
+      if (!lead) throw new NotFoundException('Matched lead not found');
+
+      const inquiry = await this.inquiryFromEvent(manager, lead.id, event, false);
+      await this.visitFollowUp(manager, lead.id, event);
+      // Lead status deliberately untouched — even Dropped/Converted: attaching
+      // evidence must never resurrect or rewrite lifecycle state.
+      await manager.getRepository(WebsiteEnquiryEvent).save({
+        ...event,
+        status: 'attached',
+        resolved_lead_id: lead.id,
+        migrated_inquiry_id: inquiry.id,
+        decided_by: requestingUserId,
+        decided_at: new Date(),
+      });
+      await this.writeEventHistory(manager, lead, 'Enquiry Attached', requestingUserId, true);
+      const label = event.property_code ?? event.property_slug ?? `#${event.property_id ?? 'N/A'}`;
+      await this.notifyLeadOwner(
+        lead,
+        requestingUserId,
+        'Website enquiry attached',
+        `Website enquiry for property ${label} attached to Lead #${lead.id}`,
+        'lead_enquiry_attached',
+      );
+      return { leadId: lead.id, inquiryId: inquiry.id };
+    });
+  }
+
+  // ── Acknowledge ── no inquiry row; records that staff saw and dismissed it.
+  async acknowledgeEvent(eventId: number, requestingUserId: number, requestingRole?: string) {
+    this.assertDeciderRole(requestingRole);
+    return this.dataSource.transaction(async (manager) => {
+      const event = await this.lockOpenEvent(manager, eventId);
+      if (!event.matched_lead_id) {
+        throw new BadRequestException('only matched enquiries can be acknowledged — convert the others');
+      }
+      const lead = await manager.getRepository(Lead).findOne({
+        where: { id: event.matched_lead_id },
+      });
+      if (!lead) throw new NotFoundException('Matched lead not found');
+
+      await manager.getRepository(WebsiteEnquiryEvent).save({
+        ...event,
+        status: 'acknowledged',
+        resolved_lead_id: lead.id,
+        decided_by: requestingUserId,
+        decided_at: new Date(),
+      });
+      await this.writeEventHistory(manager, lead, 'Enquiry Acknowledged', requestingUserId, true);
+      const label = event.property_code ?? event.property_slug ?? `#${event.property_id ?? 'N/A'}`;
+      await this.notifyLeadOwner(
+        lead,
+        requestingUserId,
+        'Website enquiry acknowledged',
+        `Website enquiry for property ${label} acknowledged on Lead #${lead.id}`,
+        'lead_enquiry_acknowledged',
+      );
+      return { leadId: lead.id, acknowledged: 1 };
+    });
   }
 
   // ── Routing History ────────────────────────────────────────────────────────
