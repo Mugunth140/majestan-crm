@@ -7,6 +7,7 @@ import { LeadInquiry } from '../../database/entities/lead-inquiry.entity';
 import { ContactLog } from '../../database/entities/contact-log.entity';
 import { User } from '../../database/entities/user.entity';
 import { LeadDocument } from '../../database/entities/lead-document.entity';
+import { WebsiteEnquiryEvent } from '../../database/entities/website-enquiry-event.entity';
 import { NON_QUEUEABLE_LEAD_STATUSES } from './lead-statuses';
 import { NotificationsService } from '../notifications/notifications.service';
 import { TasksService } from '../tasks/tasks.service';
@@ -15,9 +16,10 @@ import { extname } from 'path';
 import { fetchWatermarkedImage, isImageMimetype } from '../../common/imgproxy-watermark';
 
 export interface CreateLeadResult {
-  lead: Lead;
+  lead: Lead | null;
   isExistingCustomer: boolean;
   existingStaff?: string;
+  eventId?: number;
 }
 
 export interface DuplicateLeadInfo {
@@ -610,6 +612,47 @@ export class LeadsService {
     const normalised = { ...body, mobile };
 
     return this.dataSource.transaction(async (manager: EntityManager) => {
+      if (normalised.source === 'Website – Property page') {
+        // Decide-first intake: hold everything as a pending event. Nothing
+        // auto-creates here; Convert/Attach/Acknowledge (lead-routing) resolve it.
+        const eventRepo = manager.getRepository(WebsiteEnquiryEvent);
+        let matchedLead = await manager.getRepository(Lead).findOne({
+          where: { mobile_number: mobile },
+          relations: { assigned_staff: true },
+        });
+        if (!matchedLead && normalised.email) {
+          const byEmail = await manager.getRepository(Lead).findOne({
+            where: { email: normalised.email },
+          });
+          // Mobile wins on conflict: only adopt the email match when mobile matched nothing.
+          if (byEmail) matchedLead = byEmail;
+        }
+        const event = eventRepo.create({
+          name: normalised.name ?? null,
+          mobile_number: mobile,
+          email: normalised.email || null,
+          city: normalised.city || null,
+          whatsapp_number: normalised.whatsapp || null,
+          property_id: normalised.propertyId ?? null,
+          property_code: normalised.propertyCode ?? null,
+          property_slug: normalised.propertySlug ?? null,
+          property_type: normalised.propertyType ?? null,
+          intent: normalised.intent ?? 'enquiry',
+          visit_date: normalised.visitDate ?? null,
+          visit_slot: normalised.visitSlot ?? null,
+          preferences: normalised.preferences || null,
+          matched_lead_id: matchedLead ? matchedLead.id : null,
+          status: 'open',
+        });
+        const savedEvent = await manager.save(event);
+        return {
+          lead: matchedLead,
+          isExistingCustomer: !!matchedLead,
+          existingStaff: (matchedLead as any)?.assigned_staff?.name ?? 'Unassigned',
+          eventId: savedEvent.id,
+        };
+      }
+
       const existingLead = await manager.getRepository(Lead).findOne({
         where: { mobile_number: mobile },
         relations: { assigned_staff: true },

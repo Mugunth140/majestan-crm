@@ -10,12 +10,13 @@ jest.mock('bun', () => ({
 
 describe('createLead intent mapping', () => {
   let service: LeadsService;
-  const saved: Record<string, any[]> = { Lead: [], LeadInquiry: [], LeadFollowUp: [] };
+  const saved: Record<string, any[]> = { Lead: [], LeadInquiry: [], LeadFollowUp: [], WebsiteEnquiryEvent: [] };
 
   beforeEach(async () => {
     saved.Lead = [];
     saved.LeadInquiry = [];
     saved.LeadFollowUp = [];
+    saved.WebsiteEnquiryEvent = [];
     const repoFor = (key: string) => ({
       // Lead.findOne returns the already-saved lead, exercising the dedupe branch on repeat mobiles:
       findOne: async () => (key === 'Lead' ? saved.Lead[0] ?? null : null),
@@ -54,7 +55,7 @@ describe('createLead intent mapping', () => {
 
   it('stores the property link on the inquiry for a new enquiry lead', async () => {
     await service.createLead({
-      name: 'Rahul', mobile: '9876543210', source: 'Website – Property page',
+      name: 'Rahul', mobile: '9876543210', source: 'Manual',
       propertyType: 'apartment', propertyId: 18, propertyCode: 'AP018',
       propertySlug: 'some-villa-ap018', intent: 'enquiry',
     } as any);
@@ -71,7 +72,7 @@ describe('createLead intent mapping', () => {
 
   it('marks a new visit lead Site Visit Scheduled with a dated follow-up', async () => {
     await service.createLead({
-      name: 'Rahul', mobile: '9876543210', source: 'Website – Property page',
+      name: 'Rahul', mobile: '9876543210', source: 'Manual',
       propertyType: 'apartment', propertyId: 18, intent: 'site_visit',
       visitDate: '2026-10-05', visitSlot: '11:00',
     } as any);
@@ -102,7 +103,7 @@ describe('createLead intent mapping', () => {
   it('appends inquiries without moving status for a repeat mobile', async () => {
     // findOne returns the already-saved lead, exercising the dedupe branch:
     const body = {
-      name: 'Rahul', mobile: '9999999999', source: 'Website – Property page',
+      name: 'Rahul', mobile: '9999999999', source: 'Manual',
       propertyType: 'villa', propertyId: 19, propertyCode: 'VL009', intent: 'site_visit',
       visitDate: '2026-10-06', visitSlot: '12:00',
     } as any;
@@ -126,7 +127,7 @@ describe('createLead intent mapping', () => {
     saved.Lead.push(existingLead);
 
     await service.createLead({
-      name: 'Priya', mobile: '8888888888', source: 'Website – Property page',
+      name: 'Priya', mobile: '8888888888', source: 'Manual',
       propertyType: 'apartment', propertyId: 55, propertyCode: 'AP055', intent: 'site_visit',
       visitDate: '2026-10-10', visitSlot: '14:00',
     } as any);
@@ -143,7 +144,7 @@ describe('createLead intent mapping', () => {
 
   it('stamps repeat enquiries with source website and is_new_lead false', async () => {
     const body = {
-      name: 'Rahul', mobile: '9999999999', source: 'Website – Property page',
+      name: 'Rahul', mobile: '9999999999', source: 'Manual',
       propertyType: 'villa', propertyId: 19, intent: 'enquiry',
     } as any;
     await service.createLead(body);
@@ -153,5 +154,65 @@ describe('createLead intent mapping', () => {
       is_new_lead: false,
       property_id: 20,
     }));
+  });
+
+  it('holds a fresh website enquiry as an open event without creating a lead', async () => {
+    const result = await service.createLead({
+      name: 'Rahul', mobile: '9876543210', email: 'rahul@example.com',
+      source: 'Website – Property page',
+      propertyType: 'apartment', propertyId: 18, propertyCode: 'AP018',
+      propertySlug: 'some-villa-ap018', intent: 'enquiry',
+    } as any);
+    // Decide-first intake: nothing auto-creates.
+    expect(saved.Lead).toEqual([]);
+    expect(saved.LeadInquiry).toEqual([]);
+    expect(saved.LeadFollowUp).toEqual([]);
+    expect(saved.WebsiteEnquiryEvent).toHaveLength(1);
+    expect(saved.WebsiteEnquiryEvent[0]).toEqual(expect.objectContaining({
+      mobile_number: '9876543210',
+      email: 'rahul@example.com',
+      property_id: 18,
+      property_code: 'AP018',
+      intent: 'enquiry',
+      matched_lead_id: null,
+      status: 'open',
+    }));
+    expect(result.lead).toBeNull();
+    expect(result.isExistingCustomer).toBe(false);
+    expect(result.existingStaff).toBe('Unassigned');
+    expect(result.eventId).toBe(1);
+  });
+
+  it('holds a repeat website enquiry as an open event linked to the matched lead', async () => {
+    const existingLead = {
+      id: 1, _entityKey: 'Lead',
+      name: 'Priya', mobile_number: '8888888888',
+      assigned_staff: { name: 'Asha' },
+    };
+    saved.Lead.push(existingLead);
+
+    const result = await service.createLead({
+      name: 'Priya', mobile: '8888888888', source: 'Website – Property page',
+      propertyType: 'apartment', propertyId: 55, propertyCode: 'AP055', intent: 'site_visit',
+      visitDate: '2026-10-10', visitSlot: '14:00',
+    } as any);
+
+    // Matched by mobile: no new Lead, no inquiries, no follow-ups.
+    expect(saved.Lead).toHaveLength(1);
+    expect(saved.LeadInquiry).toEqual([]);
+    expect(saved.LeadFollowUp).toEqual([]);
+    expect(saved.WebsiteEnquiryEvent).toHaveLength(1);
+    expect(saved.WebsiteEnquiryEvent[0]).toEqual(expect.objectContaining({
+      matched_lead_id: 1,
+      status: 'open',
+      intent: 'site_visit',
+      property_id: 55,
+      visit_date: '2026-10-10',
+      visit_slot: '14:00',
+    }));
+    expect(result.lead).toEqual(expect.objectContaining({ id: 1 }));
+    expect(result.isExistingCustomer).toBe(true);
+    expect(result.existingStaff).toBe('Asha');
+    expect(result.eventId).toBe(1);
   });
 });
