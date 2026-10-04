@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Trash2, RefreshCw, Filter, ChevronDown, Check, X } from "lucide-react";
+import { Loader2, RefreshCw, Filter, ChevronDown, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "motion/react";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
@@ -59,6 +59,15 @@ interface EnquiryLead {
   intent: string;
   visit_date: string | null;
   visit_slot: string | null;
+}
+
+interface MatchedLead {
+  name: string;
+  mobile_number: string;
+  email?: string | null;
+  status?: string | null;
+  assigned_staff?: { name?: string | null } | null;
+  interestedProperty?: { title?: string | null; code?: string | null } | null;
 }
 
 interface HistoryEntry {
@@ -122,7 +131,7 @@ function MatchedLeadDialog({
   onClose,
 }: {
   event: EnquiryLead | null;
-  lead: any;
+  lead: MatchedLead | null;
   loading: boolean;
   conflict: string | null;
   busy: "accept" | "ack" | null;
@@ -426,12 +435,16 @@ export default function LeadRoutingPage() {
     setAckEnquiryId(ev.enquiry_id);
     try {
       const res = await apiFetch(`${API_URL}/lead-routing/enquiry-queue/acknowledge/${ev.enquiry_id}`, { method: "POST" });
-      const data = await res.json();
-      if (data.success) {
+      const data = await res.json().catch(() => null);
+      if (data?.success) {
         toast.success("Enquiry acknowledged");
         fetchEnquiry();
+      } else if (res.status === 409) {
+        const who = data?.handledBy != null ? ` (handled by #${data.handledBy})` : "";
+        toast.error(`${data?.message || "This enquiry was already handled"}${who}`);
+        fetchEnquiry();
       } else {
-        toast.error(data.message || data.error || "Failed to acknowledge enquiry");
+        toast.error(data?.message || data?.error || "Failed to acknowledge enquiry");
       }
     } catch {
       toast.error("Failed to acknowledge enquiry");
@@ -505,16 +518,19 @@ export default function LeadRoutingPage() {
     }
     setEnquiryBulkBusy(true);
     let done = 0;
+    let failed = 0;
     for (const ev of unmatched) {
       try {
         const res = await apiFetch(`${API_URL}/lead-routing/enquiry-queue/convert/${ev.enquiry_id}`, { method: "POST" });
         const data = await res.json();
         if (data.success) done++;
+        else failed++;
       } catch {
-        // counted as not done
+        failed++;
       }
     }
     setEnquiryBulkBusy(false);
+    if (failed > 0) toast.error(`Failed to convert ${failed} enquir${failed === 1 ? "y" : "ies"}`);
     toast.success(`Converted ${done} — lead(s) queued in Routing${skipped > 0 ? ` (skipped ${skipped} matched)` : ""}`);
     fetchEnquiry();
     setSelectedEnquiryIds([]);
@@ -530,16 +546,19 @@ export default function LeadRoutingPage() {
     }
     setEnquiryBulkBusy(true);
     let done = 0;
+    let failed = 0;
     for (const ev of matched) {
       try {
         const res = await apiFetch(`${API_URL}/lead-routing/enquiry-queue/${kind}/${ev.enquiry_id}`, { method: "POST" });
         const data = await res.json();
         if (data.success) done++;
+        else failed++;
       } catch {
-        // counted as not done
+        failed++;
       }
     }
     setEnquiryBulkBusy(false);
+    if (failed > 0) toast.error(`Failed on ${failed} enquir${failed === 1 ? "y" : "ies"}`);
     toast.success(`${kind === "accept" ? "Accepted" : "Acknowledged"} ${done} enquir${done === 1 ? "y" : "ies"}${skipped > 0 ? ` (skipped ${skipped} unmatched)` : ""}`);
     fetchEnquiry();
     setSelectedEnquiryIds([]);
