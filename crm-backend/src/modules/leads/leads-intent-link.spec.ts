@@ -18,8 +18,15 @@ describe('createLead intent mapping', () => {
     saved.LeadFollowUp = [];
     saved.WebsiteEnquiryEvent = [];
     const repoFor = (key: string) => ({
-      // Lead.findOne returns the already-saved lead, exercising the dedupe branch on repeat mobiles:
-      findOne: async () => (key === 'Lead' ? saved.Lead[0] ?? null : null),
+      // Arg-aware Lead.findOne: matches by mobile_number/email like the real
+      // queries, falling back to the first saved lead for arg-less calls.
+      findOne: async (args?: any) => {
+        if (key !== 'Lead') return null;
+        const w = args?.where ?? args ?? {};
+        if (w.mobile_number) return saved.Lead.find((l) => l.mobile_number === w.mobile_number) ?? null;
+        if (w.email) return saved.Lead.find((l) => l.email === w.email) ?? null;
+        return saved.Lead[0] ?? null;
+      },
       create: (x: any) => ({ ...x, _entityKey: key }),
       save: async (x: any) => {
         const row = { ...x, id: saved[key].length + 1 };
@@ -214,5 +221,24 @@ describe('createLead intent mapping', () => {
     expect(result.isExistingCustomer).toBe(true);
     expect(result.existingStaff).toBe('Asha');
     expect(result.eventId).toBe(1);
+  });
+
+  it('prefers the mobile match when mobile and email point at different leads', async () => {
+    saved.Lead.push(
+      { id: 1, _entityKey: 'Lead', name: 'Asha', mobile_number: '1111111111', email: 'a@example.com' },
+      { id: 2, _entityKey: 'Lead', name: 'Bala', mobile_number: '2222222222', email: 'b@example.com' },
+    );
+
+    await service.createLead({
+      name: 'X', mobile: '1111111111', email: 'b@example.com',
+      source: 'Website – Property page', propertyId: 18, intent: 'enquiry',
+    } as any);
+
+    expect(saved.Lead).toHaveLength(2);
+    expect(saved.WebsiteEnquiryEvent).toHaveLength(1);
+    expect(saved.WebsiteEnquiryEvent[0]).toEqual(expect.objectContaining({
+      matched_lead_id: 1,
+      status: 'open',
+    }));
   });
 });
