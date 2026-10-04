@@ -24,21 +24,21 @@ export class RoutingHistory {
   @Column({ type: 'varchar', nullable: true })
   department: string | null; // department at time of event
 
-  @Column({ name: 'from_user_id', nullable: true })
+  @Column({ name: 'from_user_id', type: 'int', nullable: true })
   from_user_id: number | null;
 
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'from_user_id' })
   from_user: Relation<User> | null;
 
-  @Column({ name: 'to_user_id', nullable: true })
+  @Column({ name: 'to_user_id', type: 'int', nullable: true })
   to_user_id: number | null;
 
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'to_user_id' })
   to_user: Relation<User> | null;
 
-  @Column({ name: 'actioned_by_id', nullable: true })
+  @Column({ name: 'actioned_by_id', type: 'int', nullable: true })
   actioned_by_id: number | null;
 
   @ManyToOne(() => User, { nullable: true })

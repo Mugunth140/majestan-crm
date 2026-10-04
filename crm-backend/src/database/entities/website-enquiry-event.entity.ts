@@ -50,7 +50,7 @@ export class WebsiteEnquiryEvent {
   @Column({ type: 'json', nullable: true })
   preferences: any;
 
-  @Column({ name: 'matched_lead_id', nullable: true })
+  @Column({ name: 'matched_lead_id', type: 'int', nullable: true })
   matched_lead_id: number | null;
 
   @ManyToOne(() => Lead, { onDelete: 'SET NULL', nullable: true })
@@ -60,19 +60,19 @@ export class WebsiteEnquiryEvent {
   @Column({ type: 'varchar', length: 16, default: 'open' })
   status: string;
 
-  @Column({ name: 'resolved_lead_id', nullable: true })
+  @Column({ name: 'resolved_lead_id', type: 'int', nullable: true })
   resolved_lead_id: number | null;
 
   @ManyToOne(() => Lead, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'resolved_lead_id' })
   resolvedLead: Relation<Lead>;
 
-  @Column({ name: 'decided_by', nullable: true })
+  @Column({ name: 'decided_by', type: 'int', nullable: true })
   decided_by: number | null;
 
   @Column({ name: 'decided_at', type: 'datetime', precision: 6, nullable: true })
   decided_at: Date | null;
 
-  @Column({ name: 'migrated_inquiry_id', nullable: true })
+  @Column({ name: 'migrated_inquiry_id', type: 'int', nullable: true })
   migrated_inquiry_id: number | null;
 }
