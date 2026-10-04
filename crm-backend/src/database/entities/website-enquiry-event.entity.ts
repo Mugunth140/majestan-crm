@@ -8,13 +8,13 @@ export class WebsiteEnquiryEvent {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ precision: 6 })
   created_at: Date;
 
   @Column({ nullable: true })
   name: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', length: 32, nullable: true })
   mobile_number: string;
 
   @Column({ nullable: true })
@@ -23,7 +23,7 @@ export class WebsiteEnquiryEvent {
   @Column({ nullable: true })
   city: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', length: 32, nullable: true })
   whatsapp_number: string;
 
   @Column({ name: 'property_id', type: 'int', unsigned: true, nullable: true })
