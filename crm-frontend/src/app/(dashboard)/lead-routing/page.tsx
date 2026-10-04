@@ -476,7 +476,9 @@ export default function LeadRoutingPage() {
     if (!dialogEvent) return;
     setDialogBusy(kind);
     try {
-      const res = await apiFetch(`${API_URL}/lead-routing/enquiry-queue/${kind}/${dialogEvent.enquiry_id}`, { method: "POST" });
+      // Backend route is `acknowledge`, not `ack` (the `kind` shorthand is UI-only).
+      const segment = kind === "accept" ? "accept" : "acknowledge";
+      const res = await apiFetch(`${API_URL}/lead-routing/enquiry-queue/${segment}/${dialogEvent.enquiry_id}`, { method: "POST" });
       const data = await res.json().catch(() => null);
       if (res.ok && data?.success) {
         toast.success(kind === "accept" ? "Enquiry added to Interested In" : "Enquiry acknowledged");
@@ -541,7 +543,9 @@ export default function LeadRoutingPage() {
     let failed = 0;
     for (const ev of matched) {
       try {
-        const res = await apiFetch(`${API_URL}/lead-routing/enquiry-queue/${kind}/${ev.enquiry_id}`, { method: "POST" });
+        // Backend route is `acknowledge`, not `ack` (the `kind` shorthand is UI-only).
+        const segment = kind === "accept" ? "accept" : "acknowledge";
+        const res = await apiFetch(`${API_URL}/lead-routing/enquiry-queue/${segment}/${ev.enquiry_id}`, { method: "POST" });
         const data = await res.json();
         if (data.success) done++;
         else failed++;
