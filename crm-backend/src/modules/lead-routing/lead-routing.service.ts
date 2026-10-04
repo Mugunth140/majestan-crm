@@ -140,8 +140,8 @@ export class LeadRoutingService {
               l.assigned_staff_id,
               s.name AS assigned_staff_name,
               -- Open events for this person: the queue's pending working set.
-              (SELECT COUNT(*) FROM website_enquiry_events
-               WHERE mobile_number = e.mobile_number AND status = 'open') AS repeat_count
+              (SELECT COUNT(*) FROM website_enquiry_events siblings
+               WHERE siblings.mobile_number = e.mobile_number AND siblings.status = 'open') AS repeat_count
        FROM website_enquiry_events e
        LEFT JOIN leads l ON l.id = e.matched_lead_id
        LEFT JOIN users s ON s.id = l.assigned_staff_id
@@ -179,7 +179,7 @@ export class LeadRoutingService {
         // enquiry_id for event endpoints; null id => Convert, id => Accept).
         id: matched ? r.matched_lead_id : null,
         display_id: matched
-          ? `L${String(r.id).padStart(5, '0')}`
+          ? `L${String(r.matched_lead_id).padStart(5, '0')}`
           : `EQ${String(r.enquiry_id).padStart(5, '0')}`,
         // This row's own event (one row per open event).
         enquiry_id: r.enquiry_id,
