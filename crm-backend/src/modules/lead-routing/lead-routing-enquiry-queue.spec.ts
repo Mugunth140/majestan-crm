@@ -53,24 +53,37 @@ describe('LeadRoutingService enquiry queue', () => {
     expect(sql).toContain('ia.source = \'website\') AS repeat_count');
   });
 
-  it('marks a single-website-enquiry new lead as New, everything else as Repeat', async () => {
+  it('marks unassigned website-born leads as New, everything else as Repeat', async () => {
     queryMock
-      .mockResolvedValueOnce([{ total: 2 }])
+      .mockResolvedValueOnce([{ total: 3 }])
       .mockResolvedValueOnce([
-        { id: 7, repeat_count: '1', has_new_lead_flag: 1 },
-        { id: 8, repeat_count: '1', has_new_lead_flag: 0 },
+        { id: 7, repeat_count: '1', first_is_new_lead: 1, assigned_staff_id: null },
+        { id: 8, repeat_count: '1', first_is_new_lead: 0, assigned_staff_id: null },
+        { id: 9, repeat_count: '2', first_is_new_lead: 1, assigned_staff_id: 3 },
       ]);
     const result = await service.getEnquiryQueue(1, 10);
     const byId = Object.fromEntries(result.items.map((i: any) => [i.id, i.type]));
     expect(byId[7]).toBe('New');
     expect(byId[8]).toBe('Repeat');
+    expect(byId[9]).toBe('Repeat');
+  });
+
+  it('marks a first-time visit (enquiry + visit rows) as New, not Repeat', async () => {
+    queryMock
+      .mockResolvedValueOnce([{ total: 1 }])
+      .mockResolvedValueOnce([
+        { id: 7, repeat_count: '2', first_is_new_lead: 1, assigned_staff_id: null },
+      ]);
+    const result = await service.getEnquiryQueue(1, 10);
+    expect(result.items[0].type).toBe('New');
+    expect(result.items[0].repeat_count).toBe(2);
   });
 
   it('applies propertyType/intent/date filters to the latest open enquiry', async () => {
     queryMock
       .mockResolvedValueOnce([{ total: 1 }])
       .mockResolvedValueOnce([
-        { id: 7, repeat_count: '2', has_new_lead_flag: 1 },
+        { id: 7, repeat_count: '2', first_is_new_lead: 1 },
       ]);
     await service.getEnquiryQueue(1, 10, {
       propertyType: 'villa',

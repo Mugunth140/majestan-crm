@@ -79,9 +79,23 @@ describe('createLead intent mapping', () => {
     expect(saved.LeadFollowUp[0]).toEqual(expect.objectContaining({
       next_follow_up_date: '2026-10-05', next_follow_up_time: '11:00', purpose: 'Site Visit',
     }));
+    // A visit lays down its enquiry first, then the visit on top of it.
+    expect(saved.LeadInquiry).toHaveLength(2);
     expect(saved.LeadInquiry[0]).toEqual(expect.objectContaining({
       source: 'website',
       is_new_lead: true,
+      intent: 'enquiry',
+      property_id: 18,
+      visit_date: null,
+      visit_slot: null,
+    }));
+    expect(saved.LeadInquiry[1]).toEqual(expect.objectContaining({
+      source: 'website',
+      is_new_lead: true,
+      intent: 'site_visit',
+      property_id: 18,
+      visit_date: '2026-10-05',
+      visit_slot: '11:00',
     }));
   });
 
@@ -95,8 +109,10 @@ describe('createLead intent mapping', () => {
     await service.createLead(body);
     await service.createLead({ ...body, propertyId: 20, propertyCode: 'VL010' });
     expect(saved.Lead).toHaveLength(1);
-    expect(saved.LeadInquiry).toHaveLength(2);
-    expect(saved.LeadInquiry[1]).toEqual(expect.objectContaining({ property_id: 20 }));
+    // Each visit writes enquiry + visit rows: [enquiry(19), visit(19), enquiry(20), visit(20)].
+    expect(saved.LeadInquiry).toHaveLength(4);
+    expect(saved.LeadInquiry[2]).toEqual(expect.objectContaining({ property_id: 20, intent: 'enquiry' }));
+    expect(saved.LeadInquiry[3]).toEqual(expect.objectContaining({ property_id: 20, intent: 'site_visit' }));
     // status was set once by the first call and never rewritten:
     expect(saved.Lead[0].status).toBe('Site Visit Scheduled');
   });
@@ -119,9 +135,10 @@ describe('createLead intent mapping', () => {
     expect(saved.Lead).toHaveLength(1);
     // Status must remain untouched — dedupe branch never writes lead.status
     expect(saved.Lead[0].status).toBe('Negotiation');
-    // An inquiry must still have been appended
-    expect(saved.LeadInquiry).toHaveLength(1);
-    expect(saved.LeadInquiry[0]).toEqual(expect.objectContaining({ property_id: 55, intent: 'site_visit' }));
+    // Enquiry first, then the visit on top of it
+    expect(saved.LeadInquiry).toHaveLength(2);
+    expect(saved.LeadInquiry[0]).toEqual(expect.objectContaining({ property_id: 55, intent: 'enquiry' }));
+    expect(saved.LeadInquiry[1]).toEqual(expect.objectContaining({ property_id: 55, intent: 'site_visit' }));
   });
 
   it('stamps repeat enquiries with source website and is_new_lead false', async () => {

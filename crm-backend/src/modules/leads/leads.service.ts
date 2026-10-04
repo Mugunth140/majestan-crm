@@ -617,7 +617,7 @@ export class LeadsService {
 
       if (existingLead) {
         if (normalised.purchaseType || normalised.propertyType || normalised.funder || normalised.project || normalised.propertyCategory || normalised.propertyId) {
-          const inquiry = manager.getRepository(LeadInquiry).create({
+          const inquiryBase = {
             lead_id: existingLead.id,
             project_list: normalised.project || null,
             purchase_type: normalised.purchaseType || null,
@@ -633,13 +633,22 @@ export class LeadsService {
             property_id: normalised.propertyId ?? null,
             property_code: normalised.propertyCode ?? null,
             property_slug: normalised.propertySlug ?? null,
-            intent: normalised.intent ?? 'enquiry',
-            visit_date: normalised.visitDate ?? null,
-            visit_slot: normalised.visitSlot ?? null,
             source: 'website',
             is_new_lead: false,
-          });
-          await manager.save(inquiry);
+          };
+          // A visit booking lays down its enquiry first, then the visit on
+          // top of it — so the funnel always has the base enquiry record.
+          const intents =
+            normalised.intent === 'site_visit' ? ['enquiry', 'site_visit'] : [normalised.intent ?? 'enquiry'];
+          for (const intent of intents) {
+            const inquiry = manager.getRepository(LeadInquiry).create({
+              ...inquiryBase,
+              intent,
+              visit_date: intent === 'site_visit' ? (normalised.visitDate ?? null) : null,
+              visit_slot: intent === 'site_visit' ? (normalised.visitSlot ?? null) : null,
+            });
+            await manager.save(inquiry);
+          }
         }
 
         if (normalised.followUpDate || normalised.purpose || normalised.priority || normalised.notes || normalised.rnr || normalised.visitDate) {
@@ -694,7 +703,7 @@ export class LeadsService {
       }
 
       if (normalised.purchaseType || normalised.propertyType || normalised.funder || normalised.project || normalised.propertyCategory || normalised.propertyId) {
-        const inquiry = manager.getRepository(LeadInquiry).create({
+        const inquiryBase = {
           lead_id: savedLead.id,
           project_list: normalised.project || null,
           purchase_type: normalised.purchaseType || null,
@@ -710,13 +719,22 @@ export class LeadsService {
           property_id: normalised.propertyId ?? null,
           property_code: normalised.propertyCode ?? null,
           property_slug: normalised.propertySlug ?? null,
-          intent: normalised.intent ?? 'enquiry',
-          visit_date: normalised.visitDate ?? null,
-          visit_slot: normalised.visitSlot ?? null,
           source: 'website',
           is_new_lead: true,
-        });
-        await manager.save(inquiry);
+        };
+        // A visit booking lays down its enquiry first, then the visit on
+        // top of it — so the funnel always has the base enquiry record.
+        const intents =
+          normalised.intent === 'site_visit' ? ['enquiry', 'site_visit'] : [normalised.intent ?? 'enquiry'];
+        for (const intent of intents) {
+          const inquiry = manager.getRepository(LeadInquiry).create({
+            ...inquiryBase,
+            intent,
+            visit_date: intent === 'site_visit' ? (normalised.visitDate ?? null) : null,
+            visit_slot: intent === 'site_visit' ? (normalised.visitSlot ?? null) : null,
+          });
+          await manager.save(inquiry);
+        }
       }
 
       if (normalised.followUpDate || normalised.purpose || normalised.priority || normalised.notes || normalised.rnr || normalised.visitDate) {

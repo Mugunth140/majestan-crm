@@ -132,8 +132,12 @@ export class LeadRoutingService {
               -- (the JOIN above) only sees unacknowledged rows.
               (SELECT COUNT(*) FROM lead_inquiries ia
                WHERE ia.lead_id = l.id AND ia.source = 'website') AS repeat_count,
-              (SELECT MAX(ia.is_new_lead) FROM lead_inquiries ia
-               WHERE ia.lead_id = l.id AND ia.source = 'website') AS has_new_lead_flag,
+              -- Earliest website enquiry: a visit booking writes its enquiry
+              -- row first, so MAX() would mislead — the first row tells whether
+              -- this lead was born from the website.
+              (SELECT ia.is_new_lead FROM lead_inquiries ia
+               WHERE ia.lead_id = l.id AND ia.source = 'website'
+               ORDER BY ia.id ASC LIMIT 1) AS first_is_new_lead,
               MAX(i.created_at) AS last_enquiry_at
        FROM leads l
        JOIN lead_inquiries i ON i.lead_id = l.id
@@ -198,7 +202,10 @@ export class LeadRoutingService {
         created_at: r.created_at,
         assigned_staff_id: r.assigned_staff_id,
         assigned_staff_name: r.assigned_staff_name ?? null,
-        type: repeatCount === 1 && Number(r.has_new_lead_flag) === 1 ? 'New' : 'Repeat',
+        // New = still unassigned and born from the website (its earliest
+        // website enquiry created it). A first-time visit writes two rows
+        // (enquiry + visit), so a count-based rule would mislabel it Repeat.
+        type: r.assigned_staff_id == null && Number(r.first_is_new_lead) === 1 ? 'New' : 'Repeat',
         repeat_count: repeatCount,
         last_enquiry_at: r.last_enquiry_at,
         property_code: latest.property_code ?? null,
