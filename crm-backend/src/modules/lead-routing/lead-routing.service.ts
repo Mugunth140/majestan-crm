@@ -28,7 +28,10 @@ export class LeadRoutingService {
       .where('lead.assigned_staff_id IS NULL')
       .andWhere('lead.department = :department', { department })
       .andWhere('lead.status NOT IN (:...excluded)', { excluded: NON_QUEUEABLE_LEAD_STATUSES })
-      .andWhere('(lead.lead_source IS NULL OR lead.lead_source != :websiteSource)', { websiteSource: 'Website – Property page' })
+      // A lead stays out of Routing only while it has pending decisions;
+      // converted/decided website leads flow into Routing normally; legacy
+      // website leads surface in Routing once their backfilled events resolve.
+      .andWhere(`NOT EXISTS (SELECT 1 FROM website_enquiry_events e WHERE (e.matched_lead_id = lead.id OR e.resolved_lead_id = lead.id) AND e.status = 'open')`)
       .orderBy('lead.created_at', 'DESC')
       .skip(skip)
       .take(limit)
@@ -226,14 +229,6 @@ export class LeadRoutingService {
       });
       await manager.save(rh);
 
-      // Acknowledge this lead's open website enquiries: claiming removes it
-      // from the Enquiry Queue.
-      await manager.query(
-        `UPDATE lead_inquiries SET acknowledged_at = NOW(6)
-         WHERE lead_id = ? AND source = 'website' AND acknowledged_at IS NULL`,
-        [leadId],
-      );
-
       const claimingUser = await manager.getRepository(User).findOne({ 
         where: { id: requestingUserId }, 
         relations: { department: true } 
@@ -297,14 +292,6 @@ export class LeadRoutingService {
       department: lead.department,
     });
     await this.dataSource.getRepository(RoutingHistory).save(rh);
-
-    // Acknowledge this lead's open website enquiries: assigning removes it
-    // from the Enquiry Queue.
-    await this.dataSource.query(
-      `UPDATE lead_inquiries SET acknowledged_at = NOW(6)
-       WHERE lead_id = ? AND source = 'website' AND acknowledged_at IS NULL`,
-      [leadId],
-    );
 
     // Notify assigned staff
     await this.notificationsService.createNotification(

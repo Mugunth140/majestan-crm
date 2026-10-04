@@ -82,14 +82,12 @@ describe('claim/assign role rules', () => {
     await expect(service.claimLead(7, 3, 'Viewer')).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('claim acknowledges the lead open website enquiries', async () => {
+  it('claim no longer acknowledges website enquiries (event-driven resolution)', async () => {
     await service.claimLead(7, 3, 'Staff');
-    const ackCall = managerQueryMock.mock.calls.find(([sql]: any[]) =>
-      String(sql).includes('acknowledged_at = NOW(6)'),
+    const ackCalls = managerQueryMock.mock.calls.filter(([sql]: any[]) =>
+      String(sql).includes('acknowledged_at'),
     );
-    expect(ackCall).toBeDefined();
-    expect(ackCall[0]).toContain("source = 'website'");
-    expect(ackCall[1]).toEqual([7]);
+    expect(ackCalls).toHaveLength(0);
   });
 
   it.each(ASSIGN_ROLES)('assign allows role %s', async (role) => {
@@ -100,13 +98,11 @@ describe('claim/assign role rules', () => {
     await expect(service.assignLead(7, 5, 3, 'Staff')).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('assign acknowledges the lead open website enquiries', async () => {
+  it('assign no longer acknowledges website enquiries (event-driven resolution)', async () => {
     await service.assignLead(7, 5, 3, 'Manager');
-    const ackCall = dataSourceQueryMock.mock.calls.find(([sql]: any[]) =>
-      String(sql).includes('acknowledged_at = NOW(6)'),
+    const ackCalls = dataSourceQueryMock.mock.calls.filter(([sql]: any[]) =>
+      String(sql).includes('acknowledged_at'),
     );
-    expect(ackCall).toBeDefined();
-    expect(ackCall[0]).toContain("source = 'website'");
-    expect(ackCall[1]).toEqual([7]);
+    expect(ackCalls).toHaveLength(0);
   });
 });
