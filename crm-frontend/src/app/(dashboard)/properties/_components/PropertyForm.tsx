@@ -73,6 +73,39 @@ const FURNISHING_STATUS_OPTIONS = [
   { value: "UNFURNISHED", label: "Unfurnished" },
 ];
 
+export const ROAD_ACCESS_OPTIONS = [
+  { value: "23ft", label: "23ft" },
+  { value: "30ft", label: "30ft" },
+  { value: "40ft", label: "40ft" },
+  { value: "60ft", label: "60ft" },
+  { value: "80ft", label: "80ft" },
+  { value: "100ft", label: "100ft" },
+];
+
+export const SALE_TYPE_OPTIONS = [
+  { value: "Full", label: "Full" },
+  { value: "Partial", label: "Partial" },
+];
+
+export const TRANSACTION_TYPE_OPTIONS = [
+  { value: "New", label: "New" },
+  { value: "Resale Unoccupied", label: "Resale Unoccupied" },
+  { value: "Resale Occupied", label: "Resale Occupied" },
+  { value: "Resale Tenant Occupied", label: "Resale Tenant Occupied" },
+];
+
+/**
+ * Stored date strings come in two shapes: yyyy-MM-dd (picker-saved) and
+ * legacy free text ("Jan 2025"). Only the former feeds the DatePicker —
+ * legacy values show the placeholder instead of an Invalid Date, and are
+ * preserved untouched until re-saved.
+ */
+export function parseStoredDate(value: string | undefined): Date | undefined {
+  if (!value) return undefined;
+  const parsed = new Date(`${value}T00:00:00`);
+  return isNaN(parsed.getTime()) ? undefined : parsed;
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -1661,11 +1694,12 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             {!isLandType && (
               <div className="space-y-2">
                 <label className={labelClass}>Transaction Type</label>
-                <Input
-                  value={transactionType}
-                  onChange={(e) => setTransactionType(e.target.value)}
-                  placeholder="e.g. RESALE TENANT OCCUPIED"
-                  className={inputClass}
+                <FormSelect
+                  name="transactionType"
+                  placeholder="Select Transaction Type"
+                  options={TRANSACTION_TYPE_OPTIONS}
+                  value={transactionType || null}
+                  onValueChange={setTransactionType}
                 />
               </div>
             )}
@@ -1674,11 +1708,11 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             {!isLandType && (
               <div className="space-y-2">
                 <label className={labelClass}>Handover Date</label>
-                <Input
-                  value={handoverDate}
-                  onChange={(e) => setHandoverDate(e.target.value)}
-                  placeholder="e.g. Jan 2025"
-                  className={inputClass}
+                <DatePicker
+                  value={parseStoredDate(handoverDate)}
+                  onChange={(d) => setHandoverDate(d ? format(d, "yyyy-MM-dd") : "")}
+                  placeholder="Pick handover date"
+                  className="h-12 rounded-xl bg-muted/30"
                 />
               </div>
             )}
@@ -1686,22 +1720,24 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             {/* Sale Type */}
             <div className="space-y-2">
               <label className={labelClass}>Sale Type (Full/Partial)</label>
-              <Input
-                value={saleType}
-                onChange={(e) => setSaleType(e.target.value)}
-                placeholder="e.g. Full"
-                className={inputClass}
+              <FormSelect
+                name="saleType"
+                placeholder="Select Sale Type"
+                options={SALE_TYPE_OPTIONS}
+                value={saleType || null}
+                onValueChange={setSaleType}
               />
             </div>
 
             {/* Road Access */}
             <div className="space-y-2">
               <label className={labelClass}>Road Access</label>
-              <Input
-                value={roadAccess}
-                onChange={(e) => setRoadAccess(e.target.value)}
-                placeholder="e.g. 30 FT"
-                className={inputClass}
+              <FormSelect
+                name="roadAccess"
+                placeholder="Select Road Access"
+                options={ROAD_ACCESS_OPTIONS}
+                value={roadAccess || null}
+                onValueChange={setRoadAccess}
               />
             </div>
 
@@ -1720,12 +1756,13 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             {!isLandType && (
               <div className="space-y-2">
                 <label className={labelClass}>Tenant Occupied</label>
-                <Input
-                  value={tenantOccupied}
-                  onChange={(e) => setTenantOccupied(e.target.value)}
-                  placeholder="e.g. Yes / No"
-                  className={inputClass}
-                />
+                <label className="flex h-12 items-center gap-3 rounded-xl bg-muted/30 border border-border/60 px-4 text-sm font-medium cursor-pointer">
+                  <Checkbox
+                    checked={tenantOccupied === "Yes"}
+                    onCheckedChange={(checked) => setTenantOccupied(checked === true ? "Yes" : "No")}
+                  />
+                  Yes — currently tenant occupied
+                </label>
               </div>
             )}
           </div>
