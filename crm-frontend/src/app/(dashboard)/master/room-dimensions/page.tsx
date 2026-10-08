@@ -53,9 +53,21 @@ export default function RoomDimensionsMasterPage() {
     fetchDims();
   }, [fetchDims]);
 
+  const dimensionName = (): string | null => {
+    const toNum = (v: string) => {
+      const n = Number(v);
+      return v.trim() !== "" && Number.isFinite(n) && n > 0 ? String(parseFloat(n.toFixed(2))) : null;
+    };
+    const len = toNum(formData.lengthFt);
+    const wid = toNum(formData.widthFt);
+    if (len == null || wid == null) return null;
+    return `${len} × ${wid} ft`;
+  };
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) return toast.error("Name is required");
+    const name = dimensionName();
+    if (!name) return toast.error("Enter length and width in feet.");
 
     setIsSubmitting(true);
     try {
@@ -63,7 +75,7 @@ export default function RoomDimensionsMasterPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: formData.name.trim(),
+          name,
           lengthFt: formData.lengthFt.trim() === "" ? null : Number(formData.lengthFt),
           widthFt: formData.widthFt.trim() === "" ? null : Number(formData.widthFt),
         })
@@ -86,7 +98,8 @@ export default function RoomDimensionsMasterPage() {
 
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedDim || !formData.name.trim()) return toast.error("Name is required");
+    const name = dimensionName();
+    if (!selectedDim || !name) return toast.error("Enter length and width in feet.");
 
     setIsSubmitting(true);
     try {
@@ -94,7 +107,7 @@ export default function RoomDimensionsMasterPage() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: formData.name.trim(),
+          name,
           lengthFt: formData.lengthFt.trim() === "" ? null : Number(formData.lengthFt),
           widthFt: formData.widthFt.trim() === "" ? null : Number(formData.widthFt),
           is_active: formData.is_active,
@@ -140,9 +153,9 @@ export default function RoomDimensionsMasterPage() {
   const openEdit = (dim: any) => {
     setSelectedDim(dim);
     setFormData({
-      name: dim.name,
-      lengthFt: dim.lengthFt ?? "",
-      widthFt: dim.widthFt ?? "",
+      name: "",
+      lengthFt: dim.lengthFt != null ? String(dim.lengthFt) : "",
+      widthFt: dim.widthFt != null ? String(dim.widthFt) : "",
       is_active: dim.is_active,
     });
     setIsEditOpen(true);
@@ -203,22 +216,12 @@ export default function RoomDimensionsMasterPage() {
     },
     {
       accessorKey: "name",
-      header: "Preset",
-      cell: ({ row }) => (
-        <span className="font-medium capitalize">{row.original.name}</span>
-      )
-    },
-    {
-      accessorKey: "dimensions",
       header: "Dimensions",
       cell: ({ row }) => (
-        <span className="font-medium tabular-nums">
-          {row.original.lengthFt != null && row.original.widthFt != null
-            ? `${row.original.lengthFt} × ${row.original.widthFt} ft`
-            : "—"}
-        </span>
+        <span className="font-medium tabular-nums">{row.original.name}</span>
       )
     },
+
     {
       accessorKey: "is_active",
       header: "Status",
@@ -300,13 +303,9 @@ export default function RoomDimensionsMasterPage() {
               <DialogDescription className="mt-1">Create a new room dimension for property locations.</DialogDescription>
             </DialogHeader>
           </div>
-          <form onSubmit={handleAdd}>
-            <div className="px-5 md:px-6 py-5 space-y-5">
-              <div className="space-y-2">
-                <label htmlFor="name" className="text-sm font-medium">Preset Name</label>
-                <Input id="name" placeholder="e.g. Standard Bedroom" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required autoFocus />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleAdd}>
+              <div className="px-5 md:px-6 py-5 space-y-5">
+                <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label htmlFor="lengthFt" className="text-sm font-medium">Length (ft)</label>
                   <Input id="lengthFt" type="number" min={0} step="0.5" placeholder="e.g. 12" value={formData.lengthFt} onChange={(e) => setFormData({ ...formData, lengthFt: e.target.value })} />
@@ -340,10 +339,6 @@ export default function RoomDimensionsMasterPage() {
           </div>
           <form onSubmit={handleEdit}>
             <div className="px-5 md:px-6 py-5 space-y-5">
-              <div className="space-y-2">
-                <label htmlFor="edit-name" className="text-sm font-medium">Preset Name</label>
-                <Input id="edit-name" placeholder="e.g. Standard Bedroom" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
-              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label htmlFor="edit-lengthFt" className="text-sm font-medium">Length (ft)</label>
