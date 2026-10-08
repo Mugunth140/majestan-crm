@@ -61,6 +61,8 @@ const navigation = [
       { name: "Road Names", href: "/master/road-names" },
       { name: "Registration Charges", href: "/master/registration-charges" },
       { name: "Furnishing Items", href: "/master/furnishing-items" },
+      { name: "Room Names", href: "/master/room-names" },
+      { name: "Room Dimensions", href: "/master/room-dimensions" },
       { name: "Utilities", href: "/master/utilities" },
     ]
   },

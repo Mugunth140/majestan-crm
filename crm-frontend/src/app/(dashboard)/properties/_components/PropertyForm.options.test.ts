@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ARCHITECTURAL_STYLE_OPTIONS,
+  formatRoomDimension,
   isHypothecated,
   moveListItem,
   BOOKING_AMOUNT_OPTIONS,
@@ -176,6 +177,19 @@ describe("moveListItem", () => {
     expect(moveListItem(["a", "b"], 0, 0)).toEqual(["a", "b"]);
     expect(moveListItem(["a", "b"], -1, 1)).toEqual(["a", "b"]);
     expect(moveListItem(["a", "b"], 0, 5)).toEqual(["a", "b"]);
+  });
+});
+
+describe("formatRoomDimension", () => {
+  it("formats length and width as a dimension string", () => {
+    expect(formatRoomDimension(12, 10)).toBe("12 × 10 ft");
+    expect(formatRoomDimension("12.5", "10")).toBe("12.5 × 10 ft");
+  });
+
+  it("returns null when either side is missing", () => {
+    expect(formatRoomDimension(null, 10)).toBeNull();
+    expect(formatRoomDimension(12, undefined)).toBeNull();
+    expect(formatRoomDimension("abc", 10)).toBeNull();
   });
 });
 

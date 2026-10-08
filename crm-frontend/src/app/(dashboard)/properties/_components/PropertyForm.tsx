@@ -175,6 +175,26 @@ export function withLegacyOption(
 }
 
 /**
+ * Dimension preset label from separate length/width values, e.g. "12 × 10 ft".
+ * Null when either side is missing or non-numeric.
+ */
+export function formatRoomDimension(
+  lengthFt: string | number | null | undefined,
+  widthFt: string | number | null | undefined
+): string | null {
+  const trimNum = (v: string | number | null | undefined): string | null => {
+    if (v === null || v === undefined) return null;
+    const n = typeof v === "number" ? v : parseFloat(String(v));
+    if (!Number.isFinite(n) || n <= 0) return null;
+    return String(parseFloat(n.toFixed(2)));
+  };
+  const len = trimNum(lengthFt);
+  const wid = trimNum(widthFt);
+  if (len == null || wid == null) return null;
+  return `${len} × ${wid} ft`;
+}
+
+/**
  * Hypothecation checkbox state from the stored string. Explicit negatives
  * (No/NIL/N/A/None/-) and empties mean unchecked; anything else present
  * means the property is hypothecated.
@@ -235,6 +255,8 @@ interface FormDataShape {
   propertyTypes: any[];
   roadNames: { value: string; label: string }[];
   registrationCharges: { value: string; label: string }[];
+  roomNames: { value: string; label: string }[];
+  roomDimensions: { value: string; label: string; lengthFt: number | null; widthFt: number | null }[];
 }
 
 interface UploadedImage {
@@ -311,7 +333,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   // ---- Meta state ----
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingFormData, setIsLoadingFormData] = useState(true);
-  const [formData, setFormData] = useState<FormDataShape>({ cities: [], sublocations: [], amenities: [], furnishings: [], utilities: [], propertyTypes: [], roadNames: [], registrationCharges: [] });
+  const [formData, setFormData] = useState<FormDataShape>({ cities: [], sublocations: [], amenities: [], furnishings: [], utilities: [], propertyTypes: [], roadNames: [], registrationCharges: [], roomNames: [], roomDimensions: [] });
 
   // Shorthand helpers for initialData
   const d = initialData as any;
@@ -990,6 +1012,8 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           amenities: data.amenities ?? [],
           furnishings: data.furnishings ?? [],
           utilities: data.utilities ?? [],
+          roomNames: data.roomNames ?? [],
+          roomDimensions: data.roomDimensions ?? [],
           propertyTypes: data.propertyTypes ?? [],
           roadNames: data.roadNames ?? [],
           registrationCharges: data.registrationCharges ?? [],
@@ -3941,7 +3965,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 <Input
                   value={financeFacing}
                   onChange={(e) => setFinanceFacing(e.target.value)}
-                  placeholder="e.g. Bank Eligible"
+                  placeholder="e.g. 1 Lakh"
                   className={inputClass}
                 />
               </div>
@@ -4230,27 +4254,38 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               {roomDimensions.map((room, idx) => (
                 <div key={idx} className="flex gap-4 items-start">
                   <div className="flex-1 space-y-2">
-                    <Input
-                      value={room.name}
-                      onChange={(e) => {
+                    <FormSelect
+                      name={`room-name-${idx}`}
+                      placeholder="Room Name (e.g. Master Bedroom)"
+                      options={withLegacyOption(
+                        formData.roomNames.map((r) => ({ value: r.value, label: r.label })),
+                        room.name
+                      )}
+                      value={room.name || null}
+                      onValueChange={(v) => {
                         const newRooms = [...roomDimensions];
-                        newRooms[idx].name = e.target.value;
+                        newRooms[idx].name = v;
                         setRoomDimensions(newRooms);
                       }}
-                      placeholder="Room Name (e.g. Master Bedroom)"
-                      className={inputClass}
                     />
                   </div>
                   <div className="flex-1 space-y-2">
-                    <Input
-                      value={room.dimensions}
-                      onChange={(e) => {
+                    <FormSelect
+                      name={`room-dimensions-${idx}`}
+                      placeholder="Dimensions (e.g. 12x14 ft)"
+                      options={withLegacyOption(
+                        formData.roomDimensions.map((d) => {
+                          const dims = formatRoomDimension(d.lengthFt, d.widthFt) ?? d.value;
+                          return { value: dims, label: d.label && dims !== d.label ? `${d.label} (${dims})` : dims };
+                        }),
+                        room.dimensions
+                      )}
+                      value={room.dimensions || null}
+                      onValueChange={(v) => {
                         const newRooms = [...roomDimensions];
-                        newRooms[idx].dimensions = e.target.value;
+                        newRooms[idx].dimensions = v;
                         setRoomDimensions(newRooms);
                       }}
-                      placeholder="Dimensions (e.g. 12x14 ft)"
-                      className={inputClass}
                     />
                   </div>
                   <Button

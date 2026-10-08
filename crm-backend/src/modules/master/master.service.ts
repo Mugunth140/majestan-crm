@@ -3,6 +3,8 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { LeadSource } from '../../database/entities/lead-source.entity';
 import { PropertyType } from '../../database/entities/property-type.entity';
+import { RoomName } from '../../database/entities/room-name.entity';
+import { RoomDimension } from '../../database/entities/room-dimension.entity';
 import { RoadName } from '../../database/entities/road-name.entity';
 import { RegistrationCharge } from '../../database/entities/registration-charge.entity';
 import { SiteApiService } from '../properties/site-api.service';
@@ -299,6 +301,108 @@ export class MasterService {
 
   async deleteUtility(id: number) {
     return this.siteApi.del(`/admin/utilities/${id}`);
+  }
+
+  // ---- Room Names ----
+
+  async getRoomNames() {
+    const repo = this.crmDataSource.getRepository(RoomName);
+    const rows = await repo.find({ where: { is_active: true }, order: { name: 'ASC' } });
+    return rows.map((t) => ({ id: t.id, label: t.name, value: t.name, is_active: t.is_active }));
+  }
+
+  async getAllRoomNames() {
+    const repo = this.crmDataSource.getRepository(RoomName);
+    const rows = await repo.find({ order: { name: 'ASC' } });
+    return rows.map((t) => ({ id: t.id, label: t.name, value: t.name, is_active: t.is_active, name: t.name }));
+  }
+
+  async createRoomName(name: string) {
+    const repo = this.crmDataSource.getRepository(RoomName);
+    const existing = await repo.findOne({ where: { name } });
+    if (existing) {
+      return { id: existing.id, label: existing.name, value: existing.name, is_active: existing.is_active };
+    }
+    const created = await repo.save(repo.create({ name }));
+    return { id: created.id, label: created.name, value: created.name, is_active: created.is_active };
+  }
+
+  async updateRoomName(id: number, data: { name: string; is_active: boolean }) {
+    const repo = this.crmDataSource.getRepository(RoomName);
+    const row = await repo.findOne({ where: { id } });
+    if (!row) throw new InternalServerErrorException('Room name not found');
+    row.name = data.name;
+    row.is_active = data.is_active;
+    const updated = await repo.save(row);
+    return { id: updated.id, label: updated.name, value: updated.name, is_active: updated.is_active };
+  }
+
+  async deleteRoomName(id: number) {
+    const repo = this.crmDataSource.getRepository(RoomName);
+    const result = await repo.delete(id);
+    if (result.affected === 0) {
+      throw new InternalServerErrorException('Room name not found or could not be deleted');
+    }
+    return { success: true };
+  }
+
+  // ---- Room Dimensions ----
+
+  async getRoomDimensions() {
+    const repo = this.crmDataSource.getRepository(RoomDimension);
+    const rows = await repo.find({ where: { is_active: true }, order: { name: 'ASC' } });
+    return rows.map((t) => ({
+      id: t.id,
+      label: t.name,
+      value: t.name,
+      lengthFt: t.lengthFt != null ? Number(t.lengthFt) : null,
+      widthFt: t.widthFt != null ? Number(t.widthFt) : null,
+      is_active: t.is_active,
+    }));
+  }
+
+  async getAllRoomDimensions() {
+    const repo = this.crmDataSource.getRepository(RoomDimension);
+    const rows = await repo.find({ order: { name: 'ASC' } });
+    return rows.map((t) => ({
+      id: t.id,
+      label: t.name,
+      value: t.name,
+      lengthFt: t.lengthFt != null ? Number(t.lengthFt) : null,
+      widthFt: t.widthFt != null ? Number(t.widthFt) : null,
+      is_active: t.is_active,
+      name: t.name,
+    }));
+  }
+
+  async createRoomDimension(data: { name: string; lengthFt?: number | null; widthFt?: number | null }) {
+    const repo = this.crmDataSource.getRepository(RoomDimension);
+    const created = await repo.save(repo.create({ ...data, is_active: true }));
+    return { id: created.id, label: created.name, value: created.name, is_active: created.is_active };
+  }
+
+  async updateRoomDimension(
+    id: number,
+    data: { name: string; lengthFt?: number | null; widthFt?: number | null; is_active: boolean },
+  ) {
+    const repo = this.crmDataSource.getRepository(RoomDimension);
+    const row = await repo.findOne({ where: { id } });
+    if (!row) throw new InternalServerErrorException('Room dimension not found');
+    row.name = data.name;
+    if (data.lengthFt !== undefined) row.lengthFt = data.lengthFt;
+    if (data.widthFt !== undefined) row.widthFt = data.widthFt;
+    row.is_active = data.is_active;
+    const updated = await repo.save(row);
+    return { id: updated.id, label: updated.name, value: updated.name, is_active: updated.is_active };
+  }
+
+  async deleteRoomDimension(id: number) {
+    const repo = this.crmDataSource.getRepository(RoomDimension);
+    const result = await repo.delete(id);
+    if (result.affected === 0) {
+      throw new InternalServerErrorException('Room dimension not found or could not be deleted');
+    }
+    return { success: true };
   }
 
   // ---- Property Types ----

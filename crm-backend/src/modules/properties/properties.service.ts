@@ -10,6 +10,8 @@ import { DataSource } from 'typeorm';
 import { PropertyType } from '../../database/entities/property-type.entity';
 import { RoadName } from '../../database/entities/road-name.entity';
 import { RegistrationCharge } from '../../database/entities/registration-charge.entity';
+import { RoomName } from '../../database/entities/room-name.entity';
+import { RoomDimension } from '../../database/entities/room-dimension.entity';
 
 // CRM form keys → site details keys
 const RENAMED_DETAILS_KEYS: Record<string, string> = {
@@ -224,6 +226,29 @@ export class PropertiesService {
       console.error('[Properties] registration_charges lookup failed, degrading to empty list', e);
     }
 
+    let roomNames: { value: string; label: string }[] = [];
+    try {
+      const roomNamesRepo = this.crmDataSource.getRepository(RoomName);
+      const rows = await roomNamesRepo.find({ where: { is_active: true }, order: { name: 'ASC' } });
+      roomNames = rows.map(t => ({ value: t.name, label: t.name }));
+    } catch (e) {
+      console.error('[Properties] room_names lookup failed, degrading to empty list', e);
+    }
+
+    let roomDimensions: { value: string; label: string; lengthFt: number | null; widthFt: number | null }[] = [];
+    try {
+      const roomDimsRepo = this.crmDataSource.getRepository(RoomDimension);
+      const rows = await roomDimsRepo.find({ where: { is_active: true }, order: { name: 'ASC' } });
+      roomDimensions = rows.map(t => ({
+        value: t.name,
+        label: t.name,
+        lengthFt: t.lengthFt != null ? Number(t.lengthFt) : null,
+        widthFt: t.widthFt != null ? Number(t.widthFt) : null,
+      }));
+    } catch (e) {
+      console.error('[Properties] room_dimensions lookup failed, degrading to empty list', e);
+    }
+
     return {
       amenities,
       furnishings,
@@ -231,6 +256,8 @@ export class PropertiesService {
       propertyTypes,
       roadNames,
       registrationCharges,
+      roomNames,
+      roomDimensions,
       cities: cities.map((c: any) => ({
         id: c.id,
         cityName: c.city_name ?? c.cityName,

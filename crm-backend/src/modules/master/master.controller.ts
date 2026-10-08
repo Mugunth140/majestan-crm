@@ -250,6 +250,81 @@ export class MasterController {
     return { success: true, data };
   }
 
+  // ---- Room Names ----
+
+  @Get('room-names')
+  async getRoomNames() {
+    const data = await this.masterService.getRoomNames();
+    return { success: true, data };
+  }
+
+  @Get('all-room-names')
+  async getAllRoomNames() {
+    const data = await this.masterService.getAllRoomNames();
+    return { success: true, data };
+  }
+
+  @Post('room-names')
+  @Roles('Admin')
+  async createRoomName(@Body() body: { name: string }) {
+    const data = await this.masterService.createRoomName(body.name);
+    return { success: true, data };
+  }
+
+  @Put('room-names/:id')
+  @Roles('Admin')
+  async updateRoomName(@Param('id') id: number, @Body() body: { name: string; is_active: boolean }) {
+    const data = await this.masterService.updateRoomName(id, body);
+    return { success: true, data };
+  }
+
+  @Delete('room-names/:id')
+  @Roles('Admin')
+  async deleteRoomName(@Param('id') id: number) {
+    const data = await this.masterService.deleteRoomName(id);
+    return { success: true, data };
+  }
+
+  // ---- Room Dimensions ----
+
+  @Get('room-dimensions')
+  async getRoomDimensions() {
+    const data = await this.masterService.getRoomDimensions();
+    return { success: true, data };
+  }
+
+  @Get('all-room-dimensions')
+  async getAllRoomDimensions() {
+    const data = await this.masterService.getAllRoomDimensions();
+    return { success: true, data };
+  }
+
+  @Post('room-dimensions')
+  @Roles('Admin')
+  async createRoomDimension(
+    @Body() body: { name: string; lengthFt?: number | null; widthFt?: number | null },
+  ) {
+    const data = await this.masterService.createRoomDimension(body);
+    return { success: true, data };
+  }
+
+  @Put('room-dimensions/:id')
+  @Roles('Admin')
+  async updateRoomDimension(
+    @Param('id') id: number,
+    @Body() body: { name: string; lengthFt?: number | null; widthFt?: number | null; is_active: boolean },
+  ) {
+    const data = await this.masterService.updateRoomDimension(id, body);
+    return { success: true, data };
+  }
+
+  @Delete('room-dimensions/:id')
+  @Roles('Admin')
+  async deleteRoomDimension(@Param('id') id: number) {
+    const data = await this.masterService.deleteRoomDimension(id);
+    return { success: true, data };
+  }
+
   // ---- Property Types ----
 
   @Get('property-types')
