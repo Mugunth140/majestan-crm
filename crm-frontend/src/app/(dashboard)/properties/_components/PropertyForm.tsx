@@ -126,6 +126,7 @@ interface FormDataShape {
   sublocations: any[];
   amenities: any[];
   propertyTypes: any[];
+  roadNames: { value: string; label: string }[];
 }
 
 interface UploadedImage {
@@ -202,7 +203,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   // ---- Meta state ----
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingFormData, setIsLoadingFormData] = useState(true);
-  const [formData, setFormData] = useState<FormDataShape>({ cities: [], sublocations: [], amenities: [], propertyTypes: [] });
+  const [formData, setFormData] = useState<FormDataShape>({ cities: [], sublocations: [], amenities: [], propertyTypes: [], roadNames: [] });
 
   // Shorthand helpers for initialData
   const d = initialData as any;
@@ -874,6 +875,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           sublocations: data.sublocations ?? [],
           amenities: data.amenities ?? [],
           propertyTypes: data.propertyTypes ?? [],
+          roadNames: data.roadNames ?? [],
         });
         }
       })
@@ -1741,14 +1743,15 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               />
             </div>
 
-            {/* Road Name */}
+            {/* Road Name — options from Master Registry, legacy free text still displays */}
             <div className="space-y-2">
               <label className={labelClass}>Road Name</label>
-              <Input
-                value={roadName}
-                onChange={(e) => setRoadName(e.target.value)}
-                placeholder="Road Name"
-                className={inputClass}
+              <FormSelect
+                name="roadName"
+                placeholder="Select Road Name"
+                options={formData.roadNames}
+                value={roadName || null}
+                onValueChange={setRoadName}
               />
             </div>
 

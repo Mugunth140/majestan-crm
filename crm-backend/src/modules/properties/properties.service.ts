@@ -8,6 +8,7 @@ import { PropertyQueryDto } from './dto/property-query.dto';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { PropertyType } from '../../database/entities/property-type.entity';
+import { RoadName } from '../../database/entities/road-name.entity';
 
 // CRM form keys → site details keys
 const RENAMED_DETAILS_KEYS: Record<string, string> = {
@@ -200,9 +201,19 @@ export class PropertiesService {
       console.error('[Properties] property_types lookup failed, degrading to empty list', e);
     }
 
+    let roadNames: { value: string; label: string }[] = [];
+    try {
+      const roadNamesRepo = this.crmDataSource.getRepository(RoadName);
+      const rows = await roadNamesRepo.find({ where: { is_active: true }, order: { name: 'ASC' } });
+      roadNames = rows.map(t => ({ value: t.name, label: t.name }));
+    } catch (e) {
+      console.error('[Properties] road_names lookup failed, degrading to empty list', e);
+    }
+
     return {
       amenities,
       propertyTypes,
+      roadNames,
       cities: cities.map((c: any) => ({
         id: c.id,
         cityName: c.city_name ?? c.cityName,
