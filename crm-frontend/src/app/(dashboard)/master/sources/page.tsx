@@ -232,93 +232,104 @@ export default function LeadSourcesMasterPage() {
   const filteredSources = sources.filter((s) => s.name?.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="flex flex-col space-y-6 mb-20 md:mb-0 px-4 md:px-8 mt-2 md:mt-0">
+    <>
       <MobileHeader title="Master: Lead Sources" showBack />
+      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:h-full px-4 md:px-8">
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pr-0 md:pr-[150px] min-h-12">
-        <h1 className="text-3xl font-bold tracking-tight hidden md:block">Master: Lead Sources</h1>
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-          <Input
-            placeholder="Search sources..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-11 rounded-xl w-full sm:w-64 bg-background"
-          />
-          <Button 
-            className="h-11 px-5 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC] shrink-0 w-full sm:w-auto"
-            onClick={() => { setFormData({ name: "", is_active: true }); setIsAddOpen(true); }}
-          >
-            <Plus className="mr-1.5 h-4 w-4" /> Add Source
-          </Button>
-        </div>
-      </div>
-
-      <div className="bg-card border rounded-2xl overflow-hidden shadow-sm p-4 md:p-6">
-        {isLoading ? (
-          <div className="flex h-40 items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pr-0 md:pr-[150px] min-h-[48px]">
+          <h1 className="text-[28px] font-bold tracking-tight hidden md:block">Master: Lead Sources</h1>
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+            <Input
+              placeholder="Search sources..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-11 rounded-full w-full sm:w-64 bg-background"
+            />
+            <Button 
+              className="h-11 px-5 rounded-full bg-[#0052FF] text-white hover:bg-[#0040CC] shrink-0 w-full sm:w-auto shadow-sm"
+              onClick={() => { setFormData({ name: "", is_active: true }); setIsAddOpen(true); }}
+            >
+              <Plus className="mr-1.5 h-4 w-4" /> Add Source
+            </Button>
           </div>
-        ) : (
-          <DataTable 
-            columns={columns} 
-            data={filteredSources} 
-            showToolbar={true}
-            showDeleteAction={true}
-            onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
-          />
-        )}
-      </div>
+        </div>
 
-      {/* Add Dialog */}
-      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-5 md:p-6">
-          <DialogHeader>
-            <DialogTitle>Add Lead Source</DialogTitle>
-            <DialogDescription>Create a new source channel for incoming leads.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleAdd} className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label htmlFor="name" className="text-sm font-medium">Source Name</label>
-              <Input id="name" placeholder="e.g. Facebook Ads" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+        <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col bg-card border rounded-2xl shadow-sm p-4 md:p-6 mb-20 md:mb-0">
+          {isLoading ? (
+            <div className="flex h-40 items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)}>Cancel</Button>
-              <Button type="submit" className="bg-[#0052FF] text-white hover:bg-[#0040CC]" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Add Source
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+          ) : (
+            <DataTable 
+              columns={columns} 
+              data={filteredSources} 
+              showToolbar={true}
+              showDeleteAction={true}
+              onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
+            />
+          )}
+        </div>
 
-      {/* Edit Dialog */}
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-5 md:p-6">
-          <DialogHeader>
-            <DialogTitle>Edit Lead Source</DialogTitle>
-            <DialogDescription>Update details and status for this lead source.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleEdit} className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label htmlFor="edit-name" className="text-sm font-medium">Source Name</label>
-              <Input id="edit-name" placeholder="e.g. Facebook Ads" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+        {/* Add Dialog */}
+        <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+          <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-0 overflow-hidden">
+            <div className="px-5 md:px-6 pt-5 md:pt-6">
+              <DialogHeader className="text-left">
+                <DialogTitle className="text-lg font-semibold">Add Lead Source</DialogTitle>
+                <DialogDescription className="mt-1">Create a new source channel for incoming leads.</DialogDescription>
+              </DialogHeader>
             </div>
-            <div className="flex items-center justify-between pt-2">
-              <div className="space-y-0.5">
-                <label className="text-sm font-medium">Active Status</label>
-                <p className="text-xs text-muted-foreground">Inactive sources won't appear in the dropdowns.</p>
+            <form onSubmit={handleAdd}>
+              <div className="px-5 md:px-6 py-5 space-y-2">
+                <label htmlFor="name" className="text-sm font-medium">Source Name</label>
+                <Input id="name" placeholder="e.g. Facebook Ads" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required autoFocus />
               </div>
-              <Switch checked={formData.is_active} onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} />
+              <DialogFooter className="px-5 md:px-6 py-4 border-t border-border/60 bg-muted/40 flex-row items-center gap-2">
+                <div className="ml-auto flex items-center gap-2">
+                  <Button type="button" variant="outline" className="h-10 px-5 rounded-xl" onClick={() => setIsAddOpen(false)}>Cancel</Button>
+                  <Button type="submit" className="h-10 px-5 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC]" disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Add Source
+                  </Button>
+                </div>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Dialog */}
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+          <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-0 overflow-hidden">
+            <div className="px-5 md:px-6 pt-5 md:pt-6">
+              <DialogHeader className="text-left">
+                <DialogTitle className="text-lg font-semibold">Edit Lead Source</DialogTitle>
+                <DialogDescription className="mt-1">Update details and status for this lead source.</DialogDescription>
+              </DialogHeader>
             </div>
-            <DialogFooter className="pt-4">
-              <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
-              <Button type="submit" className="bg-[#0052FF] text-white hover:bg-[#0040CC]" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Save Changes
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+            <form onSubmit={handleEdit}>
+              <div className="px-5 md:px-6 py-5 space-y-5">
+                <div className="space-y-2">
+                  <label htmlFor="edit-name" className="text-sm font-medium">Source Name</label>
+                  <Input id="edit-name" placeholder="e.g. Facebook Ads" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+                </div>
+                <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
+                  <div className="space-y-0.5">
+                    <label className="text-sm font-medium">Active Status</label>
+                    <p className="text-xs text-muted-foreground">Inactive sources won't appear in the dropdowns.</p>
+                  </div>
+                  <Switch checked={formData.is_active} onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} />
+                </div>
+              </div>
+              <DialogFooter className="px-5 md:px-6 py-4 border-t border-border/60 bg-muted/40 flex-row items-center gap-2">
+                <div className="ml-auto flex items-center gap-2">
+                  <Button type="button" variant="outline" className="h-10 px-5 rounded-xl" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+                  <Button type="submit" className="h-10 px-5 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC]" disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Save Changes
+                  </Button>
+                </div>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
       {/* Delete Dialog */}
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
@@ -355,6 +366,7 @@ export default function LeadSourcesMasterPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </>
   );
 }
