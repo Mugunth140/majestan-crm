@@ -20,7 +20,7 @@ import { MobileHeader } from "@/components/layout/mobile-header";
 import { apiFetch, ApiError } from "@/lib/api-fetch";
 import { parseIndianCurrency } from "@/lib/indian-currency";
 import { propertiesApi } from "@/lib/properties-api";
-import { fetchNearbyCategories, resolveCenterFromText, type LocalityCategory } from "@/lib/nearby-places";
+import { fetchNearbyCategories, fetchPostalCode, resolveCenterFromText, type LocalityCategory } from "@/lib/nearby-places";
 import { canViewPropertyContacts } from "@/lib/permissions";
 export interface Property {
   id: number;
@@ -122,6 +122,11 @@ export const TIME_FOR_REGISTRATION_OPTIONS = [
   { value: "3 Months", label: "3 Months" },
   { value: "6 Months", label: "6 Months" },
   { value: "8 Months", label: "8 Months" },
+];
+
+export const MODE_OF_PAYMENT_OPTIONS = [
+  { value: "Only Guideline Value", label: "Only Guideline Value" },
+  { value: "Full Account", label: "Full Account" },
 ];
 
 /**
@@ -1003,6 +1008,44 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
     setCityId(val);
     setSublocationId("");
   };
+
+  // ---- Auto-populate pincode (never overwrites a filled field) ----
+  // 1. Coordinates → reverse-geocoded pincode; 2. fallback → the selected
+  // locality's postal code. The field stays a plain editable input, and a
+  // signature guard keeps manual clears from refilling until inputs change.
+  const pinAutoSig = useRef<string | null>(null);
+  useEffect(() => {
+    if (pincode.trim() !== "") return;
+    const sig = `${latitude.trim()}|${longitude.trim()}|${sublocationId}`;
+    if (pinAutoSig.current === sig) return;
+    pinAutoSig.current = sig;
+    const sub = formData.sublocations.find(
+      (s: { id?: number | string; postal_code?: unknown; postalCode?: unknown }) =>
+        String(s.id) === sublocationId
+    );
+    const subPin = sub?.postal_code ?? sub?.postalCode;
+    const fillLocalityPin = () => {
+      if (subPin) setPincode(String(subPin).trim());
+    };
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (latitude.trim() !== "" && longitude.trim() !== "" && Number.isFinite(lat) && Number.isFinite(lng) && apiKey) {
+      let cancelled = false;
+      fetchPostalCode(lat, lng, apiKey)
+        .then((pin) => {
+          if (cancelled) return;
+          if (pin) setPincode(pin);
+          else fillLocalityPin();
+        })
+        .catch(() => {});
+      return () => {
+        cancelled = true;
+      };
+    }
+    fillLocalityPin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latitude, longitude, sublocationId, formData.sublocations, pincode]);
 
   const handleAutoPopulatePlaces = async () => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
@@ -2013,11 +2056,12 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             {/* Mode of Payment */}
             <div className="space-y-2">
               <label className={labelClass}>Mode of Payment</label>
-              <Input
-                value={modeOfPayment}
-                onChange={(e) => setModeOfPayment(e.target.value)}
-                placeholder="e.g. Bank Transfer"
-                className={inputClass}
+              <FormSelect
+                name="modeOfPayment"
+                placeholder="Select Mode of Payment"
+                options={withLegacyOption(MODE_OF_PAYMENT_OPTIONS, modeOfPayment)}
+                value={modeOfPayment || null}
+                onValueChange={setModeOfPayment}
               />
             </div>
 

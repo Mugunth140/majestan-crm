@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   BOOKING_AMOUNT_OPTIONS,
+  MODE_OF_PAYMENT_OPTIONS,
   LOCK_IN_PERIOD_OPTIONS,
   parseStoredDate,
   ROAD_ACCESS_OPTIONS,
@@ -91,6 +92,15 @@ describe("withLegacyOption", () => {
     expect(withLegacyOption(BOOKING_AMOUNT_OPTIONS, "")).toHaveLength(
       BOOKING_AMOUNT_OPTIONS.length
     );
+  });
+});
+
+describe("Mode of Payment options", () => {
+  it("offers guideline value and full account", () => {
+    expect(MODE_OF_PAYMENT_OPTIONS.map((o) => o.value)).toEqual([
+      "Only Guideline Value",
+      "Full Account",
+    ]);
   });
 });
 

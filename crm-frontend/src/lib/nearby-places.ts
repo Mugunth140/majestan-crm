@@ -72,6 +72,30 @@ export async function fetchNearbyCategories(
   return results.filter((c) => c.places.length > 0);
 }
 
+/**
+ * Reverse-geocode coordinates to a postal code via the Geocoding API.
+ * Returns null when no postal component exists; throws on request failure
+ * so callers can fall back (e.g. to the locality pincode).
+ */
+export async function fetchPostalCode(
+  lat: number,
+  lng: number,
+  apiKey: string
+): Promise<string | null> {
+  const res = await fetch(
+    `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${encodeURIComponent(apiKey)}`
+  );
+  if (!res.ok) throw new Error("Failed to reverse-geocode coordinates");
+  const data = (await res.json()) as {
+    results?: { address_components?: { long_name?: string; types?: string[] }[] }[];
+  };
+  for (const r of data.results ?? []) {
+    const comp = (r.address_components ?? []).find((c) => (c.types ?? []).includes("postal_code"));
+    if (comp?.long_name) return comp.long_name.trim();
+  }
+  return null;
+}
+
 export interface ResolvedCenter {
   latitude: number;
   longitude: number;
