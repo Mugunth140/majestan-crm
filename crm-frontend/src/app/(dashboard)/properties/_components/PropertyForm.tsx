@@ -1762,7 +1762,9 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                     onCheckedChange={(checked) => setTenantOccupied(checked === true ? "Yes" : "No")}
                     className="shrink-0"
                   />
-                  <span className="leading-none">Yes</span>
+                  <span className="leading-none">
+                    Yes <span className="font-normal text-muted-foreground">currently tenant occupied</span>
+                  </span>
                 </label>
               </div>
             )}
