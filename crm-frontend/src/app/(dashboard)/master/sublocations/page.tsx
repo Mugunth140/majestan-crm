@@ -313,51 +313,55 @@ export default function MasterSublocationsPage() {
   );
 
   return (
-    <div className="flex flex-col space-y-6 mb-20 md:mb-0 px-4 md:px-8 mt-2 md:mt-0">
+    <>
       <MobileHeader title="Master: Sublocations" showBack />
+      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:h-full px-4 md:px-8">
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pr-0 md:pr-[150px] min-h-12">
-        <h1 className="text-3xl font-bold tracking-tight hidden md:block">Master: Sublocations</h1>
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-          <Input
-            placeholder="Search sublocations or cities..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-11 rounded-xl w-full sm:w-72 bg-background"
-          />
-          <Button
-            className="h-11 px-5 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC] shrink-0 w-full sm:w-auto"
-            onClick={() => { setForm({ ...emptyForm }); setIsAddOpen(true); }}
-          >
-            <Plus className="mr-1.5 h-4 w-4" /> Add Sublocation
-          </Button>
-        </div>
-      </div>
-
-      <div className="bg-card border rounded-2xl overflow-hidden shadow-sm p-4 md:p-6">
-        {isLoading ? (
-          <div className="flex h-40 items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pr-0 md:pr-[150px] min-h-[48px]">
+          <h1 className="text-[28px] font-bold tracking-tight hidden md:block">Master: Sublocations</h1>
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+            <Input
+              placeholder="Search sublocations or cities..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-11 rounded-full w-full sm:w-72 bg-background"
+            />
+            <Button
+              className="h-11 px-5 rounded-full bg-[#0052FF] text-white hover:bg-[#0040CC] shrink-0 w-full sm:w-auto shadow-sm"
+              onClick={() => { setForm({ ...emptyForm }); setIsAddOpen(true); }}
+            >
+              <Plus className="mr-1.5 h-4 w-4" /> Add Sublocation
+            </Button>
           </div>
-        ) : (
-          <DataTable 
-            columns={columns} 
-            data={sublocations} 
-            showToolbar={true}
-            showDeleteAction={true}
-            onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
-          />
-        )}
-      </div>
+        </div>
 
-      {/* Add Dialog */}
-      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-5 md:p-6">
-          <DialogHeader>
-            <DialogTitle>Add Sublocation</DialogTitle>
-            <DialogDescription>Create a new locality and map it to a city.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleAdd} className="space-y-4 py-2">
+        <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col bg-card border rounded-2xl shadow-sm p-4 md:p-6 mb-20 md:mb-0">
+          {isLoading ? (
+            <div className="flex h-40 items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <DataTable 
+              columns={columns} 
+              data={sublocations} 
+              showToolbar={true}
+              showDeleteAction={true}
+              onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
+            />
+          )}
+        </div>
+
+        {/* Add Dialog */}
+        <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+          <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-0 overflow-hidden">
+            <div className="px-5 md:px-6 pt-5 md:pt-6">
+              <DialogHeader className="text-left">
+                <DialogTitle className="text-lg font-semibold">Add Sublocation</DialogTitle>
+                <DialogDescription className="mt-1">Create a new locality and map it to a city.</DialogDescription>
+              </DialogHeader>
+            </div>
+            <form onSubmit={handleAdd}>
+              <div className="px-5 md:px-6 py-5 space-y-5">
             <div className="space-y-2">
               <label className="text-sm font-medium">City *</label>
               <CitySelect value={form.city_id} onChange={(v) => setForm({ ...form, city_id: v })} />
@@ -379,64 +383,73 @@ export default function MasterSublocationsPage() {
                 rows={4}
               />
             </div>
-            <div className="flex items-center justify-between pt-1">
-              <div>
-                <label className="text-sm font-medium">Active</label>
+            <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
+              <div className="space-y-0.5">
+                <label className="text-sm font-medium">Active Status</label>
                 <p className="text-xs text-muted-foreground">Show in property forms</p>
               </div>
               <Switch checked={form.is_active === 1} onCheckedChange={(v) => setForm({ ...form, is_active: v ? 1 : 0 })} />
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)}>Cancel</Button>
-              <Button type="submit" className="bg-[#0052FF] text-white hover:bg-[#0040CC]" disabled={isSubmitting}>
+          </div>
+          <DialogFooter className="px-5 md:px-6 py-4 border-t border-border/60 bg-muted/40 flex-row items-center gap-2">
+            <div className="ml-auto flex items-center gap-2">
+              <Button type="button" variant="outline" className="h-10 px-5 rounded-xl" onClick={() => setIsAddOpen(false)}>Cancel</Button>
+              <Button type="submit" className="h-10 px-5 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC]" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Add Sublocation
               </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+            </div>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
 
       {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-5 md:p-6">
-          <DialogHeader>
-            <DialogTitle>Edit Sublocation</DialogTitle>
-            <DialogDescription>Update locality details.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleEdit} className="space-y-4 py-2">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">City *</label>
-              <CitySelect value={form.city_id} onChange={(v) => setForm({ ...form, city_id: v })} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Locality / Sublocation Name *</label>
-              <Input placeholder="e.g. Velachery" value={form.locality_name} onChange={(e) => setForm({ ...form, locality_name: e.target.value })} required className="h-10" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">PIN Code</label>
-              <Input placeholder="e.g. 600042" value={form.postal_code} onChange={(e) => setForm({ ...form, postal_code: e.target.value })} className="h-10" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Overview Description</label>
-              <Textarea
-                placeholder="Shown on the site as 'Overview of {locality}' — e.g. schools, connectivity, lifestyle..."
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                rows={4}
-              />
-            </div>
-            <div className="flex items-center justify-between pt-1">
-              <div>
-                <label className="text-sm font-medium">Active</label>
-                <p className="text-xs text-muted-foreground">Inactive localities won't appear in property forms</p>
+        <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-0 overflow-hidden">
+          <div className="px-5 md:px-6 pt-5 md:pt-6">
+            <DialogHeader className="text-left">
+              <DialogTitle className="text-lg font-semibold">Edit Sublocation</DialogTitle>
+              <DialogDescription className="mt-1">Update locality details.</DialogDescription>
+            </DialogHeader>
+          </div>
+          <form onSubmit={handleEdit}>
+            <div className="px-5 md:px-6 py-5 space-y-5">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">City *</label>
+                <CitySelect value={form.city_id} onChange={(v) => setForm({ ...form, city_id: v })} />
               </div>
-              <Switch checked={form.is_active === 1} onCheckedChange={(v) => setForm({ ...form, is_active: v ? 1 : 0 })} />
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Locality / Sublocation Name *</label>
+                <Input placeholder="e.g. Velachery" value={form.locality_name} onChange={(e) => setForm({ ...form, locality_name: e.target.value })} required className="h-10" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">PIN Code</label>
+                <Input placeholder="e.g. 600042" value={form.postal_code} onChange={(e) => setForm({ ...form, postal_code: e.target.value })} className="h-10" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Overview Description</label>
+                <Textarea
+                  placeholder="Shown on the site as 'Overview of {locality}' — e.g. schools, connectivity, lifestyle..."
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  rows={4}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
+                <div className="space-y-0.5">
+                  <label className="text-sm font-medium">Active Status</label>
+                  <p className="text-xs text-muted-foreground">Inactive localities won't appear in property forms</p>
+                </div>
+                <Switch checked={form.is_active === 1} onCheckedChange={(v) => setForm({ ...form, is_active: v ? 1 : 0 })} />
+              </div>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
-              <Button type="submit" className="bg-[#0052FF] text-white hover:bg-[#0040CC]" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Save Changes
-              </Button>
+            <DialogFooter className="px-5 md:px-6 py-4 border-t border-border/60 bg-muted/40 flex-row items-center gap-2">
+              <div className="ml-auto flex items-center gap-2">
+                <Button type="button" variant="outline" className="h-10 px-5 rounded-xl" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+                <Button type="submit" className="h-10 px-5 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC]" disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Save Changes
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -477,6 +490,7 @@ export default function MasterSublocationsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </>
   );
 }
