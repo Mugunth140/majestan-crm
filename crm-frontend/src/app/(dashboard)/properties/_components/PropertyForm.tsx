@@ -1756,12 +1756,15 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             {!isLandType && (
               <div className="space-y-2">
                 <label className={labelClass}>Tenant Occupied</label>
-                <label className="flex h-12 items-center gap-3 rounded-xl bg-muted/30 border border-border/60 px-4 text-sm font-medium cursor-pointer">
+                <label className="flex h-12 cursor-pointer items-center gap-3 rounded-xl border border-border/60 bg-muted/30 px-4 text-sm font-medium text-foreground transition-colors hover:border-[#0052FF]/40 hover:bg-muted/50 has-checked:border-[#0052FF]/50 has-checked:bg-[#0052FF]/8">
                   <Checkbox
                     checked={tenantOccupied === "Yes"}
                     onCheckedChange={(checked) => setTenantOccupied(checked === true ? "Yes" : "No")}
+                    className="shrink-0"
                   />
-                  Yes — currently tenant occupied
+                  <span className="leading-none">
+                    Yes <span className="font-normal text-muted-foreground">— currently tenant occupied</span>
+                  </span>
                 </label>
               </div>
             )}
