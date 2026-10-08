@@ -94,6 +94,50 @@ export const TRANSACTION_TYPE_OPTIONS = [
   { value: "Resale Tenant Occupied", label: "Resale Tenant Occupied" },
 ];
 
+export const BOOKING_AMOUNT_OPTIONS = [
+  { value: "1 Lakh", label: "1 Lakh" },
+  { value: "2 Lakhs", label: "2 Lakhs" },
+  { value: "5 Lakhs", label: "5 Lakhs" },
+  { value: "10 Lakhs", label: "10 Lakhs" },
+];
+
+export const SECURITY_DEPOSIT_OPTIONS = [
+  { value: "3 Months", label: "3 Months" },
+  { value: "6 Months", label: "6 Months" },
+  { value: "8 Months", label: "8 Months" },
+  { value: "10 Months", label: "10 Months" },
+  { value: "12 Months", label: "12 Months" },
+];
+
+export const LOCK_IN_PERIOD_OPTIONS = [
+  { value: "1 Year", label: "1 Year" },
+  { value: "3 Years", label: "3 Years" },
+  { value: "5 Years", label: "5 Years" },
+  { value: "8 Years", label: "8 Years" },
+  { value: "10 Years", label: "10 Years" },
+];
+
+export const TIME_FOR_REGISTRATION_OPTIONS = [
+  { value: "1 Month", label: "1 Month" },
+  { value: "3 Months", label: "3 Months" },
+  { value: "6 Months", label: "6 Months" },
+  { value: "8 Months", label: "8 Months" },
+];
+
+/**
+ * Preserve legacy free-text values on edit so they don't blank out when
+ * the stored value isn't among the new dropdown options.
+ */
+export function withLegacyOption(
+  options: { value: string; label: string }[],
+  current: string
+): { value: string; label: string }[] {
+  if (current && !options.some((o) => o.value === current)) {
+    return [...options, { value: current, label: current }];
+  }
+  return options;
+}
+
 /**
  * Stored date strings come in two shapes: yyyy-MM-dd (picker-saved) and
  * legacy free text ("Jan 2025"). Only the former feeds the DatePicker —
@@ -127,6 +171,7 @@ interface FormDataShape {
   amenities: any[];
   propertyTypes: any[];
   roadNames: { value: string; label: string }[];
+  registrationCharges: { value: string; label: string }[];
 }
 
 interface UploadedImage {
@@ -203,7 +248,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   // ---- Meta state ----
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingFormData, setIsLoadingFormData] = useState(true);
-  const [formData, setFormData] = useState<FormDataShape>({ cities: [], sublocations: [], amenities: [], propertyTypes: [], roadNames: [] });
+  const [formData, setFormData] = useState<FormDataShape>({ cities: [], sublocations: [], amenities: [], propertyTypes: [], roadNames: [], registrationCharges: [] });
 
   // Shorthand helpers for initialData
   const d = initialData as any;
@@ -876,6 +921,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           amenities: data.amenities ?? [],
           propertyTypes: data.propertyTypes ?? [],
           roadNames: data.roadNames ?? [],
+          registrationCharges: data.registrationCharges ?? [],
         });
         }
       })
@@ -1820,10 +1866,12 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             {/* Booking Amount */}
             <div className="space-y-2" id="pf-bookingAmount">
               <label className={labelClass}>{listingType === "Rent" ? "Security Deposit" : "Booking Amount"}</label>
-              <PriceInput
-                value={bookingAmount}
-                onChange={(v) => { setBookingAmount(v); clearFieldError("bookingAmount"); }}
-                placeholder="e.g. 50k or 2L"
+              <FormSelect
+                name="bookingAmount"
+                placeholder="Select Amount"
+                options={withLegacyOption(BOOKING_AMOUNT_OPTIONS, bookingAmount)}
+                value={bookingAmount || null}
+                onValueChange={(v) => { setBookingAmount(v); clearFieldError("bookingAmount"); }}
               />
               <FormErr field="bookingAmount" />
             </div>
@@ -1902,11 +1950,12 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             {!isLandType && (
               <div className="space-y-2">
                 <label className={labelClass}>Security Deposit</label>
-                <Input
-                  value={securityDeposit}
-                  onChange={(e) => setSecurityDeposit(e.target.value)}
-                  placeholder="e.g. 3 months"
-                  className={inputClass}
+                <FormSelect
+                  name="securityDeposit"
+                  placeholder="Select Deposit"
+                  options={withLegacyOption(SECURITY_DEPOSIT_OPTIONS, securityDeposit)}
+                  value={securityDeposit || null}
+                  onValueChange={setSecurityDeposit}
                 />
               </div>
             )}
@@ -1915,11 +1964,12 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             {!isLandType && (
               <div className="space-y-2">
                 <label className={labelClass}>Lock In Period</label>
-                <Input
-                  value={lockInPeriod}
-                  onChange={(e) => setLockInPeriod(e.target.value)}
-                  placeholder="e.g. 11 months"
-                  className={inputClass}
+                <FormSelect
+                  name="lockInPeriod"
+                  placeholder="Select Lock In Period"
+                  options={withLegacyOption(LOCK_IN_PERIOD_OPTIONS, lockInPeriod)}
+                  value={lockInPeriod || null}
+                  onValueChange={setLockInPeriod}
                 />
               </div>
             )}
@@ -1945,14 +1995,18 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               />
             </div>
 
-            {/* Registration Charge */}
+            {/* Registration Charge — options from Master Registry, legacy free text still displays */}
             <div className="space-y-2">
               <label className={labelClass}>Registration Charge</label>
-              <Input
-                value={registrationCharge}
-                onChange={(e) => setRegistrationCharge(e.target.value)}
-                placeholder="e.g. 1%"
-                className={inputClass}
+              <FormSelect
+                name="registrationCharge"
+                placeholder="Select Registration Charge"
+                options={withLegacyOption(
+                  formData.registrationCharges,
+                  registrationCharge
+                )}
+                value={registrationCharge || null}
+                onValueChange={setRegistrationCharge}
               />
             </div>
 
@@ -1970,11 +2024,12 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             {/* Time for Registration */}
             <div className="space-y-2">
               <label className={labelClass}>Time for Registration</label>
-              <Input
-                value={timeForRegistration}
-                onChange={(e) => setTimeForRegistration(e.target.value)}
-                placeholder="e.g. 30 days"
-                className={inputClass}
+              <FormSelect
+                name="timeForRegistration"
+                placeholder="Select Timeline"
+                options={withLegacyOption(TIME_FOR_REGISTRATION_OPTIONS, timeForRegistration)}
+                value={timeForRegistration || null}
+                onValueChange={setTimeForRegistration}
               />
             </div>
           </div>

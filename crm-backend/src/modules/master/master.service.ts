@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { LeadSource } from '../../database/entities/lead-source.entity';
 import { PropertyType } from '../../database/entities/property-type.entity';
 import { RoadName } from '../../database/entities/road-name.entity';
+import { RegistrationCharge } from '../../database/entities/registration-charge.entity';
 import { SiteApiService } from '../properties/site-api.service';
 
 @Injectable()
@@ -207,6 +208,49 @@ export class MasterService {
     const result = await repo.delete(id);
     if (result.affected === 0) {
       throw new InternalServerErrorException('Road name not found or could not be deleted');
+    }
+    return { success: true };
+  }
+
+  // ---- Registration Charges ----
+
+  async getRegistrationCharges() {
+    const repo = this.crmDataSource.getRepository(RegistrationCharge);
+    const charges = await repo.find({ where: { is_active: true }, order: { name: 'ASC' } });
+    return charges.map((c) => ({ id: c.id, label: c.name, value: c.name, is_active: c.is_active }));
+  }
+
+  async getAllRegistrationCharges() {
+    const repo = this.crmDataSource.getRepository(RegistrationCharge);
+    const charges = await repo.find({ order: { name: 'ASC' } });
+    return charges.map((c) => ({ id: c.id, label: c.name, value: c.name, is_active: c.is_active, name: c.name }));
+  }
+
+  async createRegistrationCharge(name: string) {
+    const repo = this.crmDataSource.getRepository(RegistrationCharge);
+    const existing = await repo.findOne({ where: { name } });
+    if (existing) {
+      return { id: existing.id, label: existing.name, value: existing.name, is_active: existing.is_active };
+    }
+    const created = await repo.save(repo.create({ name }));
+    return { id: created.id, label: created.name, value: created.name, is_active: created.is_active };
+  }
+
+  async updateRegistrationCharge(id: number, data: { name: string; is_active: boolean }) {
+    const repo = this.crmDataSource.getRepository(RegistrationCharge);
+    const charge = await repo.findOne({ where: { id } });
+    if (!charge) throw new InternalServerErrorException('Registration charge not found');
+    charge.name = data.name;
+    charge.is_active = data.is_active;
+    const updated = await repo.save(charge);
+    return { id: updated.id, label: updated.name, value: updated.name, is_active: updated.is_active };
+  }
+
+  async deleteRegistrationCharge(id: number) {
+    const repo = this.crmDataSource.getRepository(RegistrationCharge);
+    const result = await repo.delete(id);
+    if (result.affected === 0) {
+      throw new InternalServerErrorException('Registration charge not found or could not be deleted');
     }
     return { success: true };
   }

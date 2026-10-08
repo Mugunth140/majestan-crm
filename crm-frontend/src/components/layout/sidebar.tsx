@@ -59,6 +59,7 @@ const navigation = [
       { name: "Cities", href: "/master/cities" },
       { name: "Sublocations", href: "/master/sublocations" },
       { name: "Road Names", href: "/master/road-names" },
+      { name: "Registration Charges", href: "/master/registration-charges" },
     ]
   },
 ];

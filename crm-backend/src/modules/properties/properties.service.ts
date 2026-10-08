@@ -9,6 +9,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { PropertyType } from '../../database/entities/property-type.entity';
 import { RoadName } from '../../database/entities/road-name.entity';
+import { RegistrationCharge } from '../../database/entities/registration-charge.entity';
 
 // CRM form keys → site details keys
 const RENAMED_DETAILS_KEYS: Record<string, string> = {
@@ -210,10 +211,20 @@ export class PropertiesService {
       console.error('[Properties] road_names lookup failed, degrading to empty list', e);
     }
 
+    let registrationCharges: { value: string; label: string }[] = [];
+    try {
+      const chargesRepo = this.crmDataSource.getRepository(RegistrationCharge);
+      const rows = await chargesRepo.find({ where: { is_active: true }, order: { name: 'ASC' } });
+      registrationCharges = rows.map(t => ({ value: t.name, label: t.name }));
+    } catch (e) {
+      console.error('[Properties] registration_charges lookup failed, degrading to empty list', e);
+    }
+
     return {
       amenities,
       propertyTypes,
       roadNames,
+      registrationCharges,
       cities: cities.map((c: any) => ({
         id: c.id,
         cityName: c.city_name ?? c.cityName,

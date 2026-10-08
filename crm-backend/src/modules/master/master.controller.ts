@@ -157,6 +157,41 @@ export class MasterController {
     return { success: true, data };
   }
 
+  // ---- Registration Charges ----
+
+  @Get('registration-charges')
+  async getRegistrationCharges() {
+    const data = await this.masterService.getRegistrationCharges();
+    return { success: true, data };
+  }
+
+  @Get('all-registration-charges')
+  async getAllRegistrationCharges() {
+    const data = await this.masterService.getAllRegistrationCharges();
+    return { success: true, data };
+  }
+
+  @Post('registration-charges')
+  @Roles('Admin')
+  async createRegistrationCharge(@Body() body: { name: string }) {
+    const data = await this.masterService.createRegistrationCharge(body.name);
+    return { success: true, data };
+  }
+
+  @Put('registration-charges/:id')
+  @Roles('Admin')
+  async updateRegistrationCharge(@Param('id') id: number, @Body() body: { name: string; is_active: boolean }) {
+    const data = await this.masterService.updateRegistrationCharge(id, body);
+    return { success: true, data };
+  }
+
+  @Delete('registration-charges/:id')
+  @Roles('Admin')
+  async deleteRegistrationCharge(@Param('id') id: number) {
+    const data = await this.masterService.deleteRegistrationCharge(id);
+    return { success: true, data };
+  }
+
   // ---- Property Types ----
 
   @Get('property-types')
