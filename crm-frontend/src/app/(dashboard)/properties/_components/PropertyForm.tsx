@@ -175,6 +175,31 @@ export function withLegacyOption(
 }
 
 /**
+ * Hypothecation checkbox state from the stored string. Explicit negatives
+ * (No/NIL/N/A/None/-) and empties mean unchecked; anything else present
+ * means the property is hypothecated.
+ */
+export function isHypothecated(value: string): boolean {
+  const t = value.trim().toLowerCase();
+  if (!t) return false;
+  return !["no", "nil", "n/a", "na", "none", "-"].includes(t);
+}
+
+/**
+ * Immutable reorder for draggable lists. Out-of-range indices return the
+ * list untouched.
+ */
+export function moveListItem<T>(list: T[], from: number, to: number): T[] {
+  if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) {
+    return list;
+  }
+  const next = [...list];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}
+
+/**
  * Stored date strings come in two shapes: yyyy-MM-dd (picker-saved) and
  * legacy free text ("Jan 2025"). Only the former feeds the DatePicker —
  * legacy values show the placeholder instead of an Invalid Date, and are
@@ -1126,6 +1151,39 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
     } finally {
       setIsFetchingPlaces(false);
     }
+  };
+
+  // ---- Draggable photo grids (drop position sets order; first photo is primary) ----
+  const imgDrag = useRef<{ list: "existing" | "uploaded"; index: number } | null>(null);
+  const [draggingImg, setDraggingImg] = useState<{ list: string; index: number } | null>(null);
+
+  const onImgDragStart =
+    (list: "existing" | "uploaded", index: number) => (e: React.DragEvent) => {
+      imgDrag.current = { list, index };
+      setDraggingImg({ list, index });
+      e.dataTransfer.effectAllowed = "move";
+    };
+  const onImgDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+  const onImgDrop = (list: "existing" | "uploaded", index: number) => (e: React.DragEvent) => {
+    e.preventDefault();
+    const from = imgDrag.current;
+    imgDrag.current = null;
+    setDraggingImg(null);
+    if (!from || from.list !== list || from.index === index) return;
+    if (list === "existing") {
+      setExistingImages((prev) =>
+        moveListItem(prev, from.index, index).map((img, i) => ({ ...img, isPrimary: i === 0 }))
+      );
+    } else {
+      setUploadedImages((prev) => moveListItem(prev, from.index, index));
+    }
+  };
+  const onImgDragEnd = () => {
+    imgDrag.current = null;
+    setDraggingImg(null);
   };
 
   // ---- Image upload logic ----
@@ -3866,24 +3924,28 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             </div>
 
             <div className="space-y-2">
-              <label className={labelClass}>Finance Facing</label>
-              <Input
-                value={financeFacing}
-                onChange={(e) => setFinanceFacing(e.target.value)}
-                placeholder="e.g. Bank Eligible"
-                className={inputClass}
-              />
+              <label className={labelClass}>Hypothecation</label>
+              <label className="flex h-12 cursor-pointer items-center gap-3 rounded-xl border border-border/60 bg-muted/30 px-4 text-sm font-medium text-foreground transition-colors hover:border-[#0052FF]/40 hover:bg-muted/50 has-checked:border-[#0052FF]/50 has-checked:bg-[#0052FF]/8">
+                <Checkbox
+                  checked={isHypothecated(hypothecation)}
+                  onCheckedChange={(checked) => setHypothecation(checked === true ? "Yes" : "")}
+                  className="shrink-0"
+                />
+                <span className="leading-none">Yes</span>
+              </label>
             </div>
 
-            <div className="space-y-2">
-              <label className={labelClass}>Hypothecation</label>
-              <Input
-                value={hypothecation}
-                onChange={(e) => setHypothecation(e.target.value)}
-                placeholder="e.g. NIL"
-                className={inputClass}
-              />
-            </div>
+            {isHypothecated(hypothecation) && (
+              <div className="space-y-2">
+                <label className={labelClass}>Finance</label>
+                <Input
+                  value={financeFacing}
+                  onChange={(e) => setFinanceFacing(e.target.value)}
+                  placeholder="e.g. Bank Eligible"
+                  className={inputClass}
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <label className={labelClass}>Deviation</label>
@@ -3995,7 +4057,15 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 {existingImages.map((img, idx) => (
                   <div
                     key={img.imageKey || img.imageUrl}
-                    className="relative border border-border rounded-xl overflow-hidden bg-muted/10 group"
+                    draggable
+                    onDragStart={onImgDragStart("existing", idx)}
+                    onDragOver={onImgDragOver}
+                    onDrop={onImgDrop("existing", idx)}
+                    onDragEnd={onImgDragEnd}
+                    title="Drag to reorder — first photo is primary"
+                    className={`relative border border-border rounded-xl overflow-hidden bg-muted/10 group cursor-grab active:cursor-grabbing transition-opacity ${
+                      draggingImg?.list === "existing" && draggingImg.index === idx ? "opacity-40" : ""
+                    }`}
                   >
                     <img
                       src={img.imageUrl}
@@ -4034,11 +4104,19 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           {/* Thumbnails */}
           {uploadedImages.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {uploadedImages.map((img, idx) => (
-                <div
-                  key={idx}
-                  className="relative border border-border rounded-xl overflow-hidden bg-muted/10 group"
-                >
+                {uploadedImages.map((img, idx) => (
+                  <div
+                    key={idx}
+                    draggable
+                    onDragStart={onImgDragStart("uploaded", idx)}
+                    onDragOver={onImgDragOver}
+                    onDrop={onImgDrop("uploaded", idx)}
+                    onDragEnd={onImgDragEnd}
+                    title="Drag to reorder — first photo is primary"
+                    className={`relative border border-border rounded-xl overflow-hidden bg-muted/10 group cursor-grab active:cursor-grabbing transition-opacity ${
+                      draggingImg?.list === "uploaded" && draggingImg.index === idx ? "opacity-40" : ""
+                    }`}
+                  >
                   <img
                     src={img.previewUrl}
                     alt={img.fileName}
@@ -4093,7 +4171,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                       }}
                     />
                     <div className="flex flex-col min-w-0">
-                      <span className="text-sm font-semibold text-foreground truncate" title={amenity.name}>
+                      <span className="text-sm font-semibold text-foreground truncate capitalize" title={amenity.name}>
                         {amenity.name}
                       </span>
                       <span className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   ARCHITECTURAL_STYLE_OPTIONS,
+  isHypothecated,
+  moveListItem,
   BOOKING_AMOUNT_OPTIONS,
   MODE_OF_PAYMENT_OPTIONS,
   PROPERTY_AGE_OPTIONS,
@@ -147,6 +149,33 @@ describe("Mode of Payment options", () => {
       "Only Guideline Value",
       "Full Account",
     ]);
+  });
+});
+
+describe("isHypothecated", () => {
+  it("treats affirmative values as hypothecated", () => {
+    for (const v of ["Yes", "yes", "YES", "HDFC Bank", "SBI"]) {
+      expect(isHypothecated(v)).toBe(true);
+    }
+  });
+
+  it("treats negative and empty values as not hypothecated", () => {
+    for (const v of ["", "No", "NIL", "N/A", "NA", "None", "-"]) {
+      expect(isHypothecated(v)).toBe(false);
+    }
+  });
+});
+
+describe("moveListItem", () => {
+  it("moves an item to the target index", () => {
+    expect(moveListItem(["a", "b", "c"], 2, 0)).toEqual(["c", "a", "b"]);
+    expect(moveListItem(["a", "b", "c"], 0, 2)).toEqual(["b", "c", "a"]);
+  });
+
+  it("returns the list unchanged for invalid indices", () => {
+    expect(moveListItem(["a", "b"], 0, 0)).toEqual(["a", "b"]);
+    expect(moveListItem(["a", "b"], -1, 1)).toEqual(["a", "b"]);
+    expect(moveListItem(["a", "b"], 0, 5)).toEqual(["a", "b"]);
   });
 });
 
