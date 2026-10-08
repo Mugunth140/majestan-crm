@@ -125,6 +125,36 @@ export const TIME_FOR_REGISTRATION_OPTIONS = [
   { value: "8 Months", label: "8 Months" },
 ];
 
+export const SUITABLE_FOR_OPTIONS = [
+  { value: "Family", label: "Family" },
+  { value: "Bachelors", label: "Bachelors" },
+  { value: "Office", label: "Office" },
+  { value: "Showroom", label: "Showroom" },
+];
+
+export const PROPERTY_AGE_OPTIONS = [
+  { value: "1-3 Years", label: "1-3 Years" },
+  { value: "4-6 Years", label: "4-6 Years" },
+  { value: "7-10 Years", label: "7-10 Years" },
+  { value: "10-14 Years", label: "10-14 Years" },
+  { value: "15 & Above Years", label: "15 & Above Years" },
+];
+
+export const UNIT_TYPE_OPTIONS = [
+  { value: "1BHK", label: "1BHK" },
+  { value: "2BHK", label: "2BHK" },
+  { value: "3BHK", label: "3BHK" },
+  { value: "4BHK", label: "4BHK" },
+  { value: "5BHK", label: "5BHK" },
+  { value: "6BHK", label: "6BHK" },
+];
+
+export const ARCHITECTURAL_STYLE_OPTIONS = [
+  { value: "Contemporary", label: "Contemporary" },
+  { value: "Modern", label: "Modern" },
+  { value: "Traditional", label: "Traditional" },
+];
+
 export const MODE_OF_PAYMENT_OPTIONS = [
   { value: "Only Guideline Value", label: "Only Guideline Value" },
   { value: "Full Account", label: "Full Account" },
@@ -175,7 +205,8 @@ interface FormDataShape {
   cities: any[];
   sublocations: any[];
   amenities: any[];
-  furnishings: any[];
+  furnishings: { id: number; name: string; icon?: string | null }[];
+  utilities: { id: number; name: string; icon?: string | null }[];
   propertyTypes: any[];
   roadNames: { value: string; label: string }[];
   registrationCharges: { value: string; label: string }[];
@@ -255,7 +286,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   // ---- Meta state ----
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingFormData, setIsLoadingFormData] = useState(true);
-  const [formData, setFormData] = useState<FormDataShape>({ cities: [], sublocations: [], amenities: [], furnishings: [], propertyTypes: [], roadNames: [], registrationCharges: [] });
+  const [formData, setFormData] = useState<FormDataShape>({ cities: [], sublocations: [], amenities: [], furnishings: [], utilities: [], propertyTypes: [], roadNames: [], registrationCharges: [] });
 
   // Shorthand helpers for initialData
   const d = initialData as any;
@@ -933,6 +964,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           sublocations: data.sublocations ?? [],
           amenities: data.amenities ?? [],
           furnishings: data.furnishings ?? [],
+          utilities: data.utilities ?? [],
           propertyTypes: data.propertyTypes ?? [],
           roadNames: data.roadNames ?? [],
           registrationCharges: data.registrationCharges ?? [],
@@ -2315,11 +2347,12 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             {!isLandType && (
               <div className="space-y-2">
                 <label className={labelClass}>Suitable For</label>
-                <Input
-                  value={suitableFor}
-                  onChange={(e) => setSuitableFor(e.target.value)}
-                  placeholder="e.g. Family, Bachelors"
-                  className={inputClass}
+                <FormSelect
+                  name="suitableFor"
+                  placeholder="Select Segment"
+                  options={withLegacyOption(SUITABLE_FOR_OPTIONS, suitableFor)}
+                  value={suitableFor || null}
+                  onValueChange={setSuitableFor}
                 />
               </div>
             )}
@@ -2328,11 +2361,12 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             {!isLandType && (
               <div className="space-y-2">
                 <label className={labelClass}>Age of Property</label>
-                <Input
-                  value={propertyAge}
-                  onChange={(e) => setPropertyAge(e.target.value)}
-                  placeholder="e.g. 5 years"
-                  className={inputClass}
+                <FormSelect
+                  name="propertyAge"
+                  placeholder="Select Age Band"
+                  options={withLegacyOption(PROPERTY_AGE_OPTIONS, propertyAge)}
+                  value={propertyAge || null}
+                  onValueChange={setPropertyAge}
                 />
               </div>
             )}
@@ -2376,12 +2410,13 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
               <div className="space-y-2">
-                <label className={labelClass}>Unit Type (2BHK, 3BHK...)</label>
-                <Input
-                  value={unitType}
-                  onChange={(e) => setUnitType(e.target.value)}
-                  placeholder="e.g. 3BHK"
-                  className={inputClass}
+                <label className={labelClass}>Unit Type</label>
+                <FormSelect
+                  name="unitType"
+                  placeholder="Select Unit Type"
+                  options={withLegacyOption(UNIT_TYPE_OPTIONS, unitType)}
+                  value={unitType || null}
+                  onValueChange={setUnitType}
                 />
               </div>
 
@@ -2470,9 +2505,11 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               <div className="space-y-2">
                 <label className={labelClass}>Plot Area</label>
                 <Input
+                  type="number"
+                  min={0}
                   value={plotArea}
                   onChange={(e) => setPlotArea(e.target.value)}
-                  placeholder="e.g. 2400 sqft"
+                  placeholder="e.g. 2400"
                   className={inputClass}
                 />
               </div>
@@ -2548,11 +2585,12 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
               <div className="space-y-2">
                 <label className={labelClass}>Architectural Style</label>
-                <Input
-                  value={architecturalStyle}
-                  onChange={(e) => setArchitecturalStyle(e.target.value)}
-                  placeholder="e.g. Contemporary"
-                  className={inputClass}
+                <FormSelect
+                  name="architecturalStyle"
+                  placeholder="Select Style"
+                  options={withLegacyOption(ARCHITECTURAL_STYLE_OPTIONS, architecturalStyle)}
+                  value={architecturalStyle || null}
+                  onValueChange={setArchitecturalStyle}
                 />
               </div>
 
@@ -2572,36 +2610,6 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   value={outdoorSpaces}
                   onChange={(e) => setOutdoorSpaces(e.target.value)}
                   placeholder="e.g. Terrace, Garden"
-                  className={inputClass}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className={labelClass}>Utilities Provided</label>
-                <Input
-                  value={utilitiesProvided}
-                  onChange={(e) => setUtilitiesProvided(e.target.value)}
-                  placeholder="e.g. Water, Electricity"
-                  className={inputClass}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className={labelClass}>Neighborhood Highlights</label>
-                <Input
-                  value={neighborhoodHighlights}
-                  onChange={(e) => setNeighborhoodHighlights(e.target.value)}
-                  placeholder="e.g. Near metro station"
-                  className={inputClass}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className={labelClass}>Community Facilities</label>
-                <Input
-                  value={communityFacilities}
-                  onChange={(e) => setCommunityFacilities(e.target.value)}
-                  placeholder="e.g. Gym, Pool"
                   className={inputClass}
                 />
               </div>
@@ -2931,12 +2939,23 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               </div>
 
               <div className="space-y-2">
-                <label className={labelClass}>Visitors Parking</label>
-                <Input
-                  value={visitorsParking}
-                  onChange={(e) => setVisitorsParking(e.target.value)}
-                  placeholder="e.g. Available"
-                  className={inputClass}
+                <label className={labelClass}>Utilities Provided</label>
+                <FormSelect
+                  name="utilitiesProvided"
+                  placeholder="Select Utility"
+                  options={[
+                    ...formData.utilities.map((u: any) => ({
+                      value: u.name,
+                      label: u.name,
+                    })),
+                    // Preserve legacy free-text values on edit so they don't blank out
+                    ...(utilitiesProvided &&
+                    !formData.utilities.some((u: any) => u.name === utilitiesProvided)
+                      ? [{ value: utilitiesProvided, label: utilitiesProvided }]
+                      : []),
+                  ]}
+                  value={utilitiesProvided || null}
+                  onValueChange={setUtilitiesProvided}
                 />
               </div>
 
@@ -4096,7 +4115,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               <p className="text-sm text-muted-foreground italic">No furnishing items available in the master list.</p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {formData.furnishings.map((item: any) => (
+                {formData.furnishings.map((item: { id: number; name: string; icon?: string | null }) => (
                   <label
                     key={item.id}
                     className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${

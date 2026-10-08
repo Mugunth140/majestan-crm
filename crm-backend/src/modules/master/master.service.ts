@@ -279,6 +279,28 @@ export class MasterService {
     return this.siteApi.del(`/admin/furnishing-items/${id}`);
   }
 
+  // ---- Utilities (proxied to site admin API) ----
+
+  async getAllUtilities(search?: string) {
+    const qs = search ? `?search=${encodeURIComponent(search)}` : '';
+    const res = await this.siteApi.get(`/admin/utilities${qs}`);
+    if (Array.isArray(res)) return res;
+    if (Array.isArray((res as any)?.items)) return (res as any).items;
+    return [];
+  }
+
+  async createUtility(data: { name: string; icon?: string }) {
+    return this.siteApi.post('/admin/utilities', { data });
+  }
+
+  async updateUtility(id: number, data: { name?: string; icon?: string; is_active?: boolean }) {
+    return this.siteApi.patch(`/admin/utilities/${id}`, { data });
+  }
+
+  async deleteUtility(id: number) {
+    return this.siteApi.del(`/admin/utilities/${id}`);
+  }
+
   // ---- Property Types ----
 
   async getPropertyTypes() {

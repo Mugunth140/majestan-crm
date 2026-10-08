@@ -221,6 +221,35 @@ export class MasterController {
     return { success: true, data };
   }
 
+  // ---- Utilities ----
+
+  @Get('all-utilities')
+  async getAllUtilities(@Query('search') search?: string) {
+    const data = await this.masterService.getAllUtilities(search);
+    return { success: true, data };
+  }
+
+  @Post('utilities')
+  @Roles('Admin')
+  async createUtility(@Body() body: { name: string; icon?: string }) {
+    const data = await this.masterService.createUtility(body);
+    return { success: true, data };
+  }
+
+  @Put('utilities/:id')
+  @Roles('Admin')
+  async updateUtility(@Param('id') id: number, @Body() body: { name?: string; icon?: string; is_active?: boolean }) {
+    const data = await this.masterService.updateUtility(id, body);
+    return { success: true, data };
+  }
+
+  @Delete('utilities/:id')
+  @Roles('Admin')
+  async deleteUtility(@Param('id') id: number) {
+    const data = await this.masterService.deleteUtility(id);
+    return { success: true, data };
+  }
+
   // ---- Property Types ----
 
   @Get('property-types')

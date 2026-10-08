@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { createElement, useState } from "react";
 import {
   Archive,
   Armchair,
@@ -91,8 +91,7 @@ export function getFurnishingIcon(name?: string | null): LucideIcon {
 
 /** Render a stored furnishing icon by name. */
 export function FurnishingIcon({ name, className }: { name?: string | null; className?: string }) {
-  const Icon = getFurnishingIcon(name);
-  return <Icon className={className} />;
+  return createElement(getFurnishingIcon(name), { className });
 }
 
 type FurnishingIconPickerProps = {

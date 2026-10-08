@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  ARCHITECTURAL_STYLE_OPTIONS,
   BOOKING_AMOUNT_OPTIONS,
   MODE_OF_PAYMENT_OPTIONS,
+  PROPERTY_AGE_OPTIONS,
+  SUITABLE_FOR_OPTIONS,
+  UNIT_TYPE_OPTIONS,
   LOCK_IN_PERIOD_OPTIONS,
   parseStoredDate,
   ROAD_ACCESS_OPTIONS,
@@ -92,6 +96,48 @@ describe("withLegacyOption", () => {
     expect(withLegacyOption(BOOKING_AMOUNT_OPTIONS, "")).toHaveLength(
       BOOKING_AMOUNT_OPTIONS.length
     );
+  });
+});
+
+describe("Details dropdown options", () => {
+  it("offers suitable-for segments", () => {
+    expect(SUITABLE_FOR_OPTIONS.map((o) => o.value)).toEqual([
+      "Family",
+      "Bachelors",
+      "Office",
+      "Showroom",
+    ]);
+  });
+
+  it("offers property age bands", () => {
+    expect(PROPERTY_AGE_OPTIONS.map((o) => o.value)).toEqual([
+      "1-3 Years",
+      "4-6 Years",
+      "7-10 Years",
+      "10-14 Years",
+      "15 & Above Years",
+    ]);
+  });
+});
+
+describe("Apartment details dropdown options", () => {
+  it("offers unit types from 1 to 6 BHK", () => {
+    expect(UNIT_TYPE_OPTIONS.map((o) => o.value)).toEqual([
+      "1BHK",
+      "2BHK",
+      "3BHK",
+      "4BHK",
+      "5BHK",
+      "6BHK",
+    ]);
+  });
+
+  it("offers architectural styles", () => {
+    expect(ARCHITECTURAL_STYLE_OPTIONS.map((o) => o.value)).toEqual([
+      "Contemporary",
+      "Modern",
+      "Traditional",
+    ]);
   });
 });
 

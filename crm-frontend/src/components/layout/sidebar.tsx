@@ -61,6 +61,7 @@ const navigation = [
       { name: "Road Names", href: "/master/road-names" },
       { name: "Registration Charges", href: "/master/registration-charges" },
       { name: "Furnishing Items", href: "/master/furnishing-items" },
+      { name: "Utilities", href: "/master/utilities" },
     ]
   },
 ];

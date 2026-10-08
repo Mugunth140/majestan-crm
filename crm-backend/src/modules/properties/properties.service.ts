@@ -107,7 +107,7 @@ function str(v: any): string | undefined {
 
 @Injectable()
 export class PropertiesService {
-  private citiesCache: { at: number; cities: any[]; sublocations: any[]; amenities: any[]; furnishings: any[] } | null = null;
+  private citiesCache: { at: number; cities: any[]; sublocations: any[]; amenities: any[]; furnishings: any[]; utilities: any[] } | null = null;
 
   constructor(
     private readonly siteApi: SiteApiService,
@@ -136,7 +136,7 @@ export class PropertiesService {
     return copy as T;
   }
 
-  private async formDataCached(): Promise<{ cities: any[]; sublocations: any[]; amenities: any[]; furnishings: any[] }> {
+  private async formDataCached(): Promise<{ cities: any[]; sublocations: any[]; amenities: any[]; furnishings: any[]; utilities: any[] }> {
     if (this.citiesCache && Date.now() - this.citiesCache.at < 5 * 60 * 1000) {
       return this.citiesCache;
     }
@@ -145,8 +145,9 @@ export class PropertiesService {
     const sublocations = data?.sublocations ?? [];
     const amenities = data?.amenities ?? [];
     const furnishings = data?.furnishings ?? [];
-    this.citiesCache = { at: Date.now(), cities, sublocations, amenities, furnishings };
-    return { cities, sublocations, amenities, furnishings };
+    const utilities = data?.utilities ?? [];
+    this.citiesCache = { at: Date.now(), cities, sublocations, amenities, furnishings, utilities };
+    return { cities, sublocations, amenities, furnishings, utilities };
   }
 
   private cityNameOf(cities: any[], id: number): any | null {
@@ -190,8 +191,9 @@ export class PropertiesService {
     let sublocations: any[] = [];
     let amenities: any[] = [];
     let furnishings: any[] = [];
+    let utilities: any[] = [];
     try {
-      ({ cities, sublocations, amenities, furnishings } = await this.formDataCached());
+      ({ cities, sublocations, amenities, furnishings, utilities } = await this.formDataCached());
     } catch (e) {
       console.error('[Properties] formDataCached failed, degrading to empty lists', e);
     }
@@ -225,6 +227,7 @@ export class PropertiesService {
     return {
       amenities,
       furnishings,
+      utilities,
       propertyTypes,
       roadNames,
       registrationCharges,
