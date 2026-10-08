@@ -187,14 +187,9 @@ export default function PropertyTypesMasterPage() {
     },
     { 
       accessorKey: "name", 
-      header: "Type Name",
+      header: "Property Type",
       cell: ({ row }) => (
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-            <Building2 size={15} className="text-muted-foreground" />
-          </div>
-          <span className="font-medium capitalize">{row.original.name}</span>
-        </div>
+        <span className="font-medium capitalize">{row.original.name}</span>
       )
     },
     { 
@@ -240,104 +235,118 @@ export default function PropertyTypesMasterPage() {
   );
 
   return (
-    <div className="flex flex-col space-y-6 mb-20 md:mb-0 px-4 md:px-8 mt-2 md:mt-0">
+    <>
       <MobileHeader title="Master: Property Types" showBack />
+      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:h-full px-4 md:px-8">
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pr-0 md:pr-[150px] min-h-12">
-        <h1 className="text-3xl font-bold tracking-tight hidden md:block">Master: Property Types</h1>
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-          <Input
-            placeholder="Search types..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-11 rounded-xl w-full sm:w-64 bg-background"
-          />
-          <Button 
-            className="h-11 px-5 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC] shrink-0 w-full sm:w-auto"
-            onClick={() => { setFormData({ name: "", value: "", is_active: true }); setIsAddOpen(true); }}
-          >
-            <Plus className="mr-1.5 h-4 w-4" /> Add Type
-          </Button>
-        </div>
-      </div>
-
-      <div className="bg-card border rounded-2xl overflow-hidden shadow-sm p-4 md:p-6">
-        {isLoading ? (
-          <div className="flex h-40 items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pr-0 md:pr-[150px] min-h-[48px]">
+          <h1 className="text-[28px] font-bold tracking-tight hidden md:block">Master: Property Types</h1>
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+            <Input
+              placeholder="Search types..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-11 rounded-full w-full sm:w-64 bg-background"
+            />
+            <Button 
+              className="h-11 px-5 rounded-full bg-[#0052FF] text-white hover:bg-[#0040CC] shrink-0 w-full sm:w-auto shadow-sm"
+              onClick={() => { setFormData({ name: "", value: "", is_active: true }); setIsAddOpen(true); }}
+            >
+              <Plus className="mr-1.5 h-4 w-4" /> Add Type
+            </Button>
           </div>
-        ) : (
-          <DataTable 
-            columns={columns} 
-            data={filteredTypes} 
-            showToolbar={true}
-            showDeleteAction={true}
-            onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
-          />
-        )}
-      </div>
+        </div>
 
-      {/* Add Dialog */}
-      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-5 md:p-6">
-          <DialogHeader>
-            <DialogTitle>Add Property Type</DialogTitle>
-            <DialogDescription>Create a new property classification.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleAdd} className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label htmlFor="name" className="text-sm font-medium">Display Name</label>
-              <Input id="name" placeholder="e.g. Independent House" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+        <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col bg-card border rounded-2xl shadow-sm p-4 md:p-6 mb-20 md:mb-0">
+          {isLoading ? (
+            <div className="flex h-40 items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-            <div className="space-y-2">
-              <label htmlFor="value" className="text-sm font-medium">Internal Value (DB Key)</label>
-              <Input id="value" placeholder="e.g. individual_portion" value={formData.value} onChange={(e) => setFormData({ ...formData, value: e.target.value })} required />
+          ) : (
+            <DataTable 
+              columns={columns} 
+              data={filteredTypes} 
+              showToolbar={true}
+              showDeleteAction={true}
+              onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
+            />
+          )}
+        </div>
+
+        {/* Add Dialog */}
+        <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+          <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-0 overflow-hidden">
+            <div className="px-5 md:px-6 pt-5 md:pt-6">
+              <DialogHeader className="text-left">
+                <DialogTitle className="text-lg font-semibold">Add Property Type</DialogTitle>
+                <DialogDescription className="mt-1">Create a new property classification.</DialogDescription>
+              </DialogHeader>
             </div>
-            <div className="flex items-center justify-between pt-2">
-              <div className="space-y-0.5">
-                <label className="text-sm font-medium">Active Status</label>
-                <p className="text-xs text-muted-foreground">Show in property forms</p>
+            <form onSubmit={handleAdd}>
+              <div className="px-5 md:px-6 py-5 space-y-5">
+                <div className="space-y-2">
+                  <label htmlFor="name" className="text-sm font-medium">Display Name</label>
+                  <Input id="name" placeholder="e.g. Independent House" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required autoFocus />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="value" className="text-sm font-medium">Internal Value (DB Key)</label>
+                  <Input id="value" placeholder="e.g. individual_portion" value={formData.value} onChange={(e) => setFormData({ ...formData, value: e.target.value })} required />
+                </div>
+                <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
+                  <div className="space-y-0.5">
+                    <label className="text-sm font-medium">Active Status</label>
+                    <p className="text-xs text-muted-foreground">Show in property forms</p>
+                  </div>
+                  <Switch checked={formData.is_active} onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} />
+                </div>
               </div>
-              <Switch checked={formData.is_active} onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)}>Cancel</Button>
-              <Button type="submit" className="bg-[#0052FF] text-white hover:bg-[#0040CC]" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Add Type
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+              <DialogFooter className="px-5 md:px-6 py-4 border-t border-border/60 bg-muted/40 flex-row items-center gap-2">
+                <div className="ml-auto flex items-center gap-2">
+                  <Button type="button" variant="outline" className="h-10 px-5 rounded-xl" onClick={() => setIsAddOpen(false)}>Cancel</Button>
+                  <Button type="submit" className="h-10 px-5 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC]" disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Add Type
+                  </Button>
+                </div>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
       {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-5 md:p-6">
-          <DialogHeader>
-            <DialogTitle>Edit Property Type</DialogTitle>
-            <DialogDescription>Update details for this property type.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleEdit} className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label htmlFor="edit-name" className="text-sm font-medium">Display Name</label>
-              <Input id="edit-name" placeholder="e.g. Independent House" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="edit-value" className="text-sm font-medium">Internal Value (DB Key)</label>
-              <Input id="edit-value" placeholder="e.g. individual_portion" value={formData.value} onChange={(e) => setFormData({ ...formData, value: e.target.value })} required />
-            </div>
-            <div className="flex items-center justify-between pt-2">
-              <div className="space-y-0.5">
-                <label className="text-sm font-medium">Active Status</label>
-                <p className="text-xs text-muted-foreground">Inactive types won't appear in the dropdowns.</p>
+        <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-0 overflow-hidden">
+          <div className="px-5 md:px-6 pt-5 md:pt-6">
+            <DialogHeader className="text-left">
+              <DialogTitle className="text-lg font-semibold">Edit Property Type</DialogTitle>
+              <DialogDescription className="mt-1">Update details for this property type.</DialogDescription>
+            </DialogHeader>
+          </div>
+          <form onSubmit={handleEdit}>
+            <div className="px-5 md:px-6 py-5 space-y-5">
+              <div className="space-y-2">
+                <label htmlFor="edit-name" className="text-sm font-medium">Display Name</label>
+                <Input id="edit-name" placeholder="e.g. Independent House" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
               </div>
-              <Switch checked={formData.is_active} onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} />
+              <div className="space-y-2">
+                <label htmlFor="edit-value" className="text-sm font-medium">Internal Value</label>
+                <Input id="edit-value" value={formData.value} disabled className="bg-muted cursor-not-allowed" />
+                <p className="text-xs text-muted-foreground">Internal values cannot be changed once created.</p>
+              </div>
+              <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
+                <div className="space-y-0.5">
+                  <label className="text-sm font-medium">Active Status</label>
+                  <p className="text-xs text-muted-foreground">Inactive types won't appear in dropdowns.</p>
+                </div>
+                <Switch checked={formData.is_active} onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} />
+              </div>
             </div>
-            <DialogFooter className="pt-4">
-              <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
-              <Button type="submit" className="bg-[#0052FF] text-white hover:bg-[#0040CC]" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Save Changes
-              </Button>
+            <DialogFooter className="px-5 md:px-6 py-4 border-t border-border/60 bg-muted/40 flex-row items-center gap-2">
+              <div className="ml-auto flex items-center gap-2">
+                <Button type="button" variant="outline" className="h-10 px-5 rounded-xl" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+                <Button type="submit" className="h-10 px-5 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC]" disabled={isSubmitting}>
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Save Changes
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -378,6 +387,7 @@ export default function PropertyTypesMasterPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </>
   );
 }

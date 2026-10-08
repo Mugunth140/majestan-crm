@@ -224,12 +224,7 @@ export default function MasterCitiesPage() {
       accessorKey: "city_name",
       header: "City",
       cell: ({ row }) => (
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-            <MapPin size={15} className="text-muted-foreground" />
-          </div>
-          <span className="font-medium capitalize">{row.original.city_name}</span>
-        </div>
+        <span className="font-medium capitalize">{row.original.city_name}</span>
       ),
     },
     {
@@ -312,41 +307,47 @@ export default function MasterCitiesPage() {
 
       {/* Add Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-5 md:p-6">
-          <DialogHeader>
-            <DialogTitle>Add City</DialogTitle>
-            <DialogDescription>Create a new city for property listings.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleAdd} className="space-y-4 py-2">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">City Name *</label>
-              <Input placeholder="e.g. Chennai" value={form.city_name} onChange={(e) => setForm({ ...form, city_name: e.target.value })} required className="h-10" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">State *</label>
-              <Select required value={form.state_name} onValueChange={(val) => setForm({ ...form, state_name: val ?? "" })}>
-                <SelectTrigger className="h-10 w-full rounded-lg border border-input bg-transparent dark:bg-input/30 px-3 py-2 text-sm focus:ring-3 focus:ring-ring/50">
-                  <SelectValue placeholder="Select a state" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px]">
-                  {INDIA_STATES.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center justify-between pt-1">
-              <div>
-                <label className="text-sm font-medium">Active</label>
-                <p className="text-xs text-muted-foreground">Show this city in property forms</p>
+        <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-0 overflow-hidden">
+          <div className="px-5 md:px-6 pt-5 md:pt-6">
+            <DialogHeader className="text-left">
+              <DialogTitle className="text-lg font-semibold">Add City</DialogTitle>
+              <DialogDescription className="mt-1">Create a new city for property listings.</DialogDescription>
+            </DialogHeader>
+          </div>
+          <form onSubmit={handleAdd}>
+            <div className="px-5 md:px-6 py-5 space-y-5">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">City Name *</label>
+                <Input placeholder="e.g. Chennai" value={form.city_name} onChange={(e) => setForm({ ...form, city_name: e.target.value })} required className="h-10" autoFocus />
               </div>
-              <Switch checked={form.is_active === 1} onCheckedChange={(v) => setForm({ ...form, is_active: v ? 1 : 0 })} />
+              <div className="space-y-2">
+                <label className="text-sm font-medium">State *</label>
+                <Select required value={form.state_name} onValueChange={(val) => setForm({ ...form, state_name: val ?? "" })}>
+                  <SelectTrigger className="h-10 w-full rounded-lg border border-input bg-transparent dark:bg-input/30 px-3 py-2 text-sm focus:ring-3 focus:ring-ring/50">
+                    <SelectValue placeholder="Select a state" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    {INDIA_STATES.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
+                <div className="space-y-0.5">
+                  <label className="text-sm font-medium">Active Status</label>
+                  <p className="text-xs text-muted-foreground">Show this city in property forms</p>
+                </div>
+                <Switch checked={form.is_active === 1} onCheckedChange={(v) => setForm({ ...form, is_active: v ? 1 : 0 })} />
+              </div>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)}>Cancel</Button>
-              <Button type="submit" className="bg-[#0052FF] text-white hover:bg-[#0040CC]" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Add City
-              </Button>
+            <DialogFooter className="px-5 md:px-6 py-4 border-t border-border/60 bg-muted/40 flex-row items-center gap-2">
+              <div className="ml-auto flex items-center gap-2">
+                <Button type="button" variant="outline" className="h-10 px-5 rounded-xl" onClick={() => setIsAddOpen(false)}>Cancel</Button>
+                <Button type="submit" className="h-10 px-5 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC]" disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Add City
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -354,41 +355,47 @@ export default function MasterCitiesPage() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-5 md:p-6">
-          <DialogHeader>
-            <DialogTitle>Edit City</DialogTitle>
-            <DialogDescription>Update city details.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleEdit} className="space-y-4 py-2">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">City Name *</label>
-              <Input placeholder="e.g. Chennai" value={form.city_name} onChange={(e) => setForm({ ...form, city_name: e.target.value })} required className="h-10" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">State *</label>
-              <Select required value={form.state_name} onValueChange={(val) => setForm({ ...form, state_name: val ?? "" })}>
-                <SelectTrigger className="h-10 w-full rounded-lg border border-input bg-transparent dark:bg-input/30 px-3 py-2 text-sm focus:ring-3 focus:ring-ring/50">
-                  <SelectValue placeholder="Select a state" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px]">
-                  {INDIA_STATES.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center justify-between pt-1">
-              <div>
-                <label className="text-sm font-medium">Active</label>
-                <p className="text-xs text-muted-foreground">Inactive cities won't appear in property forms</p>
+        <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-0 overflow-hidden">
+          <div className="px-5 md:px-6 pt-5 md:pt-6">
+            <DialogHeader className="text-left">
+              <DialogTitle className="text-lg font-semibold">Edit City</DialogTitle>
+              <DialogDescription className="mt-1">Update city details.</DialogDescription>
+            </DialogHeader>
+          </div>
+          <form onSubmit={handleEdit}>
+            <div className="px-5 md:px-6 py-5 space-y-5">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">City Name *</label>
+                <Input value={form.city_name} onChange={(e) => setForm({ ...form, city_name: e.target.value })} required className="h-10" />
               </div>
-              <Switch checked={form.is_active === 1} onCheckedChange={(v) => setForm({ ...form, is_active: v ? 1 : 0 })} />
+              <div className="space-y-2">
+                <label className="text-sm font-medium">State *</label>
+                <Select required value={form.state_name} onValueChange={(val) => setForm({ ...form, state_name: val ?? "" })}>
+                  <SelectTrigger className="h-10 w-full rounded-lg border border-input bg-transparent dark:bg-input/30 px-3 py-2 text-sm focus:ring-3 focus:ring-ring/50">
+                    <SelectValue placeholder="Select a state" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    {INDIA_STATES.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
+                <div className="space-y-0.5">
+                  <label className="text-sm font-medium">Active Status</label>
+                  <p className="text-xs text-muted-foreground">Inactive cities won't appear in property forms</p>
+                </div>
+                <Switch checked={form.is_active === 1} onCheckedChange={(v) => setForm({ ...form, is_active: v ? 1 : 0 })} />
+              </div>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
-              <Button type="submit" className="bg-[#0052FF] text-white hover:bg-[#0040CC]" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Save Changes
-              </Button>
+            <DialogFooter className="px-5 md:px-6 py-4 border-t border-border/60 bg-muted/40 flex-row items-center gap-2">
+              <div className="ml-auto flex items-center gap-2">
+                <Button type="button" variant="outline" className="h-10 px-5 rounded-xl" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+                <Button type="submit" className="h-10 px-5 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC]" disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Save Changes
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         </DialogContent>

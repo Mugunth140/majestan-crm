@@ -191,12 +191,7 @@ export default function LeadSourcesMasterPage() {
       accessorKey: "name", 
       header: "Source Name",
       cell: ({ row }) => (
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-            <Filter size={15} className="text-muted-foreground" />
-          </div>
-          <span className="font-medium capitalize">{row.original.name}</span>
-        </div>
+        <span className="font-medium capitalize">{row.original.name}</span>
       )
     },
     {

@@ -231,18 +231,13 @@ export default function MasterSublocationsPage() {
       accessorKey: "locality_name",
       header: "Sublocation",
       cell: ({ row }) => (
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
-            <MapPin size={15} className="text-muted-foreground" />
-          </div>
-          <div className="min-w-0">
-            <div className="font-medium capitalize">{row.original.locality_name}</div>
-            {row.original.description ? (
-              <div className="text-xs text-muted-foreground truncate max-w-64">{row.original.description}</div>
-            ) : (
-              <div className="text-xs text-muted-foreground/60 italic">No overview yet</div>
-            )}
-          </div>
+        <div className="min-w-0">
+          <div className="font-medium capitalize">{row.original.locality_name}</div>
+          {row.original.description ? (
+            <div className="text-xs text-muted-foreground truncate max-w-64">{row.original.description}</div>
+          ) : (
+            <div className="text-xs text-muted-foreground/60 italic">No overview yet</div>
+          )}
         </div>
       ),
     },
