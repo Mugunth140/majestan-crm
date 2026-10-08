@@ -58,6 +58,7 @@ const navigation = [
       { name: "Property Types", href: "/master/property-types" },
       { name: "Cities", href: "/master/cities" },
       { name: "Sublocations", href: "/master/sublocations" },
+      { name: "Road Names", href: "/master/road-names" },
     ]
   },
 ];

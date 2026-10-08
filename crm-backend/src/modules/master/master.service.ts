@@ -3,6 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { LeadSource } from '../../database/entities/lead-source.entity';
 import { PropertyType } from '../../database/entities/property-type.entity';
+import { RoadName } from '../../database/entities/road-name.entity';
 import { SiteApiService } from '../properties/site-api.service';
 
 @Injectable()
@@ -163,6 +164,49 @@ export class MasterService {
     const result = await repo.delete(id);
     if (result.affected === 0) {
       throw new InternalServerErrorException('Source not found or could not be deleted');
+    }
+    return { success: true };
+  }
+
+  // ---- Road Names ----
+
+  async getRoadNames() {
+    const repo = this.crmDataSource.getRepository(RoadName);
+    const names = await repo.find({ where: { is_active: true }, order: { name: 'ASC' } });
+    return names.map((n) => ({ id: n.id, label: n.name, value: n.name, is_active: n.is_active }));
+  }
+
+  async getAllRoadNames() {
+    const repo = this.crmDataSource.getRepository(RoadName);
+    const names = await repo.find({ order: { name: 'ASC' } });
+    return names.map((n) => ({ id: n.id, label: n.name, value: n.name, is_active: n.is_active, name: n.name }));
+  }
+
+  async createRoadName(name: string) {
+    const repo = this.crmDataSource.getRepository(RoadName);
+    const existing = await repo.findOne({ where: { name } });
+    if (existing) {
+      return { id: existing.id, label: existing.name, value: existing.name, is_active: existing.is_active };
+    }
+    const created = await repo.save(repo.create({ name }));
+    return { id: created.id, label: created.name, value: created.name, is_active: created.is_active };
+  }
+
+  async updateRoadName(id: number, data: { name: string; is_active: boolean }) {
+    const repo = this.crmDataSource.getRepository(RoadName);
+    const road = await repo.findOne({ where: { id } });
+    if (!road) throw new InternalServerErrorException('Road name not found');
+    road.name = data.name;
+    road.is_active = data.is_active;
+    const updated = await repo.save(road);
+    return { id: updated.id, label: updated.name, value: updated.name, is_active: updated.is_active };
+  }
+
+  async deleteRoadName(id: number) {
+    const repo = this.crmDataSource.getRepository(RoadName);
+    const result = await repo.delete(id);
+    if (result.affected === 0) {
+      throw new InternalServerErrorException('Road name not found or could not be deleted');
     }
     return { success: true };
   }
