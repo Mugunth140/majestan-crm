@@ -271,19 +271,21 @@ export default function RoadNamesMasterPage() {
 
       {/* Add Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-5 md:p-6">
-          <DialogHeader>
-            <DialogTitle>Add Road Name</DialogTitle>
-            <DialogDescription>Create a new road name for property locations.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleAdd} className="space-y-4 py-4">
-            <div className="space-y-2">
+        <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-0 overflow-hidden">
+          <div className="px-5 md:px-6 pt-5 md:pt-6">
+            <DialogHeader className="text-left">
+              <DialogTitle className="text-lg font-semibold">Add Road Name</DialogTitle>
+              <DialogDescription className="mt-1">Create a new road name for property locations.</DialogDescription>
+            </DialogHeader>
+          </div>
+          <form onSubmit={handleAdd}>
+            <div className="px-5 md:px-6 py-5 space-y-2">
               <label htmlFor="name" className="text-sm font-medium">Road Name</label>
-              <Input id="name" placeholder="e.g. Ring Road" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+              <Input id="name" placeholder="e.g. Ring Road" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required autoFocus />
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)}>Cancel</Button>
-              <Button type="submit" className="bg-[#0052FF] text-white hover:bg-[#0040CC]" disabled={isSubmitting}>
+            <DialogFooter className="px-5 md:px-6 py-4 border-t border-border/60 bg-muted/40 flex-row items-center justify-end gap-2">
+              <Button type="button" variant="outline" className="h-10 px-5 rounded-xl" onClick={() => setIsAddOpen(false)}>Cancel</Button>
+              <Button type="submit" className="h-10 px-5 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC]" disabled={isSubmitting}>
                 {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Add Road Name
               </Button>
             </DialogFooter>
@@ -293,26 +295,30 @@ export default function RoadNamesMasterPage() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-5 md:p-6">
-          <DialogHeader>
-            <DialogTitle>Edit Road Name</DialogTitle>
-            <DialogDescription>Update details and status for this road name.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleEdit} className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label htmlFor="edit-name" className="text-sm font-medium">Road Name</label>
-              <Input id="edit-name" placeholder="e.g. Ring Road" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
-            </div>
-            <div className="flex items-center justify-between pt-2">
-              <div className="space-y-0.5">
-                <label className="text-sm font-medium">Active Status</label>
-                <p className="text-xs text-muted-foreground">Inactive road names won't appear in the dropdowns.</p>
+        <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-0 overflow-hidden">
+          <div className="px-5 md:px-6 pt-5 md:pt-6">
+            <DialogHeader className="text-left">
+              <DialogTitle className="text-lg font-semibold">Edit Road Name</DialogTitle>
+              <DialogDescription className="mt-1">Update details and status for this road name.</DialogDescription>
+            </DialogHeader>
+          </div>
+          <form onSubmit={handleEdit}>
+            <div className="px-5 md:px-6 py-5 space-y-5">
+              <div className="space-y-2">
+                <label htmlFor="edit-name" className="text-sm font-medium">Road Name</label>
+                <Input id="edit-name" placeholder="e.g. Ring Road" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
               </div>
-              <Switch checked={formData.is_active} onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} />
+              <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
+                <div className="space-y-0.5">
+                  <label className="text-sm font-medium">Active Status</label>
+                  <p className="text-xs text-muted-foreground">Inactive road names won't appear in the dropdowns.</p>
+                </div>
+                <Switch checked={formData.is_active} onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} />
+              </div>
             </div>
-            <DialogFooter className="pt-4">
-              <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
-              <Button type="submit" className="bg-[#0052FF] text-white hover:bg-[#0040CC]" disabled={isSubmitting}>
+            <DialogFooter className="px-5 md:px-6 py-4 border-t border-border/60 bg-muted/40 flex-row items-center justify-end gap-2">
+              <Button type="button" variant="outline" className="h-10 px-5 rounded-xl" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+              <Button type="submit" className="h-10 px-5 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC]" disabled={isSubmitting}>
                 {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Save Changes
               </Button>
             </DialogFooter>
