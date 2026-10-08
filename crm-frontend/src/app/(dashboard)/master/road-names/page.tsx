@@ -232,44 +232,45 @@ export default function RoadNamesMasterPage() {
   const filteredRoads = roads.filter((r) => r.name?.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="flex flex-col space-y-6 mb-20 md:mb-0 px-4 md:px-8 mt-2 md:mt-0">
+    <>
       <MobileHeader title="Master: Road Names" showBack />
+      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:h-full px-4 md:px-8">
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pr-0 md:pr-[150px] min-h-12">
-        <h1 className="text-3xl font-bold tracking-tight hidden md:block">Master: Road Names</h1>
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-          <Input
-            placeholder="Search road names..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-11 rounded-xl w-full sm:w-64 bg-background"
-          />
-          <Button
-            className="h-11 px-5 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC] shrink-0 w-full sm:w-auto"
-            onClick={() => { setFormData({ name: "", is_active: true }); setIsAddOpen(true); }}
-          >
-            <Plus className="mr-1.5 h-4 w-4" /> Add Road Name
-          </Button>
-        </div>
-      </div>
-
-      <div className="bg-card border rounded-2xl overflow-hidden shadow-sm p-4 md:p-6">
-        {isLoading ? (
-          <div className="flex h-40 items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pr-0 md:pr-[150px] min-h-[48px]">
+          <h1 className="text-[28px] font-bold tracking-tight hidden md:block">Master: Road Names</h1>
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+            <Input
+              placeholder="Search road names..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-11 rounded-full w-full sm:w-64 bg-background"
+            />
+            <Button
+              className="h-11 px-5 rounded-full bg-[#0052FF] text-white hover:bg-[#0040CC] shrink-0 w-full sm:w-auto shadow-sm"
+              onClick={() => { setFormData({ name: "", is_active: true }); setIsAddOpen(true); }}
+            >
+              <Plus className="mr-1.5 h-4 w-4" /> Add Road Name
+            </Button>
           </div>
-        ) : (
-          <DataTable
-            columns={columns}
-            data={filteredRoads}
-            showToolbar={true}
-            showDeleteAction={true}
-            onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
-          />
-        )}
-      </div>
+        </div>
 
-      {/* Add Dialog */}
+        <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col bg-card border rounded-2xl shadow-sm p-4 md:p-6 mb-20 md:mb-0">
+          {isLoading ? (
+            <div className="flex h-40 items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <DataTable
+              columns={columns}
+              data={filteredRoads}
+              showToolbar={true}
+              showDeleteAction={true}
+              onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
+            />
+          )}
+        </div>
+
+        {/* Add Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
         <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-0 overflow-hidden">
           <div className="px-5 md:px-6 pt-5 md:pt-6">
@@ -348,23 +349,24 @@ export default function RoadNamesMasterPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Bulk Delete Dialog */}
-      <Dialog open={bulkDeleteIds !== null} onOpenChange={(open) => { if (!open) setBulkDeleteIds(null); }}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Delete Road Name{bulkDeleteIds && bulkDeleteIds.length > 1 ? "s" : ""}</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete {bulkDeleteIds ? `${bulkDeleteIds.length} road name${bulkDeleteIds.length > 1 ? "s" : ""}` : "this road name"}? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setBulkDeleteIds(null)} disabled={isDeletingBulk}>Cancel</Button>
-            <Button variant="destructive" onClick={handleBulkDelete} disabled={isDeletingBulk}>
-              {isDeletingBulk ? "Deleting..." : "Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+        {/* Bulk Delete Dialog */}
+        <Dialog open={bulkDeleteIds !== null} onOpenChange={(open) => { if (!open) setBulkDeleteIds(null); }}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Delete Road Name{bulkDeleteIds && bulkDeleteIds.length > 1 ? "s" : ""}</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete {bulkDeleteIds ? `${bulkDeleteIds.length} road name${bulkDeleteIds.length > 1 ? "s" : ""}` : "this road name"}? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="mt-4">
+              <Button variant="outline" onClick={() => setBulkDeleteIds(null)} disabled={isDeletingBulk}>Cancel</Button>
+              <Button variant="destructive" onClick={handleBulkDelete} disabled={isDeletingBulk}>
+                {isDeletingBulk ? "Deleting..." : "Delete"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </>
   );
 }
