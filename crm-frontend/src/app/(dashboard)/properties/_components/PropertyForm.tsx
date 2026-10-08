@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { FormSelect } from "@/components/shared/form-select";
+import { FurnishingIcon } from "@/components/shared/furnishing-icons";
 import { DatePicker } from "@/components/shared/date-picker";
 import { format } from "date-fns";
 import {
@@ -174,6 +175,7 @@ interface FormDataShape {
   cities: any[];
   sublocations: any[];
   amenities: any[];
+  furnishings: any[];
   propertyTypes: any[];
   roadNames: { value: string; label: string }[];
   registrationCharges: { value: string; label: string }[];
@@ -253,7 +255,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   // ---- Meta state ----
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingFormData, setIsLoadingFormData] = useState(true);
-  const [formData, setFormData] = useState<FormDataShape>({ cities: [], sublocations: [], amenities: [], propertyTypes: [], roadNames: [], registrationCharges: [] });
+  const [formData, setFormData] = useState<FormDataShape>({ cities: [], sublocations: [], amenities: [], furnishings: [], propertyTypes: [], roadNames: [], registrationCharges: [] });
 
   // Shorthand helpers for initialData
   const d = initialData as any;
@@ -320,7 +322,6 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   const [bathrooms, setBathrooms] = useState(det?.bathrooms ? String(det.bathrooms) : "");
   const [areaSqft, setAreaSqft] = useState(det?.areaSqft ? String(det.areaSqft) : "");
   const [areaUnit, setAreaUnit] = useState(det?.areaUnit ?? "Sq Ft");
-  const [furnished, setFurnished] = useState<boolean>(det?.furnished ?? false);
   const [furnishingStatus, setFurnishingStatus] = useState(det?.furnishingStatus ?? "");
   const [propertyFacing, setPropertyFacing] = useState(det?.propertyFacing ?? "");
   const [floorFacing, setFloorFacing] = useState(det?.floorFacing ?? "");
@@ -337,6 +338,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
   // ---- Arrays: Amenities, FAQs, Connectivity, Rooms ----
   const [amenityIds, setAmenityIds] = useState<number[]>(d?.amenityIds ?? []);
+  const [furnishingItemIds, setFurnishingItemIds] = useState<number[]>(d?.furnishingItemIds ?? []);
   const [faqs, setFaqs] = useState<{ question: string; answer: string; section?: string }[]>(d?.faqs ?? []);
   // Active tab of the per-section FAQ editor. Only used for multi-page
   // types; single-page types render the one flat list.
@@ -551,7 +553,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
     `majestan:property-form:${mode}:${mode === "edit" ? ((initialData as any)?.id ?? "unknown") : "new"}`;
   const restoredDraftRef = useRef(false);
 
-  type DraftKind = "s" | "b" | "a" | "listing" | "amenityIds" | "images" | "docs" | "uploads";
+  type DraftKind = "s" | "b" | "a" | "listing" | "amenityIds" | "furnishingItemIds" | "images" | "docs" | "uploads";
   const draftFields: Array<{ key: string; kind: DraftKind; get: () => unknown; set: (v: any) => void }> = [
     { key: "title", kind: "s", get: () => title, set: setTitle },
     { key: "listingType", kind: "listing", get: () => listingType, set: setListingType },
@@ -594,7 +596,6 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
     { key: "bathrooms", kind: "s", get: () => bathrooms, set: setBathrooms },
     { key: "areaSqft", kind: "s", get: () => areaSqft, set: setAreaSqft },
     { key: "areaUnit", kind: "s", get: () => areaUnit, set: setAreaUnit },
-    { key: "furnished", kind: "b", get: () => furnished, set: setFurnished },
     { key: "furnishingStatus", kind: "s", get: () => furnishingStatus, set: setFurnishingStatus },
     { key: "propertyFacing", kind: "s", get: () => propertyFacing, set: setPropertyFacing },
     { key: "floorFacing", kind: "s", get: () => floorFacing, set: setFloorFacing },
@@ -609,6 +610,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
     { key: "floorsOccupied", kind: "s", get: () => floorsOccupied, set: setFloorsOccupied },
     { key: "hasRestroom", kind: "b", get: () => hasRestroom, set: setHasRestroom },
     { key: "amenityIds", kind: "amenityIds", get: () => amenityIds, set: setAmenityIds },
+    { key: "furnishingItemIds", kind: "furnishingItemIds", get: () => furnishingItemIds, set: setFurnishingItemIds },
     { key: "faqs", kind: "a", get: () => faqs, set: setFaqs },
     { key: "connectivity", kind: "a", get: () => connectivity, set: setConnectivity },
     { key: "categories", kind: "a", get: () => categories, set: setCategories },
@@ -805,6 +807,12 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               applied++;
             }
             break;
+          case "furnishingItemIds":
+            if (Array.isArray(v)) {
+              f.set(v.filter((n: any) => Number.isFinite(Number(n))).map(Number));
+              applied++;
+            }
+            break;
           case "images":
             if (Array.isArray(v)) {
               f.set(
@@ -924,6 +932,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           cities: data.cities ?? [],
           sublocations: data.sublocations ?? [],
           amenities: data.amenities ?? [],
+          furnishings: data.furnishings ?? [],
           propertyTypes: data.propertyTypes ?? [],
           roadNames: data.roadNames ?? [],
           registrationCharges: data.registrationCharges ?? [],
@@ -1282,7 +1291,6 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         bathrooms: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : bathrooms ? Number(bathrooms) : undefined,
         areaSqft: areaSqft ? Number(areaSqft) : undefined,
         areaUnit,
-        furnished: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : furnished,
         furnishingStatus: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : furnishingStatus.trim() || undefined,
         propertyFacing: propertyFacing.trim() || undefined,
         floorFacing: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : floorFacing.trim() || undefined,
@@ -1304,6 +1312,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
         // Arrays — master amenities are hidden for land, never submit them.
         amenityIds: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : amenityIds.length > 0 ? amenityIds : undefined,
+        furnishingItemIds: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : furnishingItemIds.length > 0 ? furnishingItemIds : undefined,
         faqs: faqs.filter((f) => f.question && f.answer).length > 0 ? faqs : undefined,
         
         // Owner
@@ -2241,22 +2250,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               </div>
             )}
 
-            {/* Furnished (boolean kept for backward compat) — hidden for plot / farmland */}
-            {!isLandType && (
-              <div className="space-y-2">
-                <label className={labelClass}>Furnished</label>
-                <div className={checkboxRowClass}>
-                  <Checkbox
-                    id="furnished"
-                    checked={furnished}
-                    onCheckedChange={(checked) => setFurnished(!!checked)}
-                  />
-                  <label htmlFor="furnished" className="text-sm font-semibold cursor-pointer flex-1">
-                    Property is furnished
-                  </label>
-                </div>
-              </div>
-            )}
+
 
             {/* Property Facing */}
             <div className="space-y-2">
@@ -4085,6 +4079,43 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                       </span>
                       <span className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">
                         {amenity.category || "General"}
+                      </span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ---- Furnishing Items — hidden for plot / farmland ---- */}
+        {!isLandType && (
+          <div className="bg-card border rounded-2xl p-8 shadow-sm">
+            <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Furnishing Items</h3>
+            {formData.furnishings.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">No furnishing items available in the master list.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {formData.furnishings.map((item: any) => (
+                  <label
+                    key={item.id}
+                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                      furnishingItemIds.includes(item.id)
+                        ? "bg-[#0052FF]/5 border-[#0052FF]/30"
+                        : "bg-muted/10 border-border/40 hover:bg-muted/30"
+                    }`}
+                  >
+                    <Checkbox
+                      checked={furnishingItemIds.includes(item.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) setFurnishingItemIds((prev) => [...prev, item.id]);
+                        else setFurnishingItemIds((prev) => prev.filter((id) => id !== item.id));
+                      }}
+                    />
+                    <FurnishingIcon name={item.icon} className="h-5 w-5 text-muted-foreground shrink-0" />
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-semibold text-foreground truncate" title={item.name}>
+                        {item.name}
                       </span>
                     </div>
                   </label>

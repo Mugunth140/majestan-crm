@@ -192,6 +192,35 @@ export class MasterController {
     return { success: true, data };
   }
 
+  // ---- Furnishing Items ----
+
+  @Get('all-furnishing-items')
+  async getAllFurnishingItems(@Query('search') search?: string) {
+    const data = await this.masterService.getAllFurnishingItems(search);
+    return { success: true, data };
+  }
+
+  @Post('furnishing-items')
+  @Roles('Admin')
+  async createFurnishingItem(@Body() body: { name: string; icon?: string }) {
+    const data = await this.masterService.createFurnishingItem(body);
+    return { success: true, data };
+  }
+
+  @Put('furnishing-items/:id')
+  @Roles('Admin')
+  async updateFurnishingItem(@Param('id') id: number, @Body() body: { name?: string; icon?: string; is_active?: boolean }) {
+    const data = await this.masterService.updateFurnishingItem(id, body);
+    return { success: true, data };
+  }
+
+  @Delete('furnishing-items/:id')
+  @Roles('Admin')
+  async deleteFurnishingItem(@Param('id') id: number) {
+    const data = await this.masterService.deleteFurnishingItem(id);
+    return { success: true, data };
+  }
+
   // ---- Property Types ----
 
   @Get('property-types')

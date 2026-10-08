@@ -255,6 +255,25 @@ export class MasterService {
     return { success: true };
   }
 
+  // ---- Furnishing Items (proxied to site admin API) ----
+
+  async getAllFurnishingItems(search?: string) {
+    const qs = search ? `?search=${encodeURIComponent(search)}` : '';
+    return this.siteApi.get(`/admin/furnishing-items${qs}`);
+  }
+
+  async createFurnishingItem(data: { name: string; icon?: string }) {
+    return this.siteApi.post('/admin/furnishing-items', { data });
+  }
+
+  async updateFurnishingItem(id: number, data: { name?: string; icon?: string; is_active?: boolean }) {
+    return this.siteApi.patch(`/admin/furnishing-items/${id}`, { data });
+  }
+
+  async deleteFurnishingItem(id: number) {
+    return this.siteApi.del(`/admin/furnishing-items/${id}`);
+  }
+
   // ---- Property Types ----
 
   async getPropertyTypes() {

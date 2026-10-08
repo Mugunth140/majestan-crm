@@ -107,7 +107,7 @@ function str(v: any): string | undefined {
 
 @Injectable()
 export class PropertiesService {
-  private citiesCache: { at: number; cities: any[]; sublocations: any[]; amenities: any[] } | null = null;
+  private citiesCache: { at: number; cities: any[]; sublocations: any[]; amenities: any[]; furnishings: any[] } | null = null;
 
   constructor(
     private readonly siteApi: SiteApiService,
@@ -136,7 +136,7 @@ export class PropertiesService {
     return copy as T;
   }
 
-  private async formDataCached(): Promise<{ cities: any[]; sublocations: any[]; amenities: any[] }> {
+  private async formDataCached(): Promise<{ cities: any[]; sublocations: any[]; amenities: any[]; furnishings: any[] }> {
     if (this.citiesCache && Date.now() - this.citiesCache.at < 5 * 60 * 1000) {
       return this.citiesCache;
     }
@@ -144,8 +144,9 @@ export class PropertiesService {
     const cities = data?.cities ?? [];
     const sublocations = data?.sublocations ?? [];
     const amenities = data?.amenities ?? [];
-    this.citiesCache = { at: Date.now(), cities, sublocations, amenities };
-    return { cities, sublocations, amenities };
+    const furnishings = data?.furnishings ?? [];
+    this.citiesCache = { at: Date.now(), cities, sublocations, amenities, furnishings };
+    return { cities, sublocations, amenities, furnishings };
   }
 
   private cityNameOf(cities: any[], id: number): any | null {
@@ -188,8 +189,9 @@ export class PropertiesService {
     let cities: any[] = [];
     let sublocations: any[] = [];
     let amenities: any[] = [];
+    let furnishings: any[] = [];
     try {
-      ({ cities, sublocations, amenities } = await this.formDataCached());
+      ({ cities, sublocations, amenities, furnishings } = await this.formDataCached());
     } catch (e) {
       console.error('[Properties] formDataCached failed, degrading to empty lists', e);
     }
@@ -222,6 +224,7 @@ export class PropertiesService {
 
     return {
       amenities,
+      furnishings,
       propertyTypes,
       roadNames,
       registrationCharges,
@@ -289,6 +292,12 @@ export class PropertiesService {
         id: pa.amenityId ?? null,
         name: pa.amenity?.name ?? null,
         category: pa.amenity?.category ?? null,
+      })),
+      furnishingItemIds: (record.propertyFurnishings ?? []).map((pf: any) => pf.furnishingItemId),
+      furnishingsList: (record.propertyFurnishings ?? []).map((pf: any) => ({
+        id: pf.furnishingItemId ?? null,
+        name: pf.furnishingItem?.name ?? null,
+        icon: pf.furnishingItem?.icon ?? null,
       })),
       propertyUnits: record.propertyUnits ?? [],
     };
@@ -509,6 +518,10 @@ export class PropertiesService {
 
     if ((dto as any).amenityIds !== undefined) {
       payload.amenities = ((dto as any).amenityIds as number[]).map(id => ({ amenityId: id }));
+    }
+
+    if ((dto as any).furnishingItemIds !== undefined) {
+      payload.furnishingItems = ((dto as any).furnishingItemIds as number[]).map(id => ({ furnishingItemId: id }));
     }
 
     if ((dto as any).faqs !== undefined) {
