@@ -259,7 +259,12 @@ export class MasterService {
 
   async getAllFurnishingItems(search?: string) {
     const qs = search ? `?search=${encodeURIComponent(search)}` : '';
-    return this.siteApi.get(`/admin/furnishing-items${qs}`);
+    const res = await this.siteApi.get(`/admin/furnishing-items${qs}`);
+    // Site admin list endpoints paginate ({ items, total, ... }) while this
+    // master API contracts an array — unwrap, passing arrays through.
+    if (Array.isArray(res)) return res;
+    if (Array.isArray((res as any)?.items)) return (res as any).items;
+    return [];
   }
 
   async createFurnishingItem(data: { name: string; icon?: string }) {

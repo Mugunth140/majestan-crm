@@ -18,6 +18,32 @@ describe('MasterService furnishing items proxy', () => {
     expect(siteApi.get).toHaveBeenCalledWith('/admin/furnishing-items?search=sofa');
   });
 
+  it('unwraps the paginated site response into an array', async () => {
+    const siteApi = {
+      get: jest.fn(async () => ({ items: [{ id: 1, name: 'Sofa' }], total: 1 })),
+      post: jest.fn(),
+      patch: jest.fn(),
+      del: jest.fn(),
+    };
+    const service = new MasterService({} as any, {} as any, siteApi as any);
+    await expect(service.getAllFurnishingItems()).resolves.toEqual([
+      { id: 1, name: 'Sofa' },
+    ]);
+  });
+
+  it('passes plain arrays through untouched', async () => {
+    const siteApi = {
+      get: jest.fn(async () => [{ id: 1, name: 'Sofa' }]),
+      post: jest.fn(),
+      patch: jest.fn(),
+      del: jest.fn(),
+    };
+    const service = new MasterService({} as any, {} as any, siteApi as any);
+    await expect(service.getAllFurnishingItems()).resolves.toEqual([
+      { id: 1, name: 'Sofa' },
+    ]);
+  });
+
   it('creates via the site admin endpoint', async () => {
     const { service, siteApi } = make();
     await service.createFurnishingItem({ name: 'Sofa', icon: 'Sofa' });
