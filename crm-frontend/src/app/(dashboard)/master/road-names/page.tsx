@@ -211,8 +211,9 @@ export default function RoadNamesMasterPage() {
     {
       id: "actions",
       header: "Actions",
+      meta: { fixedWidth: 96 },
       cell: ({ row }) => (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center justify-center gap-1">
           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-[#0052FF] hover:bg-blue-50" onClick={() => openEdit(row.original)}>
             <Edit size={15} />
           </Button>

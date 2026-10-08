@@ -14,6 +14,14 @@ import {
 } from "@tanstack/react-table";
 import { useEffect, useState } from "react";
 
+declare module "@tanstack/react-table" {
+  interface ColumnMeta<TData, TValue> {
+    hideOnMobile?: boolean;
+    /** Fixed pixel width for narrow columns (e.g. Actions). Opt-in only. */
+    fixedWidth?: number;
+  }
+}
+
 import {
   Table,
   TableBody,
@@ -145,6 +153,7 @@ export function DataTable<TData, TValue>({
                 {headerGroup.headers.map((header, idx) => (
                   <TableHead
                     key={header.id}
+                    style={(header.column.columnDef.meta as any)?.fixedWidth ? { width: (header.column.columnDef.meta as any).fixedWidth, maxWidth: (header.column.columnDef.meta as any).fixedWidth } : undefined}
                     className={cn(
                       "text-[13px] h-11 font-semibold tracking-wide text-muted-foreground whitespace-nowrap border-r border-border last:border-r-0 px-4 text-center bg-muted",
                       idx === 0 ? "sticky left-0 z-30" : "",
@@ -176,6 +185,7 @@ export function DataTable<TData, TValue>({
                     {row.getVisibleCells().map((cell, idx) => (
                       <TableCell
                         key={cell.id}
+                        style={(cell.column.columnDef.meta as any)?.fixedWidth ? { width: (cell.column.columnDef.meta as any).fixedWidth, maxWidth: (cell.column.columnDef.meta as any).fixedWidth } : undefined}
                         className={cn(
                           "py-2.5 px-4 text-[14px] border-r border-border/40 last:border-r-0 text-center",
                           idx === 0 ? "sticky left-0 z-10 bg-card" : "",
