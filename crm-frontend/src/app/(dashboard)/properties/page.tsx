@@ -192,11 +192,9 @@ export default function PropertiesPage() {
       header: "Locality",
       cell: ({ row }) => {
         const locality = row.original.localityName || "-";
-        const city = row.original.cityName || row.original.city;
         return (
           <div className="min-w-0">
             <div className="font-medium text-foreground text-sm truncate">{locality}</div>
-            {city && <div className="text-xs text-muted-foreground truncate">{city}</div>}
           </div>
         );
       },
