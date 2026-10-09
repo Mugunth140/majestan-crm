@@ -1576,6 +1576,8 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
       // Coworking fields
       if (propertyType === "coworking") {
         Object.assign(payload, {
+          builtUpArea: builtUpArea ? Number(builtUpArea) : undefined,
+          carpetArea: carpetArea ? Number(carpetArea) : undefined,
           availableWorkstations: availableWorkstations ? Number(availableWorkstations) : undefined,
           privateCabins: privateCabins ? Number(privateCabins) : undefined,
           meetingRooms: meetingRooms ? Number(meetingRooms) : undefined,
@@ -3188,6 +3190,30 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               Coworking Details
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+              <div className="space-y-2">
+                <label className={labelClass}>Built-up Area (sqft)</label>
+                <Input
+                  type="number"
+                  value={builtUpArea}
+                  onChange={(e) => setBuiltUpArea(e.target.value)}
+                  placeholder="e.g. 1200"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Carpet Area (sqft)</label>
+                <Input
+                  type="number"
+                  value={carpetArea}
+                  onChange={(e) => setCarpetArea(e.target.value)}
+                  placeholder="e.g. 1000"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
 
               <div className="space-y-2">
                 <label className={labelClass}>Available Workstations</label>
