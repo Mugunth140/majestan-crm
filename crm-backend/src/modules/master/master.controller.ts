@@ -325,6 +325,41 @@ export class MasterController {
     return { success: true, data };
   }
 
+  // ---- Specifications ----
+
+  @Get('specifications')
+  async getSpecifications() {
+    const data = await this.masterService.getSpecifications();
+    return { success: true, data };
+  }
+
+  @Get('all-specifications')
+  async getAllSpecifications() {
+    const data = await this.masterService.getAllSpecifications();
+    return { success: true, data };
+  }
+
+  @Post('specifications')
+  @Roles('Admin')
+  async createSpecification(@Body() body: { name: string }) {
+    const data = await this.masterService.createSpecification(body.name);
+    return { success: true, data };
+  }
+
+  @Put('specifications/:id')
+  @Roles('Admin')
+  async updateSpecification(@Param('id') id: number, @Body() body: { name: string; is_active: boolean }) {
+    const data = await this.masterService.updateSpecification(id, body);
+    return { success: true, data };
+  }
+
+  @Delete('specifications/:id')
+  @Roles('Admin')
+  async deleteSpecification(@Param('id') id: number) {
+    const data = await this.masterService.deleteSpecification(id);
+    return { success: true, data };
+  }
+
   // ---- Property Types ----
 
   @Get('property-types')

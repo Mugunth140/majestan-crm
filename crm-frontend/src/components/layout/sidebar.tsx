@@ -63,6 +63,7 @@ const navigation = [
       { name: "Furnishing Items", href: "/master/furnishing-items" },
       { name: "Room Names", href: "/master/room-names" },
       { name: "Room Dimensions", href: "/master/room-dimensions" },
+      { name: "Specifications", href: "/master/specifications" },
       { name: "Utilities", href: "/master/utilities" },
     ]
   },

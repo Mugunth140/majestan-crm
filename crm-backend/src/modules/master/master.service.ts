@@ -5,6 +5,7 @@ import { LeadSource } from '../../database/entities/lead-source.entity';
 import { PropertyType } from '../../database/entities/property-type.entity';
 import { RoomName } from '../../database/entities/room-name.entity';
 import { RoomDimension } from '../../database/entities/room-dimension.entity';
+import { Specification } from '../../database/entities/specification.entity';
 import { RoadName } from '../../database/entities/road-name.entity';
 import { RegistrationCharge } from '../../database/entities/registration-charge.entity';
 import { SiteApiService } from '../properties/site-api.service';
@@ -401,6 +402,49 @@ export class MasterService {
     const result = await repo.delete(id);
     if (result.affected === 0) {
       throw new InternalServerErrorException('Room dimension not found or could not be deleted');
+    }
+    return { success: true };
+  }
+
+  // ---- Specifications ----
+
+  async getSpecifications() {
+    const repo = this.crmDataSource.getRepository(Specification);
+    const rows = await repo.find({ where: { is_active: true }, order: { name: 'ASC' } });
+    return rows.map((t) => ({ id: t.id, label: t.name, value: t.name, is_active: t.is_active }));
+  }
+
+  async getAllSpecifications() {
+    const repo = this.crmDataSource.getRepository(Specification);
+    const rows = await repo.find({ order: { name: 'ASC' } });
+    return rows.map((t) => ({ id: t.id, label: t.name, value: t.name, is_active: t.is_active, name: t.name }));
+  }
+
+  async createSpecification(name: string) {
+    const repo = this.crmDataSource.getRepository(Specification);
+    const existing = await repo.findOne({ where: { name } });
+    if (existing) {
+      return { id: existing.id, label: existing.name, value: existing.name, is_active: existing.is_active };
+    }
+    const created = await repo.save(repo.create({ name }));
+    return { id: created.id, label: created.name, value: created.name, is_active: created.is_active };
+  }
+
+  async updateSpecification(id: number, data: { name: string; is_active: boolean }) {
+    const repo = this.crmDataSource.getRepository(Specification);
+    const row = await repo.findOne({ where: { id } });
+    if (!row) throw new InternalServerErrorException('Specification not found');
+    row.name = data.name;
+    row.is_active = data.is_active;
+    const updated = await repo.save(row);
+    return { id: updated.id, label: updated.name, value: updated.name, is_active: updated.is_active };
+  }
+
+  async deleteSpecification(id: number) {
+    const repo = this.crmDataSource.getRepository(Specification);
+    const result = await repo.delete(id);
+    if (result.affected === 0) {
+      throw new InternalServerErrorException('Specification not found or could not be deleted');
     }
     return { success: true };
   }

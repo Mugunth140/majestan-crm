@@ -12,6 +12,7 @@ import { RoadName } from '../../database/entities/road-name.entity';
 import { RegistrationCharge } from '../../database/entities/registration-charge.entity';
 import { RoomName } from '../../database/entities/room-name.entity';
 import { RoomDimension } from '../../database/entities/room-dimension.entity';
+import { Specification } from '../../database/entities/specification.entity';
 
 // CRM form keys → site details keys
 const RENAMED_DETAILS_KEYS: Record<string, string> = {
@@ -249,6 +250,15 @@ export class PropertiesService {
       console.error('[Properties] room_dimensions lookup failed, degrading to empty list', e);
     }
 
+    let specifications: { value: string; label: string }[] = [];
+    try {
+      const specsRepo = this.crmDataSource.getRepository(Specification);
+      const rows = await specsRepo.find({ where: { is_active: true }, order: { name: 'ASC' } });
+      specifications = rows.map(t => ({ value: t.name, label: t.name }));
+    } catch (e) {
+      console.error('[Properties] specifications lookup failed, degrading to empty list', e);
+    }
+
     return {
       amenities,
       furnishings,
@@ -258,6 +268,7 @@ export class PropertiesService {
       registrationCharges,
       roomNames,
       roomDimensions,
+      specifications,
       cities: cities.map((c: any) => ({
         id: c.id,
         cityName: c.city_name ?? c.cityName,

@@ -25,11 +25,13 @@ import { Edit, Eye, Filter, Plus, RefreshCw, Search, X } from "lucide-react";
 const PROJECT_TYPE_OPTIONS = [
   { value: "apartment", label: "Apartment" },
   { value: "villa", label: "Villa" },
+  { value: "plot", label: "Plot" },
 ];
 
 const STATUS_STYLES: Record<string, string> = {
   published: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
   draft: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
+  booked: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400",
   archived: "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400",
 };
 
@@ -54,7 +56,7 @@ export default function ProjectsPage() {
     } catch { /* ignore */ }
   }, []);
 
-  const tabs = ["All", "Published", "Draft", "Archived"];
+  const tabs = ["All", "Published", "Draft", "Booked", "Archived"];
 
   useEffect(() => {
     fetchProjects({ pagination, debouncedSearchQuery, activeTab, filters });
