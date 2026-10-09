@@ -188,15 +188,15 @@ export default function PropertiesPage() {
       cell: ({ row }) => <span className="font-semibold">{formatPrice(Number(row.original.price))}</span>,
     },
     {
-      id: "location",
-      header: "Location",
+      id: "locality",
+      header: "Locality",
       cell: ({ row }) => {
-        const city = row.original.cityName || row.original.city || "-";
-        const locality = row.original.localityName;
+        const locality = row.original.localityName || "-";
+        const city = row.original.cityName || row.original.city;
         return (
           <div className="min-w-0">
-            <div className="font-medium text-foreground text-sm truncate">{city}</div>
-            {locality && <div className="text-xs text-muted-foreground truncate">{locality}</div>}
+            <div className="font-medium text-foreground text-sm truncate">{locality}</div>
+            {city && <div className="text-xs text-muted-foreground truncate">{city}</div>}
           </div>
         );
       },
