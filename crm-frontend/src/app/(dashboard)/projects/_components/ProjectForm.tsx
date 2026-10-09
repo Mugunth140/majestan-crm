@@ -12,7 +12,7 @@ import { FormSelect } from "@/components/shared/form-select";
 import { DatePicker } from "@/components/shared/date-picker";
 import { PriceInput } from "@/components/shared/price-input";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { ArrowLeft, BookOpen, Car, Fence, Flame, ImagePlus, Loader2, MapPin, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ImagePlus, Loader2, MapPin, Plus, Trash2, X } from "lucide-react";
 import { projectsApi } from "@/lib/projects-api";
 import { propertiesApi } from "@/lib/properties-api";
 import { resolveCenterFromText, fetchPostalCode } from "@/lib/nearby-places";
@@ -73,6 +73,15 @@ const UNIT_STATUS_OPTIONS = [
   { value: "rented", label: "Rented" },
   { value: "inactive", label: "Inactive" },
 ];
+
+const UNIT_TABS = [
+  { id: "basic", label: "Basic" },
+  { id: "areas", label: "Areas & Rooms" },
+  { id: "features", label: "Features & Parking" },
+  { id: "price", label: "Price & Media" },
+] as const;
+
+type UnitTabId = (typeof UNIT_TABS)[number]["id"];
 
 const UNIT_TYPE_OPTIONS = [
   { value: "studio", label: "Studio" },
@@ -312,8 +321,7 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
     }));
   });
 
-  const [units, setUnits] = useState<UnitRow[]>(() => {
-    const existing = d?.units ?? d?.__units__ ?? [];
+  const [units, setUnits] = useState<UnitRow[]>(() => {    const existing = d?.units ?? d?.__units__ ?? [];
     if (existing.length === 0) return [emptyUnit()];
     return existing.map((u: any) => ({
       unitCode: u.unitCode ?? "",
@@ -378,7 +386,56 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
 
   const removeUnit = (idx: number) => {
     setUnits((prev) => (prev.length === 1 ? [emptyUnit()] : prev.filter((_, i) => i !== idx)));
+    const shiftKeys = <T,>(map: Record<number, T>): Record<number, T> => {
+      const next: Record<number, T> = {};
+      Object.entries(map).forEach(([k, v]) => {
+        const n = Number(k);
+        if (n === idx) return;
+        next[n > idx ? n - 1 : n] = v;
+      });
+      return next;
+    };
+    setOpenUnits((prev) => shiftKeys(prev));
+    setUnitTabs((prev) => shiftKeys(prev));
   };
+
+  // Collapsible unit cards — only the first is open initially so a long
+  // unit list reads as tidy summaries instead of a wall of fields.
+  const [openUnits, setOpenUnits] = useState<Record<number, boolean>>({ 0: true });
+  const isUnitOpen = (idx: number) => openUnits[idx] ?? false;
+  const toggleUnit = (idx: number) => setOpenUnits((prev) => ({ ...prev, [idx]: !(prev[idx] ?? false) }));
+
+  // Active inner tab per unit card. Only one group shows at a time so the
+  // open card stays compact.
+  const [unitTabs, setUnitTabs] = useState<Record<number, UnitTabId>>({});
+  const unitTab = (idx: number): UnitTabId => unitTabs[idx] ?? "basic";
+  const setUnitTab = (idx: number, tab: UnitTabId) =>
+    setUnitTabs((prev) => ({ ...prev, [idx]: tab }));
+
+  const unitStatusLabel = (status: string) =>
+    UNIT_STATUS_OPTIONS.find((o) => o.value === status)?.label ?? status;
+
+  const unitSummary = (u: UnitRow): string =>
+    [
+      u.unitCode.trim() || "Untitled unit",
+      u.bedrooms.trim() ? `${u.bedrooms.trim()} BHK` : null,
+      u.price.trim() || null,
+      unitStatusLabel(u.status),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+  // A unit with entered data but no code would be silently dropped on
+  // submit — catch it first and open it for the user to fix.
+  const unitHasContent = (u: UnitRow): boolean =>
+    [
+      u.title, u.unitType, u.bedrooms, u.bathrooms, u.carpetAreaSqft, u.builtupAreaSqft,
+      u.superBuiltupAreaSqft, u.udsAreaSqft, u.plotAreaSqft, u.parking, u.balconies,
+      u.floorNo, u.totalFloors, u.openSides, u.price, u.facing, u.furnishedStatus,
+      u.floorPlanImageUrl, u.floorPlanImageKey,
+    ].some((v) => v.trim() !== "") ||
+    u.poojaRoom || u.studyRoom || u.boundaryWall || u.unitGuestParking ||
+    u.roomDimensions.length > 0;
 
   const handleCoverFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -505,6 +562,12 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
       return;
     }
     const validUnits = units.filter((u) => u.unitCode.trim());
+    const incompleteIdx = units.findIndex((u) => !u.unitCode.trim() && unitHasContent(u));
+    if (incompleteIdx >= 0) {
+      setOpenUnits((prev) => ({ ...prev, [incompleteIdx]: true }));
+      toast.error(`Unit ${incompleteIdx + 1} has details but no unit code.`);
+      return;
+    }
     setIsLoading(true);
     try {
       const payload: Record<string, any> = {
@@ -1076,26 +1139,90 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
         <div className="bg-card border rounded-2xl p-8 shadow-sm">
           <div className="flex items-center justify-between border-b pb-3 mb-6">
             <h3 className="text-lg font-bold text-foreground">Units ({units.filter((u) => u.unitCode.trim()).length})</h3>
-            {preview.unitsCount > 0 && (
-              <span className="text-sm font-semibold text-[#0052FF]">
-                {formatPriceRange(preview.minPrice, preview.maxPrice)}
-              </span>
-            )}
-          </div>
-          <div className="space-y-5">
-            {units.map((unit, idx) => (
-              <div key={idx} className="border border-border/60 rounded-2xl p-5 space-y-4 bg-muted/10">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-foreground">Unit {idx + 1}</span>
+            <div className="flex items-center gap-3">
+              {preview.unitsCount > 0 && (
+                <span className="text-sm font-semibold text-[#0052FF]">
+                  {formatPriceRange(preview.minPrice, preview.maxPrice)}
+                </span>
+              )}
+              {units.length > 1 && (
+                <div className="flex items-center gap-1">
                   <Button
                     type="button"
                     variant="ghost"
-                    onClick={() => removeUnit(idx)}
-                    className="h-9 w-9 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                    onClick={() => setOpenUnits(Object.fromEntries(units.map((_, i) => [i, true])))}
+                    className="h-8 px-3 text-xs font-semibold text-muted-foreground hover:text-foreground"
+                  >
+                    Expand all
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setOpenUnits({})}
+                    className="h-8 px-3 text-xs font-semibold text-muted-foreground hover:text-foreground"
+                  >
+                    Collapse all
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="space-y-5">
+            {units.map((unit, idx) => (
+              <div key={idx} className="border border-border/60 rounded-2xl bg-muted/10 overflow-hidden">
+                <div
+                  className="flex items-center gap-3 p-5 cursor-pointer select-none"
+                  onClick={() => toggleUnit(idx)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      toggleUnit(idx);
+                    }
+                  }}
+                  aria-expanded={isUnitOpen(idx)}
+                >
+                  <span className="text-sm font-bold text-foreground shrink-0">Unit {idx + 1}</span>
+                  <span className="flex-1 truncate text-[13px] text-muted-foreground">{unitSummary(unit)}</span>
+                  <ChevronDown
+                    className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${isUnitOpen(idx) ? "rotate-180" : ""}`}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeUnit(idx);
+                    }}
+                    className="h-9 w-9 shrink-0 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                    aria-label={`Remove unit ${idx + 1}`}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
+                {isUnitOpen(idx) && (
+                <div className="px-5 pb-5 space-y-4 border-t border-border/40 pt-4">
+                <div className="flex gap-1 rounded-xl bg-muted/40 p-1 overflow-x-auto" role="tablist" aria-label={`Unit ${idx + 1} sections`}>
+                  {UNIT_TABS.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={unitTab(idx) === t.id}
+                      onClick={() => setUnitTab(idx, t.id)}
+                      className={`flex-1 whitespace-nowrap px-3 py-2 rounded-lg text-[13px] font-semibold transition-colors cursor-pointer ${
+                        unitTab(idx) === t.id
+                          ? "bg-white text-[#0052FF] shadow-sm dark:bg-card dark:text-white"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+                {unitTab(idx) === "basic" && (
+                <>
                 <p className={unitSectionTitle}>Identity</p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
@@ -1146,6 +1273,10 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
                     <Input type="number" min={0} value={unit.totalFloors} onChange={(e) => updateUnit(idx, { totalFloors: e.target.value })} placeholder="e.g. 12" className={inputClass} />
                   </div>
                 </div>
+                </>
+                )}
+                {unitTab(idx) === "areas" && (
+                <>
                 <p className={unitSectionTitle}>Areas (sqft)</p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
@@ -1180,17 +1311,21 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
                     </div>
                   </>
                 )}
+                </>
+                )}
+                {unitTab(idx) === "features" && (
+                <>
                 <p className={unitSectionTitle}>Features</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {(
                     [
-                      { key: "poojaRoom", label: "Pooja Room", icon: Flame },
-                      { key: "studyRoom", label: "Study / Store Room", icon: BookOpen },
+                      { key: "poojaRoom", label: "Pooja Room" },
+                      { key: "studyRoom", label: "Study / Store Room" },
                       ...(isLandProject(projectType)
-                        ? [{ key: "boundaryWall", label: "Boundary Wall", icon: Fence }]
+                        ? [{ key: "boundaryWall", label: "Boundary Wall" }]
                         : []),
-                    ] as { key: "poojaRoom" | "studyRoom" | "boundaryWall"; label: string; icon: typeof Flame }[]
-                  ).map(({ key, label, icon: Icon }) => {
+                    ] as { key: "poojaRoom" | "studyRoom" | "boundaryWall"; label: string }[]
+                  ).map(({ key, label }) => {
                     const checked = unit[key] === true;
                     return (
                       <label
@@ -1205,7 +1340,6 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
                           checked={checked}
                           onCheckedChange={(c) => updateUnit(idx, { [key]: c === true } as Partial<UnitRow>)}
                         />
-                        <Icon className={`h-4 w-4 shrink-0 ${checked ? "text-[#0052FF]" : "text-muted-foreground"}`} />
                         <span className="text-sm font-semibold text-foreground">{label}</span>
                       </label>
                     );
@@ -1231,11 +1365,14 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
                       }`}
                     >
                       <Checkbox checked={unit.unitGuestParking} onCheckedChange={(checked) => updateUnit(idx, { unitGuestParking: checked === true })} />
-                      <Car className={`h-4 w-4 shrink-0 ${unit.unitGuestParking ? "text-[#0052FF]" : "text-muted-foreground"}`} />
                       <span className="text-sm font-semibold text-foreground">Available</span>
                     </label>
                   </div>
                 </div>
+                </>
+                )}
+                {unitTab(idx) === "price" && (
+                <>
                 <p className={unitSectionTitle}>Pricing</p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
@@ -1292,6 +1429,9 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
                     )}
                   </div>
                 </div>
+                </>
+                )}
+                {unitTab(idx) === "areas" && (
                 <div className="space-y-3 pt-1">
                   <div className="flex items-center justify-between border-b border-border/40 pb-2">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Room Dimensions</span>
@@ -1353,12 +1493,18 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
                     </div>
                   ))}
                 </div>
+                )}
+                </div>
+                )}
               </div>
             ))}
             <Button
               type="button"
               variant="outline"
-              onClick={() => setUnits((prev) => [...prev, emptyUnit()])}
+              onClick={() => {
+                setUnits((prev) => [...prev, emptyUnit()]);
+                setOpenUnits((prev) => ({ ...prev, [units.length]: true }));
+              }}
               className="w-full border-dashed border-2 h-12"
             >
               <Plus className="h-4 w-4 mr-2" /> Add Unit
