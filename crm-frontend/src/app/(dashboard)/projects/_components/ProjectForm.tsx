@@ -117,7 +117,6 @@ interface UnitRow {
   furnishedStatus: string;
   floorPlanImageUrl: string;
   floorPlanImageKey: string;
-  isPrimary: boolean;
   status: string;
 }
 
@@ -166,7 +165,6 @@ const emptyUnit = (): UnitRow => ({
   furnishedStatus: "",
   floorPlanImageUrl: "",
   floorPlanImageKey: "",
-  isPrimary: false,
   status: "available",
 });
 
@@ -346,7 +344,6 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
       furnishedStatus: u.furnishedStatus ?? "",
       floorPlanImageUrl: u.floorPlanImageUrl ?? "",
       floorPlanImageKey: u.floorPlanImageKey ?? "",
-      isPrimary: u.isPrimary ?? false,
       status: u.status ?? "available",
     }));
   });
@@ -575,7 +572,6 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
           furnishedStatus: u.furnishedStatus || undefined,
           floorPlanImageUrl: u.floorPlanImageUrl.trim() || undefined,
           floorPlanImageKey: u.floorPlanImageKey.trim() || undefined,
-          isPrimary: u.isPrimary,
           status: u.status || undefined,
         })),
       };
@@ -1091,20 +1087,14 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
               <div key={idx} className="border border-border/60 rounded-2xl p-5 space-y-4 bg-muted/10">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-bold text-foreground">Unit {idx + 1}</span>
-                  <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-2 text-xs font-semibold text-muted-foreground cursor-pointer">
-                      <Checkbox checked={unit.isPrimary} onCheckedChange={(checked) => updateUnit(idx, { isPrimary: checked === true })} />
-                      Primary
-                    </label>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => removeUnit(idx)}
-                      className="h-9 w-9 text-muted-foreground hover:text-red-600 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => removeUnit(idx)}
+                    className="h-9 w-9 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
                 <p className={unitSectionTitle}>Identity</p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
