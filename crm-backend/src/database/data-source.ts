@@ -10,6 +10,9 @@ export const AppDataSource = new DataSource({
   password: process.env.DB_PASSWORD,
   database: process.env.CRM_DB_NAME || 'majestan_crm',
   entities: ['src/database/entities/*.entity.ts'],
-  migrations: ['src/database/migrations/*.ts'],
+  // No TypeORM migrations here by design: all CRM schema changes ship as raw
+  // SQL in infra/migrations/ (applied by the db-migrate container against
+  // majestan_crm). See infra/migrations/README.md and AGENTS.md.
+  migrations: [],
   synchronize: false,
 });
