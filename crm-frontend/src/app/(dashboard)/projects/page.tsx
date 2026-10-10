@@ -18,9 +18,12 @@ import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useProjectsList } from "@/hooks/use-projects-list";
 import { computeProjectRanges, formatPriceRange } from "@/lib/project-ranges";
+import { apiFetch } from "@/lib/api-fetch";
 import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
 import { Edit, Eye, Filter, Plus, RefreshCw, Search, X } from "lucide-react";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 const PROJECT_TYPE_OPTIONS = [
   { value: "apartment", label: "Apartment" },
@@ -28,7 +31,15 @@ const PROJECT_TYPE_OPTIONS = [
   { value: "plot", label: "Plot" },
 ];
 
-const BHK_FILTER_OPTIONS = [1, 2, 3, 4, 5];
+const BHK_FILTER_OPTIONS = [1, 2, 3, 4, 5].map((b) => ({ value: String(b), label: `${b} BHK` }));
+
+const UNITS_FILTER_OPTIONS = [
+  { value: "5", label: "5+ units" },
+  { value: "10", label: "10+ units" },
+  { value: "25", label: "25+ units" },
+  { value: "50", label: "50+ units" },
+  { value: "100", label: "100+ units" },
+];
 
 const STATUS_STYLES: Record<string, string> = {
   published: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
@@ -54,6 +65,7 @@ export default function ProjectsPage() {
   const [filters, setFilters] = useState({ projectType: "", minPrice: "", maxPrice: "", bhk: [] as number[], locality: "", minUnits: "" });
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [role, setRole] = useState("");
+  const [localityOptions, setLocalityOptions] = useState<{ value: string; label: string }[]>([]);
 
   const { projects, totalCount, isLoading, fetchProjects, deleteBulk } = useProjectsList();
 
@@ -62,6 +74,24 @@ export default function ProjectsPage() {
       const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
       setRole(user?.role?.name || user?.role || "");
     } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const url = new URL(`${API_URL}/master/all-sublocations`, window.location.origin);
+        const res = await apiFetch(url.toString());
+        const data = await res.json();
+        if (data?.success) {
+          const names = Array.from(
+            new Set(
+              (data.data ?? []).map((s: any) => String(s.locality_name ?? "").trim()).filter((n: string) => n !== ""),
+            ),
+          ).sort((a, b) => (a as string).localeCompare(b as string));
+          setLocalityOptions(names.map((n) => ({ value: n as string, label: n as string })));
+        }
+      } catch { /* non-fatal: locality dropdown stays empty */ }
+    })();
   }, []);
 
   const tabs = ["All", "Published", "Draft", "Booked", "Archived"];
@@ -230,8 +260,8 @@ export default function ProjectsPage() {
     setFilters({ projectType: "", minPrice: "", maxPrice: "", bhk: [], locality: "", minUnits: "" });
     resetPage();
   };
-  const toggleBhk = (b: number) => {
-    setFilters((f) => ({ ...f, bhk: f.bhk.includes(b) ? f.bhk.filter((x) => x !== b) : [...f.bhk, b].sort((a, x) => a - x) }));
+  const setBhkFilter = (v: string) => {
+    setFilters((f) => ({ ...f, bhk: v ? [Number(v)] : [] }));
     resetPage();
   };
 
@@ -295,45 +325,15 @@ export default function ProjectsPage() {
           </div>
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">BHK</label>
-            <div className="flex flex-wrap gap-2">
-              {BHK_FILTER_OPTIONS.map((b) => {
-                const isActive = filters.bhk.includes(b);
-                return (
-                  <button
-                    key={b}
-                    type="button"
-                    onClick={() => toggleBhk(b)}
-                    className={cn(
-                      "h-9 min-w-9 px-3 rounded-full text-[13px] font-semibold border transition-all active:scale-95",
-                      isActive ? "bg-foreground text-background border-foreground shadow-sm" : "bg-card text-muted-foreground border-border hover:bg-muted"
-                    )}
-                  >
-                    {b}
-                  </button>
-                );
-              })}
-            </div>
+            <FormSelect name="bhk" options={BHK_FILTER_OPTIONS} value={filters.bhk[0] != null ? String(filters.bhk[0]) : ""} onValueChange={(v) => setBhkFilter(v || "")} placeholder="All BHK" />
           </div>
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Locality</label>
-            <Input
-              placeholder="e.g. Whitefield"
-              value={filters.locality}
-              onChange={(e) => { setFilters((f) => ({ ...f, locality: e.target.value })); resetPage(); }}
-              className="h-10 rounded-xl bg-muted/30 border-border/60 text-[13.5px]"
-            />
+            <FormSelect name="locality" options={localityOptions} value={filters.locality} onValueChange={(v) => { setFilters((f) => ({ ...f, locality: v || "" })); resetPage(); }} placeholder="All Localities" />
           </div>
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Units</label>
-            <Input
-              type="number"
-              min={1}
-              step={1}
-              placeholder="Min units"
-              value={filters.minUnits}
-              onChange={(e) => { setFilters((f) => ({ ...f, minUnits: e.target.value })); resetPage(); }}
-              className="h-10 rounded-xl bg-muted/30 border-border/60 text-[13.5px]"
-            />
+            <FormSelect name="minUnits" options={UNITS_FILTER_OPTIONS} value={filters.minUnits} onValueChange={(v) => { setFilters((f) => ({ ...f, minUnits: v || "" })); resetPage(); }} placeholder="Any" />
           </div>
         </div>
       </PopoverContent>
