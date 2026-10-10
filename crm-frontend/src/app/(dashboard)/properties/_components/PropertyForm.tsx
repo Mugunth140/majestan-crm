@@ -1414,10 +1414,14 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         suitableFor: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : suitableFor.trim() || undefined,
         floorNumber: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : floorNumber.trim() || undefined,
         totalFloors: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : totalFloors ? Number(totalFloors) : undefined,
-        guestParking,
-        parkingType: parkingType.trim() || undefined,
-        floorsOccupied: floorsOccupied.trim() ? floorsOccupied.split(",").map((s) => s.trim()) : undefined,
-        hasRestroom,
+        guestParking: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : guestParking,
+        parkingType: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : parkingType.trim() || undefined,
+        floorsOccupied: LAND_PROPERTY_TYPES.includes(propertyType)
+          ? undefined
+          : floorsOccupied.trim()
+            ? floorsOccupied.split(",").map((s) => s.trim())
+            : undefined,
+        hasRestroom: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : hasRestroom,
         roomDimensions: LAND_PROPERTY_TYPES.includes(propertyType)
           ? undefined
           : roomDimensions.filter((r) => r.name || r.dimensions).length > 0
@@ -2834,8 +2838,8 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 </div>
               </div>
 
-              {/* Farmland-only agri fields */}
-              {propertyType === "farmland" && (
+              {/* Land agri fields — plots and farmland */}
+              {["plot", "farmland"].includes(propertyType) && (
                 <>
                   <div className="space-y-2">
                     <label className={labelClass}>Topography</label>
@@ -2884,7 +2888,12 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                       </label>
                     </div>
                   </div>
+                </>
+              )}
 
+              {/* Farmland-only crop fields */}
+              {propertyType === "farmland" && (
+                <>
                   <div className="space-y-2">
                     <label className={labelClass}>Crop Suitability</label>
                     <Input

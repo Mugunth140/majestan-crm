@@ -94,6 +94,8 @@ const UNIT_TYPE_OPTIONS = [
   { value: "other", label: "Other" },
 ];
 
+const PLOT_UNIT_TYPE_OPTIONS = [{ value: "plot_unit", label: "Plot" }];
+
 interface RoomDimensionRow {
   name: string;
   dimensions: string;
@@ -110,6 +112,7 @@ interface UnitRow {
   superBuiltupAreaSqft: string;
   udsAreaSqft: string;
   plotAreaSqft: string;
+  plotAreaCents: string;
   parking: string;
   parkingType: string;
   unitGuestParking: boolean;
@@ -158,6 +161,7 @@ const emptyUnit = (): UnitRow => ({
   superBuiltupAreaSqft: "",
   udsAreaSqft: "",
   plotAreaSqft: "",
+  plotAreaCents: "",
   parking: "",
   parkingType: "",
   unitGuestParking: false,
@@ -208,6 +212,8 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
   const d = initialData as any;
   const isLandProject = (projectTypeValue: string) =>
     projectTypeValue === "villa" || projectTypeValue === "plot";
+  const isPlotProject = (projectTypeValue: string) => projectTypeValue === "plot";
+  const isVillaProject = (projectTypeValue: string) => projectTypeValue === "villa";
 
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<{
@@ -334,6 +340,7 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
       superBuiltupAreaSqft: u.superBuiltupAreaSqft != null ? String(u.superBuiltupAreaSqft) : "",
       udsAreaSqft: u.udsAreaSqft != null ? String(u.udsAreaSqft) : "",
       plotAreaSqft: u.plotAreaSqft != null ? String(u.plotAreaSqft) : "",
+      plotAreaCents: u.plotAreaCents != null ? String(u.plotAreaCents) : "",
       parking: u.parking != null ? String(u.parking) : "",
       parkingType: u.parkingType ?? "",
       unitGuestParking: u.unitGuestParking ?? false,
@@ -406,9 +413,13 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
   const toggleUnit = (idx: number) => setOpenUnits((prev) => ({ ...prev, [idx]: !(prev[idx] ?? false) }));
 
   // Active inner tab per unit card. Only one group shows at a time so the
-  // open card stays compact.
+  // open card stays compact. Plots have no Features tab — fall back to Basic.
   const [unitTabs, setUnitTabs] = useState<Record<number, UnitTabId>>({});
-  const unitTab = (idx: number): UnitTabId => unitTabs[idx] ?? "basic";
+  const unitTab = (idx: number): UnitTabId => {
+    const stored = unitTabs[idx] ?? "basic";
+    if (stored === "features" && projectType === "plot") return "basic";
+    return stored;
+  };
   const setUnitTab = (idx: number, tab: UnitTabId) =>
     setUnitTabs((prev) => ({ ...prev, [idx]: tab }));
 
@@ -430,7 +441,7 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
   const unitHasContent = (u: UnitRow): boolean =>
     [
       u.title, u.unitType, u.bedrooms, u.bathrooms, u.carpetAreaSqft, u.builtupAreaSqft,
-      u.superBuiltupAreaSqft, u.udsAreaSqft, u.plotAreaSqft, u.parking, u.balconies,
+      u.superBuiltupAreaSqft, u.udsAreaSqft, u.plotAreaSqft, u.plotAreaCents, u.parking, u.balconies,
       u.floorNo, u.totalFloors, u.openSides, u.price, u.facing, u.furnishedStatus,
       u.floorPlanImageUrl, u.floorPlanImageKey,
     ].some((v) => v.trim() !== "") ||
@@ -615,35 +626,44 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
         galleryImageUrls: gallery.length > 0 ? gallery.map((g) => g.key) : undefined,
         status,
         amenities: amenityIds.map((id) => ({ amenityId: id })),
-        units: validUnits.map((u) => ({
-          unitCode: u.unitCode.trim(),
-          title: u.title.trim() || undefined,
-          unitType: u.unitType || undefined,
-          bedrooms: u.bedrooms ? Number(u.bedrooms) : undefined,
-          bathrooms: u.bathrooms ? Number(u.bathrooms) : undefined,
-          carpetAreaSqft: u.carpetAreaSqft ? Number(u.carpetAreaSqft) : undefined,
-          builtupAreaSqft: u.builtupAreaSqft ? Number(u.builtupAreaSqft) : undefined,
-          superBuiltupAreaSqft: u.superBuiltupAreaSqft ? Number(u.superBuiltupAreaSqft) : undefined,
-          udsAreaSqft: u.udsAreaSqft ? Number(u.udsAreaSqft) : undefined,
-          plotAreaSqft: u.plotAreaSqft ? Number(u.plotAreaSqft) : undefined,
-          parking: u.parking ? Number(u.parking) : undefined,
-          parkingType: u.parkingType || undefined,
-          unitGuestParking: u.unitGuestParking,
-          balconies: u.balconies ? Number(u.balconies) : undefined,
-          floorNo: u.floorNo ? Number(u.floorNo) : undefined,
-          totalFloors: u.totalFloors ? Number(u.totalFloors) : undefined,
-          poojaRoom: u.poojaRoom,
-          studyRoom: u.studyRoom,
-          openSides: u.openSides ? Number(u.openSides) : undefined,
-          boundaryWall: u.boundaryWall,
-          roomDimensions: u.roomDimensions.filter((r) => r.name.trim() && r.dimensions.trim()),
-          price: u.price ? parseIndianCurrency(u.price) || undefined : undefined,
-          facing: u.facing || undefined,
-          furnishedStatus: u.furnishedStatus || undefined,
-          floorPlanImageUrl: u.floorPlanImageUrl.trim() || undefined,
-          floorPlanImageKey: u.floorPlanImageKey.trim() || undefined,
-          status: u.status || undefined,
-        })),
+        units: validUnits.map((u) => {
+          // Plot units are land parcels: strip every building-only key so
+          // legacy apartment data can't ride along after a type switch.
+          const isPlotUnit = projectType === "plot";
+          const isVillaUnit = projectType === "villa";
+          return {
+            unitCode: u.unitCode.trim(),
+            title: u.title.trim() || undefined,
+            unitType: u.unitType || undefined,
+            bedrooms: !isPlotUnit && u.bedrooms ? Number(u.bedrooms) : undefined,
+            bathrooms: !isPlotUnit && u.bathrooms ? Number(u.bathrooms) : undefined,
+            carpetAreaSqft: !isPlotUnit && u.carpetAreaSqft ? Number(u.carpetAreaSqft) : undefined,
+            builtupAreaSqft: !isPlotUnit && u.builtupAreaSqft ? Number(u.builtupAreaSqft) : undefined,
+            superBuiltupAreaSqft: !isPlotUnit && u.superBuiltupAreaSqft ? Number(u.superBuiltupAreaSqft) : undefined,
+            udsAreaSqft: isVillaUnit && u.udsAreaSqft ? Number(u.udsAreaSqft) : undefined,
+            plotAreaSqft: isVillaUnit && u.plotAreaSqft ? Number(u.plotAreaSqft) : undefined,
+            plotAreaCents: isPlotUnit && u.plotAreaCents ? Number(u.plotAreaCents) : undefined,
+            parking: !isPlotUnit && u.parking ? Number(u.parking) : undefined,
+            parkingType: !isPlotUnit && u.parkingType ? u.parkingType : undefined,
+            unitGuestParking: !isPlotUnit ? u.unitGuestParking : undefined,
+            balconies: !isPlotUnit && u.balconies ? Number(u.balconies) : undefined,
+            floorNo: !isPlotUnit && u.floorNo ? Number(u.floorNo) : undefined,
+            totalFloors: !isPlotUnit && u.totalFloors ? Number(u.totalFloors) : undefined,
+            poojaRoom: !isPlotUnit ? u.poojaRoom : undefined,
+            studyRoom: !isPlotUnit ? u.studyRoom : undefined,
+            openSides: u.openSides ? Number(u.openSides) : undefined,
+            boundaryWall: u.boundaryWall,
+            roomDimensions: !isPlotUnit
+              ? u.roomDimensions.filter((r) => r.name.trim() && r.dimensions.trim())
+              : [],
+            price: u.price ? parseIndianCurrency(u.price) || undefined : undefined,
+            facing: u.facing || undefined,
+            furnishedStatus: !isPlotUnit && u.furnishedStatus ? u.furnishedStatus : undefined,
+            floorPlanImageUrl: !isPlotUnit && u.floorPlanImageUrl.trim() ? u.floorPlanImageUrl.trim() : undefined,
+            floorPlanImageKey: !isPlotUnit && u.floorPlanImageKey.trim() ? u.floorPlanImageKey.trim() : undefined,
+            status: u.status || undefined,
+          };
+        }),
       };
       if (!payload.towerDetails || payload.towerDetails.length === 0) delete payload.towerDetails;
       if (payload.specifications.length === 0) delete payload.specifications;
@@ -1211,7 +1231,7 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
                 {isUnitOpen(idx) && (
                 <div className="px-5 pb-5 space-y-4 border-t border-border/40 pt-4">
                 <div className="flex gap-1 rounded-xl bg-muted/40 p-1 overflow-x-auto" role="tablist" aria-label={`Unit ${idx + 1} sections`}>
-                  {UNIT_TABS.map((t) => (
+                  {UNIT_TABS.filter((t) => t.id !== "features" || !isPlotProject(projectType)).map((t) => (
                     <button
                       key={t.id}
                       type="button"
@@ -1234,15 +1254,15 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
                     <label className={labelClass}>Unit Code *</label>
-                    <Input value={unit.unitCode} onChange={(e) => updateUnit(idx, { unitCode: e.target.value })} placeholder="e.g. 3BHK-A" className={inputClass} />
+                    <Input value={unit.unitCode} onChange={(e) => updateUnit(idx, { unitCode: e.target.value })} placeholder={isPlotProject(projectType) ? "e.g. Plot No. 12" : "e.g. 3BHK-A"} className={inputClass} />
                   </div>
                   <div className="space-y-2">
                     <label className={labelClass}>Title</label>
-                    <Input value={unit.title} onChange={(e) => updateUnit(idx, { title: e.target.value })} placeholder="e.g. East-facing 3BHK" className={inputClass} />
+                    <Input value={unit.title} onChange={(e) => updateUnit(idx, { title: e.target.value })} placeholder={isPlotProject(projectType) ? "e.g. East-facing plot" : "e.g. East-facing 3BHK"} className={inputClass} />
                   </div>
                   <div className="space-y-2">
                     <label className={labelClass}>Unit Type</label>
-                    <FormSelect name={`unitType-${idx}`} options={UNIT_TYPE_OPTIONS} value={unit.unitType} onValueChange={(v) => updateUnit(idx, { unitType: v || "" })} placeholder="Any" />
+                    <FormSelect name={`unitType-${idx}`} options={isPlotProject(projectType) ? PLOT_UNIT_TYPE_OPTIONS : UNIT_TYPE_OPTIONS} value={unit.unitType} onValueChange={(v) => updateUnit(idx, { unitType: v || "" })} placeholder="Any" />
                   </div>
                   <div className="space-y-2">
                     <label className={labelClass}>Unit Status</label>
@@ -1251,70 +1271,96 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
                 </div>
                 <p className={unitSectionTitle}>Configuration</p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="space-y-2">
-                    <label className={labelClass}>Bedrooms</label>
-                    <Input type="number" min={0} value={unit.bedrooms} onChange={(e) => updateUnit(idx, { bedrooms: e.target.value })} placeholder="3" className={inputClass} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className={labelClass}>Bathrooms</label>
-                    <Input type="number" min={0} value={unit.bathrooms} onChange={(e) => updateUnit(idx, { bathrooms: e.target.value })} placeholder="2" className={inputClass} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className={labelClass}>Balconies</label>
-                    <Input type="number" min={0} value={unit.balconies} onChange={(e) => updateUnit(idx, { balconies: e.target.value })} placeholder="2" className={inputClass} />
-                  </div>
+                  {!isPlotProject(projectType) && (
+                    <>
+                      <div className="space-y-2">
+                        <label className={labelClass}>Bedrooms</label>
+                        <Input type="number" min={0} value={unit.bedrooms} onChange={(e) => updateUnit(idx, { bedrooms: e.target.value })} placeholder="3" className={inputClass} />
+                      </div>
+                      <div className="space-y-2">
+                        <label className={labelClass}>Bathrooms</label>
+                        <Input type="number" min={0} value={unit.bathrooms} onChange={(e) => updateUnit(idx, { bathrooms: e.target.value })} placeholder="2" className={inputClass} />
+                      </div>
+                      <div className="space-y-2">
+                        <label className={labelClass}>Balconies</label>
+                        <Input type="number" min={0} value={unit.balconies} onChange={(e) => updateUnit(idx, { balconies: e.target.value })} placeholder="2" className={inputClass} />
+                      </div>
+                    </>
+                  )}
                   <div className="space-y-2">
                     <label className={labelClass}>Facing</label>
                     <FormSelect name={`facing-${idx}`} options={FACING_OPTIONS} value={unit.facing} onValueChange={(v) => updateUnit(idx, { facing: v || "" })} placeholder="Any" />
                   </div>
-                  <div className="space-y-2">
-                    <label className={labelClass}>Furnishing</label>
-                    <FormSelect name={`furnished-${idx}`} options={FURNISHED_OPTIONS} value={unit.furnishedStatus} onValueChange={(v) => updateUnit(idx, { furnishedStatus: v || "" })} placeholder="Any" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className={labelClass}>Floor No</label>
-                    <Input type="number" min={0} value={unit.floorNo} onChange={(e) => updateUnit(idx, { floorNo: e.target.value })} placeholder="e.g. 4" className={inputClass} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className={labelClass}>Total Floors</label>
-                    <Input type="number" min={0} value={unit.totalFloors} onChange={(e) => updateUnit(idx, { totalFloors: e.target.value })} placeholder="e.g. 12" className={inputClass} />
-                  </div>
+                  {!isPlotProject(projectType) && (
+                    <>
+                      <div className="space-y-2">
+                        <label className={labelClass}>Furnishing</label>
+                        <FormSelect name={`furnished-${idx}`} options={FURNISHED_OPTIONS} value={unit.furnishedStatus} onValueChange={(v) => updateUnit(idx, { furnishedStatus: v || "" })} placeholder="Any" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className={labelClass}>Floor No</label>
+                        <Input type="number" min={0} value={unit.floorNo} onChange={(e) => updateUnit(idx, { floorNo: e.target.value })} placeholder="e.g. 4" className={inputClass} />
+                      </div>
+                      <div className="space-y-2">
+                        <label className={labelClass}>Total Floors</label>
+                        <Input type="number" min={0} value={unit.totalFloors} onChange={(e) => updateUnit(idx, { totalFloors: e.target.value })} placeholder="e.g. 12" className={inputClass} />
+                      </div>
+                    </>
+                  )}
                 </div>
                 </>
                 )}
                 {unitTab(idx) === "areas" && (
                 <>
-                <p className={unitSectionTitle}>Areas (sqft)</p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="space-y-2">
-                    <label className={labelClass}>Carpet (sqft)</label>
-                    <Input type="number" min={0} value={unit.carpetAreaSqft} onChange={(e) => updateUnit(idx, { carpetAreaSqft: e.target.value })} placeholder="1000" className={inputClass} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className={labelClass}>Built-up (sqft)</label>
-                    <Input type="number" min={0} value={unit.builtupAreaSqft} onChange={(e) => updateUnit(idx, { builtupAreaSqft: e.target.value })} placeholder="1200" className={inputClass} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className={labelClass}>Super Built-up</label>
-                    <Input type="number" min={0} value={unit.superBuiltupAreaSqft} onChange={(e) => updateUnit(idx, { superBuiltupAreaSqft: e.target.value })} placeholder="1450" className={inputClass} />
-                  </div>
-                </div>
-                {isLandProject(projectType) && (
+                {!isPlotProject(projectType) && (
                   <>
-                    <p className={unitSectionTitle}>Villa Details</p>
+                    <p className={unitSectionTitle}>Areas (sqft)</p>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div className="space-y-2">
-                        <label className={labelClass}>UDS Area (sqft)</label>
-                        <Input type="number" min={0} value={unit.udsAreaSqft} onChange={(e) => updateUnit(idx, { udsAreaSqft: e.target.value })} placeholder="e.g. 200" className={inputClass} />
+                        <label className={labelClass}>Carpet (sqft)</label>
+                        <Input type="number" min={0} value={unit.carpetAreaSqft} onChange={(e) => updateUnit(idx, { carpetAreaSqft: e.target.value })} placeholder="1000" className={inputClass} />
                       </div>
                       <div className="space-y-2">
-                        <label className={labelClass}>Plot Area (sqft)</label>
-                        <Input type="number" min={0} value={unit.plotAreaSqft} onChange={(e) => updateUnit(idx, { plotAreaSqft: e.target.value })} placeholder="e.g. 2400" className={inputClass} />
+                        <label className={labelClass}>Built-up (sqft)</label>
+                        <Input type="number" min={0} value={unit.builtupAreaSqft} onChange={(e) => updateUnit(idx, { builtupAreaSqft: e.target.value })} placeholder="1200" className={inputClass} />
                       </div>
+                      <div className="space-y-2">
+                        <label className={labelClass}>Super Built-up</label>
+                        <Input type="number" min={0} value={unit.superBuiltupAreaSqft} onChange={(e) => updateUnit(idx, { superBuiltupAreaSqft: e.target.value })} placeholder="1450" className={inputClass} />
+                      </div>
+                    </div>
+                  </>
+                )}
+                {isLandProject(projectType) && (
+                  <>
+                    <p className={unitSectionTitle}>{isPlotProject(projectType) ? "Plot Details" : "Villa Details"}</p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {isVillaProject(projectType) && (
+                        <div className="space-y-2">
+                          <label className={labelClass}>UDS Area (sqft)</label>
+                          <Input type="number" min={0} value={unit.udsAreaSqft} onChange={(e) => updateUnit(idx, { udsAreaSqft: e.target.value })} placeholder="e.g. 200" className={inputClass} />
+                        </div>
+                      )}
+                      {isVillaProject(projectType) && (
+                        <div className="space-y-2">
+                          <label className={labelClass}>Plot Area (sqft)</label>
+                          <Input type="number" min={0} value={unit.plotAreaSqft} onChange={(e) => updateUnit(idx, { plotAreaSqft: e.target.value })} placeholder="e.g. 2400" className={inputClass} />
+                        </div>
+                      )}
+                      {isPlotProject(projectType) && (
+                        <div className="space-y-2">
+                          <label className={labelClass}>Plot Area (cents)</label>
+                          <Input type="number" min={0} value={unit.plotAreaCents} onChange={(e) => updateUnit(idx, { plotAreaCents: e.target.value })} placeholder="e.g. 10" className={inputClass} />
+                        </div>
+                      )}
                       <div className="space-y-2">
                         <label className={labelClass}>Open Sides</label>
                         <Input type="number" min={0} max={4} value={unit.openSides} onChange={(e) => updateUnit(idx, { openSides: e.target.value })} placeholder="e.g. 2" className={inputClass} />
                       </div>
+                      <label className="flex items-center gap-2 text-xs font-semibold text-muted-foreground cursor-pointer self-end pb-3">
+                        <Checkbox checked={unit.boundaryWall} onCheckedChange={(checked) => updateUnit(idx, { boundaryWall: checked === true })} />
+                        Boundary Wall
+                      </label>
                     </div>
                   </>
                 )}
@@ -1322,17 +1368,16 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
                 )}
                 {unitTab(idx) === "features" && (
                 <>
-                <p className={unitSectionTitle}>Features</p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {(
-                    [
-                      { key: "poojaRoom", label: "Pooja Room" },
-                      { key: "studyRoom", label: "Study / Store Room" },
-                      ...(isLandProject(projectType)
-                        ? [{ key: "boundaryWall", label: "Boundary Wall" }]
-                        : []),
-                    ] as { key: "poojaRoom" | "studyRoom" | "boundaryWall"; label: string }[]
-                  ).map(({ key, label }) => {
+                {!isPlotProject(projectType) && (
+                  <>
+                    <p className={unitSectionTitle}>Features</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {(
+                        [
+                          { key: "poojaRoom", label: "Pooja Room" },
+                          { key: "studyRoom", label: "Study / Store Room" },
+                        ] as { key: "poojaRoom" | "studyRoom"; label: string }[]
+                      ).map(({ key, label }) => {
                     const checked = unit[key] === true;
                     return (
                       <label
@@ -1352,30 +1397,36 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
                     );
                   })}
                 </div>
-                <p className={unitSectionTitle}>Parking</p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="space-y-2">
-                    <label className={labelClass}>Parking</label>
-                    <Input type="number" min={0} value={unit.parking} onChange={(e) => updateUnit(idx, { parking: e.target.value })} placeholder="2" className={inputClass} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className={labelClass}>Parking Type</label>
-                    <FormSelect name={`parkingType-${idx}`} options={PARKING_TYPE_OPTIONS} value={unit.parkingType} onValueChange={(v) => updateUnit(idx, { parkingType: v || "" })} placeholder="Any" />
-                  </div>
-                  <div className="space-y-2">
-                    <span className={labelClass}>Guest Parking</span>
-                    <label
-                      className={`flex h-12 items-center gap-3 px-4 rounded-xl border cursor-pointer transition-colors ${
-                        unit.unitGuestParking
-                          ? "bg-[#0052FF]/5 border-[#0052FF]/30"
-                          : "bg-muted/10 border-border/40 hover:bg-muted/30"
-                      }`}
-                    >
-                      <Checkbox checked={unit.unitGuestParking} onCheckedChange={(checked) => updateUnit(idx, { unitGuestParking: checked === true })} />
-                      <span className="text-sm font-semibold text-foreground">Available</span>
-                    </label>
-                  </div>
-                </div>
+                </>
+                )}
+                {!isPlotProject(projectType) && (
+                  <>
+                    <p className={unitSectionTitle}>Parking</p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="space-y-2">
+                        <label className={labelClass}>Parking</label>
+                        <Input type="number" min={0} value={unit.parking} onChange={(e) => updateUnit(idx, { parking: e.target.value })} placeholder="2" className={inputClass} />
+                      </div>
+                      <div className="space-y-2">
+                        <label className={labelClass}>Parking Type</label>
+                        <FormSelect name={`parkingType-${idx}`} options={PARKING_TYPE_OPTIONS} value={unit.parkingType} onValueChange={(v) => updateUnit(idx, { parkingType: v || "" })} placeholder="Any" />
+                      </div>
+                      <div className="space-y-2">
+                        <span className={labelClass}>Guest Parking</span>
+                        <label
+                          className={`flex h-12 items-center gap-3 px-4 rounded-xl border cursor-pointer transition-colors ${
+                            unit.unitGuestParking
+                              ? "bg-[#0052FF]/5 border-[#0052FF]/30"
+                              : "bg-muted/10 border-border/40 hover:bg-muted/30"
+                          }`}
+                        >
+                          <Checkbox checked={unit.unitGuestParking} onCheckedChange={(checked) => updateUnit(idx, { unitGuestParking: checked === true })} />
+                          <span className="text-sm font-semibold text-foreground">Available</span>
+                        </label>
+                      </div>
+                    </div>
+                  </>
+                )}
                 </>
                 )}
                 {unitTab(idx) === "price" && (
@@ -1387,10 +1438,10 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
                     <PriceInput value={unit.price} onChange={(v) => updateUnit(idx, { price: v })} placeholder="e.g. 80L or 1.2Cr" />
                   </div>
                 </div>
-                <p className={unitSectionTitle}>Floor Plan</p>
+                <p className={unitSectionTitle}>{isPlotProject(projectType) ? "Plot Layout" : "Floor Plan"}</p>
                 <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-2 md:col-span-2">
-                    <label className={labelClass}>Floor Plan Image</label>
+                    <label className={labelClass}>{isPlotProject(projectType) ? "Plot Layout Image" : "Floor Plan Image"}</label>
                     <input
                       type="file"
                       accept="image/jpeg,image/png,image/webp,image/gif"
@@ -1431,14 +1482,14 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
                         className="w-full h-14 rounded-xl border-2 border-dashed border-border/60 flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:border-[#0052FF]/50 hover:text-[#0052FF] transition-colors disabled:opacity-60"
                       >
                         {uploadingFloorPlanIdx === idx ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-                        {uploadingFloorPlanIdx === idx ? "Uploading..." : "Upload floor plan"}
+                        {uploadingFloorPlanIdx === idx ? "Uploading..." : isPlotProject(projectType) ? "Upload plot layout" : "Upload floor plan"}
                       </button>
                     )}
                   </div>
                 </div>
                 </>
                 )}
-                {unitTab(idx) === "areas" && (
+                {unitTab(idx) === "areas" && !isPlotProject(projectType) && (
                 <div className="space-y-3 pt-1">
                   <div className="flex items-center justify-between border-b border-border/40 pb-2">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Room Dimensions</span>

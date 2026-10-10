@@ -286,13 +286,17 @@ export default function PropertyViewPage() {
             <SectionField label="Status" value={property.status} />
             <SectionField label="Price" value={formatPrice(Number(property.price))} />
             <SectionField label="Negotiable" value={bool(property.negotiable)} />
+            {!isPlotLike && (<>
             <SectionField label="Property Condition" value={property.propertyCondition} />
+            </>)}
             <SectionField label="Ownership Type" value={property.ownershipType} />
             <SectionField label="RERA Number" value={property.reraNumber} />
+            {!isPlotLike && (<>
             <SectionField label="Project Name" value={property.projectName} />
             <SectionField label="Builder Name" value={property.builderName} />
             <SectionField label="Transaction Type" value={property.transactionType} />
             <SectionField label="Handover Date" value={property.handoverDate} />
+            </>)}
             <SectionField label="Sale Type" value={property.saleType} />
             <SectionField label="Available From" value={formatDate(property.availableFrom)} />
             <SectionField label="Available Until" value={formatDate(property.availableUntil)} />
@@ -325,13 +329,17 @@ export default function PropertyViewPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Section title="Pricing & Commercials" icon={<IndianRupee className="h-4 w-4 text-emerald-600" />}>
             <SectionField label="Expected Sale Price" value={property.expectedSalePrice ? formatPrice(Number(property.expectedSalePrice)) : undefined} />
+            {!isPlotLike && (<>
             <SectionField label="Monthly Rent" value={property.monthlyRent ? formatPrice(Number(property.monthlyRent)) : undefined} />
             <SectionField label="Maintenance Charges" value={property.maintenanceCharges} />
             <SectionField label="Security Deposit" value={property.securityDeposit} />
+            </>)}
             <SectionField label="Booking Amount" value={property.bookingAmount} />
             <SectionField label="Brokerage Type" value={property.brokerageType} />
             <SectionField label="Brokerage Value" value={property.brokerageValue} />
+            {!isPlotLike && (
             <SectionField label="Lock-in Period" value={property.lockInPeriod} />
+            )}
             <SectionField label="Taxes" value={property.taxes} />
             <SectionField label="Registration Charge" value={property.registrationCharge} />
             <SectionField label="Mode of Payment" value={property.modeOfPayment} />
@@ -346,7 +354,9 @@ export default function PropertyViewPage() {
                 <SectionField label="Owner Name" value={property.ownerName} />
                 <SectionField label="Owner Phone" value={property.ownerPhone} />
                 <SectionField label="Owner Email" value={property.ownerEmail} />
+                {!isPlotLike && (
                 <SectionField label="Tenant Occupied" value={property.tenantOccupied} />
+                )}
                 <SectionField label="Agent Name" value={property.agentName} />
                 <SectionField label="Agency" value={property.agencyName} />
                 <SectionField label="Commission Terms" value={property.commissionTerms} />
@@ -361,22 +371,28 @@ export default function PropertyViewPage() {
         {/* Common Specs + Type Specs */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Section title="Specifications" icon={<Ruler className="h-4 w-4 text-purple-500" />}>
+            {!isPlotLike && (<>
             <SectionField label="Bedrooms" value={det.bedrooms} />
             <SectionField label="Bathrooms" value={det.bathrooms} />
+            </>)}
             <SectionField label="Area" value={det.areaSqft ? `${det.areaSqft} ${det.areaUnit || "Sq Ft"}` : undefined} />
+            {!isPlotLike && (<>
             <SectionField label="Furnished" value={bool(det.furnished)} />
             <SectionField label="Furnishing Status" value={det.furnishingStatus} />
+            </>)}
             <SectionField label="Facing" value={det.propertyFacing} />
+            {!isPlotLike && (<>
             <SectionField label="Property Age" value={det.propertyAge} />
             <SectionField label="Possession Status" value={det.possessionStatus} />
+            </>)}
             <SectionField label="Open Sides" value={det.openSides} />
+            {!isPlotLike && (<>
             <SectionField label="Suitable For" value={det.suitableFor} />
             <SectionField label="Floor No" value={det.floorNumber} />
             <SectionField label="Total Floors" value={det.totalFloors} />
             <SectionField label="Built-up Area" value={det.builtUpArea} />
             <SectionField label="Carpet Area" value={det.carpetArea} />
             <SectionField label="Super Built-up" value={det.superBuiltUpArea} />
-            <SectionField label="Plot Area" value={det.plotArea} />
             <SectionField label="UDS Area" value={det.udsArea} />
             <SectionField label="Balconies" value={det.balconies} />
             <SectionField label="Parking" value={det.parking} />
@@ -385,6 +401,7 @@ export default function PropertyViewPage() {
             <SectionField label="Guest Parking" value={bool(det.guestParking)} />
             <SectionField label="Power Backup" value={bool(det.powerBackup)} />
             <SectionField label="Water Supply" value={det.waterSupply} />
+            </>)}
             <SectionField label="Road Width" value={det.roadWidth} />
           </Section>
 
@@ -491,6 +508,7 @@ export default function PropertyViewPage() {
 
         {/* Amenities + Connectivity */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {!isPlotLike && (
           <Section title="Amenities" icon={<Sparkles className="h-4 w-4 text-yellow-500" />}>
             {amenitiesList.length === 0 ? (
               <p className="text-sm text-muted-foreground italic sm:col-span-2">No amenities tagged.</p>
@@ -504,6 +522,7 @@ export default function PropertyViewPage() {
               </div>
             )}
           </Section>
+          )}
 
           <Section title="Connectivity" icon={<Map className="h-4 w-4 text-sky-500" />}>
             {connectivity.length === 0 ? (
@@ -516,17 +535,17 @@ export default function PropertyViewPage() {
           </Section>
         </div>
 
-        {/* Room Dimensions + Units */}
-        {(roomDimensions.length > 0 || units.length > 0) && (
+        {/* Room Dimensions + Units — building-only, never land */}
+        {!isPlotLike && (roomDimensions.length > 0 || units.length > 0) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {roomDimensions.length > 0 && (
+            {!isPlotLike && roomDimensions.length > 0 && (
               <Section title="Room Dimensions" icon={<Layers className="h-4 w-4 text-cyan-500" />}>
                 {roomDimensions.map((r: any, i: number) => (
                   <SectionField key={i} label={r.name || `Room ${i + 1}`} value={r.dimensions} />
                 ))}
               </Section>
             )}
-            {units.length > 0 && (
+            {!isPlotLike && units.length > 0 && (
               <Section title="Units" icon={<Building2 className="h-4 w-4 text-indigo-500" />}>
                 {units.map((u: any, i: number) => (
                   <SectionField
@@ -545,10 +564,14 @@ export default function PropertyViewPage() {
           <Section title="Documents & Verification" icon={<ShieldCheck className="h-4 w-4 text-green-600" />}>
             <SectionField label="Ownership Title" value={property.ownershipTitleVerified} />
             <SectionField label="Encumbrance Cert." value={property.encumbranceCertificate} />
+            {!isPlotLike && (
             <SectionField label="Rental Agreement" value={property.rentalAgreementDraft} />
+            )}
             <SectionField label="TSLR / FMB" value={property.tslrFmb} />
             <SectionField label="Tax Receipt" value={property.taxReceipt} />
+            {!isPlotLike && (
             <SectionField label="EB Receipt" value={property.ebReceipt} />
+            )}
             <SectionField label="Patta / Chitta" value={property.pattaChitta} />
             <SectionField label="Approvals" value={property.approvals} />
             <SectionField label="Finance Facing" value={property.financeFacing} />
@@ -558,7 +581,9 @@ export default function PropertyViewPage() {
 
           <Section title="Market Analysis" icon={<TrendingUp className="h-4 w-4 text-rose-500" />}>
             <SectionField label="Comparative Price" value={property.comparativePrice} />
+            {!isPlotLike && (
             <SectionField label="Rental Yield" value={property.rentalYield} />
+            )}
             <SectionField label="Market Price" value={property.marketPrice} />
             <SectionField label="Demand Area" value={property.demandArea} />
             <div className="sm:col-span-2">

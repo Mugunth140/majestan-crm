@@ -252,13 +252,21 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     <th className="py-3 pr-2 font-medium w-8" aria-label="Expand" />
                     <th className="py-3 pr-4 font-medium">Code</th>
                     <th className="py-3 pr-4 font-medium">Type</th>
-                    <th className="py-3 pr-4 font-medium">BHK</th>
-                    <th className="py-3 pr-4 font-medium">Area (sqft)</th>
-                    <th className="py-3 pr-4 font-medium">Floor</th>
+                    {project.projectType !== "plot" && (
+                      <th className="py-3 pr-4 font-medium">BHK</th>
+                    )}
+                    <th className="py-3 pr-4 font-medium">{project.projectType === "plot" ? "Area" : "Area (sqft)"}</th>
+                    {project.projectType !== "plot" && (
+                      <th className="py-3 pr-4 font-medium">Floor</th>
+                    )}
                     <th className="py-3 pr-4 font-medium">Price</th>
                     <th className="py-3 pr-4 font-medium">Facing</th>
-                    <th className="py-3 pr-4 font-medium">Furnishing</th>
-                    <th className="py-3 pr-4 font-medium">Parking</th>
+                    {project.projectType !== "plot" && (
+                      <th className="py-3 pr-4 font-medium">Furnishing</th>
+                    )}
+                    {project.projectType !== "plot" && (
+                      <th className="py-3 pr-4 font-medium">Parking</th>
+                    )}
                     <th className="py-3 pr-4 font-medium">Status</th>
                   </tr>
                 </thead>
@@ -282,47 +290,80 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                           </td>
                           <td className="py-3 pr-4 font-mono text-xs">{u.unitCode}</td>
                           <td className="py-3 pr-4 capitalize">{u.unitType?.replace(/_/g, " ") ?? "-"}</td>
-                          <td className="py-3 pr-4">{u.bedrooms != null ? `${u.bedrooms}BHK` : "-"}</td>
-                          <td className="py-3 pr-4">{u.builtupAreaSqft ?? u.carpetAreaSqft ?? "-"}</td>
-                          <td className="py-3 pr-4">{u.floorNo != null ? (u.totalFloors ? `${u.floorNo} of ${u.totalFloors}` : `${u.floorNo}`) : "-"}</td>
+                          {project.projectType !== "plot" && (
+                            <td className="py-3 pr-4">{u.bedrooms != null ? `${u.bedrooms}BHK` : "-"}</td>
+                          )}
+                          <td className="py-3 pr-4">
+                            {project.projectType === "plot"
+                              ? (u.plotAreaCents != null && String(u.plotAreaCents).trim() !== ""
+                                  ? `${String(parseFloat(Number(u.plotAreaCents).toFixed(2)))} cents`
+                                  : "-")
+                              : (u.builtupAreaSqft ?? u.carpetAreaSqft ?? "-")}
+                          </td>
+                          {project.projectType !== "plot" && (
+                            <td className="py-3 pr-4">{u.floorNo != null ? (u.totalFloors ? `${u.floorNo} of ${u.totalFloors}` : `${u.floorNo}`) : "-"}</td>
+                          )}
                           <td className="py-3 pr-4 font-semibold">{formatPrice(Number(u.price))}</td>
                           <td className="py-3 pr-4 capitalize">{u.facing?.replace(/_/g, " ") ?? "-"}</td>
-                          <td className="py-3 pr-4 capitalize">{u.furnishedStatus?.replace(/_/g, " ") ?? "-"}</td>
-                          <td className="py-3 pr-4 capitalize">
-                            {[
-                              u.parking != null ? `${u.parking}` : null,
-                              u.parkingType ? String(u.parkingType).replace(/_/g, " ") : null,
-                              u.unitGuestParking ? "Guest" : null,
-                            ].filter(Boolean).join(" · ") || "-"}
-                          </td>
+                          {project.projectType !== "plot" && (
+                            <td className="py-3 pr-4 capitalize">{u.furnishedStatus?.replace(/_/g, " ") ?? "-"}</td>
+                          )}
+                          {project.projectType !== "plot" && (
+                            <td className="py-3 pr-4 capitalize">
+                              {[
+                                u.parking != null ? `${u.parking}` : null,
+                                u.parkingType ? String(u.parkingType).replace(/_/g, " ") : null,
+                                u.unitGuestParking ? "Guest" : null,
+                              ].filter(Boolean).join(" · ") || "-"}
+                            </td>
+                          )}
                           <td className="py-3 pr-4 capitalize">{u.status ?? "-"}</td>
                         </tr>
                         {open && (
                           <tr key={`${u.id ?? u.unitCode}-details`}>
-                            <td colSpan={11} className="py-4 pr-4 bg-muted/20">
+                            <td colSpan={project.projectType === "plot" ? 6 : 11} className="py-4 pr-4 bg-muted/20">
                               {(() => {
                                 const fmtArea = (v: any) =>
                                   v != null && String(v).trim() !== ""
                                     ? `${Number(v).toLocaleString("en-IN")} sqft`
                                     : undefined;
+                                const isPlot = project.projectType === "plot";
+                                const plotCents =
+                                  u.plotAreaCents != null && String(u.plotAreaCents).trim() !== ""
+                                    ? Number(u.plotAreaCents)
+                                    : null;
                                 const details: [string, React.ReactNode][] = [
                                   ["Title", u.title],
-                                  ["Bathrooms", u.bathrooms],
-                                  ["Balconies", u.balconies],
-                                  ["Carpet Area", fmtArea(u.carpetAreaSqft)],
-                                  ["Built-up Area", fmtArea(u.builtupAreaSqft)],
-                                  ["Super Built-up", fmtArea(u.superBuiltupAreaSqft)],
-                                  ...((project.projectType === "villa" || project.projectType === "plot"
+                                  ...(!isPlot
+                                    ? [
+                                        ["Bathrooms", u.bathrooms],
+                                        ["Balconies", u.balconies],
+                                        ["Carpet Area", fmtArea(u.carpetAreaSqft)],
+                                        ["Built-up Area", fmtArea(u.builtupAreaSqft)],
+                                        ["Super Built-up", fmtArea(u.superBuiltupAreaSqft)],
+                                      ]
+                                    : []),
+                                  ...(isPlot && plotCents != null && Number.isFinite(plotCents)
+                                    ? [
+                                        ["Plot Area", `${String(parseFloat(plotCents.toFixed(2)))} cents`],
+                                        ["Plot Area (sq.ft)", `${Math.round(plotCents * 435.6).toLocaleString("en-IN")} sqft`],
+                                      ]
+                                    : []),
+                                  ...((project.projectType === "villa"
                                     ? [
                                         ["UDS Area", fmtArea(u.udsAreaSqft)],
                                         ["Plot Area", fmtArea(u.plotAreaSqft)],
+                                      ]
+                                    : []) as [string, React.ReactNode][]),
+                                  ...((project.projectType === "villa" || project.projectType === "plot"
+                                    ? [
                                         ["Open Sides", u.openSides],
                                         ...(u.boundaryWall ? [["Boundary Wall", "Yes"]] : []),
                                       ]
                                     : []) as [string, React.ReactNode][]),
-                                  ...(u.poojaRoom ? [["Pooja Room", "Yes"] as [string, React.ReactNode]] : []),
-                                  ...(u.studyRoom ? [["Study Room", "Yes"] as [string, React.ReactNode]] : []),
-                                  ["Unit Total Floors", u.totalFloors],
+                                  ...(!isPlot && u.poojaRoom ? [["Pooja Room", "Yes"] as [string, React.ReactNode]] : []),
+                                  ...(!isPlot && u.studyRoom ? [["Study Room", "Yes"] as [string, React.ReactNode]] : []),
+                                  ...(!isPlot && u.totalFloors != null ? [["Unit Total Floors", u.totalFloors] as [string, React.ReactNode]] : []),
                                 ].filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== "") as [string, React.ReactNode][];
                                 if (details.length === 0 && !(u.roomDimensions ?? []).length && !u.floorPlanImageUrl) {
                                   return <p className="text-sm text-muted-foreground italic">No additional details.</p>;
@@ -339,7 +380,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                   </>
                                 );
                               })()}
-                              {Array.isArray(u.roomDimensions) && u.roomDimensions.length > 0 && (
+                              {Array.isArray(u.roomDimensions) && u.roomDimensions.length > 0 && project.projectType !== "plot" && (
                                 <div className="mt-4">
                                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Room Dimensions</p>
                                   <div className="flex flex-wrap gap-2">
@@ -353,8 +394,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                               )}
                               {u.floorPlanImageUrl && (
                                 <div className="mt-4">
-                                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Floor Plan</p>
-                                  <img src={u.floorPlanImageUrl} alt={`Floor plan ${u.unitCode}`} className="h-40 rounded-xl object-contain border border-border/60 bg-white" />
+                                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">{project.projectType === "plot" ? "Plot Layout" : "Floor Plan"}</p>
+                                  <img src={u.floorPlanImageUrl} alt={`${project.projectType === "plot" ? "Plot layout" : "Floor plan"} ${u.unitCode}`} className="h-40 rounded-xl object-contain border border-border/60 bg-white" />
                                 </div>
                               )}
                             </td>
