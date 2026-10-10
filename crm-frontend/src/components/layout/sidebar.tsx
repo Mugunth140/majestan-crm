@@ -169,9 +169,9 @@ export function Sidebar() {
                     title={isCollapsed ? item.name : undefined}
                     onClick={() => toggleExpand(item.name)}
                     className={cn(
-                      "sidebar-nav-item relative flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
+                      "side-nav-item-v2 relative flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
                       isActive 
-                        ? "sidebar-nav-active font-semibold shadow-sm" 
+                        ? "side-nav-active-v2 font-semibold shadow-sm" 
                         : "text-muted-foreground hover:text-foreground",
                       isCollapsed && "justify-center px-0"
                     )}
@@ -183,9 +183,9 @@ export function Sidebar() {
                     href={item.href || "#"}
                     title={isCollapsed ? item.name : undefined}
                     className={cn(
-                      "sidebar-nav-item relative flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
+                      "side-nav-item-v2 relative flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
                       isActive 
-                        ? "sidebar-nav-active font-semibold shadow-sm" 
+                        ? "side-nav-active-v2 font-semibold shadow-sm" 
                         : "text-muted-foreground hover:text-foreground",
                       isCollapsed && "justify-center px-0"
                     )}
@@ -224,9 +224,9 @@ export function Sidebar() {
                               key={sub.name}
                               href={sub.href}
                               className={cn(
-                                "sidebar-nav-item rounded-lg px-3 py-2 text-[13px] transition-all duration-300",
+                                "side-nav-item-v2 rounded-lg px-3 py-2 text-[13px] transition-all duration-300",
                                 isSubActive 
-                                  ? "sidebar-nav-active font-semibold" 
+                                  ? "side-nav-active-v2 font-semibold" 
                                   : "text-muted-foreground hover:text-foreground"
                               )}
                             >

@@ -223,7 +223,7 @@
 
 
 @layer utilities {
-  .sidebar-nav-item {
+  .side-nav-item-v2 {
     position: relative;
     transition: all 0.3s ease;
     border: 1px solid transparent;
@@ -231,13 +231,13 @@
     background-color: transparent;
   }
   
-  .sidebar-nav-item > * {
+  .side-nav-item-v2 > * {
     position: relative;
     z-index: 10;
   }
   
   /* --- ACTIVE STATE: Triangle Halftone Fill --- */
-  .sidebar-nav-item::after {
+  .side-nav-item-v2::after {
     content: "";
     position: absolute;
     inset: 0;
@@ -253,25 +253,25 @@
     pointer-events: none;
   }
 
-  .dark .sidebar-nav-item::after {
+  .dark .side-nav-item-v2::after {
     background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 14 14' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 2L13 12H1L7 2Z' fill='%233b82f6' fill-opacity='0.3'/%3E%3C/svg%3E");
   }
 
-  .sidebar-nav-active {
+  .side-nav-active-v2 {
     background-color: #eff6ff; /* blue-50 */
     color: #0052FF;
   }
   
-  .dark .sidebar-nav-active {
+  .dark .side-nav-active-v2 {
     background-color: rgba(30, 58, 138, 0.2); /* blue-900/20 */
   }
 
-  .sidebar-nav-active::after {
+  .side-nav-active-v2::after {
     opacity: 1;
   }
 
   /* --- HOVER STATE: Animated Border Sweep & Fill --- */
-  .sidebar-nav-item::before {
+  .side-nav-item-v2::before {
     content: "";
     position: absolute;
     inset: 0;
@@ -296,7 +296,7 @@
     pointer-events: none;
   }
 
-  .dark .sidebar-nav-item::before {
+  .dark .side-nav-item-v2::before {
     background: linear-gradient(
       70deg, 
       rgba(255, 255, 255, 0.15) 0%, 
@@ -308,31 +308,31 @@
     background-size: 300% 100%;
   }
 
-  .sidebar-nav-item:not(.sidebar-nav-active):hover {
+  .side-nav-item-v2:not(.side-nav-active-v2):hover {
     color: var(--color-foreground);
-    animation: nav-item-bg-fill 1.2s ease-out forwards;
+    animation: side-nav-bg-fill 1.2s ease-out forwards;
   }
   
-  .dark .sidebar-nav-item:not(.sidebar-nav-active):hover {
-    animation: nav-item-bg-fill-dark 1.2s ease-out forwards;
+  .dark .side-nav-item-v2:not(.side-nav-active-v2):hover {
+    animation: side-nav-bg-fill-dark 1.2s ease-out forwards;
   }
 
-  .sidebar-nav-item:not(.sidebar-nav-active):hover::before {
+  .side-nav-item-v2:not(.side-nav-active-v2):hover::before {
     opacity: 1; /* Show the border */
-    animation: border-sweep-and-fill 1.2s ease-out forwards;
+    animation: border-sweep-fill-v2 1.2s ease-out forwards;
   }
 
-  @keyframes border-sweep-and-fill {
+  @keyframes border-sweep-fill-v2 {
     0% { background-position: 100% 0; }
     100% { background-position: 0% 0; }
   }
 
-  @keyframes nav-item-bg-fill {
+  @keyframes side-nav-bg-fill {
     0%, 70% { background-color: transparent; }
     100% { background-color: rgba(0, 0, 0, 0.04); }
   }
 
-  @keyframes nav-item-bg-fill-dark {
+  @keyframes side-nav-bg-fill-dark {
     0%, 70% { background-color: transparent; }
     100% { background-color: rgba(255, 255, 255, 0.06); }
   }
