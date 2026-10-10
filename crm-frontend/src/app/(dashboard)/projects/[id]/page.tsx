@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useState, Fragment } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
-import { Edit, Loader2 } from "lucide-react";
+import { Edit, Loader2, ChevronDown, Download } from "lucide-react";
 import { projectsApi } from "@/lib/projects-api";
 import { computeProjectRanges, formatPrice, formatPriceRange } from "@/lib/project-ranges";
 
@@ -26,6 +26,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const router = useRouter();
   const [project, setProject] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [expandedUnits, setExpandedUnits] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     projectsApi
@@ -61,7 +62,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   return (
     <>
       <MobileHeader title={project.name} showBack />
-      <div className="max-w-5xl mx-auto w-full flex flex-col gap-6 pt-4 lg:p-0 px-2.5 md:px-0 mt-2 md:mt-0 mb-20 md:mb-0">
+      <div className="max-w-5xl mx-auto w-full flex flex-col gap-6 pt-4 lg:p-0 px-2.5 md:px-0 mt-2 md:mt-0 mb-20 md:mb-0 pb-10 lg:pb-16">
         <div className="hidden md:flex items-center justify-between pr-0 md:pr-[150px] min-h-[48px]">
           <div>
             <div className="flex items-center gap-3">
@@ -185,6 +186,61 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         )}
 
         <div className="bg-card border rounded-2xl p-8 shadow-sm">
+          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Location</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <Field label="City" value={project.city} />
+            <Field label="Sublocation" value={project.sublocation} />
+            <Field label="State" value={project.state} />
+            <Field label="Pincode" value={project.pincode} />
+            <div className="col-span-2 md:col-span-4">
+              <Field label="Address" value={project.address} />
+            </div>
+            <Field label="Latitude" value={project.latitude} />
+            <Field label="Longitude" value={project.longitude} />
+          </div>
+        </div>
+
+        <div className="bg-card border rounded-2xl p-8 shadow-sm">
+          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Media</h3>
+          {project.coverImageUrl && (
+            <div className="mb-6">
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Cover Image</p>
+              <img src={project.coverImageUrl} alt={`${project.name} cover`} className="w-full max-w-md h-52 rounded-xl object-cover border border-border/60" />
+            </div>
+          )}
+          {Array.isArray(project.galleryImageUrls) && project.galleryImageUrls.length > 0 && (
+            <div className="mb-6">
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Gallery ({project.galleryImageUrls.length})</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {project.galleryImageUrls.map((g: any, i: number) => (
+                  <img key={i} src={typeof g === "string" ? g : (g.imageUrl ?? g.imageKey ?? "")} alt={`Gallery ${i + 1}`} className="h-24 w-full rounded-xl object-cover border border-border/60 bg-muted/20" />
+                ))}
+              </div>
+            </div>
+          )}
+          {(project.brochureUrl || project.brochureKey) && (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Brochure</p>
+              {project.brochureUrl ? (
+                <a
+                  href={project.brochureUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 rounded-full bg-[#0052FF] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0040CC]"
+                >
+                  <Download className="h-4 w-4" /> {project.brochureName || "Download brochure"}
+                </a>
+              ) : (
+                <p className="text-[15px] font-medium text-foreground">{project.brochureName || project.brochureKey}</p>
+              )}
+            </div>
+          )}
+          {!project.coverImageUrl && !(project.galleryImageUrls ?? []).length && !project.brochureKey && (
+            <p className="text-sm text-muted-foreground italic">No media uploaded.</p>
+          )}
+        </div>
+
+        <div className="bg-card border rounded-2xl p-8 shadow-sm">
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Units ({units.length})</h3>
           {units.length === 0 ? (
             <p className="text-muted-foreground">No units added yet.</p>
@@ -193,6 +249,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               <table className="w-full text-[14px] text-left">
                 <thead>
                   <tr className="text-[12px] text-muted-foreground uppercase border-b">
+                    <th className="py-3 pr-2 font-medium w-8" aria-label="Expand" />
                     <th className="py-3 pr-4 font-medium">Code</th>
                     <th className="py-3 pr-4 font-medium">Type</th>
                     <th className="py-3 pr-4 font-medium">BHK</th>
@@ -206,26 +263,106 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">
-                  {units.map((u: any) => (
-                    <tr key={u.id ?? u.unitCode}>
-                      <td className="py-3 pr-4 font-mono text-xs">{u.unitCode}</td>
-                      <td className="py-3 pr-4 capitalize">{u.unitType?.replace(/_/g, " ") ?? "-"}</td>
-                      <td className="py-3 pr-4">{u.bedrooms != null ? `${u.bedrooms}BHK` : "-"}</td>
-                      <td className="py-3 pr-4">{u.builtupAreaSqft ?? u.carpetAreaSqft ?? "-"}</td>
-                      <td className="py-3 pr-4">{u.floorNo != null ? (u.totalFloors ? `${u.floorNo} of ${u.totalFloors}` : `${u.floorNo}`) : "-"}</td>
-                      <td className="py-3 pr-4 font-semibold">{formatPrice(Number(u.price))}</td>
-                      <td className="py-3 pr-4 capitalize">{u.facing?.replace(/_/g, " ") ?? "-"}</td>
-                      <td className="py-3 pr-4 capitalize">{u.furnishedStatus?.replace(/_/g, " ") ?? "-"}</td>
-                      <td className="py-3 pr-4 capitalize">
-                        {[
-                          u.parking != null ? `${u.parking}` : null,
-                          u.parkingType ? String(u.parkingType).replace(/_/g, " ") : null,
-                          u.unitGuestParking ? "Guest" : null,
-                        ].filter(Boolean).join(" · ") || "-"}
-                      </td>
-                      <td className="py-3 pr-4 capitalize">{u.status ?? "-"}</td>
-                    </tr>
-                  ))}
+                  {units.map((u: any, idx: number) => {
+                    const key = String(u.id ?? u.unitCode ?? idx);
+                    const open = expandedUnits[key] ?? false;
+                    return (
+                      <Fragment key={u.id ?? u.unitCode}>
+                        <tr key={u.id ?? u.unitCode} className={open ? "bg-muted/30" : undefined}>
+                          <td className="py-3 pr-2">
+                            <button
+                              type="button"
+                              onClick={() => setExpandedUnits((prev) => ({ ...prev, [key]: !open }))}
+                              className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                              aria-label={open ? `Collapse unit ${u.unitCode}` : `Expand unit ${u.unitCode}`}
+                              aria-expanded={open}
+                            >
+                              <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+                            </button>
+                          </td>
+                          <td className="py-3 pr-4 font-mono text-xs">{u.unitCode}</td>
+                          <td className="py-3 pr-4 capitalize">{u.unitType?.replace(/_/g, " ") ?? "-"}</td>
+                          <td className="py-3 pr-4">{u.bedrooms != null ? `${u.bedrooms}BHK` : "-"}</td>
+                          <td className="py-3 pr-4">{u.builtupAreaSqft ?? u.carpetAreaSqft ?? "-"}</td>
+                          <td className="py-3 pr-4">{u.floorNo != null ? (u.totalFloors ? `${u.floorNo} of ${u.totalFloors}` : `${u.floorNo}`) : "-"}</td>
+                          <td className="py-3 pr-4 font-semibold">{formatPrice(Number(u.price))}</td>
+                          <td className="py-3 pr-4 capitalize">{u.facing?.replace(/_/g, " ") ?? "-"}</td>
+                          <td className="py-3 pr-4 capitalize">{u.furnishedStatus?.replace(/_/g, " ") ?? "-"}</td>
+                          <td className="py-3 pr-4 capitalize">
+                            {[
+                              u.parking != null ? `${u.parking}` : null,
+                              u.parkingType ? String(u.parkingType).replace(/_/g, " ") : null,
+                              u.unitGuestParking ? "Guest" : null,
+                            ].filter(Boolean).join(" · ") || "-"}
+                          </td>
+                          <td className="py-3 pr-4 capitalize">{u.status ?? "-"}</td>
+                        </tr>
+                        {open && (
+                          <tr key={`${u.id ?? u.unitCode}-details`}>
+                            <td colSpan={11} className="py-4 pr-4 bg-muted/20">
+                              {(() => {
+                                const fmtArea = (v: any) =>
+                                  v != null && String(v).trim() !== ""
+                                    ? `${Number(v).toLocaleString("en-IN")} sqft`
+                                    : undefined;
+                                const details: [string, React.ReactNode][] = [
+                                  ["Title", u.title],
+                                  ["Bathrooms", u.bathrooms],
+                                  ["Balconies", u.balconies],
+                                  ["Carpet Area", fmtArea(u.carpetAreaSqft)],
+                                  ["Built-up Area", fmtArea(u.builtupAreaSqft)],
+                                  ["Super Built-up", fmtArea(u.superBuiltupAreaSqft)],
+                                  ...((project.projectType === "villa" || project.projectType === "plot"
+                                    ? [
+                                        ["UDS Area", fmtArea(u.udsAreaSqft)],
+                                        ["Plot Area", fmtArea(u.plotAreaSqft)],
+                                        ["Open Sides", u.openSides],
+                                        ...(u.boundaryWall ? [["Boundary Wall", "Yes"]] : []),
+                                      ]
+                                    : []) as [string, React.ReactNode][]),
+                                  ...(u.poojaRoom ? [["Pooja Room", "Yes"] as [string, React.ReactNode]] : []),
+                                  ...(u.studyRoom ? [["Study Room", "Yes"] as [string, React.ReactNode]] : []),
+                                  ["Unit Total Floors", u.totalFloors],
+                                ].filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== "") as [string, React.ReactNode][];
+                                if (details.length === 0 && !(u.roomDimensions ?? []).length && !u.floorPlanImageUrl) {
+                                  return <p className="text-sm text-muted-foreground italic">No additional details.</p>;
+                                }
+                                return (
+                                  <>
+                                    {details.length > 0 && (
+                                      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
+                                        {details.map(([label, value]) => (
+                                          <Field key={label} label={label} value={value} />
+                                        ))}
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                              {Array.isArray(u.roomDimensions) && u.roomDimensions.length > 0 && (
+                                <div className="mt-4">
+                                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Room Dimensions</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {u.roomDimensions.map((r: any, i: number) => (
+                                      <span key={i} className="inline-flex items-center rounded-full border border-border/60 bg-muted/30 px-3 py-1.5 text-[13px] font-medium">
+                                        {r.name}: {r.dimensions}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {u.floorPlanImageUrl && (
+                                <div className="mt-4">
+                                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Floor Plan</p>
+                                  <img src={u.floorPlanImageUrl} alt={`Floor plan ${u.unitCode}`} className="h-40 rounded-xl object-contain border border-border/60 bg-white" />
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
