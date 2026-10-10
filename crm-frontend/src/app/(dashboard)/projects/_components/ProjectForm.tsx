@@ -1751,7 +1751,7 @@ export function ProjectForm({
                   ) : (
                     <ImagePlus className="h-5 w-5" />
                   )}
-                  {uploadingCover ? "Uploading..." : "Upload cover image"}
+                  {uploadingCover ? "Uploading..." : "Upload cover image (16:9)"}
                 </button>
               )}
             </div>
@@ -1825,7 +1825,7 @@ export function ProjectForm({
                   )}
                   {uploadingMobileCover
                     ? "Uploading..."
-                    : "Upload mobile cover image"}
+                    : "Upload mobile cover image (4:5)"}
                 </button>
               )}
             </div>
