@@ -221,77 +221,104 @@
 
 
 
+
 @layer utilities {
   .sidebar-nav-item {
     position: relative;
     transition: all 0.3s ease;
     border: 1px solid transparent;
-    z-index: 0; /* Stacking context */
+    z-index: 0;
+    background-color: transparent;
   }
   
-  /* Elevate all content above the patterned background */
   .sidebar-nav-item > * {
     position: relative;
     z-index: 10;
   }
   
+  /* --- ACTIVE STATE: Triangle Halftone Fill --- */
   .sidebar-nav-item::after {
     content: "";
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    /* Triangle pattern SVG */
     background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 14 14' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 2L13 12H1L7 2Z' fill='%230052FF' fill-opacity='0.25'/%3E%3C/svg%3E");
     background-size: 14px 14px;
     background-repeat: repeat;
-    /* Fade from left to right */
     -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,1) 10%, rgba(0,0,0,0) 80%);
     mask-image: linear-gradient(to right, rgba(0,0,0,1) 10%, rgba(0,0,0,0) 80%);
-    z-index: 1; /* Above parent background, below z-10 children */
+    z-index: 1;
     opacity: 0;
     transition: opacity 0.3s ease;
+    pointer-events: none;
   }
 
   .dark .sidebar-nav-item::after {
     background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 14 14' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 2L13 12H1L7 2Z' fill='%233b82f6' fill-opacity='0.3'/%3E%3C/svg%3E");
   }
 
-    /* Hover state (inactive) */
-  .sidebar-nav-item:not(.sidebar-nav-active):hover {
-    /* Only show the shimmer animation on hover, no background fill or border changes */
-    color: var(--color-foreground);
-    background-color: transparent;
-    border-color: transparent;
-  }
-  
-  .sidebar-nav-item:not(.sidebar-nav-active):hover::after {
-    opacity: 1;
-    /* Neutral triangles for inactive hover */
-    background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 14 14' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 2L13 12H1L7 2Z' fill='%23888888' fill-opacity='0.15'/%3E%3C/svg%3E");
-    animation: nav-triangle-shimmer 1.5s linear infinite;
-  }
-
-  /* Active state */
-    .sidebar-nav-active {
+  .sidebar-nav-active {
     background-color: #eff6ff; /* blue-50 */
     color: #0052FF;
-    border-color: rgba(0, 0, 0, 0.05);
   }
+  
   .dark .sidebar-nav-active {
     background-color: rgba(30, 58, 138, 0.2); /* blue-900/20 */
-    border-color: rgba(255, 255, 255, 0.08);
   }
 
   .sidebar-nav-active::after {
     opacity: 1;
   }
 
-  /* Shimmer animation ONLY on hover for active item */
-  .sidebar-nav-item.sidebar-nav-active:hover::after {
-    animation: nav-triangle-shimmer 1.5s linear infinite;
+  /* --- HOVER STATE: Animated Border Shimmer --- */
+  .sidebar-nav-item::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1.5px; /* Border thickness */
+    background: linear-gradient(
+      90deg, 
+      transparent 0%, 
+      transparent 30%, 
+      rgba(0, 82, 255, 0.8) 50%, 
+      transparent 70%, 
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
   }
 
-  @keyframes nav-triangle-shimmer {
-    to { background-position: 28px 0; }
+  .dark .sidebar-nav-item::before {
+    background: linear-gradient(
+      90deg, 
+      transparent 0%, 
+      transparent 30%, 
+      rgba(59, 130, 246, 0.8) 50%, 
+      transparent 70%, 
+      transparent 100%
+    );
+    background-size: 200% 100%;
+  }
+
+  .sidebar-nav-item:not(.sidebar-nav-active):hover {
+    color: var(--color-foreground);
+    background-color: transparent; /* No fill inside */
+  }
+  
+  .sidebar-nav-item:not(.sidebar-nav-active):hover::before {
+    opacity: 1; /* Show the border */
+    animation: border-light-sweep 1.5s linear infinite; /* Animate the shimmer */
+  }
+
+  @keyframes border-light-sweep {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
   }
 }
