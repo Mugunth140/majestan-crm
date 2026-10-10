@@ -278,11 +278,11 @@
     border-radius: inherit;
     padding: 1.5px; /* Border thickness */
     background: linear-gradient(
-      90deg, 
+      70deg, 
       transparent 0%, 
-      transparent 30%, 
+      transparent 35%, 
       rgba(0, 82, 255, 0.8) 50%, 
-      transparent 70%, 
+      transparent 65%, 
       transparent 100%
     );
     background-size: 200% 100%;
@@ -297,11 +297,11 @@
 
   .dark .sidebar-nav-item::before {
     background: linear-gradient(
-      90deg, 
+      70deg, 
       transparent 0%, 
-      transparent 30%, 
+      transparent 35%, 
       rgba(59, 130, 246, 0.8) 50%, 
-      transparent 70%, 
+      transparent 65%, 
       transparent 100%
     );
     background-size: 200% 100%;
@@ -314,7 +314,7 @@
   
   .sidebar-nav-item:not(.sidebar-nav-active):hover::before {
     opacity: 1; /* Show the border */
-    animation: border-light-sweep 1.5s linear infinite; /* Animate the shimmer */
+    animation: border-light-sweep 3s linear infinite; /* Animate the shimmer */
   }
 
   @keyframes border-light-sweep {
