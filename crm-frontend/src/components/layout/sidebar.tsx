@@ -169,7 +169,7 @@ export function Sidebar() {
                     title={isCollapsed ? item.name : undefined}
                     onClick={() => toggleExpand(item.name)}
                     className={cn(
-                      "sidebar-nav-item flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
+                      "sidebar-nav-item relative flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
                       isActive 
                         ? "sidebar-nav-active font-semibold shadow-sm" 
                         : "text-muted-foreground hover:text-foreground",
@@ -183,7 +183,7 @@ export function Sidebar() {
                     href={item.href || "#"}
                     title={isCollapsed ? item.name : undefined}
                     className={cn(
-                      "sidebar-nav-item flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
+                      "sidebar-nav-item relative flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
                       isActive 
                         ? "sidebar-nav-active font-semibold shadow-sm" 
                         : "text-muted-foreground hover:text-foreground",
