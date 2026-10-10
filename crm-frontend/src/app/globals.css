@@ -218,63 +218,75 @@
 .table-scroll::-webkit-scrollbar-corner {
   background: transparent !important;
 }
+
 @layer utilities {
   .sidebar-nav-item {
-    position: relative;
-    border: 1px solid transparent; 
+    transition: all 0.3s ease;
   }
   
-  .sidebar-nav-item::after {
-    content: "";
-    position: absolute;
-    inset: -1px; /* Overlap the transparent border exactly */
-    border-radius: inherit;
-    padding: 1px; /* Border thickness */
-    background: repeating-linear-gradient(
-      45deg,
-      #0052FF 0px,
-      #0052FF 4px,
-      transparent 4px,
-      transparent 8px
-    );
-    background-size: 200% 200%;
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-            mask-composite: exclude;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s ease;
+  /* Inactive hover state */
+  .sidebar-nav-item:not(.sidebar-nav-active):hover {
+    background: 
+      repeating-linear-gradient(
+        45deg,
+        rgba(0, 0, 0, 0.03),
+        rgba(0, 0, 0, 0.03) 4px,
+        transparent 4px,
+        transparent 8px
+      ),
+      linear-gradient(to right, rgba(0,0,0,0.05), transparent);
+    background-size: 200% 100%, 100% 100%;
+    animation: nav-shimmer 1.5s linear infinite;
+    color: var(--color-foreground);
   }
 
-  .dark .sidebar-nav-item::after {
-    background: repeating-linear-gradient(
-      45deg,
-      #3b82f6 0px,
-      #3b82f6 4px,
-      transparent 4px,
-      transparent 8px
-    );
-    background-size: 200% 200%;
+  .dark .sidebar-nav-item:not(.sidebar-nav-active):hover {
+    background: 
+      repeating-linear-gradient(
+        45deg,
+        rgba(255, 255, 255, 0.03),
+        rgba(255, 255, 255, 0.03) 4px,
+        transparent 4px,
+        transparent 8px
+      ),
+      linear-gradient(to right, rgba(255, 255, 255, 0.05), transparent);
+    background-size: 200% 100%, 100% 100%;
   }
 
-  .sidebar-nav-item:hover::after {
-    opacity: 1;
-    animation: sidebar-shimmer 1.5s linear infinite;
-  }
-
+  /* Active state */
   .sidebar-nav-active {
-    background-color: #eff6ff; /* blue-50 */
+    background: 
+      repeating-linear-gradient(
+        45deg,
+        rgba(0, 82, 255, 0.06),
+        rgba(0, 82, 255, 0.06) 4px,
+        transparent 4px,
+        transparent 8px
+      ),
+      linear-gradient(to right, #eff6ff, transparent);
+    background-size: 200% 100%, 100% 100%;
     color: #0052FF;
   }
+
   .dark .sidebar-nav-active {
-    background-color: rgba(30, 58, 138, 0.2); /* blue-900/20 */
+    background: 
+      repeating-linear-gradient(
+        45deg,
+        rgba(255, 255, 255, 0.05),
+        rgba(255, 255, 255, 0.05) 4px,
+        transparent 4px,
+        transparent 8px
+      ),
+      linear-gradient(to right, rgba(30, 58, 138, 0.3), transparent);
+    background-size: 200% 100%, 100% 100%;
   }
 
-  .sidebar-nav-active::after {
-    opacity: 1;
+  /* Shimmer animation ONLY on hover */
+  .sidebar-nav-item:hover {
+    animation: nav-shimmer 1s linear infinite;
   }
 
-  @keyframes sidebar-shimmer {
-    to { background-position: 28px -28px; }
+  @keyframes nav-shimmer {
+    to { background-position: 24px 0, 0 0; }
   }
 }
