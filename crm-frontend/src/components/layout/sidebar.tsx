@@ -112,21 +112,73 @@ export function Sidebar() {
 
 
   const navStyles = `
-    .side-nav-item-v4 { position: relative; transition: all 0.3s ease; border: 1px solid transparent; z-index: 0; background-color: transparent; }
-    .side-nav-item-v4 > * { position: relative; z-index: 10; }
-    .side-nav-item-v4::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 14 14' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 2L13 12H1L7 2Z' fill='%230052FF' fill-opacity='0.25'/%3E%3C/svg%3E"); background-size: 14px 14px; background-repeat: repeat; -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,1) 10%, rgba(0,0,0,0) 80%); mask-image: linear-gradient(to right, rgba(0,0,0,1) 10%, rgba(0,0,0,0) 80%); z-index: 1; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
-    .dark .side-nav-item-v4::after { background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 14 14' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 2L13 12H1L7 2Z' fill='%233b82f6' fill-opacity='0.3'/%3E%3C/svg%3E"); }
-    .side-nav-active-v4 { background-color: #eff6ff; color: #0052FF; }
-    .dark .side-nav-active-v4 { background-color: rgba(30, 58, 138, 0.2); }
-    .side-nav-active-v4::after { opacity: 1; }
-    .side-nav-item-v4::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; background: linear-gradient(70deg, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.1) 45%, rgba(0, 0, 0, 0.3) 50%, transparent 55%, transparent 100%); background-size: 300% 100%; background-position: 100% 0; -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; z-index: 2; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
-    .dark .side-nav-item-v4::before { background: linear-gradient(70deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.15) 45%, rgba(255, 255, 255, 0.8) 50%, transparent 55%, transparent 100%); background-size: 300% 100%; }
-    .side-nav-item-v4:not(.side-nav-active-v4):hover { color: var(--color-foreground); animation: side-nav-bg-fill-v4 0.7s ease-out forwards; }
-    .dark .side-nav-item-v4:not(.side-nav-active-v4):hover { animation: side-nav-bg-fill-dark-v4 0.7s ease-out forwards; }
-    .side-nav-item-v4:not(.side-nav-active-v4):hover::before { opacity: 1; animation: border-sweep-fill-v4 0.7s ease-out forwards; }
-    @keyframes border-sweep-fill-v4 { 0% { background-position: 100% 0; } 100% { background-position: 0% 0; } }
-    @keyframes side-nav-bg-fill-v4 { 0%, 70% { background-color: transparent; } 100% { background-color: rgba(0, 0, 0, 0.04); } }
-    @keyframes side-nav-bg-fill-dark-v4 { 0%, 70% { background-color: transparent; } 100% { background-color: rgba(255, 255, 255, 0.06); } }
+    .side-nav-item-v5 {
+      position: relative;
+      transition: all 0.3s ease;
+      border: 1px solid transparent;
+      z-index: 0;
+      background-color: transparent;
+      background-image: linear-gradient(to right, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.08));
+      background-size: 0% 100%;
+      background-repeat: no-repeat;
+      background-position: left center;
+    }
+    .dark .side-nav-item-v5 {
+      background-image: linear-gradient(to right, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.01));
+    }
+    .side-nav-item-v5 > * { position: relative; z-index: 10; }
+    
+    .side-nav-item-v5::after {
+      content: ""; position: absolute; inset: 0; border-radius: inherit;
+      background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 14 14' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 2L13 12H1L7 2Z' fill='%230052FF' fill-opacity='0.25'/%3E%3C/svg%3E");
+      background-size: 14px 14px; background-repeat: repeat;
+      -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,1) 10%, rgba(0,0,0,0) 80%);
+      mask-image: linear-gradient(to right, rgba(0,0,0,1) 10%, rgba(0,0,0,0) 80%);
+      z-index: 1; opacity: 0; transition: opacity 0.3s ease; pointer-events: none;
+    }
+    .dark .side-nav-item-v5::after {
+      background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 14 14' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 2L13 12H1L7 2Z' fill='%233b82f6' fill-opacity='0.3'/%3E%3C/svg%3E");
+    }
+    
+    .side-nav-active-v5 {
+      background-color: #eff6ff; color: #0052FF;
+      background-image: none;
+    }
+    .dark .side-nav-active-v5 {
+      background-color: rgba(30, 58, 138, 0.2);
+      background-image: none;
+    }
+    .side-nav-active-v5::after { opacity: 1; }
+    
+    .side-nav-item-v5::before {
+      content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+      background: linear-gradient(70deg, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.1) 45%, rgba(0, 0, 0, 0.3) 50%, transparent 55%, transparent 100%);
+      background-size: 300% 100%; background-position: 100% 0;
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor; mask-composite: exclude;
+      z-index: 2; opacity: 0; transition: opacity 0.3s ease; pointer-events: none;
+    }
+    .dark .side-nav-item-v5::before {
+      background: linear-gradient(70deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.15) 45%, rgba(255, 255, 255, 0.8) 50%, transparent 55%, transparent 100%);
+      background-size: 300% 100%;
+    }
+    
+    .side-nav-item-v5:not(.side-nav-active-v5):hover {
+      color: var(--color-foreground);
+      animation: nav-bg-wipe-v5 0.7s ease-out forwards;
+    }
+    .side-nav-item-v5:not(.side-nav-active-v5):hover::before {
+      opacity: 1; animation: border-sweep-fill-v5 0.7s ease-out forwards;
+    }
+    
+    @keyframes border-sweep-fill-v5 {
+      0% { background-position: 100% 0; }
+      100% { background-position: 0% 0; }
+    }
+    @keyframes nav-bg-wipe-v5 {
+      0%, 70% { background-size: 0% 100%; }
+      100% { background-size: 100% 100%; }
+    }
   `;
 
   return (
@@ -191,9 +243,9 @@ export function Sidebar() {
                     title={isCollapsed ? item.name : undefined}
                     onClick={() => toggleExpand(item.name)}
                     className={cn(
-                      "side-nav-item-v4 relative flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
+                      "side-nav-item-v5 relative flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
                       isActive 
-                        ? "side-nav-active-v4 font-semibold shadow-sm" 
+                        ? "side-nav-active-v5 font-semibold shadow-sm" 
                         : "text-muted-foreground hover:text-foreground",
                       isCollapsed && "justify-center px-0"
                     )}
@@ -205,9 +257,9 @@ export function Sidebar() {
                     href={item.href || "#"}
                     title={isCollapsed ? item.name : undefined}
                     className={cn(
-                      "side-nav-item-v4 relative flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
+                      "side-nav-item-v5 relative flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
                       isActive 
-                        ? "side-nav-active-v4 font-semibold shadow-sm" 
+                        ? "side-nav-active-v5 font-semibold shadow-sm" 
                         : "text-muted-foreground hover:text-foreground",
                       isCollapsed && "justify-center px-0"
                     )}
@@ -246,9 +298,9 @@ export function Sidebar() {
                               key={sub.name}
                               href={sub.href}
                               className={cn(
-                                "side-nav-item-v4 rounded-lg px-3 py-2 text-[13px] transition-all duration-300",
+                                "side-nav-item-v5 rounded-lg px-3 py-2 text-[13px] transition-all duration-300",
                                 isSubActive 
-                                  ? "side-nav-active-v4 font-semibold" 
+                                  ? "side-nav-active-v5 font-semibold" 
                                   : "text-muted-foreground hover:text-foreground"
                               )}
                             >
