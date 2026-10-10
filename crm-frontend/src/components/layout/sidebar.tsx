@@ -244,30 +244,26 @@ export function Sidebar() {
         </nav>
       </div>
 
-      <div className={cn("p-3 mt-auto border-t border-border/40", isCollapsed && "p-2")}>
+      <div className={cn("px-2 py-3 mt-auto", isCollapsed && "px-0")}>
         <Link
           href="/settings"
-          title={isCollapsed ? "System Settings" : undefined}
+          title={isCollapsed ? (userRole ? `${userRole} Settings` : "Settings") : undefined}
           className={cn(
-            "flex items-center gap-3 rounded-xl p-2.5 transition-all duration-300 ease-out active:scale-[0.98] border shadow-sm group",
+            "flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-200 ease-out active:scale-[0.98] hover:scale-[1.01] text-[14px] font-medium",
             pathname.startsWith("/settings") 
-              ? "bg-[#0052FF] text-white border-[#0052FF] shadow-md" 
-              : "bg-gradient-to-b from-background to-muted/20 hover:from-muted/50 hover:to-muted/50 text-foreground border-border/60"
+              ? "bg-blue-50 text-[#0052FF] font-semibold dark:bg-blue-900/20 shadow-sm" 
+              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+            isCollapsed && "justify-center px-0"
           )}
         >
           <Settings className={cn(
-            "h-[22px] w-[22px] shrink-0 transition-transform duration-500 group-hover:rotate-90", 
-            pathname.startsWith("/settings") ? "text-white" : "text-muted-foreground group-hover:text-foreground"
+            "h-[22px] w-[22px] shrink-0", 
+            pathname.startsWith("/settings") ? "text-[#0052FF]" : "text-muted-foreground"
           )} />
           {!isCollapsed && (
-            <div className="flex flex-col flex-1 overflow-hidden text-left">
-              <span className="truncate text-[13px] font-bold leading-tight">
-                {userRole || "Loading..."}
-              </span>
-              <span className={cn("truncate text-[10px] font-medium leading-tight mt-0.5", pathname.startsWith("/settings") ? "text-blue-100" : "text-muted-foreground")}>
-                Majestan CRM
-              </span>
-            </div>
+            <span className="truncate whitespace-nowrap flex-1 text-left">
+              {userRole ? `${userRole} Settings` : "Settings"}
+            </span>
           )}
         </Link>
       </div>
