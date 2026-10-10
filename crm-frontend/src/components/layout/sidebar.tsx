@@ -169,10 +169,10 @@ export function Sidebar() {
                     title={isCollapsed ? item.name : undefined}
                     onClick={() => toggleExpand(item.name)}
                     className={cn(
-                      "flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
+                      "sidebar-nav-item flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
                       isActive 
-                        ? "bg-gradient-to-r from-blue-100/60 to-transparent dark:from-blue-900/30 dark:to-transparent text-[#0052FF] font-semibold shadow-sm" 
-                        : "text-muted-foreground hover:bg-gradient-to-r hover:from-muted/50 hover:to-transparent hover:text-foreground",
+                        ? "sidebar-nav-active font-semibold shadow-sm" 
+                        : "text-muted-foreground hover:bg-muted/10 hover:text-foreground",
                       isCollapsed && "justify-center px-0"
                     )}
                   >
@@ -183,10 +183,10 @@ export function Sidebar() {
                     href={item.href || "#"}
                     title={isCollapsed ? item.name : undefined}
                     className={cn(
-                      "flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
+                      "sidebar-nav-item flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
                       isActive 
-                        ? "bg-gradient-to-r from-blue-100/60 to-transparent dark:from-blue-900/30 dark:to-transparent text-[#0052FF] font-semibold shadow-sm" 
-                        : "text-muted-foreground hover:bg-gradient-to-r hover:from-muted/50 hover:to-transparent hover:text-foreground",
+                        ? "sidebar-nav-active font-semibold shadow-sm" 
+                        : "text-muted-foreground hover:bg-muted/10 hover:text-foreground",
                       isCollapsed && "justify-center px-0"
                     )}
                   >
@@ -224,10 +224,10 @@ export function Sidebar() {
                               key={sub.name}
                               href={sub.href}
                               className={cn(
-                                "rounded-lg px-3 py-2 text-[13px] transition-all duration-300",
+                                "sidebar-nav-item rounded-lg px-3 py-2 text-[13px] transition-all duration-300",
                                 isSubActive 
-                                  ? "text-[#0052FF] font-semibold bg-gradient-to-r from-blue-50/80 to-transparent dark:from-blue-900/20 dark:to-transparent" 
-                                  : "text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-muted/40 hover:to-transparent"
+                                  ? "sidebar-nav-active font-semibold" 
+                                  : "text-muted-foreground hover:text-foreground hover:bg-muted/10"
                               )}
                             >
                               {sub.name}
