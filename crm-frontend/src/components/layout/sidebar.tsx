@@ -339,7 +339,7 @@ export function Sidebar() {
       <div className={cn("px-3 py-2 mt-auto border-t border-border/50", isCollapsed && "p-2")}>
         <Link
           href="/settings"
-          title={isCollapsed ? (userRole ? `${userRole} Settings` : "Settings") : undefined}
+          title={isCollapsed ? (userRole ? userRole + " Settings" : "Settings") : undefined}
           className={cn(
             "flex items-center gap-3 rounded-xl px-3 py-3.5 transition-all duration-200 ease-out active:scale-[0.98] hover:scale-[1.01] border text-[14px] font-medium",
             pathname.startsWith("/settings") 
@@ -354,7 +354,7 @@ export function Sidebar() {
           )} />
           {!isCollapsed && (
             <span className="truncate whitespace-nowrap flex-1 text-left">
-              {userRole ? `${userRole} Settings` : "Settings"}
+              {userRole ? userRole + " Settings" : "Settings"}
             </span>
           )}
         </Link>
