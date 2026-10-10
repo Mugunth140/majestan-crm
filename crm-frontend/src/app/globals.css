@@ -281,7 +281,7 @@
       70deg, 
       transparent 0%, 
       transparent 35%, 
-      rgba(0, 82, 255, 0.8) 50%, 
+      rgba(0, 0, 0, 0.15) 50%, 
       transparent 65%, 
       transparent 100%
     );
@@ -300,7 +300,7 @@
       70deg, 
       transparent 0%, 
       transparent 35%, 
-      rgba(59, 130, 246, 0.8) 50%, 
+      rgba(255, 255, 255, 0.7) 50%, 
       transparent 65%, 
       transparent 100%
     );
