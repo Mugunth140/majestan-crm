@@ -140,13 +140,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             <Field label="Possession Date" value={project.possessionDate ? String(project.possessionDate).split("T")[0] : undefined} />
           </div>
           {project.description && <p className="text-muted-foreground mt-6 whitespace-pre-wrap break-words">{project.description}</p>}
-          {project.highlights && (
+          {project.projectType !== "plot" && project.highlights && (
             <>
               <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6 mt-8">Highlights</h3>
               <p className="text-muted-foreground whitespace-pre-wrap break-words">{project.highlights}</p>
             </>
           )}
-          {Array.isArray(project.specifications) && project.specifications.length > 0 && (
+          {project.projectType !== "plot" && Array.isArray(project.specifications) && project.specifications.length > 0 && (
             <>
               <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6 mt-8">Specifications</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -172,7 +172,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           )}
         </div>
 
-        {(project.projectAmenities ?? []).length > 0 && (
+        {project.projectType !== "plot" && (project.projectAmenities ?? []).length > 0 && (
           <div className="bg-card border rounded-2xl p-8 shadow-sm">
             <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Amenities</h3>
             <div className="flex flex-wrap gap-2">

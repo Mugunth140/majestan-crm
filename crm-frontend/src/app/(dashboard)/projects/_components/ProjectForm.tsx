@@ -96,6 +96,14 @@ const UNIT_TYPE_OPTIONS = [
 
 const PLOT_UNIT_TYPE_OPTIONS = [{ value: "plot_unit", label: "Plot" }];
 
+// Project Area is collected in any unit but always stored as sqft.
+const PROJECT_AREA_UNITS = [
+  { value: "sqft", label: "Sq Ft", factor: 1 },
+  { value: "cents", label: "Cents", factor: 435.6 },
+  { value: "acres", label: "Acres", factor: 43560 },
+  { value: "grounds", label: "Grounds", factor: 2400 },
+];
+
 interface RoomDimensionRow {
   name: string;
   dimensions: string;
@@ -277,6 +285,7 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
   const [totalFloors, setTotalFloors] = useState(d?.totalFloors ? String(d.totalFloors) : "");
   const [totalUnits, setTotalUnits] = useState(d?.totalUnits ? String(d.totalUnits) : "");
   const [projectAreaSqft, setProjectAreaSqft] = useState(d?.projectAreaSqft != null ? String(d.projectAreaSqft) : "");
+  const [projectAreaUnit, setProjectAreaUnit] = useState("sqft");
   const [description, setDescription] = useState(d?.description ?? "");
   const [highlights, setHighlights] = useState(d?.highlights ?? "");
   const [coverImageUrl, setCoverImageUrl] = useState(d?.coverImageUrl ?? "");
@@ -605,7 +614,11 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
         towers: projectType === "apartment" && towers ? Number(towers) : undefined,
         totalFloors: projectType === "apartment" && totalFloors ? Number(totalFloors) : undefined,
         totalUnits: totalUnits ? Number(totalUnits) : undefined,
-        projectAreaSqft: projectAreaSqft ? Number(projectAreaSqft) : undefined,
+        projectAreaSqft: (() => {
+          if (!projectAreaSqft || isNaN(Number(projectAreaSqft))) return undefined;
+          const factor = PROJECT_AREA_UNITS.find((u) => u.value === projectAreaUnit)?.factor ?? 1;
+          return Math.round(Number(projectAreaSqft) * factor * 100) / 100;
+        })(),
         towerDetails: projectType !== "apartment"
           ? undefined
           : towerDetails
@@ -616,16 +629,18 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
                 units: t.units ? Number(t.units) : undefined,
               })),
         description: description.trim() || undefined,
-        highlights: highlights.trim() || undefined,
-        specifications: specifications
-          .filter((s) => s.label.trim() && s.value.trim())
-          .map((s) => ({ label: s.label.trim(), value: s.value.trim() })),
+        highlights: projectType === "plot" ? undefined : highlights.trim() || undefined,
+        specifications: projectType === "plot"
+          ? undefined
+          : specifications
+              .filter((s) => s.label.trim() && s.value.trim())
+              .map((s) => ({ label: s.label.trim(), value: s.value.trim() })),
         coverImageUrl: coverImageUrl.trim() || undefined,
         brochureKey: brochureKey.trim() || undefined,
         brochureName: brochureKey.trim() ? brochureName.trim() || undefined : undefined,
         galleryImageUrls: gallery.length > 0 ? gallery.map((g) => g.key) : undefined,
         status,
-        amenities: amenityIds.map((id) => ({ amenityId: id })),
+        amenities: projectType === "plot" ? [] : amenityIds.map((id) => ({ amenityId: id })),
         units: validUnits.map((u) => {
           // Plot units are land parcels: strip every building-only key so
           // legacy apartment data can't ride along after a type switch.
@@ -666,7 +681,7 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
         }),
       };
       if (!payload.towerDetails || payload.towerDetails.length === 0) delete payload.towerDetails;
-      if (payload.specifications.length === 0) delete payload.specifications;
+      if (!payload.specifications || payload.specifications.length === 0) delete payload.specifications;
       Object.keys(payload).forEach((k) => {
         if (payload[k] === undefined) delete payload[k];
       });
@@ -964,8 +979,25 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Structure &amp; Layout</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div className="space-y-2">
-              <label className={labelClass}>Project Area (sqft)</label>
-              <Input type="number" min={0} value={projectAreaSqft} onChange={(e) => setProjectAreaSqft(e.target.value)} placeholder="e.g. 50000" className={inputClass} />
+              <label className={labelClass}>Project Area</label>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min={0}
+                  value={projectAreaSqft}
+                  onChange={(e) => setProjectAreaSqft(e.target.value)}
+                  placeholder="e.g. 50000"
+                  className={`${inputClass} flex-1 min-w-0`}
+                />
+                <FormSelect
+                  name="projectAreaUnit"
+                  className="w-32 shrink-0"
+                  placeholder="Unit"
+                  options={PROJECT_AREA_UNITS.map((u) => ({ label: u.label, value: u.value }))}
+                  value={projectAreaUnit}
+                  onValueChange={(v) => setProjectAreaUnit(v || "sqft")}
+                />
+              </div>
             </div>
             {projectType === "apartment" && (
               <div className="space-y-2">
@@ -1029,8 +1061,9 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
           )}
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Amenities</h3>
+        {projectType !== "plot" && (
+          <div className="bg-card border rounded-2xl p-8 shadow-sm">
+            <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Amenities</h3>
           {formData.amenities.length === 0 ? (
             <p className="text-sm text-muted-foreground italic">No amenities available in the master list.</p>
           ) : (
@@ -1063,10 +1096,12 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
               ))}
             </div>
           )}
-        </div>
+          </div>
+        )}
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Highlights &amp; Specifications</h3>
+        {projectType !== "plot" && (
+          <div className="bg-card border rounded-2xl p-8 shadow-sm">
+            <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Highlights &amp; Specifications</h3>
           <div className="grid grid-cols-1 gap-5">
             <div className="space-y-2">
               <label className={labelClass}>Highlights</label>
@@ -1122,6 +1157,7 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
             </div>
           </div>
         </div>
+        )}
 
         <div className="bg-card border rounded-2xl p-8 shadow-sm">
           <div className="flex items-center justify-between border-b pb-3 mb-6">
