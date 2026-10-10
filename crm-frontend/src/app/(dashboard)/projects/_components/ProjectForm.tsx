@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FormSelect } from "@/components/shared/form-select";
+import { IconPicker } from "@/components/shared/icon-picker";
 import { DatePicker } from "@/components/shared/date-picker";
 import { PriceInput } from "@/components/shared/price-input";
 import { MobileHeader } from "@/components/layout/mobile-header";
@@ -239,14 +240,6 @@ const emptyConnectivity = (): ConnectivityRow => ({
   detail: "",
 });
 
-const CONNECTIVITY_ICON_OPTIONS = [
-  { value: "bus", label: "Bus" },
-  { value: "train", label: "Train" },
-  { value: "plane", label: "Plane" },
-  { value: "navigation", label: "Navigation" },
-  { value: "map-pin", label: "Map Pin" },
-];
-
 interface FaqRow {
   question: string;
   answer: string;
@@ -278,6 +271,29 @@ interface GalleryItem {
   preview: string;
 }
 
+// Unsaved-draft persistence: every keystroke-level field state is snapshotted
+// to localStorage (debounced) so a refresh never loses entered data. The
+// snapshot only ever holds plain JSON (keys, not object URLs or Files).
+const DRAFT_VERSION = 1;
+const draftKeyFor = (mode: "create" | "edit", id: unknown) =>
+  mode === "edit" && id != null
+    ? `project-form-draft:edit:${id}`
+    : "project-form-draft:new";
+
+function loadDraft(key: string): Record<string, any> | null {
+  try {
+    if (typeof window === "undefined") return null;
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.v !== DRAFT_VERSION || typeof parsed.data !== "object")
+      return null;
+    return parsed.data;
+  } catch {
+    return null;
+  }
+}
+
 interface ProjectFormProps {
   mode: "create" | "edit";
   initialData?: any;
@@ -291,6 +307,16 @@ export function ProjectForm({
 }: ProjectFormProps) {
   const router = useRouter();
   const d = initialData as any;
+  // Draft key is stable for this mount (edit page only renders once data
+  // loads; create mode has no id). The snapshot is read exactly once.
+  const draftKey = draftKeyFor(mode, d?.id);
+  // Two-pass draft restore: the first render (SSR + client hydration) must
+  // be identical, so localStorage is only read in a post-mount effect.
+  const [draftHydrated, setDraftHydrated] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const submittedRef = useRef(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedRef = useRef<string>("");
   const isLandProject = (projectTypeValue: string) =>
     projectTypeValue === "villa" || projectTypeValue === "plot";
   const isPlotProject = (projectTypeValue: string) =>
@@ -360,6 +386,7 @@ export function ProjectForm({
   }, [formData.cities, state]);
 
   const [name, setName] = useState(d?.name ?? "");
+  const projectCode: string = (d as any)?.projectCode ?? "";
   const [projectType, setProjectType] = useState(d?.projectType ?? "apartment");
   const [builderName, setBuilderName] = useState(d?.builderName ?? "");
   const [reraNumber, setReraNumber] = useState(d?.reraNumber ?? "");
@@ -668,10 +695,38 @@ export function ProjectForm({
     const file = e.target.files?.[0];
     if (brochureInputRef.current) brochureInputRef.current.value = "";
     if (!file) return;
+    // Brochures are PDF-only — the file-picker accept hint is advisory, so
+    // enforce it here (upload-docs is shared with property docs and stays
+    // generic server-side).
+    const isPdf =
+      file.type === "application/pdf" ||
+      (file.type === "" && /\.pdf$/i.test(file.name));
+    if (!isPdf) {
+      toast.error("Only PDF files can be uploaded as a brochure.");
+      return;
+    }
+    // The stored file is named after the project so downloads arrive with a
+    // meaningful name: {project-name-slug}-{PROJECTCODE}.pdf
+    if (!name.trim()) {
+      toast.error("Enter the project name before uploading the brochure.");
+      return;
+    }
+    const slug =
+      name
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 80) || "brochure";
+    const brochureFileName = `${slug}${projectCode ? `-${projectCode}` : ""}.pdf`;
+    const uploadFile =
+      file.name === brochureFileName
+        ? file
+        : new File([file], brochureFileName, { type: "application/pdf" });
     // Must match the server's upload-docs cap — instant feedback instead of
     // a post-upload 413.
     const MAX_BROCHURE_BYTES = 15 * 1024 * 1024;
-    if (file.size > MAX_BROCHURE_BYTES) {
+    if (uploadFile.size > MAX_BROCHURE_BYTES) {
       toast.error(
         "Brochure must be under 15 MB. Please compress the PDF and try again.",
       );
@@ -679,13 +734,13 @@ export function ProjectForm({
     }
     setUploadingBrochure(true);
     try {
-      const result = await propertiesApi.uploadDocs([file]);
+      const result = await propertiesApi.uploadDocs([uploadFile]);
       const item = result?.data?.[0];
       if (!result?.success || !item?.fileKey) throw new Error("Upload failed");
       setBrochureKey(item.fileKey);
-      setBrochureName(item.fileName ?? file.name);
+      setBrochureName(item.fileName ?? uploadFile.name);
     } catch {
-      toast.error(`Failed to upload ${file.name}`);
+      toast.error(`Failed to upload ${uploadFile.name}`);
     } finally {
       setUploadingBrochure(false);
     }
@@ -784,8 +839,9 @@ export function ProjectForm({
         /* keep existing pincode */
       }
       toast.success(`Location auto-populated from ${resolved.label}.`);
-    } catch {
-      toast.error(`Could not locate "${query}" on Google Maps.`);
+    } catch (err) {
+      const detail = err instanceof Error ? ` ${err.message}` : "";
+      toast.error(`Could not locate "${query}" on Google Maps.${detail}`);
     } finally {
       setLocating(false);
     }
@@ -828,21 +884,226 @@ export function ProjectForm({
           centerLat = resolved.latitude;
           centerLng = resolved.longitude;
           centerLabel = resolved.label;
-        } catch {
-          toast.error(`Could not locate "${localityQuery}" on Google Maps.`);
+        } catch (err) {
+          const detail = err instanceof Error ? ` ${err.message}` : "";
+          toast.error(`Could not locate "${localityQuery}" on Google Maps.${detail}`);
           return;
         }
       }
       const filled = await fetchNearbyCategories(centerLat, centerLng, apiKey);
       setNearbyCategories(filled);
       toast.success(`Nearby places populated around ${centerLabel}!`);
-    } catch {
+    } catch (err) {
+      const detail = err instanceof Error ? ` ${err.message}` : "";
       toast.error(
-        "Failed to fetch nearby places. Check your API Key permissions.",
+        `Failed to fetch nearby places. Check your API Key permissions.${detail}`,
       );
     } finally {
       setFetchingNearby(false);
     }
+  };
+
+  // ---- Unsaved-draft persistence ----
+  // Snapshot every field state (plain JSON only — keys, never object URLs).
+  const collectDraft = () => ({
+    state,
+    name,
+    projectType,
+    builderName,
+    reraNumber,
+    possessionDate,
+    possessionStatus,
+    city,
+    sublocation,
+    address,
+    pincode,
+    latitude,
+    longitude,
+    towers,
+    totalFloors,
+    totalUnits,
+    projectAreaSqft,
+    projectAreaUnit,
+    description,
+    highlights,
+    coverImageUrl,
+    brochureKey,
+    brochureName,
+    status,
+    towerDetails,
+    specifications,
+    amenityIds,
+    gallery: gallery.map((g) => ({ key: g.key, preview: "" })),
+    connectivity,
+    nearbyCategories,
+    faqs,
+    units,
+  });
+
+  const flushDraft = (snapshot: string) => {
+    try {
+      window.localStorage.setItem(
+        draftKey,
+        JSON.stringify({ v: DRAFT_VERSION, data: JSON.parse(snapshot) }),
+      );
+      lastSavedRef.current = snapshot;
+    } catch {
+      /* storage full or unavailable — draft stays in memory */
+    }
+  };
+
+  // Restore a saved draft AFTER first render. Reading localStorage during
+  // render would make the client's first HTML differ from SSR and break
+  // hydration — so the server and the initial client render always show the
+  // pristine/server state, and the draft is applied here, client-only.
+  useEffect(() => {
+    const saved = loadDraft(draftKey);
+    if (saved) {
+      const str = (v: unknown, fallback = "") =>
+        v === undefined || v === null ? fallback : String(v);
+      setState(str(saved.state, state));
+      setName(str(saved.name, name));
+      if (typeof saved.projectType === "string" && saved.projectType)
+        setProjectType(saved.projectType);
+      setBuilderName(str(saved.builderName, builderName));
+      setReraNumber(str(saved.reraNumber, reraNumber));
+      setPossessionDate(str(saved.possessionDate, possessionDate));
+      if (typeof saved.possessionStatus === "string" && saved.possessionStatus)
+        setPossessionStatus(saved.possessionStatus);
+      setCity(str(saved.city, city));
+      setSublocation(str(saved.sublocation, sublocation));
+      setAddress(str(saved.address, address));
+      setPincode(str(saved.pincode, pincode));
+      setLatitude(str(saved.latitude, latitude));
+      setLongitude(str(saved.longitude, longitude));
+      setTowers(str(saved.towers, towers));
+      setTotalFloors(str(saved.totalFloors, totalFloors));
+      setTotalUnits(str(saved.totalUnits, totalUnits));
+      setProjectAreaSqft(str(saved.projectAreaSqft, projectAreaSqft));
+      if (typeof saved.projectAreaUnit === "string" && saved.projectAreaUnit)
+        setProjectAreaUnit(saved.projectAreaUnit);
+      setDescription(str(saved.description, description));
+      setHighlights(str(saved.highlights, highlights));
+      setCoverImageUrl(str(saved.coverImageUrl, coverImageUrl));
+      if (
+        typeof saved.coverImageUrl === "string" &&
+        saved.coverImageUrl.startsWith("http")
+      )
+        setCoverPreview(saved.coverImageUrl);
+      setBrochureKey(str(saved.brochureKey, brochureKey));
+      setBrochureName(str(saved.brochureName, brochureName));
+      if (typeof saved.status === "string" && saved.status)
+        setStatus(saved.status);
+      if (Array.isArray(saved.towerDetails) && saved.towerDetails.length > 0)
+        setTowerDetails(
+          saved.towerDetails.map((t: any) => ({
+            tower: t.tower ?? "",
+            floors: t.floors != null ? String(t.floors) : "",
+            units: t.units != null ? String(t.units) : "",
+          })),
+        );
+      if (Array.isArray(saved.specifications) && saved.specifications.length > 0)
+        setSpecifications(
+          saved.specifications.map((s: any) => ({
+            label: s.label ?? "",
+            value: s.value ?? "",
+          })),
+        );
+      if (Array.isArray(saved.amenityIds) && saved.amenityIds.length > 0)
+        setAmenityIds(
+          saved.amenityIds
+            .map((n: any) => Number(n))
+            .filter((n: number) => Number.isFinite(n)),
+        );
+      if (Array.isArray(saved.gallery) && saved.gallery.length > 0)
+        setGallery(
+          saved.gallery.map((g: any) => ({
+            key: typeof g === "string" ? g : (g.key ?? ""),
+            preview: "",
+          })),
+        );
+      if (Array.isArray(saved.connectivity) && saved.connectivity.length > 0)
+        setConnectivity(
+          saved.connectivity.map((c: any) => ({
+            icon: c.icon ?? "",
+            label: c.label ?? "",
+            detail: c.detail ?? "",
+          })),
+        );
+      if (Array.isArray(saved.nearbyCategories))
+        setNearbyCategories(saved.nearbyCategories);
+      if (Array.isArray(saved.faqs) && saved.faqs.length > 0)
+        setFaqs(
+          saved.faqs.map((f: any) => ({
+            question: f.question ?? "",
+            answer: f.answer ?? "",
+          })),
+        );
+      if (Array.isArray(saved.units) && saved.units.length > 0)
+        setUnits(
+          saved.units.map((u: any) => ({
+            ...emptyUnit(),
+            ...u,
+            roomDimensions: Array.isArray(u?.roomDimensions)
+              ? u.roomDimensions
+              : [],
+            furnishingItemIds: Array.isArray(u?.furnishingItemIds)
+              ? u.furnishingItemIds
+              : [],
+          })),
+        );
+      setDraftRestored(true);
+    }
+    setDraftHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Debounced write after every render that changed field state. Plain
+  // compare-then-schedule: cheap, and never writes when nothing changed.
+  useEffect(() => {
+    if (submittedRef.current || !draftHydrated) return;
+    let snapshot: string;
+    try {
+      snapshot = JSON.stringify(collectDraft());
+    } catch {
+      return;
+    }
+    if (snapshot === lastSavedRef.current) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => flushDraft(snapshot), 600);
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  });
+
+  // Flush synchronously on tab hide/close so even a refresh within the
+  // debounce window keeps the latest keystrokes. Goes through a ref because
+  // this listener is attached once but must see current state.
+  const collectRef = useRef(collectDraft);
+  collectRef.current = collectDraft;
+  const hydratedRef = useRef(false);
+  hydratedRef.current = draftHydrated;
+  useEffect(() => {
+    const onHide = () => {
+      if (submittedRef.current || !hydratedRef.current) return;
+      try {
+        const snapshot = JSON.stringify(collectRef.current());
+        if (snapshot !== lastSavedRef.current) flushDraft(snapshot);
+      } catch {
+        /* ignore */
+      }
+    };
+    window.addEventListener("pagehide", onHide);
+    return () => window.removeEventListener("pagehide", onHide);
+  }, []);
+
+  const discardDraft = () => {
+    try {
+      window.localStorage.removeItem(draftKey);
+    } catch {
+      /* ignore */
+    }
+    window.location.reload();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -932,10 +1193,7 @@ export function ProjectForm({
         galleryImageUrls:
           gallery.length > 0 ? gallery.map((g) => g.key) : undefined,
         status,
-        amenities:
-          projectType === "plot"
-            ? []
-            : amenityIds.map((id) => ({ amenityId: id })),
+        amenities: amenityIds.map((id) => ({ amenityId: id })),
         connectivity: (() => {
           const rows = connectivity
             .filter((c) => c.label.trim() || c.detail.trim())
@@ -1064,6 +1322,14 @@ export function ProjectForm({
       toast.success(
         `Project ${mode === "create" ? "created" : "updated"} successfully!`,
       );
+      // Saved — the draft is no longer needed and must not resurrect.
+      submittedRef.current = true;
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      try {
+        window.localStorage.removeItem(draftKey);
+      } catch {
+        /* ignore */
+      }
       if (onSuccess) {
         onSuccess();
       } else {
@@ -1099,6 +1365,21 @@ export function ProjectForm({
             {mode === "create" ? "Add New Project" : "Edit Project"}
           </h1>
         </div>
+        {draftHydrated && draftRestored && (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm dark:border-amber-900/50 dark:bg-amber-900/20">
+            <p className="font-medium text-amber-900 dark:text-amber-200">
+              Unsaved draft restored — your previously entered data is back.
+            </p>
+            <button
+              type="button"
+              onClick={discardDraft}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-amber-900 hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-900/40"
+            >
+              <X className="h-3.5 w-3.5" />
+              Discard
+            </button>
+          </div>
+        )}
         {preview.unitsCount > 0 && (
           <p className="text-muted-foreground text-sm">
             {`${formatPriceRange(preview.minPrice, preview.maxPrice)} · ${preview.bhk.length ? preview.bhk.map((b) => `${b}BHK`).join(", ") : "No BHK"} · ${preview.unitsCount} unit${preview.unitsCount > 1 ? "s" : ""}`}
@@ -1430,18 +1711,23 @@ export function ProjectForm({
                   </span>
                   <button
                     type="button"
+                    disabled={uploadingBrochure}
                     onClick={() => brochureInputRef.current?.click()}
-                    className="!px-3 !py-1.5 !text-[12px] !font-medium !text-[#0052FF] hover:!bg-[#0052FF]/10 !rounded-lg"
+                    className="!px-3 !py-1.5 !text-[12px] !font-medium !text-[#0052FF] hover:!bg-[#0052FF]/10 !rounded-lg disabled:opacity-60 inline-flex items-center gap-1.5"
                   >
-                    Replace
+                    {uploadingBrochure && (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    )}
+                    {uploadingBrochure ? "Uploading..." : "Replace"}
                   </button>
                   <button
                     type="button"
+                    disabled={uploadingBrochure}
                     onClick={() => {
                       setBrochureKey("");
                       setBrochureName("");
                     }}
-                    className="p-2 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                    className="p-2 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 disabled:opacity-60"
                     aria-label="Remove brochure"
                   >
                     <X className="h-4 w-4" />
@@ -1636,8 +1922,7 @@ export function ProjectForm({
           )}
         </div>
 
-        {projectType !== "plot" && (
-          <div className="bg-card border rounded-2xl p-8 shadow-sm">
+        <div className="bg-card border rounded-2xl p-8 shadow-sm">
             <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
               Amenities
             </h3>
@@ -1683,7 +1968,6 @@ export function ProjectForm({
               </div>
             )}
           </div>
-        )}
 
         {projectType !== "plot" && (
           <div className="bg-card border rounded-2xl p-8 shadow-sm">
@@ -1932,14 +2216,12 @@ export function ProjectForm({
               >
                 <div className="space-y-2">
                   <label className={labelClass}>Icon</label>
-                  <FormSelect
-                    name={`connIcon-${i}`}
-                    options={CONNECTIVITY_ICON_OPTIONS}
+                  <IconPicker
                     value={c.icon || null}
-                    onValueChange={(v) =>
+                    onChange={(v) =>
                       setConnectivity((prev) =>
                         prev.map((row, j) =>
-                          j === i ? { ...row, icon: v || "" } : row,
+                          j === i ? { ...row, icon: v } : row,
                         ),
                       )
                     }

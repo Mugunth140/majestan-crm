@@ -38,9 +38,36 @@ export default function ProjectDetailPage({
   const router = useRouter();
   const [project, setProject] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [downloadingBrochure, setDownloadingBrochure] = useState(false);
   const [expandedUnits, setExpandedUnits] = useState<Record<string, boolean>>(
     {},
   );
+
+  const handleBrochureDownload = async () => {
+    if (!project?.brochureUrl || downloadingBrochure) return;
+    // Force a real download instead of opening the PDF in a new tab, with
+    // a new-tab fallback if the fetch fails (e.g. storage CORS).
+    setDownloadingBrochure(true);
+    try {
+      const res = await fetch(project.brochureUrl);
+      if (!res.ok) throw new Error("download failed");
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download =
+        project.brochureName ??
+        `${project.projectCode ? `${project.projectCode}-` : ""}brochure.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 5000);
+    } catch {
+      window.open(project.brochureUrl, "_blank", "noopener");
+    } finally {
+      setDownloadingBrochure(false);
+    }
+  };
 
   useEffect(() => {
     projectsApi
@@ -257,8 +284,7 @@ export default function ProjectDetailPage({
             )}
         </div>
 
-        {project.projectType !== "plot" &&
-          (project.projectAmenities ?? []).length > 0 && (
+        {(project.projectAmenities ?? []).length > 0 && (
             <div className="bg-card border rounded-2xl p-8 shadow-sm">
               <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
                 Amenities
@@ -337,15 +363,17 @@ export default function ProjectDetailPage({
                 Brochure
               </p>
               {project.brochureUrl ? (
-                <a
-                  href={project.brochureUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-full bg-[#0052FF] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0040CC]"
+                <button
+                  type="button"
+                  onClick={handleBrochureDownload}
+                  disabled={downloadingBrochure}
+                  className="inline-flex items-center gap-2 rounded-full bg-[#0052FF] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0040CC] disabled:opacity-70"
                 >
                   <Download className="h-4 w-4" />{" "}
-                  {project.brochureName || "Download brochure"}
-                </a>
+                  {downloadingBrochure
+                    ? "Downloading..."
+                    : project.brochureName || "Download brochure"}
+                </button>
               ) : (
                 <p className="text-[15px] font-medium text-foreground">
                   {project.brochureName || project.brochureKey}

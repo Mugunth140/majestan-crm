@@ -1,6 +1,6 @@
 "use client";
 
-import { createElement, useState } from "react";
+import { createElement } from "react";
 import {
   Archive,
   Armchair,
@@ -37,8 +37,11 @@ import {
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import {
+  IconPicker,
+  resolveIcon,
+  type PickerOption,
+} from "@/components/shared/icon-picker";
 
 export type FurnishingIconEntry = {
   /** Stored value (lucide PascalCase name). */
@@ -47,7 +50,8 @@ export type FurnishingIconEntry = {
   Icon: LucideIcon;
 };
 
-/** Curated, staff-friendly icon set for furnishing items. */
+/** Featured furnishing set — the picker's default view. Search reaches the
+ *  full library, so this stays a staff-friendly shortlist. */
 export const FURNISHING_ICONS: FurnishingIconEntry[] = [
   { name: "Sofa", label: "Sofa", Icon: Sofa },
   { name: "Armchair", label: "Armchair", Icon: Armchair },
@@ -83,10 +87,11 @@ export const FURNISHING_ICONS: FurnishingIconEntry[] = [
   { name: "TreePine", label: "Indoor Plant", Icon: TreePine },
 ];
 
-/** Resolve a stored icon name to its component, falling back to Sparkles. */
+/** Resolve a stored icon name to its component, falling back to Sparkles.
+ *  Accepts canonical PascalCase names and anything else the shared resolver
+ *  understands. */
 export function getFurnishingIcon(name?: string | null): LucideIcon {
-  if (!name) return Sparkles;
-  return FURNISHING_ICONS.find((i) => i.name === name)?.Icon ?? Sparkles;
+  return resolveIcon(name) ?? Sparkles;
 }
 
 /** Render a stored furnishing icon by name. */
@@ -94,58 +99,27 @@ export function FurnishingIcon({ name, className }: { name?: string | null; clas
   return createElement(getFurnishingIcon(name), { className });
 }
 
+const FURNISHING_FEATURED: PickerOption[] = FURNISHING_ICONS.map((i) => ({
+  key: i.name,
+  label: i.label,
+  Icon: i.Icon,
+}));
+
 type FurnishingIconPickerProps = {
   value?: string | null;
   onChange: (name: string) => void;
 };
 
-/** Searchable icon grid for picking a furnishing item's icon. */
+/** Popup picker for a furnishing item's icon — featured shortlist up front,
+ *  full library on search. */
 export function FurnishingIconPicker({ value, onChange }: FurnishingIconPickerProps) {
-  const [query, setQuery] = useState("");
-  const q = query.trim().toLowerCase();
-  const list = q
-    ? FURNISHING_ICONS.filter((i) => `${i.name} ${i.label}`.toLowerCase().includes(q))
-    : FURNISHING_ICONS;
-
   return (
-    <div className="space-y-3">
-      <Input
-        placeholder="Search icons..."
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        className="h-10"
-      />
-      <div className="grid max-h-56 grid-cols-4 gap-2 overflow-y-auto rounded-xl border border-border/60 bg-muted/20 p-2 sm:grid-cols-6">
-        {list.map(({ name, label, Icon }) => {
-          const selected = value === name;
-          return (
-            <button
-              key={name}
-              type="button"
-              title={label}
-              aria-label={label}
-              aria-pressed={selected}
-              onClick={() => onChange(name)}
-              className={cn(
-                "flex flex-col items-center gap-1 rounded-lg border px-1 py-2.5 transition-colors",
-                selected
-                  ? "border-[#0052FF]/50 bg-[#0052FF]/10 text-[#0052FF]"
-                  : "border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-              )}
-            >
-              <Icon className="h-5 w-5" />
-              <span className="w-full truncate text-center text-[10px] font-medium leading-tight">
-                {label}
-              </span>
-            </button>
-          );
-        })}
-        {list.length === 0 && (
-          <p className="col-span-full py-4 text-center text-sm text-muted-foreground">
-            No icons match “{query}”.
-          </p>
-        )}
-      </div>
-    </div>
+    <IconPicker
+      value={value}
+      onChange={onChange}
+      placeholder="Select icon"
+      featured={FURNISHING_FEATURED}
+      showLabels
+    />
   );
 }
