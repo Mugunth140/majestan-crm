@@ -459,6 +459,13 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
     const file = e.target.files?.[0];
     if (brochureInputRef.current) brochureInputRef.current.value = "";
     if (!file) return;
+    // Must match the server's upload-docs cap — instant feedback instead of
+    // a post-upload 413.
+    const MAX_BROCHURE_BYTES = 15 * 1024 * 1024;
+    if (file.size > MAX_BROCHURE_BYTES) {
+      toast.error("Brochure must be under 15 MB. Please compress the PDF and try again.");
+      return;
+    }
     setUploadingBrochure(true);
     try {
       const result = await propertiesApi.uploadDocs([file]);
@@ -926,7 +933,7 @@ export function ProjectForm({ mode, initialData, onSuccess }: ProjectFormProps) 
                   className="w-full h-24 rounded-xl border-2 border-dashed border-border/60 flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:border-[#0052FF]/50 hover:text-[#0052FF] transition-colors disabled:opacity-60"
                 >
                   {uploadingBrochure ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
-                  {uploadingBrochure ? "Uploading..." : "Upload brochure PDF"}
+                  {uploadingBrochure ? "Uploading..." : "Upload brochure PDF (max 15 MB)"}
                 </button>
               )}
             </div>

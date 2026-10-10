@@ -62,7 +62,8 @@ export class PropertiesController {
   @UseInterceptors(
     FilesInterceptor('documents', 10, {
       storage: memoryStorage(),
-      limits: { fileSize: 10 * 1024 * 1024, files: 10 },
+      // Brochures run large — 15 MB cap (images stay at 5 MB).
+      limits: { fileSize: 15 * 1024 * 1024, files: 10 },
     }),
   )
   async uploadDocuments(@UploadedFiles() files: Express.Multer.File[]) {
