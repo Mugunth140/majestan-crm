@@ -244,15 +244,15 @@ export function Sidebar() {
         </nav>
       </div>
 
-      <div className={cn("px-2 py-3 mt-auto", isCollapsed && "px-0")}>
+      <div className={cn("p-3 mt-auto border-t border-border/50", isCollapsed && "p-2")}>
         <Link
           href="/settings"
           title={isCollapsed ? (userRole ? `${userRole} Settings` : "Settings") : undefined}
           className={cn(
-            "flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-200 ease-out active:scale-[0.98] hover:scale-[1.01] text-[14px] font-medium",
+            "flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 ease-out active:scale-[0.98] hover:scale-[1.01] border shadow-sm text-[14px] font-medium",
             pathname.startsWith("/settings") 
-              ? "bg-blue-50 text-[#0052FF] font-semibold dark:bg-blue-900/20 shadow-sm" 
-              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+              ? "bg-blue-50 text-[#0052FF] font-semibold dark:bg-blue-900/20 border-blue-100 dark:border-blue-900/30" 
+              : "bg-background text-muted-foreground border-border/60 hover:bg-muted/40 hover:text-foreground",
             isCollapsed && "justify-center px-0"
           )}
         >
