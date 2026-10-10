@@ -218,3 +218,63 @@
 .table-scroll::-webkit-scrollbar-corner {
   background: transparent !important;
 }
+@layer utilities {
+  .sidebar-nav-item {
+    position: relative;
+    border: 1px solid transparent; 
+  }
+  
+  .sidebar-nav-item::after {
+    content: "";
+    position: absolute;
+    inset: -1px; /* Overlap the transparent border exactly */
+    border-radius: inherit;
+    padding: 1px; /* Border thickness */
+    background: repeating-linear-gradient(
+      45deg,
+      #0052FF 0px,
+      #0052FF 4px,
+      transparent 4px,
+      transparent 8px
+    );
+    background-size: 200% 200%;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .dark .sidebar-nav-item::after {
+    background: repeating-linear-gradient(
+      45deg,
+      #3b82f6 0px,
+      #3b82f6 4px,
+      transparent 4px,
+      transparent 8px
+    );
+    background-size: 200% 200%;
+  }
+
+  .sidebar-nav-item:hover::after {
+    opacity: 1;
+    animation: sidebar-shimmer 1.5s linear infinite;
+  }
+
+  .sidebar-nav-active {
+    background-color: #eff6ff; /* blue-50 */
+    color: #0052FF;
+  }
+  .dark .sidebar-nav-active {
+    background-color: rgba(30, 58, 138, 0.2); /* blue-900/20 */
+  }
+
+  .sidebar-nav-active::after {
+    opacity: 1;
+  }
+
+  @keyframes sidebar-shimmer {
+    to { background-position: 28px -28px; }
+  }
+}
