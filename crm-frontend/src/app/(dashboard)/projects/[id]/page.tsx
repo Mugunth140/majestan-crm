@@ -326,12 +326,24 @@ export default function ProjectDetailPage({
           {project.coverImageUrl && (
             <div className="mb-6">
               <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
-                Cover Image
+                Cover Image (Desktop)
               </p>
               <img
                 src={project.coverImageUrl}
                 alt={`${project.name} cover`}
                 className="w-full max-w-md h-52 rounded-xl object-cover border border-border/60"
+              />
+            </div>
+          )}
+          {project.mobileCoverImageUrl && (
+            <div className="mb-6">
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                Cover Image (Mobile)
+              </p>
+              <img
+                src={project.mobileCoverImageUrl}
+                alt={`${project.name} mobile cover`}
+                className="w-40 h-52 rounded-xl object-cover border border-border/60"
               />
             </div>
           )}
@@ -382,6 +394,7 @@ export default function ProjectDetailPage({
             </div>
           )}
           {!project.coverImageUrl &&
+            !project.mobileCoverImageUrl &&
             !(project.galleryImageUrls ?? []).length &&
             !project.brochureKey && (
               <p className="text-sm text-muted-foreground italic">

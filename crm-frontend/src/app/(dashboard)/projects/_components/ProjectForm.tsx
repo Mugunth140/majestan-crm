@@ -432,6 +432,12 @@ export function ProjectForm({
   const [highlights, setHighlights] = useState(d?.highlights ?? "");
   const [coverImageUrl, setCoverImageUrl] = useState(d?.coverImageUrl ?? "");
   const [coverPreview, setCoverPreview] = useState(d?.coverImageUrl ?? "");
+  const [mobileCoverImageUrl, setMobileCoverImageUrl] = useState(
+    d?.mobileCoverImageUrl ?? "",
+  );
+  const [mobileCoverPreview, setMobileCoverPreview] = useState(
+    d?.mobileCoverImageUrl ?? "",
+  );
   const [brochureKey, setBrochureKey] = useState(d?.brochureKey ?? "");
   const [brochureName, setBrochureName] = useState(d?.brochureName ?? "");
   const [uploadingBrochure, setUploadingBrochure] = useState(false);
@@ -440,12 +446,14 @@ export function ProjectForm({
     Record<number, string>
   >({});
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [uploadingMobileCover, setUploadingMobileCover] = useState(false);
   const [uploadingFloorPlanIdx, setUploadingFloorPlanIdx] = useState<
     number | null
   >(null);
   const [uploadingGallery, setUploadingGallery] = useState(false);
   const [locating, setLocating] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const mobileCoverInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState(d?.status ?? "draft");
 
@@ -705,6 +713,27 @@ export function ProjectForm({
     }
   };
 
+  const handleMobileCoverFiles = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (mobileCoverInputRef.current) mobileCoverInputRef.current.value = "";
+    if (!file) return;
+    setUploadingMobileCover(true);
+    try {
+      const result = await propertiesApi.uploadImages([file]);
+      const uploaded = result?.data ?? [];
+      if (!result?.success || uploaded.length === 0)
+        throw new Error("Upload failed");
+      setMobileCoverImageUrl(uploaded[0].imageKey);
+      setMobileCoverPreview(URL.createObjectURL(file));
+    } catch {
+      toast.error("Failed to upload mobile cover image. Please try again.");
+    } finally {
+      setUploadingMobileCover(false);
+    }
+  };
+
   const handleBrochureFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (brochureInputRef.current) brochureInputRef.current.value = "";
@@ -941,6 +970,7 @@ export function ProjectForm({
     description,
     highlights,
     coverImageUrl,
+    mobileCoverImageUrl,
     brochureKey,
     brochureName,
     status,
@@ -1004,6 +1034,14 @@ export function ProjectForm({
         saved.coverImageUrl.startsWith("http")
       )
         setCoverPreview(saved.coverImageUrl);
+      setMobileCoverImageUrl(
+        str(saved.mobileCoverImageUrl, mobileCoverImageUrl),
+      );
+      if (
+        typeof saved.mobileCoverImageUrl === "string" &&
+        saved.mobileCoverImageUrl.startsWith("http")
+      )
+        setMobileCoverPreview(saved.mobileCoverImageUrl);
       setBrochureKey(str(saved.brochureKey, brochureKey));
       setBrochureName(str(saved.brochureName, brochureName));
       if (typeof saved.status === "string" && saved.status)
@@ -1200,6 +1238,7 @@ export function ProjectForm({
                 .filter((s) => s.label.trim() && s.value.trim())
                 .map((s) => ({ label: s.label.trim(), value: s.value.trim() })),
         coverImageUrl: coverImageUrl.trim() || undefined,
+        mobileCoverImageUrl: mobileCoverImageUrl.trim() || undefined,
         brochureKey: brochureKey.trim() || undefined,
         brochureName: brochureKey.trim()
           ? brochureName.trim() || undefined
@@ -1647,7 +1686,7 @@ export function ProjectForm({
               />
             </div>
             <div className="space-y-2">
-              <label className={labelClass}>Cover Image</label>
+              <label className={labelClass}>Cover Image (Desktop)</label>
               <input
                 ref={coverInputRef}
                 type="file"
@@ -1713,6 +1752,80 @@ export function ProjectForm({
                     <ImagePlus className="h-5 w-5" />
                   )}
                   {uploadingCover ? "Uploading..." : "Upload cover image"}
+                </button>
+              )}
+            </div>
+            <div className="space-y-2">
+              <label className={labelClass}>Cover Image (Mobile)</label>
+              <input
+                ref={mobileCoverInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={handleMobileCoverFiles}
+              />
+              {mobileCoverPreview &&
+              (mobileCoverPreview.startsWith("http") ||
+                mobileCoverPreview.startsWith("blob:")) ? (
+                <div className="relative w-full h-44 rounded-xl overflow-hidden border border-border/60 bg-muted/20">
+                  <img
+                    src={mobileCoverPreview}
+                    alt="Mobile cover preview"
+                    className="w-full h-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileCoverImageUrl("");
+                      setMobileCoverPreview("");
+                    }}
+                    className="absolute top-2 right-2 p-2 rounded-lg bg-black/60 text-white hover:bg-red-600 transition-colors"
+                    aria-label="Remove mobile cover image"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : mobileCoverImageUrl ? (
+                <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 p-2">
+                  <span className="flex-1 truncate text-xs text-muted-foreground">
+                    {mobileCoverImageUrl}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={uploadingMobileCover}
+                    onClick={() => mobileCoverInputRef.current?.click()}
+                    className="!px-3 !py-1.5 !text-[12px] !font-medium !text-[#0052FF] hover:!bg-[#0052FF]/10 !rounded-lg disabled:opacity-60"
+                  >
+                    Replace
+                  </button>
+                  <button
+                    type="button"
+                    disabled={uploadingMobileCover}
+                    onClick={() => {
+                      setMobileCoverImageUrl("");
+                      setMobileCoverPreview("");
+                    }}
+                    className="p-2 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 disabled:opacity-60"
+                    aria-label="Remove mobile cover image"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={uploadingMobileCover}
+                  onClick={() => mobileCoverInputRef.current?.click()}
+                  className="w-full h-24 rounded-xl border-2 border-dashed border-border/60 flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:border-[#0052FF]/50 hover:text-[#0052FF] transition-colors disabled:opacity-60"
+                >
+                  {uploadingMobileCover ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <ImagePlus className="h-5 w-5" />
+                  )}
+                  {uploadingMobileCover
+                    ? "Uploading..."
+                    : "Upload mobile cover image"}
                 </button>
               )}
             </div>
