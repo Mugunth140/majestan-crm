@@ -223,7 +223,7 @@
 
 
 @layer utilities {
-  .side-nav-item-v2 {
+  .side-nav-item-v3 {
     position: relative;
     transition: all 0.3s ease;
     border: 1px solid transparent;
@@ -231,13 +231,13 @@
     background-color: transparent;
   }
   
-  .side-nav-item-v2 > * {
+  .side-nav-item-v3 > * {
     position: relative;
     z-index: 10;
   }
   
   /* --- ACTIVE STATE: Triangle Halftone Fill --- */
-  .side-nav-item-v2::after {
+  .side-nav-item-v3::after {
     content: "";
     position: absolute;
     inset: 0;
@@ -253,30 +253,30 @@
     pointer-events: none;
   }
 
-  .dark .side-nav-item-v2::after {
+  .dark .side-nav-item-v3::after {
     background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 14 14' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 2L13 12H1L7 2Z' fill='%233b82f6' fill-opacity='0.3'/%3E%3C/svg%3E");
   }
 
-  .side-nav-active-v2 {
+  .side-nav-active-v3 {
     background-color: #eff6ff; /* blue-50 */
     color: #0052FF;
   }
   
-  .dark .side-nav-active-v2 {
+  .dark .side-nav-active-v3 {
     background-color: rgba(30, 58, 138, 0.2); /* blue-900/20 */
   }
 
-  .side-nav-active-v2::after {
+  .side-nav-active-v3::after {
     opacity: 1;
   }
 
   /* --- HOVER STATE: Animated Border Sweep & Fill --- */
-  .side-nav-item-v2::before {
+  .side-nav-item-v3::before {
     content: "";
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    padding: 1.5px; /* Border thickness */
+    padding: 1px; /* Border thickness */
     background: linear-gradient(
       70deg, 
       rgba(0, 0, 0, 0.1) 0%, 
@@ -296,7 +296,7 @@
     pointer-events: none;
   }
 
-  .dark .side-nav-item-v2::before {
+  .dark .side-nav-item-v3::before {
     background: linear-gradient(
       70deg, 
       rgba(255, 255, 255, 0.15) 0%, 
@@ -308,18 +308,18 @@
     background-size: 300% 100%;
   }
 
-  .side-nav-item-v2:not(.side-nav-active-v2):hover {
+  .side-nav-item-v3:not(.side-nav-active-v3):hover {
     color: var(--color-foreground);
-    animation: side-nav-bg-fill 1.2s ease-out forwards;
+    animation: side-nav-bg-fill 0.7s ease-out forwards;
   }
   
-  .dark .side-nav-item-v2:not(.side-nav-active-v2):hover {
-    animation: side-nav-bg-fill-dark 1.2s ease-out forwards;
+  .dark .side-nav-item-v3:not(.side-nav-active-v3):hover {
+    animation: side-nav-bg-fill-dark 0.7s ease-out forwards;
   }
 
-  .side-nav-item-v2:not(.side-nav-active-v2):hover::before {
+  .side-nav-item-v3:not(.side-nav-active-v3):hover::before {
     opacity: 1; /* Show the border */
-    animation: border-sweep-fill-v2 1.2s ease-out forwards;
+    animation: border-sweep-fill-v2 0.7s ease-out forwards;
   }
 
   @keyframes border-sweep-fill-v2 {
