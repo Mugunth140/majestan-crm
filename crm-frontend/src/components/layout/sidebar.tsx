@@ -249,10 +249,10 @@ export function Sidebar() {
           href="/settings"
           title={isCollapsed ? (userRole ? `${userRole} Settings` : "Settings") : undefined}
           className={cn(
-            "flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 ease-out active:scale-[0.98] hover:scale-[1.01] border shadow-sm text-[14px] font-medium",
+            "flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 ease-out active:scale-[0.98] hover:scale-[1.01] border text-[14px] font-medium",
             pathname.startsWith("/settings") 
-              ? "bg-blue-50 text-[#0052FF] font-semibold dark:bg-blue-900/20 border-blue-100 dark:border-blue-900/30" 
-              : "bg-background text-muted-foreground border-border/60 hover:bg-muted/40 hover:text-foreground",
+              ? "bg-blue-50 text-[#0052FF] font-semibold dark:bg-blue-900/20 border-blue-100 dark:border-blue-900/30 shadow-sm" 
+              : "bg-transparent text-muted-foreground border-border/50 shadow-[0_0_10px_rgba(0,0,0,0.04)] dark:shadow-[0_0_10px_rgba(255,255,255,0.04)] hover:border-border/80 hover:bg-muted/20 hover:text-foreground",
             isCollapsed && "justify-center px-0"
           )}
         >
