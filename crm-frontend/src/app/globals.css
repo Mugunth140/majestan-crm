@@ -270,7 +270,7 @@
     opacity: 1;
   }
 
-  /* --- HOVER STATE: Animated Border Shimmer --- */
+  /* --- HOVER STATE: Animated Border Sweep & Fill --- */
   .sidebar-nav-item::before {
     content: "";
     position: absolute;
@@ -279,13 +279,14 @@
     padding: 1.5px; /* Border thickness */
     background: linear-gradient(
       70deg, 
-      transparent 0%, 
-      transparent 35%, 
-      rgba(0, 0, 0, 0.15) 50%, 
-      transparent 65%, 
+      rgba(0, 0, 0, 0.1) 0%, 
+      rgba(0, 0, 0, 0.1) 45%, 
+      rgba(0, 0, 0, 0.3) 50%, 
+      transparent 55%, 
       transparent 100%
     );
-    background-size: 200% 100%;
+    background-size: 300% 100%;
+    background-position: 100% 0; /* Start with transparent portion */
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
             mask-composite: exclude;
@@ -298,27 +299,41 @@
   .dark .sidebar-nav-item::before {
     background: linear-gradient(
       70deg, 
-      transparent 0%, 
-      transparent 35%, 
-      rgba(255, 255, 255, 0.7) 50%, 
-      transparent 65%, 
+      rgba(255, 255, 255, 0.15) 0%, 
+      rgba(255, 255, 255, 0.15) 45%, 
+      rgba(255, 255, 255, 0.8) 50%, 
+      transparent 55%, 
       transparent 100%
     );
-    background-size: 200% 100%;
+    background-size: 300% 100%;
   }
 
   .sidebar-nav-item:not(.sidebar-nav-active):hover {
     color: var(--color-foreground);
-    background-color: transparent; /* No fill inside */
+    animation: nav-item-bg-fill 1.2s ease-out forwards;
   }
   
-  .sidebar-nav-item:not(.sidebar-nav-active):hover::before {
-    opacity: 1; /* Show the border */
-    animation: border-light-sweep 3s linear infinite; /* Animate the shimmer */
+  .dark .sidebar-nav-item:not(.sidebar-nav-active):hover {
+    animation: nav-item-bg-fill-dark 1.2s ease-out forwards;
   }
 
-  @keyframes border-light-sweep {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
+  .sidebar-nav-item:not(.sidebar-nav-active):hover::before {
+    opacity: 1; /* Show the border */
+    animation: border-sweep-and-fill 1.2s ease-out forwards;
+  }
+
+  @keyframes border-sweep-and-fill {
+    0% { background-position: 100% 0; }
+    100% { background-position: 0% 0; }
+  }
+
+  @keyframes nav-item-bg-fill {
+    0%, 70% { background-color: transparent; }
+    100% { background-color: rgba(0, 0, 0, 0.04); }
+  }
+
+  @keyframes nav-item-bg-fill-dark {
+    0%, 70% { background-color: transparent; }
+    100% { background-color: rgba(255, 255, 255, 0.06); }
   }
 }
