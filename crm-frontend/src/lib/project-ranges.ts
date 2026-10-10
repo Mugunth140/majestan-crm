@@ -42,9 +42,14 @@ export function computeProjectRanges(units: any[] | null | undefined): ProjectRa
 
 export function formatPrice(price: number | null | undefined): string {
   if (!price) return '-';
-  if (price >= 10000000) return `₹${(price / 10000000).toFixed(2)} Cr`;
-  if (price >= 100000) return `₹${(price / 100000).toFixed(2)} L`;
+  if (price >= 10000000) return `₹${trimDecimals(price / 10000000)} Cr`;
+  if (price >= 100000) return `₹${trimDecimals(price / 100000)} L`;
   return `₹${price.toLocaleString('en-IN')}`;
+}
+
+function trimDecimals(value: number): string {
+  const fixed = value.toFixed(2);
+  return fixed.endsWith('.00') ? String(Math.round(value)) : fixed;
 }
 
 export function formatPriceRange(min: number | null, max: number | null): string {

@@ -6,7 +6,7 @@ interface UseProjectsListArgs {
   pagination: { pageIndex: number; pageSize: number };
   debouncedSearchQuery: string;
   activeTab: string;
-  filters: { projectType: string };
+  filters: { projectType: string; minPrice: string; maxPrice: string; bhk: number[]; locality: string; minUnits: string };
 }
 
 export function useProjectsList() {
@@ -35,6 +35,11 @@ export function useProjectsList() {
       if (debouncedSearchQuery.trim()) params.search = debouncedSearchQuery.trim();
       if (activeTab !== "All") params.status = activeTab.toLowerCase();
       if (filters.projectType) params.projectType = filters.projectType;
+      if (filters.minPrice !== "") params.minPrice = filters.minPrice;
+      if (filters.maxPrice !== "") params.maxPrice = filters.maxPrice;
+      if (filters.bhk.length > 0) params.bhk = filters.bhk.join(",");
+      if (filters.locality.trim()) params.locality = filters.locality.trim();
+      if (filters.minUnits !== "") params.minUnits = filters.minUnits;
 
       const data = await projectsApi.list(params); // Assuming apiFetch doesn't easily take signal yet, we'll check manually
       

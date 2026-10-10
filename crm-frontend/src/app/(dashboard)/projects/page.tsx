@@ -28,11 +28,19 @@ const PROJECT_TYPE_OPTIONS = [
   { value: "plot", label: "Plot" },
 ];
 
+const BHK_FILTER_OPTIONS = [1, 2, 3, 4, 5];
+
 const STATUS_STYLES: Record<string, string> = {
   published: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
   draft: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
   booked: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400",
   archived: "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400",
+};
+
+const PROJECT_TYPE_STYLES: Record<string, string> = {
+  apartment: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400",
+  villa: "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400",
+  plot: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400",
 };
 
 export default function ProjectsPage() {
@@ -43,7 +51,7 @@ export default function ProjectsPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
-  const [filters, setFilters] = useState({ projectType: "" });
+  const [filters, setFilters] = useState({ projectType: "", minPrice: "", maxPrice: "", bhk: [] as number[], locality: "", minUnits: "" });
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [role, setRole] = useState("");
 
@@ -108,22 +116,9 @@ export default function ProjectsPage() {
       accessorKey: "id",
       header: "Id",
       cell: ({ row }) => (
-        <Link href={`/projects/${row.original.id}`} className="text-[#0052FF] hover:underline font-medium">
-          #{row.original.id}
+        <Link href={`/projects/${row.original.id}`} className="text-[#0052FF] hover:underline font-medium font-mono text-xs tracking-wide">
+          {row.original.projectCode || row.original.id}
         </Link>
-      ),
-    },
-    {
-      accessorKey: "projectCode",
-      header: "Code",
-      cell: ({ row }) => (
-        row.original.projectCode ? (
-          <span className="font-mono text-xs font-semibold text-muted-foreground tracking-wide">
-            {row.original.projectCode}
-          </span>
-        ) : (
-          <span className="text-muted-foreground">-</span>
-        )
       ),
     },
     {
@@ -149,11 +144,15 @@ export default function ProjectsPage() {
     {
       accessorKey: "projectType",
       header: "Type",
-      cell: ({ row }) => (
-        <Badge className="bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 font-medium shadow-sm border capitalize">
-          {row.original.projectType || "-"}
-        </Badge>
-      ),
+      cell: ({ row }) => {
+        const t = (row.original.projectType || "").toLowerCase();
+        const cls = PROJECT_TYPE_STYLES[t] ?? "bg-gray-100 text-gray-800 border-gray-200";
+        return (
+          <Badge className={"font-medium shadow-sm border capitalize " + cls}>
+            {row.original.projectType || "-"}
+          </Badge>
+        );
+      },
     },
     {
       id: "priceRange",
@@ -168,7 +167,7 @@ export default function ProjectsPage() {
       header: "BHK",
       cell: ({ row }) => {
         const r = computeProjectRanges(row.original.units);
-        return <span className="whitespace-nowrap">{r.bhk.length ? r.bhk.map((b) => `${b}BHK`).join(", ") : "-"}</span>;
+        return <span className="whitespace-nowrap">{r.bhk.length ? `${r.bhk.join(",")} BHK` : "-"}</span>;
       },
     },
     {
@@ -180,17 +179,6 @@ export default function ProjectsPage() {
       },
     },
     {
-      accessorKey: "reraNumber",
-      header: "RERA",
-      cell: ({ row }) => (
-        row.original.reraNumber ? (
-          <span className="font-mono text-xs text-muted-foreground truncate max-w-[140px] block" title={row.original.reraNumber}>{row.original.reraNumber}</span>
-        ) : (
-          <span className="text-muted-foreground">-</span>
-        )
-      ),
-    },
-    {
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => {
@@ -198,15 +186,6 @@ export default function ProjectsPage() {
         const cls = STATUS_STYLES[s] ?? "bg-gray-100 text-gray-800 border-gray-200";
         return <Badge className={"font-medium shadow-sm border whitespace-nowrap capitalize " + cls}>{s || "-"}</Badge>;
       },
-    },
-    {
-      accessorKey: "createdAt",
-      header: "Created",
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground whitespace-nowrap">
-          {row.original.createdAt ? new Date(row.original.createdAt).toLocaleDateString("en-GB") : "-"}
-        </span>
-      ),
     },
   ];
 
@@ -241,9 +220,18 @@ export default function ProjectsPage() {
     onPaginationChange: setPagination,
   };
 
-  const activeFiltersCount = Object.values(filters).filter((v) => v !== "").length;
+  const activeFiltersCount =
+    (filters.projectType ? 1 : 0) +
+    (filters.minPrice !== "" || filters.maxPrice !== "" ? 1 : 0) +
+    (filters.bhk.length > 0 ? 1 : 0) +
+    (filters.locality.trim() ? 1 : 0) +
+    (filters.minUnits !== "" ? 1 : 0);
   const clearFilters = () => {
-    setFilters({ projectType: "" });
+    setFilters({ projectType: "", minPrice: "", maxPrice: "", bhk: [], locality: "", minUnits: "" });
+    resetPage();
+  };
+  const toggleBhk = (b: number) => {
+    setFilters((f) => ({ ...f, bhk: f.bhk.includes(b) ? f.bhk.filter((x) => x !== b) : [...f.bhk, b].sort((a, x) => a - x) }));
     resetPage();
   };
 
@@ -282,6 +270,70 @@ export default function ProjectsPage() {
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Project Type</label>
             <FormSelect name="projectType" options={PROJECT_TYPE_OPTIONS} value={filters.projectType} onValueChange={(v) => { setFilters((f) => ({ ...f, projectType: v || "" })); resetPage(); }} placeholder="All Types" />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Price Range (₹)</label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min={0}
+                placeholder="Min"
+                value={filters.minPrice}
+                onChange={(e) => { setFilters((f) => ({ ...f, minPrice: e.target.value })); resetPage(); }}
+                className="h-10 rounded-xl bg-muted/30 border-border/60 text-[13.5px]"
+              />
+              <span className="text-muted-foreground shrink-0">–</span>
+              <Input
+                type="number"
+                min={0}
+                placeholder="Max"
+                value={filters.maxPrice}
+                onChange={(e) => { setFilters((f) => ({ ...f, maxPrice: e.target.value })); resetPage(); }}
+                className="h-10 rounded-xl bg-muted/30 border-border/60 text-[13.5px]"
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">BHK</label>
+            <div className="flex flex-wrap gap-2">
+              {BHK_FILTER_OPTIONS.map((b) => {
+                const isActive = filters.bhk.includes(b);
+                return (
+                  <button
+                    key={b}
+                    type="button"
+                    onClick={() => toggleBhk(b)}
+                    className={cn(
+                      "h-9 min-w-9 px-3 rounded-full text-[13px] font-semibold border transition-all active:scale-95",
+                      isActive ? "bg-foreground text-background border-foreground shadow-sm" : "bg-card text-muted-foreground border-border hover:bg-muted"
+                    )}
+                  >
+                    {b}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Locality</label>
+            <Input
+              placeholder="e.g. Whitefield"
+              value={filters.locality}
+              onChange={(e) => { setFilters((f) => ({ ...f, locality: e.target.value })); resetPage(); }}
+              className="h-10 rounded-xl bg-muted/30 border-border/60 text-[13.5px]"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Units</label>
+            <Input
+              type="number"
+              min={1}
+              step={1}
+              placeholder="Min units"
+              value={filters.minUnits}
+              onChange={(e) => { setFilters((f) => ({ ...f, minUnits: e.target.value })); resetPage(); }}
+              className="h-10 rounded-xl bg-muted/30 border-border/60 text-[13.5px]"
+            />
           </div>
         </div>
       </PopoverContent>
@@ -329,7 +381,7 @@ export default function ProjectsPage() {
 
   const tableSection = (
     <div className="w-full max-w-full min-w-0 md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col">
-      {isLoading ? <TableSkeleton columns={11} rows={10} flush /> : <DataTable {...tableProps} />}
+      {isLoading ? <TableSkeleton columns={8} rows={10} flush /> : <DataTable {...tableProps} />}
     </div>
   );
 
