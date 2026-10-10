@@ -30,9 +30,9 @@ const PROJECT_TYPE_OPTIONS = [
 ];
 
 const POSSESSION_OPTIONS = [
+  { value: "new_launch", label: "New Launch" },
   { value: "under_construction", label: "Under Construction" },
   { value: "ready_to_move", label: "Ready To Move" },
-  { value: "new_launch", label: "New Launch" },
 ];
 
 const STATUS_OPTIONS = [
