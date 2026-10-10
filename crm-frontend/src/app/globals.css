@@ -258,9 +258,10 @@
 
     /* Hover state (inactive) */
   .sidebar-nav-item:not(.sidebar-nav-active):hover {
-    background-color: var(--color-muted);
+    /* Only show the shimmer animation on hover, no background fill or border changes */
     color: var(--color-foreground);
-    border-color: var(--color-border);
+    background-color: transparent;
+    border-color: transparent;
   }
   
   .sidebar-nav-item:not(.sidebar-nav-active):hover::after {

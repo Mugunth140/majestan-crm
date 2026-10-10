@@ -172,7 +172,7 @@ export function Sidebar() {
                       "sidebar-nav-item flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
                       isActive 
                         ? "sidebar-nav-active font-semibold shadow-sm" 
-                        : "text-muted-foreground hover:bg-muted/10 hover:text-foreground",
+                        : "text-muted-foreground hover:text-foreground",
                       isCollapsed && "justify-center px-0"
                     )}
                   >
@@ -186,7 +186,7 @@ export function Sidebar() {
                       "sidebar-nav-item flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
                       isActive 
                         ? "sidebar-nav-active font-semibold shadow-sm" 
-                        : "text-muted-foreground hover:bg-muted/10 hover:text-foreground",
+                        : "text-muted-foreground hover:text-foreground",
                       isCollapsed && "justify-center px-0"
                     )}
                   >
@@ -227,7 +227,7 @@ export function Sidebar() {
                                 "sidebar-nav-item rounded-lg px-3 py-2 text-[13px] transition-all duration-300",
                                 isSubActive 
                                   ? "sidebar-nav-active font-semibold" 
-                                  : "text-muted-foreground hover:text-foreground hover:bg-muted/10"
+                                  : "text-muted-foreground hover:text-foreground"
                               )}
                             >
                               {sub.name}
