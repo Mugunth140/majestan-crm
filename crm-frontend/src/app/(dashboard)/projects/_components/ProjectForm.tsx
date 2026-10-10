@@ -138,6 +138,7 @@ interface UnitRow {
   udsAreaSqft: string;
   plotAreaSqft: string;
   plotAreaCents: string;
+  plotDimensions: string;
   parking: string;
   parkingType: string;
   unitGuestParking: boolean;
@@ -185,6 +186,15 @@ const formatRoomDimension = (
   return `${String(parseFloat(l.toFixed(2)))} × ${String(parseFloat(w.toFixed(2)))} ft`;
 };
 
+// Plot dimensions round-trip through the unit roomDimensions JSON column as
+// a single { name: "Plot", dimensions } row — no schema needed.
+const PLOT_DIMENSIONS_ROW_NAME = "Plot";
+const extractPlotDimensions = (rows: unknown): string => {
+  if (!Array.isArray(rows)) return "";
+  const found = rows.find((r: any) => (r?.name ?? "") === PLOT_DIMENSIONS_ROW_NAME);
+  return typeof found?.dimensions === "string" ? found.dimensions : "";
+};
+
 // Keeps a stored string selectable even when it isn't in the masters.
 const withLegacyOption = (
   options: { value: string; label: string }[],
@@ -208,6 +218,7 @@ const emptyUnit = (): UnitRow => ({
   udsAreaSqft: "",
   plotAreaSqft: "",
   plotAreaCents: "",
+  plotDimensions: "",
   parking: "",
   parkingType: "",
   unitGuestParking: false,
@@ -536,6 +547,8 @@ export function ProjectForm({
             dimensions: r.dimensions ?? "",
           }))
         : [],
+      plotDimensions:
+        u.plotDimensions ?? extractPlotDimensions(u.roomDimensions),
       price: u.price != null ? String(u.price) : "",
       facing: u.facing ?? "",
       furnishedStatus: u.furnishedStatus ?? "",
@@ -655,6 +668,7 @@ export function ProjectForm({
       u.udsAreaSqft,
       u.plotAreaSqft,
       u.plotAreaCents,
+      u.plotDimensions,
       u.parking,
       u.balconies,
       u.floorNo,
@@ -1274,11 +1288,18 @@ export function ProjectForm({
             studyRoom: !isPlotUnit ? u.studyRoom : undefined,
             openSides: u.openSides ? Number(u.openSides) : undefined,
             boundaryWall: u.boundaryWall,
-            roomDimensions: !isPlotUnit
-              ? u.roomDimensions.filter(
+            roomDimensions: isPlotUnit
+              ? u.plotDimensions.trim()
+                ? [
+                    {
+                      name: PLOT_DIMENSIONS_ROW_NAME,
+                      dimensions: u.plotDimensions.trim(),
+                    },
+                  ]
+                : []
+              : u.roomDimensions.filter(
                   (r) => r.name.trim() && r.dimensions.trim(),
-                )
-              : [],
+                ),
             price: u.price
               ? parseIndianCurrency(u.price) || undefined
               : undefined,
@@ -2686,6 +2707,40 @@ export function ProjectForm({
                                     }
                                     placeholder="e.g. 10"
                                     className={inputClass}
+                                  />
+                                </div>
+                              )}
+                              {isPlotProject(projectType) && (
+                                <div className="space-y-2">
+                                  <label className={labelClass}>
+                                    Plot Dimensions
+                                  </label>
+                                  <FormSelect
+                                    name={`plotDims-${idx}`}
+                                    options={withLegacyOption(
+                                      formData.roomDimensions.map((rd) => {
+                                        const dims =
+                                          formatRoomDimension(
+                                            rd.lengthFt,
+                                            rd.widthFt,
+                                          ) ?? rd.value;
+                                        return {
+                                          value: dims,
+                                          label:
+                                            rd.label !== dims
+                                              ? `${rd.label} (${dims})`
+                                              : dims,
+                                        };
+                                      }),
+                                      unit.plotDimensions,
+                                    )}
+                                    value={unit.plotDimensions || null}
+                                    onValueChange={(v) =>
+                                      updateUnit(idx, {
+                                        plotDimensions: v || "",
+                                      })
+                                    }
+                                    placeholder="Select dimensions"
                                   />
                                 </div>
                               )}

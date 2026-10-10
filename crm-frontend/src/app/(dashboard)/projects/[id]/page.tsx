@@ -680,11 +680,12 @@ export default function ProjectDetailPage({
                                 );
                               })()}
                               {Array.isArray(u.roomDimensions) &&
-                                u.roomDimensions.length > 0 &&
-                                project.projectType !== "plot" && (
+                                u.roomDimensions.length > 0 && (
                                   <div className="mt-4">
                                     <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
-                                      Room Dimensions
+                                      {project.projectType === "plot"
+                                        ? "Plot Dimensions"
+                                        : "Room Dimensions"}
                                     </p>
                                     <div className="flex flex-wrap gap-2">
                                       {u.roomDimensions.map(
