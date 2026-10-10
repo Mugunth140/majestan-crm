@@ -1685,6 +1685,7 @@ export function ProjectForm({
                 className="rounded-xl bg-muted/30 min-h-[120px]"
               />
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div className="space-y-2">
               <label className={labelClass}>Cover Image (Desktop)</label>
               <input
@@ -1884,6 +1885,7 @@ export function ProjectForm({
                     : "Upload brochure PDF (max 15 MB)"}
                 </button>
               )}
+            </div>
             </div>
           </div>
         </div>
