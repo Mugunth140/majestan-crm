@@ -112,9 +112,9 @@ export function Sidebar() {
 
 
   const navStyles = `
-    .side-nav-item-v7 {
+    .side-nav-item-v8 {
       position: relative;
-      transition: all 0.3s ease;
+      transition: all 0.5s ease;
       border: 1px solid transparent;
       z-index: 0;
       background-color: transparent;
@@ -123,37 +123,48 @@ export function Sidebar() {
       background-repeat: no-repeat;
       background-position: left center;
     }
-    .dark .side-nav-item-v7 {
+    .dark .side-nav-item-v8 {
       background-image: linear-gradient(to right, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.01));
     }
-    .side-nav-item-v7 > * { position: relative; z-index: 10; }
     
-    .side-nav-item-v7::after {
+    .side-nav-active-v8 {
+      color: #0052FF;
+    }
+    
+    /* Crossfade overlays for Active State */
+    .side-nav-active-fill {
+      background-image: linear-gradient(to right, #dbeafe 0%, #eff6ff 100%);
+    }
+    .dark .side-nav-active-fill {
+      background-image: linear-gradient(to right, rgba(59, 130, 246, 0.2) 0%, rgba(30, 58, 138, 0.1) 100%);
+    }
+    
+    .side-nav-active-border {
+      padding: 1px;
+      background: linear-gradient(70deg, rgba(0, 82, 255, 0.8) 0%, rgba(0, 82, 255, 0.1) 100%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor; mask-composite: exclude;
+    }
+    .dark .side-nav-active-border {
+      background: linear-gradient(70deg, rgba(59, 130, 246, 0.8) 0%, rgba(59, 130, 246, 0.1) 100%);
+    }
+
+    /* Triangles on ::after (Fades in via active class) */
+    .side-nav-item-v8::after {
       content: ""; position: absolute; inset: 0; border-radius: inherit;
       background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 14 14' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 2L13 12H1L7 2Z' fill='%230052FF' fill-opacity='0.25'/%3E%3C/svg%3E");
       background-size: 14px 14px; background-repeat: repeat;
       -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,1) 10%, rgba(0,0,0,0) 80%);
       mask-image: linear-gradient(to right, rgba(0,0,0,1) 10%, rgba(0,0,0,0) 80%);
-      z-index: 1; opacity: 0; transition: opacity 0.3s ease; pointer-events: none;
+      z-index: 1; opacity: var(--active-opacity, 0); transition: opacity 0.5s ease; pointer-events: none;
     }
-    .dark .side-nav-item-v7::after {
+    .dark .side-nav-item-v8::after {
       background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 14 14' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 2L13 12H1L7 2Z' fill='%233b82f6' fill-opacity='0.3'/%3E%3C/svg%3E");
     }
-    
-    .side-nav-active-v7 {
-      color: #0052FF;
-      background-color: transparent;
-      background-image: linear-gradient(to right, #dbeafe 0%, #eff6ff 100%);
-      background-size: 100% 100%;
-    }
-    .dark .side-nav-active-v7 {
-      background-color: transparent;
-      background-image: linear-gradient(to right, rgba(59, 130, 246, 0.2) 0%, rgba(30, 58, 138, 0.1) 100%);
-    }
-    .side-nav-active-v7::after { opacity: 1; }
-    
-    /* Default pseudo-element for border shimmer */
-    .side-nav-item-v7::before {
+    .side-nav-active-v8 { --active-opacity: 1; }
+
+    /* Hover State Border Shimmer on ::before */
+    .side-nav-item-v8::before {
       content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
       background: linear-gradient(70deg, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.1) 45%, rgba(0, 0, 0, 0.3) 50%, transparent 55%, transparent 100%);
       background-size: 300% 100%; background-position: 100% 0;
@@ -161,37 +172,24 @@ export function Sidebar() {
       -webkit-mask-composite: xor; mask-composite: exclude;
       z-index: 2; opacity: 0; transition: opacity 0.3s ease; pointer-events: none;
     }
-    
-    .dark .side-nav-item-v7:not(.side-nav-active-v7)::before {
+    .dark .side-nav-item-v8::before {
       background: linear-gradient(70deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.15) 45%, rgba(255, 255, 255, 0.8) 50%, transparent 55%, transparent 100%);
       background-size: 300% 100%;
     }
 
-    /* Active state Border (Accent Color) */
-    .side-nav-active-v7::before {
-      opacity: 1;
-      background: linear-gradient(70deg, rgba(0, 82, 255, 0.8) 0%, rgba(0, 82, 255, 0.1) 100%);
-      background-size: 100% 100%;
-      background-position: 0% 0;
-      animation: none;
-    }
-    .dark .side-nav-active-v7::before {
-      background: linear-gradient(70deg, rgba(59, 130, 246, 0.8) 0%, rgba(59, 130, 246, 0.1) 100%);
-    }
-    
-    .side-nav-item-v7:not(.side-nav-active-v7):hover {
+    .side-nav-item-v8:not(.side-nav-active-v8):hover {
       color: var(--color-foreground);
-      animation: nav-bg-wipe-v7 0.7s ease-out forwards;
+      animation: nav-bg-wipe-v8 0.7s ease-out forwards;
     }
-    .side-nav-item-v7:not(.side-nav-active-v7):hover::before {
-      opacity: 1; animation: border-sweep-fill-v7 0.7s ease-out forwards;
+    .side-nav-item-v8:not(.side-nav-active-v8):hover::before {
+      opacity: 1; animation: border-sweep-fill-v8 0.7s ease-out forwards;
     }
-    
-    @keyframes border-sweep-fill-v7 {
+
+    @keyframes border-sweep-fill-v8 {
       0% { background-position: 100% 0; }
       100% { background-position: 0% 0; }
     }
-    @keyframes nav-bg-wipe-v7 {
+    @keyframes nav-bg-wipe-v8 {
       0% { background-size: 0% 100%; }
       100% { background-size: 100% 100%; }
     }
@@ -244,10 +242,12 @@ export function Sidebar() {
 
             const ItemContent = (
               <>
-                <item.icon className={cn("h-[22px] w-[22px] shrink-0", isActive ? "text-[#0052FF]" : "text-muted-foreground")} />
-                {!isCollapsed && <span className="truncate whitespace-nowrap flex-1 text-left">{item.name}</span>}
+                <div className={cn("absolute inset-0 rounded-xl z-0 transition-opacity duration-500 pointer-events-none side-nav-active-fill", isActive ? "opacity-100" : "opacity-0")} />
+                <div className={cn("absolute inset-0 rounded-xl z-0 transition-opacity duration-500 pointer-events-none side-nav-active-border", isActive ? "opacity-100" : "opacity-0")} />
+                <item.icon className={cn("h-[22px] w-[22px] shrink-0 relative z-10 transition-colors duration-500", isActive ? "text-[#0052FF]" : "text-muted-foreground")} />
+                {!isCollapsed && <span className="truncate whitespace-nowrap flex-1 text-left relative z-10 transition-colors duration-500">{item.name}</span>}
                 {!isCollapsed && hasSub && (
-                  <ChevronDown className={cn("h-4 w-4 transition-transform duration-200 text-muted-foreground", isExpanded && "rotate-180")} />
+                  <ChevronDown className={cn("h-4 w-4 transition-transform duration-200 text-muted-foreground relative z-10", isExpanded && "rotate-180")} />
                 )}
               </>
             );
@@ -259,9 +259,9 @@ export function Sidebar() {
                     title={isCollapsed ? item.name : undefined}
                     onClick={() => toggleExpand(item.name)}
                     className={cn(
-                      "side-nav-item-v7 relative flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
+                      "side-nav-item-v8 relative flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
                       isActive 
-                        ? "side-nav-active-v7 font-semibold shadow-sm" 
+                        ? "side-nav-active-v8 font-semibold shadow-sm" 
                         : "text-muted-foreground hover:text-foreground",
                       isCollapsed && "justify-center px-0"
                     )}
@@ -273,9 +273,9 @@ export function Sidebar() {
                     href={item.href || "#"}
                     title={isCollapsed ? item.name : undefined}
                     className={cn(
-                      "side-nav-item-v7 relative flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
+                      "side-nav-item-v8 relative flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
                       isActive 
-                        ? "side-nav-active-v7 font-semibold shadow-sm" 
+                        ? "side-nav-active-v8 font-semibold shadow-sm" 
                         : "text-muted-foreground hover:text-foreground",
                       isCollapsed && "justify-center px-0"
                     )}
@@ -314,13 +314,15 @@ export function Sidebar() {
                               key={sub.name}
                               href={sub.href}
                               className={cn(
-                                "side-nav-item-v7 rounded-lg px-3 py-2 text-[13px] transition-all duration-300",
+                                "side-nav-item-v8 overflow-hidden rounded-lg px-3 py-2 text-[13px] transition-all duration-300",
                                 isSubActive 
-                                  ? "side-nav-active-v7 font-semibold" 
+                                  ? "side-nav-active-v8 font-semibold" 
                                   : "text-muted-foreground hover:text-foreground"
                               )}
                             >
-                              {sub.name}
+                              <div className={cn("absolute inset-0 rounded-lg z-0 transition-opacity duration-500 pointer-events-none side-nav-active-fill", isSubActive ? "opacity-100" : "opacity-0")} />
+                              <div className={cn("absolute inset-0 rounded-lg z-0 transition-opacity duration-500 pointer-events-none side-nav-active-border", isSubActive ? "opacity-100" : "opacity-0")} />
+                              <span className="relative z-10 transition-colors duration-500">{sub.name}</span>
                             </Link>
                           );
                         })}
