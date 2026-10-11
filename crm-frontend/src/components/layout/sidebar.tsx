@@ -149,20 +149,6 @@ export function Sidebar() {
       background: linear-gradient(70deg, rgba(59, 130, 246, 0.8) 0%, rgba(59, 130, 246, 0.1) 100%);
     }
 
-    /* Triangles on ::after (Fades in via active class) */
-    .side-nav-item-v8::after {
-      content: ""; position: absolute; inset: 0; border-radius: inherit;
-      background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 14 14' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 2L13 12H1L7 2Z' fill='%230052FF' fill-opacity='0.25'/%3E%3C/svg%3E");
-      background-size: 14px 14px; background-repeat: repeat;
-      -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,1) 10%, rgba(0,0,0,0) 80%);
-      mask-image: linear-gradient(to right, rgba(0,0,0,1) 10%, rgba(0,0,0,0) 80%);
-      z-index: 1; opacity: var(--active-opacity, 0); transition: opacity 0.5s ease; pointer-events: none;
-    }
-    .dark .side-nav-item-v8::after {
-      background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 14 14' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 2L13 12H1L7 2Z' fill='%233b82f6' fill-opacity='0.3'/%3E%3C/svg%3E");
-    }
-    .side-nav-active-v8 { --active-opacity: 1; }
-
     /* Hover State Border Shimmer on ::before */
     .side-nav-item-v8::before {
       content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
