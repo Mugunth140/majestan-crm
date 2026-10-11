@@ -24,7 +24,8 @@ import {
   Target,
   UserPen,
   PhoneIncoming,
-  Megaphone
+  Megaphone,
+  HardHat
 } from "lucide-react";
 import { canViewAds } from "@/lib/ads-access";
 import Image from "next/image";
@@ -37,6 +38,7 @@ const navigation = [
   { name: "Agent Network", href: "/agent-network", icon: Network },
   { name: "Projects", href: "/projects", icon: Briefcase },
   { name: "Properties", href: "/properties", icon: Home },
+  { name: "Builder", href: "/builders", icon: HardHat },
   { name: "Advertisement", href: "/ads", icon: Megaphone, adsAccess: true },
   { name: "Asset Inventory", href: "/asset-inventory", icon: Package },
   { name: "HR Panel", href: "/hr", icon: UserPen },

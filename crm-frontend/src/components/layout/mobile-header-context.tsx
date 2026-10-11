@@ -27,6 +27,7 @@ const LIST_TITLES: [string, string][] = [
   ["/users", "Users"],
   ["/projects", "Projects"],
   ["/properties", "Properties"],
+  ["/builders", "Builders"],
   ["/lead-routing", "Lead Routing"],
   ["/activity-logs", "Activity Logs"],
   ["/master", "Master Registry"],

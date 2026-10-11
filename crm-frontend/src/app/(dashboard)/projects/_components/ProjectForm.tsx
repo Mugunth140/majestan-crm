@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { projectsApi } from "@/lib/projects-api";
 import { propertiesApi } from "@/lib/properties-api";
+import { apiFetch } from "@/lib/api-fetch";
 import {
   resolveCenterFromText,
   fetchPostalCode,
@@ -404,6 +405,24 @@ export function ProjectForm({
   const [name, setName] = useState(d?.name ?? "");
   const projectCode: string = (d as any)?.projectCode ?? "";
   const [projectType, setProjectType] = useState(d?.projectType ?? "apartment");
+  const [buildersList, setBuildersList] = useState<{ id: number; name: string; logoUrl?: string }[]>([]);
+
+  useEffect(() => {
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
+    apiFetch(`${API_URL}/builders/dropdown`)
+      .then((res) => res.json())
+      .then((res) => {
+        const list = res?.data ?? res ?? [];
+        if (Array.isArray(list)) {
+          setBuildersList(list);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const [builderId, setBuilderId] = useState<string>(
+    (d as any)?.builderId != null ? String((d as any).builderId) : ""
+  );
   const [builderName, setBuilderName] = useState(d?.builderName ?? "");
   const [reraNumber, setReraNumber] = useState(d?.reraNumber ?? "");
   const [possessionDate, setPossessionDate] = useState(
@@ -964,6 +983,7 @@ export function ProjectForm({
     state,
     name,
     projectType,
+    builderId,
     builderName,
     reraNumber,
     possessionDate,
@@ -1022,6 +1042,8 @@ export function ProjectForm({
       setName(str(saved.name, name));
       if (typeof saved.projectType === "string" && saved.projectType)
         setProjectType(saved.projectType);
+      if (saved.builderId !== undefined && saved.builderId !== null)
+        setBuilderId(String(saved.builderId));
       setBuilderName(str(saved.builderName, builderName));
       setReraNumber(str(saved.reraNumber, reraNumber));
       setPossessionDate(str(saved.possessionDate, possessionDate));
@@ -1210,6 +1232,7 @@ export function ProjectForm({
       const payload: Record<string, any> = {
         name: name.trim(),
         projectType,
+        builderId: builderId ? Number(builderId) : undefined,
         builderName: builderName.trim() || undefined,
         reraNumber: reraNumber.trim() || undefined,
         possessionDate: possessionDate || undefined,
@@ -1679,15 +1702,54 @@ export function ProjectForm({
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className={labelClass}>Builder Name</label>
+              <label className={labelClass}>Select Builder</label>
+              <FormSelect
+                name="builderId"
+                placeholder="Select a registered builder"
+                options={[
+                  ...buildersList.map((b) => ({ label: b.name, value: String(b.id) })),
+                  ...(builderName && !buildersList.some((b) => String(b.id) === builderId || b.name === builderName)
+                    ? [{ label: `${builderName} (Legacy / Custom)`, value: "__custom__" }]
+                    : []),
+                ]}
+                value={
+                  builderId ||
+                  (builderName && !buildersList.some((b) => b.name === builderName)
+                    ? "__custom__"
+                    : buildersList.find((b) => b.name === builderName)
+                    ? String(buildersList.find((b) => b.name === builderName)!.id)
+                    : "")
+                }
+                onValueChange={(val) => {
+                  if (val === "__custom__") {
+                    setBuilderId("");
+                  } else {
+                    setBuilderId(val || "");
+                    const found = buildersList.find((b) => String(b.id) === val);
+                    if (found) {
+                      setBuilderName(found.name);
+                    }
+                  }
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className={labelClass}>Builder Name (Custom / Display)</label>
               <Input
                 value={builderName}
-                onChange={(e) => setBuilderName(e.target.value)}
+                onChange={(e) => {
+                  setBuilderName(e.target.value);
+                  // If user edits text manually and it differs from selected builder, unset builderId
+                  const currentSelected = buildersList.find((b) => String(b.id) === builderId);
+                  if (currentSelected && currentSelected.name !== e.target.value) {
+                    setBuilderId("");
+                  }
+                }}
                 placeholder="Builder name"
                 className={inputClass}
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 md:col-span-2">
               <label className={labelClass}>RERA Number</label>
               <Input
                 value={reraNumber}
