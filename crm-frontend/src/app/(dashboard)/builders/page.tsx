@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
@@ -17,11 +18,12 @@ import { apiFetch } from "@/lib/api-fetch";
 import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
 import { Edit, ExternalLink, HardHat, Mail, Phone, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
-import { BuilderDialog, BuilderRecord } from "./_components/BuilderDialog";
+import { BuilderRecord } from "./_components/BuilderDialog";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 export default function BuildersPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"All" | "Active" | "Inactive">("All");
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -30,10 +32,6 @@ export default function BuildersPage() {
   const [builders, setBuilders] = useState<BuilderRecord[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Dialog states
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedBuilder, setSelectedBuilder] = useState<BuilderRecord | null>(null);
 
   // Single and Bulk delete
   const [deleteTarget, setDeleteTarget] = useState<BuilderRecord | null>(null);
@@ -308,10 +306,7 @@ export default function BuildersPage() {
               variant="ghost"
               size="icon"
               className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              onClick={() => {
-                setSelectedBuilder(b);
-                setIsDialogOpen(true);
-              }}
+              onClick={() => router.push(`/builders/new?edit=${b.id}`)}
               title="Edit Builder"
             >
               <Edit className="h-4 w-4" />
@@ -348,8 +343,7 @@ export default function BuildersPage() {
               variant="outline"
               size="sm"
               onClick={() => {
-                setSelectedBuilder(row);
-                setIsDialogOpen(true);
+                router.push(`/builders/new?edit=${row.id}`);
                 clearSelection();
               }}
             >
@@ -490,10 +484,7 @@ export default function BuildersPage() {
     <div className="px-4 pb-2 space-y-4">
       <div className="flex items-center gap-2">{searchBar(true)}</div>
       <Button
-        onClick={() => {
-          setSelectedBuilder(null);
-          setIsDialogOpen(true);
-        }}
+        onClick={() => router.push("/builders/new")}
         className="flex h-11 w-full rounded-xl bg-[#0052FF] px-4 text-[14px] font-semibold text-white shadow-md hover:bg-[#0052FF]/90 items-center justify-center gap-2 transition-transform active:scale-95"
       >
         <Plus size={18} />
@@ -525,10 +516,7 @@ export default function BuildersPage() {
                   <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
                 </Button>
                 <Button
-                  onClick={() => {
-                    setSelectedBuilder(null);
-                    setIsDialogOpen(true);
-                  }}
+                  onClick={() => router.push("/builders/new")}
                   className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95"
                 >
                   <Plus size={18} />
@@ -542,14 +530,6 @@ export default function BuildersPage() {
         <Device mobile={mobileFilters} desktop={desktopFilters} />
         <Device desktop={null} mobile={<div className="w-full px-4 md:px-0">{tableSection}</div>} />
       </div>
-
-      {/* Add / Edit Builder Modal */}
-      <BuilderDialog
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        builder={selectedBuilder}
-        onSuccess={fetchBuilders}
-      />
 
       {/* Single Delete Confirm Dialog */}
       <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
