@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { MapPin, Map, Filter, Building2 } from "lucide-react";
@@ -24,6 +25,12 @@ function RegistryCard({ icon: Icon, title, description, href, color, bg }: any) 
 }
 
 export default function MasterRegistryOverview() {
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    const main = document.querySelector("main");
+    if (main) main.scrollTop = 0;
+  }, []);
+
   return (
     <div className="flex flex-col space-y-6 mb-20 md:mb-0 px-4 md:px-8 mt-2 md:mt-0">
       <MobileHeader title="Master Registry" showBack />
