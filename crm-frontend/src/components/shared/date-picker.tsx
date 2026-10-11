@@ -144,6 +144,11 @@ export function DatePicker({ value, onChange, placeholder = "Pick a date", class
                 selected={internalDate}
                 onSelect={setInternalDate}
                 captionLayout="dropdown"
+                // day-picker caps dropdown navigation at Dec of the current
+                // year unless told otherwise — widen it so any date
+                // (possession years out, historic dates) stays selectable.
+                startMonth={new Date(1900, 0)}
+                endMonth={new Date(new Date().getFullYear() + 30, 11)}
                 className="p-0"
                 classNames={{
                   today:
