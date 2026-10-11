@@ -85,7 +85,7 @@ export class SiteApiService {
     return new HttpException(String(message), mapped);
   }
 
-  async request(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string, body?: any, retry = true): Promise<any> {
+  async request(method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE', path: string, body?: any, retry = true): Promise<any> {
     if (!this.token) {
       await this.login().catch((e) => {
         throw new HttpException(`Site API unavailable: ${(e as Error).message}`, 502);
@@ -125,5 +125,9 @@ export class SiteApiService {
 
   del(path: string): Promise<any> {
     return this.request('DELETE', path);
+  }
+
+  put(path: string, body: any): Promise<any> {
+    return this.request('PUT', path, body);
   }
 }
