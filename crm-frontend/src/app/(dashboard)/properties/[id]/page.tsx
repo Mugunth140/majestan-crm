@@ -458,6 +458,16 @@ export default function PropertyViewPage() {
                 <SectionField label="Conference Rooms" value={det.conferenceRoom} />
                 <SectionField label="Seater" value={det.seater} />
                 <SectionField label="Tenant Mix" value={det.tenantMix} />
+                <SectionField label="No. of Towers" value={det.towerNos} />
+                <SectionField label="Plot Area" value={det.plotArea} />
+                <SectionField label="Water Supply" value={det.waterSupply} />
+                <SectionField label="Lift Facility" value={bool(det.elevatorAccess)} />
+                <SectionField label="Private Cabins" value={det.privateCabins} />
+                <SectionField label="Fully Furnished" value={bool(det.furnished)} />
+                <SectionField label="Shared Washrooms" value={det.sharedWashrooms} />
+                <SectionField label="Individual Washrooms" value={det.individualWashrooms} />
+                <SectionField label="Construction Date" value={det.constructionDate} />
+                <SectionField label="Documents Required" value={det.documentRequire} />
               </>)}
               {type === "coworking" && (<>
                 <SectionField label="Workstations" value={det.availableWorkstations} />

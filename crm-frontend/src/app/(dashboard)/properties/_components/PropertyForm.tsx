@@ -485,6 +485,12 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   const [seater, setSeater] = useState(det?.seater ? String(det.seater) : "");
   const [tenantMix, setTenantMix] = useState(det?.tenantMix ?? "");
   const [commercialAmenities, setCommercialAmenities] = useState(det?.amenities ?? "");
+  // ---- Commercial porting (commercial only) ----
+  const [sharedWashrooms, setSharedWashrooms] = useState(det?.sharedWashrooms ? String(det.sharedWashrooms) : "");
+  const [individualWashrooms, setIndividualWashrooms] = useState(det?.individualWashrooms ? String(det.individualWashrooms) : "");
+  const [constructionDate, setConstructionDate] = useState(det?.constructionDate ?? "");
+  const [documentRequire, setDocumentRequire] = useState(det?.documentRequire ?? "");
+  const [fullyFurnished, setFullyFurnished] = useState<boolean>(det?.furnished ?? false);
 
   // ---- Coworking ----
   const [availableWorkstations, setAvailableWorkstations] = useState(det?.availableWorkstations ? String(det.availableWorkstations) : "");
@@ -760,6 +766,11 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
     { key: "seater", kind: "s", get: () => seater, set: setSeater },
     { key: "tenantMix", kind: "s", get: () => tenantMix, set: setTenantMix },
     { key: "commercialAmenities", kind: "s", get: () => commercialAmenities, set: setCommercialAmenities },
+    { key: "sharedWashrooms", kind: "s", get: () => sharedWashrooms, set: setSharedWashrooms },
+    { key: "individualWashrooms", kind: "s", get: () => individualWashrooms, set: setIndividualWashrooms },
+    { key: "constructionDate", kind: "s", get: () => constructionDate, set: setConstructionDate },
+    { key: "documentRequire", kind: "s", get: () => documentRequire, set: setDocumentRequire },
+    { key: "fullyFurnished", kind: "b", get: () => fullyFurnished, set: setFullyFurnished },
     { key: "availableWorkstations", kind: "s", get: () => availableWorkstations, set: setAvailableWorkstations },
     { key: "privateCabins", kind: "s", get: () => privateCabins, set: setPrivateCabins },
     { key: "meetingRooms", kind: "s", get: () => meetingRooms, set: setMeetingRooms },
@@ -1597,6 +1608,17 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           seater: seater ? Number(seater) : undefined,
           tenantMix: tenantMix.trim() || undefined,
           amenities: commercialAmenities.trim() || undefined,
+          // ── Commercial porting (commercial only) ──
+          towerNos: towerNos ? Number(towerNos) : undefined,
+          plotArea: plotArea.trim() || undefined,
+          waterSupply: waterSupply.trim() || undefined,
+          elevatorAccess,
+          privateCabins: privateCabins ? Number(privateCabins) : undefined,
+          furnished: fullyFurnished,
+          sharedWashrooms: sharedWashrooms ? Number(sharedWashrooms) : undefined,
+          individualWashrooms: individualWashrooms ? Number(individualWashrooms) : undefined,
+          constructionDate: constructionDate.trim() || undefined,
+          documentRequire: documentRequire.trim() || undefined,
         });
       }
 
@@ -3211,6 +3233,122 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                     Has Pantry
                   </label>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>No of Towers</label>
+                <Input
+                  type="number"
+                  value={towerNos}
+                  onChange={(e) => setTowerNos(e.target.value)}
+                  placeholder="e.g. 1"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Plot Area</label>
+                <Input
+                  value={plotArea}
+                  onChange={(e) => setPlotArea(e.target.value)}
+                  placeholder="e.g. 2000 sqft"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Water Supply</label>
+                <Input
+                  value={waterSupply}
+                  onChange={(e) => setWaterSupply(e.target.value)}
+                  placeholder="e.g. Corporation + Bore"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Lift Facility</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="commercialElevatorAccess"
+                    checked={elevatorAccess}
+                    onCheckedChange={(checked) => setElevatorAccess(!!checked)}
+                  />
+                  <label htmlFor="commercialElevatorAccess" className="text-sm font-semibold cursor-pointer flex-1">
+                    Lift Facility Available
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Private Cabins</label>
+                <Input
+                  type="number"
+                  value={privateCabins}
+                  onChange={(e) => setPrivateCabins(e.target.value)}
+                  placeholder="e.g. 2"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Fully Furnished</label>
+                <div className={checkboxRowClass}>
+                  <Checkbox
+                    id="fullyFurnished"
+                    checked={fullyFurnished}
+                    onCheckedChange={(checked) => setFullyFurnished(!!checked)}
+                  />
+                  <label htmlFor="fullyFurnished" className="text-sm font-semibold cursor-pointer flex-1">
+                    Fully Furnished
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Shared Washrooms</label>
+                <Input
+                  type="number"
+                  value={sharedWashrooms}
+                  onChange={(e) => setSharedWashrooms(e.target.value)}
+                  placeholder="e.g. 1"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Individual Washrooms</label>
+                <Input
+                  type="number"
+                  value={individualWashrooms}
+                  onChange={(e) => setIndividualWashrooms(e.target.value)}
+                  placeholder="e.g. 2"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Construction Date</label>
+                <Input
+                  value={constructionDate}
+                  onChange={(e) => setConstructionDate(e.target.value)}
+                  placeholder="e.g. June 2024"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Documents Required</label>
+                <Input
+                  value={documentRequire}
+                  onChange={(e) => setDocumentRequire(e.target.value)}
+                  placeholder="e.g. EC, Patta"
+                  className={inputClass}
+                />
               </div>
 
               <div className="space-y-2 lg:col-span-3">

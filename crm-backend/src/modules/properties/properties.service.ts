@@ -75,6 +75,15 @@ const INDUSTRIAL_ONLY_NUM_DETAILS_KEYS = new Set([
   'truckTrailerCount',
 ]);
 
+// Details keys forwarded ONLY when propertyType === 'commercial'.
+const COMMERCIAL_ONLY_NUM_DETAILS_KEYS = new Set([
+  'sharedWashrooms', 'individualWashrooms',
+]);
+
+const COMMERCIAL_ONLY_STR_DETAILS_KEYS = new Set([
+  'constructionDate', 'documentRequire',
+]);
+
 // Top-level keys forwarded ONLY when propertyType === 'industrial' (TEMP
 // porting anchors for the old-CRM Excel import + photo backfill).
 const INDUSTRIAL_ONLY_TOP_LEVEL_KEYS = new Set([
@@ -83,6 +92,10 @@ const INDUSTRIAL_ONLY_TOP_LEVEL_KEYS = new Set([
 
 function isIndustrial(propertyType: unknown): boolean {
   return String(propertyType ?? '').trim().toLowerCase() === 'industrial';
+}
+
+function isCommercial(propertyType: unknown): boolean {
+  return String(propertyType ?? '').trim().toLowerCase() === 'commercial';
 }
 
 function coerceBool(v: any): boolean | null {
@@ -533,6 +546,19 @@ export class PropertiesService {
         if (v !== undefined) details[key] = v;
       }
       for (const key of INDUSTRIAL_ONLY_NUM_DETAILS_KEYS) {
+        if (dto[key] === undefined || key in details) continue;
+        const v = num(dto[key]);
+        if (v !== undefined) details[key] = v;
+      }
+    }
+    // Commercial-only keys: same gating as industrial, for the commercial type.
+    if (isCommercial(propertyType ?? dto.propertyType)) {
+      for (const key of COMMERCIAL_ONLY_STR_DETAILS_KEYS) {
+        if (dto[key] === undefined || key in details) continue;
+        const v = str(dto[key]);
+        if (v !== undefined) details[key] = v;
+      }
+      for (const key of COMMERCIAL_ONLY_NUM_DETAILS_KEYS) {
         if (dto[key] === undefined || key in details) continue;
         const v = num(dto[key]);
         if (v !== undefined) details[key] = v;

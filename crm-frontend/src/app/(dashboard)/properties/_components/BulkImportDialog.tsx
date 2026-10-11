@@ -346,6 +346,17 @@ function mapRowToPayload(row: Record<string, unknown>): Record<string, any> {
       conferenceRoom: num("conference room"),
       seater: num("seater"),
       tenantMix: str("tenant mix"),
+      // ── Commercial porting (commercial only) ──
+      towerNos: num("no of towers"),
+      plotArea: num("plot area"),
+      waterSupply: str("water"),
+      elevatorAccess: str("lift facility"),
+      privateCabins: num("cabins"),
+      furnished: str("fully furnished"),
+      sharedWashrooms: num("no of shared washrooms"),
+      individualWashrooms: num("no of individual washroom"),
+      constructionDate: str("construction date"),
+      documentRequire: str("document require"),
     });
   }
 

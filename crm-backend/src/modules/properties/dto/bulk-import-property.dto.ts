@@ -337,6 +337,19 @@ export class BulkPropertyRowDto {
   @IsOptional() @Transform(toTrimmedString) @IsString()
   tenantMix?: string;
 
+  // ── PropertyDetails: commercial porting (commercial only) ────────────────
+  @IsOptional() @Transform(toNumber) @IsNumber()
+  sharedWashrooms?: number;
+
+  @IsOptional() @Transform(toNumber) @IsNumber()
+  individualWashrooms?: number;
+
+  @IsOptional() @Transform(toTrimmedString) @IsString()
+  constructionDate?: string;
+
+  @IsOptional() @Transform(toTrimmedString) @IsString()
+  documentRequire?: string;
+
   // ── PropertyDetails: industrial / warehouse ────────────────────────────────
   @IsOptional() @Transform(toTrimmedString) @IsString()
   buildingType?: string;

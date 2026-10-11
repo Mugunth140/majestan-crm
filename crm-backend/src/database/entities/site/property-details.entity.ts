@@ -387,6 +387,19 @@ export class PropertyDetails {
   @Column({ name: 'truck_trailer_count', type: 'int', nullable: true })
   truckTrailerCount!: number | null;
 
+  // ── Commercial porting fields (commercial only; mirror of site DB)
+  @Column({ name: 'shared_washrooms', type: 'int', nullable: true })
+  sharedWashrooms!: number | null;
+
+  @Column({ name: 'individual_washrooms', type: 'int', nullable: true })
+  individualWashrooms!: number | null;
+
+  @Column({ name: 'construction_date', type: 'varchar', length: 100, nullable: true })
+  constructionDate!: string | null;
+
+  @Column({ name: 'document_require', type: 'varchar', length: 255, nullable: true })
+  documentRequire!: string | null;
+
   @OneToOne(() => Property, (property) => property.propertyDetails, {
     lazy: true,
     nullable: false,

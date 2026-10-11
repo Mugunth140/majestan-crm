@@ -598,6 +598,19 @@ export class CreatePropertyDto {
   @IsOptional() @Type(() => Number) @IsNumber()
   truckTrailerCount?: number;
 
+  // ── PropertyDetails: commercial porting (commercial only) ───────────────
+  @IsOptional() @Type(() => Number) @IsNumber()
+  sharedWashrooms?: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  individualWashrooms?: number;
+
+  @IsOptional() @IsString()
+  constructionDate?: string;
+
+  @IsOptional() @IsString()
+  documentRequire?: string;
+
   @IsOptional() @IsBoolean()
   heavyVehicleAccess?: boolean;
 
