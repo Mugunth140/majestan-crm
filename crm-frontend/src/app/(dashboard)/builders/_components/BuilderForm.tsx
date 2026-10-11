@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Building2, Globe, Loader2, Mail, Phone, Save, Upload, X } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Upload, X } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -115,86 +115,74 @@ export function BuilderForm({ mode, initial }: BuilderFormProps) {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-16 animate-in fade-in slide-in-from-bottom-4 duration-500 px-2.5 md:px-0 mt-2 md:mt-0 mb-20 md:mb-0">
+    <div className="max-w-5xl mx-auto space-y-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500 px-2.5 md:px-0 mt-2 md:mt-0 mb-20 md:mb-0">
       <MobileHeader
         title={mode === "create" ? "Add Builder" : "Edit Builder"}
         showBack
       />
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="h-10 w-10 rounded-xl hidden md:inline-flex"
-            onClick={() => router.push("/builders")}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-              {mode === "create" ? "Add New Builder" : "Edit Builder"}
-            </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {mode === "create"
-                ? "Register a new builder with profile details, logo, and project metrics."
-                : "Update builder profile, contact information, and project statistics."}
-            </p>
-          </div>
+      {/* Desktop Header */}
+      <div className="hidden md:flex items-center gap-4 min-h-[48px]">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-10 w-10 rounded-full"
+          onClick={() => router.push("/builders")}
+        >
+          <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {mode === "create" ? "Add New Builder" : "Edit Builder"}
+          </h1>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Profile Card */}
-        <div className="bg-card border rounded-2xl p-6 md:p-8 shadow-sm space-y-6">
-          <div className="flex items-center gap-2 border-b pb-4">
-            <Building2 className="w-5 h-5 text-[#0052FF]" />
-            <h2 className="text-lg font-semibold">General Information</h2>
-          </div>
+        <div className="bg-card border rounded-2xl p-8 shadow-sm space-y-6">
+          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+            Basic Information
+          </h3>
 
           {/* Logo Upload Section */}
           <div className="space-y-2">
-            <label className={labelClass}>Profile / Company Logo</label>
-            <p className="text-xs text-muted-foreground">
-              Square or horizontal image. Automatically compressed via imgproxy and stored in Cloudflare R2.
-            </p>
-
-            <div className="flex items-center gap-5 pt-2">
-              <div className="relative h-24 w-24 rounded-2xl border-2 border-dashed border-border/80 bg-muted/20 overflow-hidden flex items-center justify-center shrink-0 shadow-inner group">
+            <label className={labelClass}>Logo</label>
+            <div className="flex items-center gap-4 pt-1">
+              <div className="relative h-20 w-20 rounded-xl border border-dashed border-border bg-muted/20 overflow-hidden flex items-center justify-center shrink-0">
                 {logoPreview ? (
                   <>
                     <Image
                       src={logoPreview}
                       alt="Logo preview"
                       fill
-                      className="object-contain p-2"
+                      className="object-contain p-1.5"
                       unoptimized={logoPreview.startsWith("blob:")}
                     />
                     <button
                       type="button"
                       onClick={handleRemoveLogo}
-                      className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
+                      className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
                       title="Remove logo"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-3 h-3" />
                     </button>
                   </>
                 ) : (
-                  <Building2 className="w-10 h-10 text-muted-foreground/40" />
+                  <span className="text-xs text-muted-foreground font-medium">No Logo</span>
                 )}
               </div>
 
-              <div className="space-y-2">
+              <div>
                 <label className="cursor-pointer">
-                  <span className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-muted/60 hover:bg-muted text-sm font-medium border border-border/60 transition-colors">
+                  <span className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-muted/60 hover:bg-muted text-sm font-medium border border-border/60 transition-colors">
                     {isUploadingLogo ? (
                       <Loader2 className="w-4 h-4 animate-spin text-[#0052FF]" />
                     ) : (
                       <Upload className="w-4 h-4" />
                     )}
-                    {isUploadingLogo ? "Compressing & Uploading..." : "Upload Logo"}
+                    {isUploadingLogo ? "Uploading..." : "Upload Logo"}
                   </span>
                   <input
                     type="file"
@@ -207,16 +195,13 @@ export function BuilderForm({ mode, initial }: BuilderFormProps) {
                     }}
                   />
                 </label>
-                <p className="text-[11px] text-muted-foreground">
-                  PNG, JPG, WebP, or SVG up to 5MB.
-                </p>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label className={labelClass}>Builder / Company Name *</label>
+              <label className={labelClass}>Builder Name *</label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -227,66 +212,55 @@ export function BuilderForm({ mode, initial }: BuilderFormProps) {
             </div>
 
             <div className="space-y-2">
-              <label className={labelClass}>Website URL</label>
-              <div className="relative">
-                <Globe className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  value={website}
-                  onChange={(e) => setWebsite(e.target.value)}
-                  placeholder="https://example.com"
-                  type="url"
-                  className={`${inputClass} pl-10`}
-                />
-              </div>
+              <label className={labelClass}>Website</label>
+              <Input
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                placeholder="https://example.com"
+                type="url"
+                className={inputClass}
+              />
             </div>
           </div>
         </div>
 
-        {/* Contact Information */}
-        <div className="bg-card border rounded-2xl p-6 md:p-8 shadow-sm space-y-6">
-          <div className="flex items-center gap-2 border-b pb-4">
-            <Phone className="w-5 h-5 text-[#0052FF]" />
-            <h2 className="text-lg font-semibold">Contact Details</h2>
-          </div>
+        {/* Contact Details */}
+        <div className="bg-card border rounded-2xl p-8 shadow-sm space-y-6">
+          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+            Contact Details
+          </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label className={labelClass}>Phone Number</label>
-              <div className="relative">
-                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+91 98765 43210"
-                  className={`${inputClass} pl-10`}
-                />
-              </div>
+              <label className={labelClass}>Mobile Number</label>
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+91 98765 43210"
+                className={inputClass}
+              />
             </div>
 
             <div className="space-y-2">
               <label className={labelClass}>Email Address</label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="contact@builder.com"
-                  type="email"
-                  className={`${inputClass} pl-10`}
-                />
-              </div>
+              <Input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="contact@builder.com"
+                type="email"
+                className={inputClass}
+              />
             </div>
           </div>
         </div>
 
-        {/* Track Record & Metrics */}
-        <div className="bg-card border rounded-2xl p-6 md:p-8 shadow-sm space-y-6">
-          <div className="flex items-center gap-2 border-b pb-4">
-            <Building2 className="w-5 h-5 text-[#0052FF]" />
-            <h2 className="text-lg font-semibold">Track Record & Experience</h2>
-          </div>
+        {/* Track Record & Experience */}
+        <div className="bg-card border rounded-2xl p-8 shadow-sm space-y-6">
+          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+            Track Record
+          </h3>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <div className="space-y-2">
               <label className={labelClass}>Experience (Years)</label>
               <Input
@@ -325,29 +299,24 @@ export function BuilderForm({ mode, initial }: BuilderFormProps) {
           </div>
 
           <div className="space-y-2 pt-2">
-            <label className={labelClass}>About Builder / Bio</label>
+            <label className={labelClass}>About Builder</label>
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Tell buyers about the builder's background, vision, architecture quality, awards, etc."
+              placeholder="Enter builder background, company overview..."
               rows={4}
               className="rounded-xl bg-muted/30 resize-y"
             />
           </div>
 
           <div className="flex items-center justify-between pt-4 border-t">
-            <div>
-              <p className="text-sm font-semibold">Active Status</p>
-              <p className="text-xs text-muted-foreground">
-                Active builders are available in project forms and public listings.
-              </p>
-            </div>
+            <span className="text-sm font-semibold">Active Status</span>
             <Switch checked={isActive} onCheckedChange={setIsActive} />
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-end gap-3 pt-4">
+        <div className="flex items-center justify-end gap-3 pt-2">
           <Button
             type="button"
             variant="outline"
