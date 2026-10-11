@@ -350,7 +350,7 @@ export class PropertiesService {
     return this.siteApi.get(`/properties/presigned-url?${q.toString()}`);
   }
 
-  private async putToR2(file: Express.Multer.File): Promise<string> {
+  private async putToR2(file: Express.Multer.File, maxAttempts = 3): Promise<string> {
     if (!file.size) throw new BadRequestException(`File is empty: ${file.originalname}`);
     const q = new URLSearchParams({ fileName: file.originalname, fileType: file.mimetype });
     const presigned = await this.siteApi.get(`/properties/presigned-url?${q.toString()}`);
@@ -359,16 +359,40 @@ export class PropertiesService {
     if (!uploadUrl || !fileKey) {
       throw new BadRequestException(`Failed to prepare upload for ${file.originalname}`);
     }
-    const put = await fetch(uploadUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': file.mimetype },
-      body: file.buffer as unknown as BodyInit,
-      signal: AbortSignal.timeout(60000),
-    });
-    if (!put.ok) {
-      throw new BadRequestException(`Failed to upload ${file.originalname}`);
+    // The R2 PUT traverses public internet from the container, where DNS
+    // intermittently stalls (getaddrinfo ETIMEOUT) and long hangs surface to
+    // the frontend as proxy socket hang-ups. Retry transient network
+    // failures; HTTP error statuses fail fast (a 403 signature problem will
+    // not heal on retry).
+    let lastError: unknown = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const put = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.mimetype },
+          body: file.buffer as unknown as BodyInit,
+          signal: AbortSignal.timeout(45000),
+        });
+        if (!put.ok) {
+          throw new BadRequestException(
+            `Failed to upload ${file.originalname} (status ${put.status})`,
+          );
+        }
+        return fileKey;
+      } catch (err) {
+        // HTTP-level failures carry our own status — never retry those.
+        if (err instanceof BadRequestException) throw err;
+        lastError = err;
+        if (attempt < maxAttempts) {
+          await new Promise((r) => setTimeout(r, 1000 * attempt));
+        }
+      }
     }
-    return fileKey;
+    throw lastError instanceof Error
+      ? new BadRequestException(
+          `Failed to upload ${file.originalname} after ${maxAttempts} attempts: ${lastError.message}`,
+        )
+      : new BadRequestException(`Failed to upload ${file.originalname}`);
   }
 
   // ── direct upload: files in → R2 keys out (no URLs for callers to handle) ──
