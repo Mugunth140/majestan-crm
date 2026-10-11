@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
-import { Edit, Loader2, ChevronDown, Download } from "lucide-react";
+import { Edit, Loader2, ChevronDown, Download, Play } from "lucide-react";
 import { projectsApi } from "@/lib/projects-api";
 import {
   computeProjectRanges,
@@ -369,6 +369,28 @@ export default function ProjectDetailPage({
                 </div>
               </div>
             )}
+          {Array.isArray(project.videoUrls) &&
+            project.videoUrls.length > 0 && (
+              <div className="mb-6">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                  Videos ({project.videoUrls.length})
+                </p>
+                <div className="space-y-1.5">
+                  {project.videoUrls.map((v: any, i: number) => (
+                    <a
+                      key={i}
+                      href={String(v)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-2 text-sm font-medium text-[#0052FF] hover:underline truncate"
+                    >
+                      <Play className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{String(v)}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           {(project.brochureUrl || project.brochureKey) && (
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
@@ -396,6 +418,7 @@ export default function ProjectDetailPage({
           {!project.coverImageUrl &&
             !project.mobileCoverImageUrl &&
             !(project.galleryImageUrls ?? []).length &&
+            !(project.videoUrls ?? []).length &&
             !project.brochureKey && (
               <p className="text-sm text-muted-foreground italic">
                 No media uploaded.
