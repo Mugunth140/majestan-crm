@@ -502,12 +502,11 @@ export function ProjectForm({
     }));
   });
 
-  const [videoUrls, setVideoUrls] = useState<string[]>(() => {
+  const [videoUrl, setVideoUrl] = useState(() => {
     const existing = d?.videoUrls ?? [];
-    if (!Array.isArray(existing)) return [];
-    return existing
-      .map((v: any) => String(v ?? "").trim())
-      .filter((v: string) => v !== "");
+    if (!Array.isArray(existing)) return "";
+    const first = existing.map((v: any) => String(v ?? "").trim()).find((v: string) => v !== "");
+    return first ?? "";
   });
 
   const [connectivity, setConnectivity] = useState<ConnectivityRow[]>(() => {
@@ -991,7 +990,7 @@ export function ProjectForm({
     specifications,
     amenityIds,
     gallery: gallery.map((g) => ({ key: g.key, preview: "" })),
-    videoUrls,
+    videoUrls: videoUrl.trim() !== "" ? [videoUrl.trim()] : [],
     connectivity,
     nearbyCategories,
     faqs,
@@ -1088,12 +1087,12 @@ export function ProjectForm({
             preview: "",
           })),
         );
-      if (Array.isArray(saved.videoUrls))
-        setVideoUrls(
-          saved.videoUrls
-            .map((v: any) => String(v ?? "").trim())
-            .filter((v: string) => v !== ""),
-        );
+      if (Array.isArray(saved.videoUrls)) {
+        const first = saved.videoUrls
+          .map((v: any) => String(v ?? "").trim())
+          .find((v: string) => v !== "");
+        setVideoUrl(first ?? "");
+      }
       if (Array.isArray(saved.connectivity) && saved.connectivity.length > 0)
         setConnectivity(
           saved.connectivity.map((c: any) => ({
@@ -1201,11 +1200,9 @@ export function ProjectForm({
       toast.error(`Unit ${incompleteIdx + 1} has details but no unit code.`);
       return;
     }
-    const badVideoIdx = videoUrls.findIndex(
-      (v) => v.trim() !== "" && !YOUTUBE_URL_RE.test(v.trim()),
-    );
-    if (badVideoIdx >= 0) {
-      toast.error(`Video ${badVideoIdx + 1} is not a valid YouTube link.`);
+    const trimmedVideoUrl = videoUrl.trim();
+    if (trimmedVideoUrl !== "" && !YOUTUBE_URL_RE.test(trimmedVideoUrl)) {
+      toast.error("Video link is not a valid YouTube link.");
       return;
     }
     setIsLoading(true);
@@ -1273,10 +1270,8 @@ export function ProjectForm({
         galleryImageUrls:
           gallery.length > 0 ? gallery.map((g) => g.key) : undefined,
         videoUrls: (() => {
-          const cleaned = videoUrls
-            .map((v) => v.trim())
-            .filter((v) => v !== "");
-          return cleaned.length > 0 ? cleaned : undefined;
+          const cleaned = videoUrl.trim();
+          return cleaned !== "" ? [cleaned] : undefined;
         })(),
         status,
         amenities: amenityIds.map((id) => ({ amenityId: id })),
@@ -2309,52 +2304,32 @@ export function ProjectForm({
         </div>
 
         <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <div className="flex items-center justify-between border-b pb-3 mb-6">
+          <div className="border-b pb-3 mb-6">
             <h3 className="text-lg font-bold text-foreground">
-              Videos ({videoUrls.filter((v) => v.trim()).length})
+              Video
             </h3>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setVideoUrls((prev) => [...prev, ""])}
-              className="h-9 rounded-full px-4"
-            >
-              <Plus className="h-4 w-4 mr-1" /> Add Video
-            </Button>
-          </div>
-          {videoUrls.length === 0 ? (
-            <p className="text-sm text-muted-foreground italic">
-              No videos yet — paste YouTube links to show on the photos page
-              later.
+            <p className="text-sm text-muted-foreground mt-1">
+              One YouTube link — plays on the photos page.
             </p>
-          ) : (
-            <div className="space-y-3">
-              {videoUrls.map((url, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <Input
-                    value={url}
-                    onChange={(e) =>
-                      setVideoUrls((prev) =>
-                        prev.map((v, j) => (j === i ? e.target.value : v)),
-                      )
-                    }
-                    placeholder="https://www.youtube.com/watch?v=..."
-                    className="h-10 rounded-xl bg-muted/30 border-border/60 text-[13.5px] flex-1 min-w-0"
-                  />
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setVideoUrls((prev) => prev.filter((_, j) => j !== i))
-                    }
-                    className="p-2.5 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 shrink-0"
-                    aria-label={`Remove video ${i + 1}`}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+          </div>
+          <div className="flex items-center gap-3">
+            <Input
+              value={videoUrl}
+              onChange={(e) => setVideoUrl(e.target.value)}
+              placeholder="https://www.youtube.com/watch?v=..."
+              className="h-10 rounded-xl bg-muted/30 border-border/60 text-[13.5px] flex-1 min-w-0"
+            />
+            {videoUrl.trim() !== "" && (
+              <button
+                type="button"
+                onClick={() => setVideoUrl("")}
+                className="p-2.5 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 shrink-0"
+                aria-label="Remove video"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="bg-card border rounded-2xl p-8 shadow-sm">
