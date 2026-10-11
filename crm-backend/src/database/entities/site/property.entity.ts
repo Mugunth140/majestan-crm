@@ -261,6 +261,16 @@ export class Property {
   @Column({ name: 'attachment6', type: 'varchar', length: 1024, nullable: true })
   attachment6!: string | null;
 
+  // ── Industrial porting anchors (TEMP, industrial only; mirror of site DB)
+  @Column({ name: 'legacy_source_id', type: 'varchar', length: 64, nullable: true })
+  legacySourceId!: string | null;
+
+  @Column({ name: 'legacy_row_no', type: 'int', nullable: true })
+  legacyRowNo!: number | null;
+
+  @Column({ name: 'available_visit_time', type: 'varchar', length: 20, nullable: true })
+  availableVisitTime!: string | null;
+
   @Column({ name: 'available_from', type: 'date', nullable: true })
   availableFrom!: Date | null;
 

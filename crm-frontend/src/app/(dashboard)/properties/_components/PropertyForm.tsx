@@ -533,6 +533,18 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   const [labourAvailability, setLabourAvailability] = useState(det?.labourAvailability ?? "");
   const [industrialPowerBackup, setIndustrialPowerBackup] = useState<boolean>(det?.powerBackup ?? false);
   const [heavyVehicleAccess, setHeavyVehicleAccess] = useState<boolean>(det?.heavyVehicleAccess ?? false);
+  // ---- Industrial porting (industrial only) ----
+  const [powerSupply2, setPowerSupply2] = useState(det?.powerSupply2 ?? "");
+  const [powerSupply3, setPowerSupply3] = useState(det?.powerSupply3 ?? "");
+  const [ownershipProofVerified, setOwnershipProofVerified] = useState(det?.ownershipProofVerified ?? "");
+  const [buildingApprovalCert, setBuildingApprovalCert] = useState(det?.buildingApprovalCert ?? "");
+  const [pollutionClearance, setPollutionClearance] = useState(det?.pollutionClearance ?? "");
+  const [blueprintLayout, setBlueprintLayout] = useState(det?.blueprintLayout ?? "");
+  const [otherLegalClearance, setOtherLegalClearance] = useState(det?.otherLegalClearance ?? "");
+  const [otherLegalDetails, setOtherLegalDetails] = useState(det?.otherLegalDetails ?? "");
+  const [publicTransportAccess, setPublicTransportAccess] = useState(det?.publicTransportAccess ?? "");
+  const [truckTrailerCount, setTruckTrailerCount] = useState(det?.truckTrailerCount ? String(det.truckTrailerCount) : "");
+  const [availableVisitTime, setAvailableVisitTime] = useState(d?.availableVisitTime ?? "");
 
   // ---- Owner ----
   const [ownerName, setOwnerName] = useState(d?.ownerName ?? "");
@@ -792,6 +804,17 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
     { key: "labourAvailability", kind: "s", get: () => labourAvailability, set: setLabourAvailability },
     { key: "industrialPowerBackup", kind: "b", get: () => industrialPowerBackup, set: setIndustrialPowerBackup },
     { key: "heavyVehicleAccess", kind: "b", get: () => heavyVehicleAccess, set: setHeavyVehicleAccess },
+    { key: "powerSupply2", kind: "s", get: () => powerSupply2, set: setPowerSupply2 },
+    { key: "powerSupply3", kind: "s", get: () => powerSupply3, set: setPowerSupply3 },
+    { key: "ownershipProofVerified", kind: "s", get: () => ownershipProofVerified, set: setOwnershipProofVerified },
+    { key: "buildingApprovalCert", kind: "s", get: () => buildingApprovalCert, set: setBuildingApprovalCert },
+    { key: "pollutionClearance", kind: "s", get: () => pollutionClearance, set: setPollutionClearance },
+    { key: "blueprintLayout", kind: "s", get: () => blueprintLayout, set: setBlueprintLayout },
+    { key: "otherLegalClearance", kind: "s", get: () => otherLegalClearance, set: setOtherLegalClearance },
+    { key: "otherLegalDetails", kind: "s", get: () => otherLegalDetails, set: setOtherLegalDetails },
+    { key: "publicTransportAccess", kind: "s", get: () => publicTransportAccess, set: setPublicTransportAccess },
+    { key: "truckTrailerCount", kind: "s", get: () => truckTrailerCount, set: setTruckTrailerCount },
+    { key: "availableVisitTime", kind: "s", get: () => availableVisitTime, set: setAvailableVisitTime },
     { key: "ownerName", kind: "s", get: () => ownerName, set: setOwnerName },
     { key: "ownerPhone", kind: "s", get: () => ownerPhone, set: setOwnerPhone },
     { key: "ownerEmail", kind: "s", get: () => ownerEmail, set: setOwnerEmail },
@@ -1632,6 +1655,18 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           labourAvailability: labourAvailability.trim() || undefined,
           powerBackup: industrialPowerBackup,
           heavyVehicleAccess,
+          // ── Industrial porting (industrial only) ──
+          powerSupply2: powerSupply2.trim() || undefined,
+          powerSupply3: powerSupply3.trim() || undefined,
+          ownershipProofVerified: ownershipProofVerified.trim() || undefined,
+          buildingApprovalCert: buildingApprovalCert.trim() || undefined,
+          pollutionClearance: pollutionClearance.trim() || undefined,
+          blueprintLayout: blueprintLayout.trim() || undefined,
+          otherLegalClearance: otherLegalClearance.trim() || undefined,
+          otherLegalDetails: otherLegalDetails.trim() || undefined,
+          publicTransportAccess: publicTransportAccess.trim() || undefined,
+          truckTrailerCount: truckTrailerCount ? Number(truckTrailerCount) : undefined,
+          availableVisitTime: availableVisitTime.trim() || undefined,
         });
       }
 
@@ -3761,6 +3796,119 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                     Heavy Vehicle Access
                   </label>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Power Supply 2</label>
+                <Input
+                  value={powerSupply2}
+                  onChange={(e) => setPowerSupply2(e.target.value)}
+                  placeholder="e.g. 50 HP"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Power Supply 3</label>
+                <Input
+                  value={powerSupply3}
+                  onChange={(e) => setPowerSupply3(e.target.value)}
+                  placeholder="e.g. 25 HP"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Truck/Trailer Count</label>
+                <Input
+                  type="number"
+                  value={truckTrailerCount}
+                  onChange={(e) => setTruckTrailerCount(e.target.value)}
+                  placeholder="e.g. 2"
+                  min={0}
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Public Transport Access</label>
+                <Input
+                  value={publicTransportAccess}
+                  onChange={(e) => setPublicTransportAccess(e.target.value)}
+                  placeholder="e.g. Bus stop 500m"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Ownership Proof Verified</label>
+                <Input
+                  value={ownershipProofVerified}
+                  onChange={(e) => setOwnershipProofVerified(e.target.value)}
+                  placeholder="e.g. Yes"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Building Approval Certification</label>
+                <Input
+                  value={buildingApprovalCert}
+                  onChange={(e) => setBuildingApprovalCert(e.target.value)}
+                  placeholder="e.g. Approved"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Pollution Clearance</label>
+                <Input
+                  value={pollutionClearance}
+                  onChange={(e) => setPollutionClearance(e.target.value)}
+                  placeholder="e.g. Obtained"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Blueprint / Layout</label>
+                <Input
+                  value={blueprintLayout}
+                  onChange={(e) => setBlueprintLayout(e.target.value)}
+                  placeholder="e.g. Available"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Other Legal Clearance</label>
+                <Input
+                  value={otherLegalClearance}
+                  onChange={(e) => setOtherLegalClearance(e.target.value)}
+                  placeholder="e.g. NOC"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass}>Available Visit Time</label>
+                <Input
+                  value={availableVisitTime}
+                  onChange={(e) => setAvailableVisitTime(e.target.value)}
+                  placeholder="e.g. 10:00"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2 lg:col-span-3">
+                <label className={labelClass}>Other Legal Clearance Details</label>
+                <Textarea
+                  value={otherLegalDetails}
+                  onChange={(e) => setOtherLegalDetails(e.target.value)}
+                  placeholder="e.g. Clearance details"
+                  rows={3}
+                  className="rounded-xl bg-muted/30 resize-none"
+                />
               </div>
 
               <div className="space-y-2 lg:col-span-3">

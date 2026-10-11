@@ -567,6 +567,37 @@ export class CreatePropertyDto {
   @IsOptional() @IsBoolean()
   industrialPowerBackup?: boolean;
 
+  // ── PropertyDetails: industrial porting (industrial only) ─────────────────
+  @IsOptional() @IsString()
+  powerSupply2?: string;
+
+  @IsOptional() @IsString()
+  powerSupply3?: string;
+
+  @IsOptional() @IsString()
+  ownershipProofVerified?: string;
+
+  @IsOptional() @IsString()
+  buildingApprovalCert?: string;
+
+  @IsOptional() @IsString()
+  pollutionClearance?: string;
+
+  @IsOptional() @IsString()
+  blueprintLayout?: string;
+
+  @IsOptional() @IsString()
+  otherLegalClearance?: string;
+
+  @IsOptional() @IsString()
+  otherLegalDetails?: string;
+
+  @IsOptional() @IsString()
+  publicTransportAccess?: string;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  truckTrailerCount?: number;
+
   @IsOptional() @IsBoolean()
   heavyVehicleAccess?: boolean;
 
@@ -580,4 +611,14 @@ export class CreatePropertyDto {
 
   @IsOptional() @IsString() suitableFor?: string;
   @IsOptional() @IsString() roadWidth?: string;
+
+  // ── Properties: industrial porting anchors (TEMP, industrial only) ────────
+  @IsOptional() @IsString()
+  legacySourceId?: string;
+
+  @IsOptional() @Type(() => Number) @IsNumber()
+  legacyRowNo?: number;
+
+  @IsOptional() @IsString()
+  availableVisitTime?: string;
 }

@@ -501,6 +501,18 @@ export default function PropertyViewPage() {
                 <SectionField label="Nearest Port" value={det.nearestPort} />
                 <SectionField label="Nearest Airport" value={det.nearestAirport} />
                 <SectionField label="Labour Availability" value={det.labourAvailability} />
+                <SectionField label="Power Supply 2" value={det.powerSupply2} />
+                <SectionField label="Power Supply 3" value={det.powerSupply3} />
+                <SectionField label="Truck/Trailer Count" value={det.truckTrailerCount} />
+                <SectionField label="Public Transport Access" value={det.publicTransportAccess} />
+                <SectionField label="Ownership Proof Verified" value={det.ownershipProofVerified} />
+                <SectionField label="Building Approval Certification" value={det.buildingApprovalCert} />
+                <SectionField label="Pollution Clearance" value={det.pollutionClearance} />
+                <SectionField label="Blueprint / Layout" value={det.blueprintLayout} />
+                <SectionField label="Other Legal Clearance" value={det.otherLegalClearance} />
+                <SectionField label="Other Legal Details" value={det.otherLegalDetails} />
+                <SectionField label="Available Visit Time" value={property.availableVisitTime} />
+                <SectionField label="Legacy Source Id" value={property.legacySourceId} />
               </>)}
             </Section>
           )}

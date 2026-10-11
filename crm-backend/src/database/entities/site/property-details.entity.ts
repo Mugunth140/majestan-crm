@@ -356,6 +356,37 @@ export class PropertyDetails {
   @Column({ name: 'accessibility', type: 'text', nullable: true })
   accessibility!: string | null;
 
+  // ── Industrial porting fields (industrial only; mirror of site DB)
+  @Column({ name: 'power_supply_2', type: 'varchar', length: 50, nullable: true })
+  powerSupply2!: string | null;
+
+  @Column({ name: 'power_supply_3', type: 'varchar', length: 50, nullable: true })
+  powerSupply3!: string | null;
+
+  @Column({ name: 'ownership_proof_verified', type: 'varchar', length: 50, nullable: true })
+  ownershipProofVerified!: string | null;
+
+  @Column({ name: 'building_approval_cert', type: 'varchar', length: 50, nullable: true })
+  buildingApprovalCert!: string | null;
+
+  @Column({ name: 'pollution_clearance', type: 'varchar', length: 50, nullable: true })
+  pollutionClearance!: string | null;
+
+  @Column({ name: 'blueprint_layout', type: 'varchar', length: 50, nullable: true })
+  blueprintLayout!: string | null;
+
+  @Column({ name: 'other_legal_clearance', type: 'varchar', length: 255, nullable: true })
+  otherLegalClearance!: string | null;
+
+  @Column({ name: 'other_legal_details', type: 'text', nullable: true })
+  otherLegalDetails!: string | null;
+
+  @Column({ name: 'public_transport_access', type: 'varchar', length: 255, nullable: true })
+  publicTransportAccess!: string | null;
+
+  @Column({ name: 'truck_trailer_count', type: 'int', nullable: true })
+  truckTrailerCount!: number | null;
+
   @OneToOne(() => Property, (property) => property.propertyDetails, {
     lazy: true,
     nullable: false,

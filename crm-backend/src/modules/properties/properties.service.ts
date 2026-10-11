@@ -62,6 +62,29 @@ const BOOLEAN_DETAILS_KEYS = new Set([
   'elevatorAccess', 'securityStaff',
 ]);
 
+// Details keys forwarded ONLY when propertyType === 'industrial'. Never add
+// these names to the shared NUMERIC/PASSTHROUGH/BOOLEAN sets above — that
+// would leak industrial-only columns onto other property types.
+const INDUSTRIAL_ONLY_STR_DETAILS_KEYS = new Set([
+  'powerSupply2', 'powerSupply3', 'ownershipProofVerified',
+  'buildingApprovalCert', 'pollutionClearance', 'blueprintLayout',
+  'otherLegalClearance', 'otherLegalDetails', 'publicTransportAccess',
+]);
+
+const INDUSTRIAL_ONLY_NUM_DETAILS_KEYS = new Set([
+  'truckTrailerCount',
+]);
+
+// Top-level keys forwarded ONLY when propertyType === 'industrial' (TEMP
+// porting anchors for the old-CRM Excel import + photo backfill).
+const INDUSTRIAL_ONLY_TOP_LEVEL_KEYS = new Set([
+  'legacySourceId', 'legacyRowNo', 'availableVisitTime',
+]);
+
+function isIndustrial(propertyType: unknown): boolean {
+  return String(propertyType ?? '').trim().toLowerCase() === 'industrial';
+}
+
 function coerceBool(v: any): boolean | null {
   if (v === undefined || v === null) return null;
   if (typeof v === 'boolean') return v;
@@ -448,7 +471,7 @@ export class PropertiesService {
     }
   }
 
-  private buildDetails(dto: Record<string, any>): Record<string, any> {
+  private buildDetails(dto: Record<string, any>, propertyType?: unknown): Record<string, any> {
     const details: Record<string, any> = {};
     const renamedSources = new Set(Object.keys(RENAMED_DETAILS_KEYS));
     for (const [from, to] of Object.entries(RENAMED_DETAILS_KEYS)) {
@@ -501,6 +524,20 @@ export class PropertiesService {
       else if (dto[key] != null && String(dto[key]).trim() !== '') details[key] = [String(dto[key]).trim()];
       // empty / non-array → drop (avoid sending {floorsOccupied: null})
     }
+    // Industrial-only keys: forwarded solely for industrial properties so
+    // other types can never receive these columns, even if present on input.
+    if (isIndustrial(propertyType ?? dto.propertyType)) {
+      for (const key of INDUSTRIAL_ONLY_STR_DETAILS_KEYS) {
+        if (dto[key] === undefined || key in details) continue;
+        const v = str(dto[key]);
+        if (v !== undefined) details[key] = v;
+      }
+      for (const key of INDUSTRIAL_ONLY_NUM_DETAILS_KEYS) {
+        if (dto[key] === undefined || key in details) continue;
+        const v = num(dto[key]);
+        if (v !== undefined) details[key] = v;
+      }
+    }
     return details;
   }
 
@@ -548,7 +585,19 @@ export class PropertiesService {
           : (str(dto[key]) ?? null);
     }
 
-    const details = this.buildDetails(dto);
+    // Industrial-only top-level anchors (TEMP porting columns). Stripped for
+    // every other property type.
+    if (isIndustrial(dto.propertyType)) {
+      for (const key of INDUSTRIAL_ONLY_TOP_LEVEL_KEYS) {
+        if (dto[key] === undefined) continue;
+        payload[key] =
+          key === 'legacyRowNo'
+            ? (num(dto[key]) ?? null)
+            : (str(dto[key]) ?? null);
+      }
+    }
+
+    const details = this.buildDetails(dto, dto.propertyType);
     if (Object.keys(details).length > 0) payload.details = details;
 
     if (dto.locationData && (dto.locationData.address || dto.locationData.latitude || dto.locationData.longitude || dto.locationData.pincode || dto.locationData.localityData)) {

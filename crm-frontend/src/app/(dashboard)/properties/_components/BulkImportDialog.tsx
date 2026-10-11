@@ -405,6 +405,19 @@ function mapRowToPayload(row: Record<string, unknown>): Record<string, any> {
       nearestAirport: str("nearest airport"),
       labourAvailability: str("labour force availability"),
       powerBackup: str("power backup"),
+      // ── Industrial porting (industrial only) ──
+      powerSupply2: str("power supply2"),
+      powerSupply3: str("power supply3"),
+      ownershipProofVerified: str("ownership proof verified"),
+      buildingApprovalCert: str("building approval certification"),
+      pollutionClearance: str("pollution clearance"),
+      blueprintLayout: strAny("blueprint (or) layout", "blueprint layout"),
+      otherLegalClearance: str("other legal clearance available"),
+      otherLegalDetails: str("other legal clearance details"),
+      publicTransportAccess: str("public transport access"),
+      truckTrailerCount: num("truck / trailer access specify number", "truck specify number"),
+      legacySourceId: strAny("industrial space id", "legacy source id"),
+      availableVisitTime: str("available time for visit"),
     });
   }
 

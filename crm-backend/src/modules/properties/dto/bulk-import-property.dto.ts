@@ -219,6 +219,16 @@ export class BulkPropertyRowDto {
   @IsOptional() @Transform(toTrimmedString) @IsString()
   attachment6?: string;
 
+  // ── Properties: industrial porting anchors (TEMP, industrial only) ────────
+  @IsOptional() @Transform(toTrimmedString) @IsString()
+  legacySourceId?: string;
+
+  @IsOptional() @Transform(toNumber) @IsNumber()
+  legacyRowNo?: number;
+
+  @IsOptional() @Transform(toTrimmedString) @IsString()
+  availableVisitTime?: string;
+
   // ── PropertyDetails: unit info ─────────────────────────────────────────────
   @IsOptional() @Transform(toNumber) @IsNumber()
   udsArea?: number;
@@ -351,6 +361,37 @@ export class BulkPropertyRowDto {
 
   @IsOptional() @Transform(toTrimmedString) @IsString()
   workerFacilities?: string;
+
+  // ── PropertyDetails: industrial porting (industrial only) ─────────────────
+  @IsOptional() @Transform(toTrimmedString) @IsString()
+  powerSupply2?: string;
+
+  @IsOptional() @Transform(toTrimmedString) @IsString()
+  powerSupply3?: string;
+
+  @IsOptional() @Transform(toTrimmedString) @IsString()
+  ownershipProofVerified?: string;
+
+  @IsOptional() @Transform(toTrimmedString) @IsString()
+  buildingApprovalCert?: string;
+
+  @IsOptional() @Transform(toTrimmedString) @IsString()
+  pollutionClearance?: string;
+
+  @IsOptional() @Transform(toTrimmedString) @IsString()
+  blueprintLayout?: string;
+
+  @IsOptional() @Transform(toTrimmedString) @IsString()
+  otherLegalClearance?: string;
+
+  @IsOptional() @Transform(toTrimmedString) @IsString()
+  otherLegalDetails?: string;
+
+  @IsOptional() @Transform(toTrimmedString) @IsString()
+  publicTransportAccess?: string;
+
+  @IsOptional() @Transform(toNumber) @IsNumber()
+  truckTrailerCount?: number;
 
   // ── PropertyDetails: location proximity ───────────────────────────────────
   @IsOptional() @Transform(toTrimmedString) @IsString()
