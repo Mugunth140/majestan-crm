@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "./sidebar-context";
 import { 
@@ -76,6 +76,7 @@ export function Sidebar() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userDept, setUserDept] = useState<string>("");
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
+  const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
     try {
@@ -104,7 +105,23 @@ export function Sidebar() {
   }, [pathname]);
 
   const toggleExpand = (name: string) => {
+    const opening = !expandedItems[name];
     setExpandedItems(prev => ({ ...prev, [name]: !prev[name] }));
+    if (!opening) return;
+    // After the expand animation, nudge only the sidebar's own scroll
+    // container so the revealed sub-items are visible (never the page).
+    setTimeout(() => {
+      const el = itemRefs.current[name];
+      const container = el?.closest(".sidebar-scroll") as HTMLElement | null;
+      if (!el || !container) return;
+      const cRect = container.getBoundingClientRect();
+      const eRect = el.getBoundingClientRect();
+      if (eRect.bottom > cRect.bottom) {
+        container.scrollTo({ top: container.scrollTop + (eRect.bottom - cRect.bottom) + 8, behavior: "smooth" });
+      } else if (eRect.top < cRect.top) {
+        container.scrollTo({ top: container.scrollTop - (cRect.top - eRect.top) - 8, behavior: "smooth" });
+      }
+    }, 230);
   };
 
   const isAdmin = userRole === "Admin" || userRole === "Super Admin";
@@ -215,7 +232,7 @@ export function Sidebar() {
         </Link>
       </div>
 
-      <div className="flex-1 overflow-x-hidden overflow-y-auto py-3 scrollbar-none">
+      <div className="sidebar-scroll flex-1 overflow-x-hidden overflow-y-auto py-3 scrollbar-none">
         <nav className="grid items-start px-2 gap-1 text-[14px] font-medium">
           {navigation.map((item: any) => {
             if (item.adminOnly && !isAdmin) return null;
@@ -239,7 +256,13 @@ export function Sidebar() {
             );
 
             return (
-              <div key={item.name} className="flex flex-col gap-1">
+              <div
+                key={item.name}
+                ref={(el) => {
+                  itemRefs.current[item.name] = el;
+                }}
+                className="flex flex-col gap-1"
+              >
                 {hasSub ? (
                   <button
                     title={isCollapsed ? item.name : undefined}
