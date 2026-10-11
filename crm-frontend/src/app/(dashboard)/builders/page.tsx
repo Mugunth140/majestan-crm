@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { FormSelect } from "@/components/shared/form-select";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
@@ -17,37 +19,30 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { apiFetch } from "@/lib/api-fetch";
 import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
-import { Edit, ExternalLink, HardHat, Mail, Phone, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
+import { Edit, Filter, Plus, RefreshCw, Search, X } from "lucide-react";
 import { BuilderRecord } from "./_components/BuilderDialog";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 export default function BuildersPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"All" | "Active" | "Inactive">("All");
+  const [activeTab, setActiveTab] = useState<"Active" | "Inactive">("Active");
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+
+  // Filters state
+  const [hasContactFilter, setHasContactFilter] = useState<string>("");
 
   const [builders, setBuilders] = useState<BuilderRecord[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Single and Bulk delete
-  const [deleteTarget, setDeleteTarget] = useState<BuilderRecord | null>(null);
+  // Bulk delete dialog state
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const [role, setRole] = useState("");
-
-  useEffect(() => {
-    try {
-      const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
-      setRole(user?.role?.name || user?.role || "");
-    } catch { /* ignore */ }
-  }, []);
-
-  const tabs: ("All" | "Active" | "Inactive")[] = ["All", "Active", "Inactive"];
+  const tabs: ("Active" | "Inactive")[] = ["Active", "Inactive"];
 
   const fetchBuilders = useCallback(async () => {
     setIsLoading(true);
@@ -60,19 +55,23 @@ export default function BuildersPage() {
         params.append("search", debouncedSearchQuery.trim());
       }
 
-      if (activeTab === "Active") {
-        params.append("status", "active");
-      } else if (activeTab === "Inactive") {
-        params.append("status", "inactive");
-      } else {
-        params.append("status", "all");
-      }
+      params.append("status", activeTab.toLowerCase());
 
       const res = await apiFetch(`${API_URL}/builders?${params.toString()}`);
       const data = await res.json();
 
       if (data?.success || Array.isArray(data?.items) || Array.isArray(data?.data)) {
-        const list = data.items || data.data || [];
+        let list: BuilderRecord[] = data.items || data.data || [];
+
+        // Apply client-side secondary filter if selected
+        if (hasContactFilter === "phone") {
+          list = list.filter((b) => Boolean(b.phone));
+        } else if (hasContactFilter === "email") {
+          list = list.filter((b) => Boolean(b.email));
+        } else if (hasContactFilter === "website") {
+          list = list.filter((b) => Boolean(b.website));
+        }
+
         const total = data.total ?? list.length;
         setBuilders(list);
         setTotalCount(total);
@@ -87,7 +86,7 @@ export default function BuildersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [pagination.pageIndex, pagination.pageSize, debouncedSearchQuery, activeTab]);
+  }, [pagination.pageIndex, pagination.pageSize, debouncedSearchQuery, activeTab, hasContactFilter]);
 
   useEffect(() => {
     fetchBuilders();
@@ -101,23 +100,10 @@ export default function BuildersPage() {
 
   const resetPage = () => setPagination((p) => ({ ...p, pageIndex: 0 }));
 
-  const handleDeleteSingle = async () => {
-    if (!deleteTarget) return;
-    setIsDeleting(true);
-    try {
-      const res = await apiFetch(`${API_URL}/builders/${deleteTarget.id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok || data?.success === false) {
-        throw new Error(data?.message || "Failed to delete builder");
-      }
-      toast.success("Builder deleted successfully");
-      setDeleteTarget(null);
-      fetchBuilders();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to delete builder");
-    } finally {
-      setIsDeleting(false);
-    }
+  const activeFiltersCount = hasContactFilter ? 1 : 0;
+  const clearFilters = () => {
+    setHasContactFilter("");
+    resetPage();
   };
 
   const handleBulkDelete = async () => {
@@ -170,103 +156,39 @@ export default function BuildersPage() {
     },
     {
       accessorKey: "name",
-      header: "Builder",
+      header: "Builder Name",
       cell: ({ row }) => {
-        const b = row.original;
         return (
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="h-10 w-10 rounded-xl bg-muted/60 border border-border/60 overflow-hidden flex items-center justify-center shrink-0">
-              {b.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={b.logoUrl}
-                  alt={b.name}
-                  className="h-full w-full object-cover"
-                  onError={(e) => {
-                    // Fallback to initial on image broken
-                    (e.target as HTMLElement).style.display = "none";
-                  }}
-                />
-              ) : (
-                <div className="h-full w-full bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center text-xs font-bold text-blue-700 dark:text-blue-300">
-                  {b.name.charAt(0).toUpperCase()}
-                </div>
-              )}
-            </div>
-            <div className="min-w-0 flex flex-col">
-              <span className="font-semibold text-foreground text-sm truncate max-w-[200px]" title={b.name}>
-                {b.name}
-              </span>
-              {b.website ? (
-                <a
-                  href={b.website.startsWith("http") ? b.website : `https://${b.website}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="text-xs text-[#0052FF] hover:underline flex items-center gap-1 truncate max-w-[180px]"
-                >
-                  <ExternalLink className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{b.website.replace(/^https?:\/\//, "")}</span>
-                </a>
-              ) : null}
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      id: "contact",
-      header: "Contact",
-      cell: ({ row }) => {
-        const b = row.original;
-        if (!b.phone && !b.email) {
-          return <span className="text-muted-foreground text-sm">-</span>;
-        }
-        return (
-          <div className="flex flex-col gap-0.5 text-xs text-muted-foreground min-w-0">
-            {b.phone && (
-              <span className="flex items-center gap-1 text-foreground font-medium truncate">
-                <Phone className="h-3 w-3 text-muted-foreground shrink-0" />
-                {b.phone}
-              </span>
-            )}
-            {b.email && (
-              <span className="flex items-center gap-1 truncate" title={b.email}>
-                <Mail className="h-3 w-3 text-muted-foreground shrink-0" />
-                <span className="truncate">{b.email}</span>
-              </span>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: "experienceYears",
-      header: "Experience",
-      cell: ({ row }) => {
-        const exp = row.original.experienceYears;
-        return (
-          <span className="text-sm font-medium">
-            {exp != null && exp > 0 ? `${exp} Yrs` : "-"}
+          <span className="font-semibold text-foreground text-sm truncate max-w-[240px] block" title={row.original.name}>
+            {row.original.name}
           </span>
         );
       },
     },
     {
-      id: "projects",
-      header: "Projects",
+      id: "phone",
+      header: "Phone Number",
       cell: ({ row }) => {
-        const c = row.original.completedProjects ?? 0;
-        const o = row.original.ongoingProjects ?? 0;
-        if (c === 0 && o === 0) {
+        const phone = row.original.phone;
+        return phone ? (
+          <span className="text-foreground text-sm font-medium">{phone}</span>
+        ) : (
+          <span className="text-muted-foreground text-sm">-</span>
+        );
+      },
+    },
+    {
+      id: "email",
+      header: "Email ID",
+      cell: ({ row }) => {
+        const email = row.original.email;
+        if (!email) {
           return <span className="text-muted-foreground text-sm">-</span>;
         }
         return (
-          <div className="text-xs">
-            <span className="font-semibold text-emerald-600 dark:text-emerald-400">{c} Completed</span>
-            <span className="text-muted-foreground mx-1">/</span>
-            <span className="font-semibold text-blue-600 dark:text-blue-400">{o} Ongoing</span>
-          </div>
+          <span className="text-muted-foreground text-sm truncate max-w-[200px] block" title={email}>
+            {email}
+          </span>
         );
       },
     },
@@ -294,35 +216,6 @@ export default function BuildersPage() {
           {row.original.createdAt ? new Date(row.original.createdAt).toLocaleDateString("en-GB") : "-"}
         </span>
       ),
-    },
-    {
-      id: "actions",
-      header: "",
-      cell: ({ row }) => {
-        const b = row.original;
-        return (
-          <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              onClick={() => router.push(`/builders/new?edit=${b.id}`)}
-              title="Edit Builder"
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-destructive"
-              onClick={() => setDeleteTarget(b)}
-              title="Delete Builder"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        );
-      },
     },
   ];
 
@@ -359,6 +252,60 @@ export default function BuildersPage() {
     onPaginationChange: setPagination,
   };
 
+  const renderFilterPopover = (isMobile: boolean) => (
+    <Popover>
+      <PopoverTrigger render={
+        isMobile ? (
+          <Button variant="outline" size="icon" className="h-12 w-12 rounded-2xl bg-black/5 dark:bg-white/10 border-transparent relative shrink-0">
+            <Filter className="h-5 w-5 text-foreground" />
+            {activeFiltersCount > 0 && (
+              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#0052FF] border-2 border-background text-white text-[10px] font-bold flex items-center justify-center">
+                {activeFiltersCount}
+              </span>
+            )}
+          </Button>
+        ) : (
+          <Button variant="outline" className="h-10 rounded-xl bg-muted/30 border-border/60 px-4 flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium text-[13.5px]">Filters</span>
+            {activeFiltersCount > 0 && (
+              <Badge className="ml-1 bg-[#0052FF] text-white px-1.5 py-0.5 rounded-md text-[10px]">{activeFiltersCount}</Badge>
+            )}
+          </Button>
+        )
+      } />
+      <PopoverContent align="start" className="w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60">
+        <div className="flex items-center justify-between p-4 border-b bg-muted/10">
+          <h4 className="font-semibold text-foreground text-sm">Filter Builders</h4>
+          {activeFiltersCount > 0 && (
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 text-xs text-muted-foreground hover:text-red-600">
+              Clear All
+            </Button>
+          )}
+        </div>
+        <div className="p-4 space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Contact Availability</label>
+            <FormSelect
+              name="contactFilter"
+              placeholder="All Builders"
+              options={[
+                { label: "Has Phone Number", value: "phone" },
+                { label: "Has Email ID", value: "email" },
+                { label: "Has Website", value: "website" },
+              ]}
+              value={hasContactFilter}
+              onValueChange={(v) => {
+                setHasContactFilter(v || "");
+                resetPage();
+              }}
+            />
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+
   const searchBar = (isMobile: boolean) => (
     <div className="relative flex-1">
       <Search
@@ -377,26 +324,15 @@ export default function BuildersPage() {
         }}
         className={
           isMobile
-            ? "pl-11 h-12 bg-black/5 dark:bg-white/10 border-transparent rounded-2xl text-[16px] focus-visible:ring-1 focus-visible:ring-primary shadow-none"
-            : "pl-9 h-10 bg-muted/30 rounded-xl border-border/60 text-[13.5px]"
+            ? "h-12 pl-11 rounded-2xl bg-black/5 dark:bg-white/10 border-transparent text-sm font-medium placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-foreground/20"
+            : "pl-9 h-10 rounded-xl bg-muted/30 border-border/60 text-[13.5px] placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring"
         }
       />
-      {isMobile && searchQuery && (
-        <button
-          onClick={() => {
-            setSearchQuery("");
-            resetPage();
-          }}
-          className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 bg-muted-foreground/20 rounded-full text-foreground hover:bg-muted-foreground/30"
-        >
-          <X className="h-3 w-3" />
-        </button>
-      )}
     </div>
   );
 
   const pillTabs = (
-    <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 -mx-4 px-4">
+    <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide py-1">
       {tabs.map((tab) => {
         const isActive = activeTab === tab;
         return (
@@ -422,7 +358,7 @@ export default function BuildersPage() {
 
   const tableSection = (
     <div className="w-full max-w-full min-w-0 md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col">
-      {isLoading ? <TableSkeleton columns={8} rows={10} flush /> : <DataTable {...tableProps} />}
+      {isLoading ? <TableSkeleton columns={6} rows={10} flush /> : <DataTable {...tableProps} />}
     </div>
   );
 
@@ -458,16 +394,17 @@ export default function BuildersPage() {
 
       <div className="flex flex-wrap items-center gap-3 px-6 py-4 border-b bg-background">
         <div className="flex-1 min-w-[240px] max-w-md">{searchBar(false)}</div>
-        {searchQuery && (
+        {renderFilterPopover(false)}
+        {(searchQuery || activeFiltersCount > 0) && (
           <Button
             variant="ghost"
             size="icon"
             onClick={() => {
               setSearchQuery("");
-              resetPage();
+              clearFilters();
             }}
             className="h-10 w-10 rounded-full text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors"
-            title="Clear Search"
+            title="Clear Search & Filters"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -482,7 +419,10 @@ export default function BuildersPage() {
 
   const mobileFilters = (
     <div className="px-4 pb-2 space-y-4">
-      <div className="flex items-center gap-2">{searchBar(true)}</div>
+      <div className="flex items-center gap-2">
+        {searchBar(true)}
+        {renderFilterPopover(true)}
+      </div>
       <Button
         onClick={() => router.push("/builders/new")}
         className="flex h-11 w-full rounded-xl bg-[#0052FF] px-4 text-[14px] font-semibold text-white shadow-md hover:bg-[#0052FF]/90 items-center justify-center gap-2 transition-transform active:scale-95"
@@ -531,33 +471,13 @@ export default function BuildersPage() {
         <Device desktop={null} mobile={<div className="w-full px-4 md:px-0">{tableSection}</div>} />
       </div>
 
-      {/* Single Delete Confirm Dialog */}
-      <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Delete Builder</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteSingle} disabled={isDeleting}>
-              {isDeleting ? "Deleting..." : "Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Bulk Delete Confirm Dialog */}
       <Dialog open={bulkDeleteIds !== null} onOpenChange={(open) => { if (!open) setBulkDeleteIds(null); }}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Delete Builder{bulkDeleteIds && bulkDeleteIds.length > 1 ? "s" : ""}</DialogTitle>
+            <DialogTitle>Delete Selected Builders</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete {bulkDeleteIds ? `${bulkDeleteIds.length} builder${bulkDeleteIds.length > 1 ? "s" : ""}` : "these builders"}? This action cannot be undone.
+              Are you sure you want to delete {bulkDeleteIds?.length} selected builder{bulkDeleteIds && bulkDeleteIds.length > 1 ? "s" : ""}? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-4">
