@@ -557,7 +557,7 @@ export default function ProjectDetailPage({
                           </td>
                           {project.projectType !== "plot" && (
                             <td className="py-3 pr-4">
-                              {u.floorNo != null
+                              {u.floorNo != null && String(u.floorNo).trim() !== ""
                                 ? u.totalFloors
                                   ? `${u.floorNo} of ${u.totalFloors}`
                                   : `${u.floorNo}`
