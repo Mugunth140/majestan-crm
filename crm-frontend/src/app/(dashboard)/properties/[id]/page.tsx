@@ -281,6 +281,7 @@ export default function PropertyViewPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Section title="Core Details" icon={<Home className="h-4 w-4 text-[#0052FF]" />}>
             <SectionField label="Property Code" value={property.propertyCode} />
+            <SectionField label="Legacy Source Id" value={property.legacySourceId} />
             <SectionField label="Property Type" value={formatPropertyType(property.propertyType)} />
             <SectionField label="Listing Type" value={property.listingType === "Sell" ? "Buy" : property.listingType} />
             <SectionField label="Status" value={property.status} />
@@ -522,7 +523,6 @@ export default function PropertyViewPage() {
                 <SectionField label="Other Legal Clearance" value={det.otherLegalClearance} />
                 <SectionField label="Other Legal Details" value={det.otherLegalDetails} />
                 <SectionField label="Available Visit Time" value={property.availableVisitTime} />
-                <SectionField label="Legacy Source Id" value={property.legacySourceId} />
               </>)}
             </Section>
           )}
