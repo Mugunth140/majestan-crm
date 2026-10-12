@@ -32,6 +32,7 @@ import {
   fetchNearbyCategories,
 } from "@/lib/nearby-places";
 import { FurnishingIcon } from "@/components/shared/furnishing-icons";
+import { FloorNosInput } from "@/components/shared/floor-nos-input";
 import { parseIndianCurrency } from "@/lib/indian-currency";
 import { computeProjectRanges, formatPriceRange } from "@/lib/project-ranges";
 
@@ -1399,7 +1400,7 @@ export function ProjectForm({
             unitGuestParking: !isPlotUnit ? u.unitGuestParking : undefined,
             balconies:
               !isPlotUnit && u.balconies ? Number(u.balconies) : undefined,
-            floorNo: !isPlotUnit && u.floorNo ? Number(u.floorNo) : undefined,
+            floorNo: !isPlotUnit && u.floorNo.trim() ? u.floorNo.trim() : undefined,
             totalFloors:
               !isPlotUnit && u.totalFloors ? Number(u.totalFloors) : undefined,
             poojaRoom: !isPlotUnit ? u.poojaRoom : undefined,
@@ -2876,16 +2877,13 @@ export function ProjectForm({
                                 />
                               </div>
                               <div className="space-y-2">
-                                <label className={labelClass}>Floor No</label>
-                                <Input
-                                  type="number"
-                                  min={0}
+                                <label className={labelClass}>Floor Nos</label>
+                                <FloorNosInput
                                   value={unit.floorNo}
-                                  onChange={(e) =>
-                                    updateUnit(idx, { floorNo: e.target.value })
+                                  onChange={(val) =>
+                                    updateUnit(idx, { floorNo: val })
                                   }
-                                  placeholder="e.g. 4"
-                                  className={inputClass}
+                                  placeholder="e.g. 8, 12, 13"
                                 />
                               </div>
                               <div className="space-y-2">

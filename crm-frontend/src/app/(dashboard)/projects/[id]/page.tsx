@@ -491,7 +491,7 @@ export default function ProjectDetailPage({
                       {project.projectType === "plot" ? "Area" : "Area (sqft)"}
                     </th>
                     {project.projectType !== "plot" && (
-                      <th className="py-3 pr-4 font-medium">Floor</th>
+                      <th className="py-3 pr-4 font-medium">Floor Nos</th>
                     )}
                     <th className="py-3 pr-4 font-medium">Price</th>
                     <th className="py-3 pr-4 font-medium">Facing</th>
