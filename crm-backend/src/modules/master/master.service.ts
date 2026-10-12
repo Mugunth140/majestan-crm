@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { LeadSource } from '../../database/entities/lead-source.entity';
@@ -491,5 +491,119 @@ export class MasterService {
       throw new InternalServerErrorException('Property type not found or could not be deleted');
     }
     return { success: true };
+  }
+
+  // ---- Amenities (site table: read via direct DB, CRUD via site admin API) ----
+
+  private static readonly AMENITY_CATEGORIES = [
+    'security',
+    'utilities',
+    'recreation',
+    'community',
+    'connectivity',
+    'interior',
+    'other',
+    'feature',
+    'utility',
+    '',
+  ];
+
+  private static toAmenitySlug(name: string): string {
+    const slug = name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    return slug || 'amenity';
+  }
+
+  private static assertAmenityCategory(category: string | undefined): string {
+    const value = category ?? 'other';
+    if (!MasterService.AMENITY_CATEGORIES.includes(value)) {
+      throw new BadRequestException(`Invalid amenity category: ${value}`);
+    }
+    return value;
+  }
+
+  async getAmenities() {
+    try {
+      const rows = await this.siteDataSource.query(
+        'SELECT id, name, category, icon_key FROM amenities WHERE is_active = 1 ORDER BY name ASC',
+      );
+      return rows.map((r: { id: number; name: string; category: string; icon_key: string | null }) => ({
+        id: r.id,
+        label: r.name,
+        value: r.name,
+        category: r.category,
+        icon_key: r.icon_key,
+      }));
+    } catch (e) {
+      throw new InternalServerErrorException('Failed to load amenities');
+    }
+  }
+
+  async getAllAmenities(search?: string) {
+    try {
+      let sql =
+        'SELECT id, name, slug, category, icon_url, icon_key, is_active FROM amenities';
+      const params: any[] = [];
+      if (search) {
+        sql += ' WHERE name LIKE ?';
+        params.push(`%${search}%`);
+      }
+      sql += ' ORDER BY name ASC';
+      return await this.siteDataSource.query(sql, params);
+    } catch (e) {
+      throw new InternalServerErrorException('Failed to load amenities');
+    }
+  }
+
+  async createAmenity(data: { name: string; category?: string; icon_key?: string }) {
+    const name = data.name?.trim();
+    if (!name) throw new BadRequestException('Amenity name is required');
+    if (name.length > 120) throw new BadRequestException('Amenity name is too long (max 120)');
+    const category = MasterService.assertAmenityCategory(data.category);
+    const nameTaken = await this.siteDataSource.query('SELECT id FROM amenities WHERE name = ? LIMIT 1', [name]);
+    if (nameTaken.length > 0) throw new BadRequestException('An amenity with this name already exists');
+    // Unique slug for uq_amenities_slug (slug is NOT NULL with no default).
+    const base = MasterService.toAmenitySlug(name);
+    let slug = base;
+    let n = 2;
+    for (;;) {
+      const taken = await this.siteDataSource.query('SELECT id FROM amenities WHERE slug = ? LIMIT 1', [slug]);
+      if (taken.length === 0) break;
+      slug = `${base}-${n++}`;
+    }
+    return this.siteApi.post('/admin/amenities', {
+      data: { name, slug, category, icon_key: data.icon_key?.trim() || null, is_active: true },
+    });
+  }
+
+  async updateAmenity(
+    id: number,
+    data: { name?: string; category?: string; icon_key?: string | null; is_active?: boolean },
+  ) {
+    const patch: Record<string, unknown> = {};
+    if (data.name !== undefined) {
+      const name = data.name.trim();
+      if (!name) throw new BadRequestException('Amenity name is required');
+      if (name.length > 120) throw new BadRequestException('Amenity name is too long (max 120)');
+      const nameTaken = await this.siteDataSource.query(
+        'SELECT id FROM amenities WHERE name = ? AND id != ? LIMIT 1',
+        [name, id],
+      );
+      if (nameTaken.length > 0) throw new BadRequestException('An amenity with this name already exists');
+      patch.name = name;
+      // Slug stays frozen on rename — it may feed site filters/URLs.
+    }
+    if (data.category !== undefined) patch.category = MasterService.assertAmenityCategory(data.category);
+    if (data.icon_key !== undefined) patch.icon_key = data.icon_key?.trim() || null;
+    if (data.is_active !== undefined) patch.is_active = data.is_active;
+    return this.siteApi.patch(`/admin/amenities/${id}`, { data: patch });
+  }
+
+  async deleteAmenity(id: number) {
+    // Site hard-deletes; linked property/project amenity rows cascade.
+    return this.siteApi.del(`/admin/amenities/${id}`);
   }
 }

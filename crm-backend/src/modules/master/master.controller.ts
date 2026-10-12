@@ -394,4 +394,42 @@ export class MasterController {
     const data = await this.masterService.deletePropertyType(id);
     return { success: true, data };
   }
+
+  // ---- Amenities (site table) ----
+
+  @Get('amenities')
+  async getAmenities() {
+    const data = await this.masterService.getAmenities();
+    return { success: true, data };
+  }
+
+  @Get('all-amenities')
+  async getAllAmenities(@Query('search') search?: string) {
+    const data = await this.masterService.getAllAmenities(search);
+    return { success: true, data };
+  }
+
+  @Post('amenities')
+  @Roles('Admin')
+  async createAmenity(@Body() body: { name: string; category?: string; icon_key?: string }) {
+    const data = await this.masterService.createAmenity(body);
+    return { success: true, data };
+  }
+
+  @Patch('amenities/:id')
+  @Roles('Admin')
+  async updateAmenity(
+    @Param('id') id: number,
+    @Body() body: { name?: string; category?: string; icon_key?: string | null; is_active?: boolean },
+  ) {
+    const data = await this.masterService.updateAmenity(id, body);
+    return { success: true, data };
+  }
+
+  @Delete('amenities/:id')
+  @Roles('Admin')
+  async deleteAmenity(@Param('id') id: number) {
+    const data = await this.masterService.deleteAmenity(id);
+    return { success: true, data };
+  }
 }

@@ -56,6 +56,7 @@ const navigation = [
     icon: Database,
     adminOnly: true,
     subItems: [
+      { name: "Amenities", href: "/master/amenities" },
       { name: "Lead Sources", href: "/master/sources" },
       { name: "Property Types", href: "/master/property-types" },
       { name: "Cities", href: "/master/cities" },
