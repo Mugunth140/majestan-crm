@@ -820,9 +820,21 @@ export class LeadsService {
     }
 
     if (query?.search) {
-      const s = `%${query.search}%`;
-      filterConds += ' AND (l.name LIKE ? OR l.mobile_number LIKE ? OR l.email LIKE ? OR l.id LIKE ?)';
-      params.push(s, s, s, s);
+      const rawSearch = String(query.search).trim();
+      const s = `%${rawSearch}%`;
+      // Check if user entered an ID format like L00025, #25, 00025, or 25
+      const parsedIdMatch = rawSearch.match(/^[Ll#]?0*(\d+)$/);
+      const parsedId = parsedIdMatch ? Number(parsedIdMatch[1]) : null;
+
+      if (parsedId !== null && Number.isFinite(parsedId) && parsedId > 0) {
+        filterConds +=
+          " AND (l.name LIKE ? OR l.mobile_number LIKE ? OR l.email LIKE ? OR l.id = ? OR CONCAT('L', LPAD(l.id, 5, '0')) LIKE ?)";
+        params.push(s, s, s, parsedId, s);
+      } else {
+        filterConds +=
+          " AND (l.name LIKE ? OR l.mobile_number LIKE ? OR l.email LIKE ? OR CONCAT('L', LPAD(l.id, 5, '0')) LIKE ?)";
+        params.push(s, s, s, s);
+      }
     }
 
     if (query?.dateFrom) {

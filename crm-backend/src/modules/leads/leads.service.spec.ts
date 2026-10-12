@@ -117,4 +117,22 @@ describe('LeadsService', () => {
     const countQuery = queryMock.mock.calls[0][0];
     expect(countQuery).not.toContain('NOT IN');
   });
+
+  it('searches lead by formatted ID with L prefix (e.g. L00025)', async () => {
+    await service.getLeads({ role: 'Admin', id: 99 }, { search: 'L00025' });
+
+    const countQuery = queryMock.mock.calls[0][0];
+    const params = queryMock.mock.calls[0][1];
+    expect(countQuery).toContain('l.id = ?');
+    expect(params).toContain(25);
+  });
+
+  it('searches lead by ID with hash prefix (e.g. #25)', async () => {
+    await service.getLeads({ role: 'Admin', id: 99 }, { search: '#25' });
+
+    const countQuery = queryMock.mock.calls[0][0];
+    const params = queryMock.mock.calls[0][1];
+    expect(countQuery).toContain('l.id = ?');
+    expect(params).toContain(25);
+  });
 });
