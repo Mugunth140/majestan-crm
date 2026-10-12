@@ -201,6 +201,29 @@ const extractPlotDimensions = (rows: unknown): string => {
 const YOUTUBE_URL_RE =
   /^(https?:\/\/)?(www\.|m\.)?(youtube\.com\/(watch\?[^#]*v=|embed\/|shorts\/|live\/)|youtu\.be\/)[\w-]+/;
 
+type VideoRow = { title: string; url: string };
+
+// Titled videos when the project has them; otherwise legacy link-only
+// `videoUrls`, as untitled rows, so older projects open with their links.
+const toVideoRows = (
+  source: { videos?: unknown; videoUrls?: unknown } | null | undefined,
+): VideoRow[] => {
+  const titled = Array.isArray(source?.videos)
+    ? (source.videos as { title?: unknown; url?: unknown }[])
+    : [];
+  if (titled.length > 0) {
+    return titled.map((v) => ({
+      title: String(v?.title ?? ""),
+      url: String(v?.url ?? ""),
+    }));
+  }
+  const legacy = Array.isArray(source?.videoUrls) ? (source.videoUrls as unknown[]) : [];
+  return legacy
+    .map((u) => String(u ?? "").trim())
+    .filter((u) => u !== "")
+    .map((url) => ({ title: "", url }));
+};
+
 // Keeps a stored string selectable even when it isn't in the masters.
 const withLegacyOption = (
   options: { value: string; label: string }[],
@@ -521,12 +544,7 @@ export function ProjectForm({
     }));
   });
 
-  const [videoUrl, setVideoUrl] = useState(() => {
-    const existing = d?.videoUrls ?? [];
-    if (!Array.isArray(existing)) return "";
-    const first = existing.map((v: any) => String(v ?? "").trim()).find((v: string) => v !== "");
-    return first ?? "";
-  });
+  const [videos, setVideos] = useState<VideoRow[]>(() => toVideoRows(d));
 
   const [connectivity, setConnectivity] = useState<ConnectivityRow[]>(() => {
     const existing = d?.connectivity ?? [];
@@ -1010,7 +1028,7 @@ export function ProjectForm({
     specifications,
     amenityIds,
     gallery: gallery.map((g) => ({ key: g.key, preview: "" })),
-    videoUrls: videoUrl.trim() !== "" ? [videoUrl.trim()] : [],
+    videos,
     connectivity,
     nearbyCategories,
     faqs,
@@ -1109,11 +1127,8 @@ export function ProjectForm({
             preview: "",
           })),
         );
-      if (Array.isArray(saved.videoUrls)) {
-        const first = saved.videoUrls
-          .map((v: any) => String(v ?? "").trim())
-          .find((v: string) => v !== "");
-        setVideoUrl(first ?? "");
+      if (Array.isArray(saved.videos) || Array.isArray(saved.videoUrls)) {
+        setVideos(toVideoRows(saved));
       }
       if (Array.isArray(saved.connectivity) && saved.connectivity.length > 0)
         setConnectivity(
@@ -1222,9 +1237,18 @@ export function ProjectForm({
       toast.error(`Unit ${incompleteIdx + 1} has details but no unit code.`);
       return;
     }
-    const trimmedVideoUrl = videoUrl.trim();
-    if (trimmedVideoUrl !== "" && !YOUTUBE_URL_RE.test(trimmedVideoUrl)) {
-      toast.error("Video link is not a valid YouTube link.");
+    const badVideo = videos.findIndex(
+      (v) => v.url.trim() !== "" && !YOUTUBE_URL_RE.test(v.url.trim()),
+    );
+    if (badVideo >= 0) {
+      toast.error(`Video ${badVideo + 1}: the link is not a valid YouTube link.`);
+      return;
+    }
+    const untitledLinkless = videos.findIndex(
+      (v) => v.title.trim() !== "" && v.url.trim() === "",
+    );
+    if (untitledLinkless >= 0) {
+      toast.error(`Video ${untitledLinkless + 1} has a title but no link.`);
       return;
     }
     setIsLoading(true);
@@ -1292,10 +1316,14 @@ export function ProjectForm({
           : undefined,
         galleryImageUrls:
           gallery.length > 0 ? gallery.map((g) => g.key) : undefined,
-        videoUrls: (() => {
-          const cleaned = videoUrl.trim();
-          return cleaned !== "" ? [cleaned] : undefined;
-        })(),
+        // Always sent, even empty: omitting it meant a removed video could
+        // never be cleared on update.
+        videos: videos
+          .filter((v) => v.url.trim() !== "")
+          .map((v) => ({
+            title: v.title.trim() || undefined,
+            url: v.url.trim(),
+          })),
         status,
         amenities: amenityIds.map((id) => ({ amenityId: id })),
         connectivity: (() => {
@@ -2366,31 +2394,94 @@ export function ProjectForm({
         </div>
 
         <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <div className="border-b pb-3 mb-6">
-            <h3 className="text-lg font-bold text-foreground">
-              Video
-            </h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              One YouTube link — plays on the photos page.
-            </p>
+          <div className="flex items-center justify-between border-b pb-3 mb-6">
+            <div>
+              <h3 className="text-lg font-bold text-foreground">Videos</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                YouTube links with a title. Shown on the overview and the
+                photos page.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                setVideos((prev) => [...prev, { title: "", url: "" }])
+              }
+              className="h-9 rounded-full px-4"
+            >
+              <Plus className="h-4 w-4 mr-1" /> Add Video
+            </Button>
           </div>
-          <div className="flex items-center gap-3">
-            <Input
-              value={videoUrl}
-              onChange={(e) => setVideoUrl(e.target.value)}
-              placeholder="https://www.youtube.com/watch?v=..."
-              className="h-10 rounded-xl bg-muted/30 border-border/60 text-[13.5px] flex-1 min-w-0"
-            />
-            {videoUrl.trim() !== "" && (
-              <button
-                type="button"
-                onClick={() => setVideoUrl("")}
-                className="p-2.5 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 shrink-0"
-                aria-label="Remove video"
+          {videos.length === 0 && (
+            <p className="text-sm text-muted-foreground italic">
+              No videos added.
+            </p>
+          )}
+          <div className="space-y-4">
+            {videos.map((v, i) => (
+              <div
+                key={i}
+                className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] gap-4 items-end"
               >
-                <X className="h-4 w-4" />
-              </button>
-            )}
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor={`video-title-${i}`}
+                    className="text-xs font-semibold text-muted-foreground"
+                  >
+                    Title
+                  </label>
+                  <Input
+                    id={`video-title-${i}`}
+                    value={v.title}
+                    maxLength={200}
+                    onChange={(e) =>
+                      setVideos((prev) =>
+                        prev.map((row, j) =>
+                          j === i ? { ...row, title: e.target.value } : row,
+                        ),
+                      )
+                    }
+                    placeholder="e.g. Site walkthrough"
+                    className="h-10 rounded-xl bg-muted/30 border-border/60 text-[13.5px]"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor={`video-url-${i}`}
+                    className="text-xs font-semibold text-muted-foreground"
+                  >
+                    YouTube link
+                  </label>
+                  <Input
+                    id={`video-url-${i}`}
+                    value={v.url}
+                    onChange={(e) =>
+                      setVideos((prev) =>
+                        prev.map((row, j) =>
+                          j === i ? { ...row, url: e.target.value } : row,
+                        ),
+                      )
+                    }
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    aria-invalid={
+                      v.url.trim() !== "" && !YOUTUBE_URL_RE.test(v.url.trim())
+                    }
+                    className="h-10 rounded-xl bg-muted/30 border-border/60 text-[13.5px] aria-[invalid=true]:border-red-400"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setVideos((prev) => prev.filter((_, j) => j !== i))
+                  }
+                  className="p-2.5 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 shrink-0"
+                  aria-label={`Remove video ${i + 1}`}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
           </div>
         </div>
 
