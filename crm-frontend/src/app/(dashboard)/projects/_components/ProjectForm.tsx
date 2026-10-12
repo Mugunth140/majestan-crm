@@ -39,6 +39,8 @@ import { computeProjectRanges, formatPriceRange } from "@/lib/project-ranges";
 const labelClass =
   "text-xs font-bold uppercase tracking-wider text-muted-foreground";
 const inputClass = "h-12 rounded-xl bg-muted/30";
+/* Matches the Room select beside it: same height, fill, border and text size. */
+const roomInputClass = "h-12 rounded-xl bg-muted/30 border-border/60 text-[15px]";
 const unitSectionTitle =
   "text-[11px] font-bold uppercase tracking-wider text-muted-foreground border-b border-border/40 pb-2";
 
@@ -125,6 +127,9 @@ const PROJECT_AREA_UNITS = [
 
 interface RoomDimensionRow {
   name: string;
+  /** Typed length and width in feet. `dimensions` is derived from them. */
+  lengthFt: string;
+  widthFt: string;
   dimensions: string;
 }
 
@@ -163,8 +168,37 @@ interface UnitRow {
 
 const emptyRoomDimension = (): RoomDimensionRow => ({
   name: "",
+  lengthFt: "",
+  widthFt: "",
   dimensions: "",
 });
+
+// Reads a stored "12 × 15 ft" (or "12x15", "12 * 15") back into two numbers,
+// so rows saved before length and width were separate still open filled in.
+const parseRoomDimension = (dimensions: unknown): { lengthFt: string; widthFt: string } => {
+  const match =
+    typeof dimensions === "string"
+      ? dimensions.match(/(\d+(?:\.\d+)?)\s*[x×*]\s*(\d+(?:\.\d+)?)/i)
+      : null;
+  return match ? { lengthFt: match[1], widthFt: match[2] } : { lengthFt: "", widthFt: "" };
+};
+
+// Normalises a room row from the API, a saved draft or an older save.
+const toRoomRow = (
+  r: { name?: unknown; lengthFt?: unknown; widthFt?: unknown; dimensions?: unknown } | null,
+): RoomDimensionRow => {
+  const name = String(r?.name ?? "");
+  const hasSplit = r?.lengthFt != null || r?.widthFt != null;
+  const { lengthFt, widthFt } = hasSplit
+    ? { lengthFt: String(r.lengthFt ?? ""), widthFt: String(r.widthFt ?? "") }
+    : parseRoomDimension(r?.dimensions);
+  return {
+    name,
+    lengthFt,
+    widthFt,
+    dimensions: formatRoomDimension(lengthFt, widthFt) ?? String(r?.dimensions ?? ""),
+  };
+};
 
 // Mirrors PropertyForm: "12" + "10" → "12 × 10 ft", null when incomplete.
 const formatRoomDimension = (
@@ -600,10 +634,7 @@ export function ProjectForm({
       openSides: u.openSides != null ? String(u.openSides) : "",
       boundaryWall: u.boundaryWall ?? false,
       roomDimensions: Array.isArray(u.roomDimensions)
-        ? u.roomDimensions.map((r: any) => ({
-            name: r.name ?? "",
-            dimensions: r.dimensions ?? "",
-          }))
+        ? u.roomDimensions.map(toRoomRow)
         : [],
       plotDimensions:
         u.plotDimensions ?? extractPlotDimensions(u.roomDimensions),
@@ -653,9 +684,15 @@ export function ProjectForm({
         i === idx
           ? {
               ...u,
-              roomDimensions: u.roomDimensions.map((r, j) =>
-                j === rIdx ? { ...r, ...patch } : r,
-              ),
+              roomDimensions: u.roomDimensions.map((r, j) => {
+                if (j !== rIdx) return r;
+                const next = { ...r, ...patch };
+                return {
+                  ...next,
+                  dimensions:
+                    formatRoomDimension(next.lengthFt, next.widthFt) ?? "",
+                };
+              }),
             }
           : u,
       ),
@@ -1154,7 +1191,7 @@ export function ProjectForm({
             ...emptyUnit(),
             ...u,
             roomDimensions: Array.isArray(u?.roomDimensions)
-              ? u.roomDimensions
+              ? u.roomDimensions.map(toRoomRow)
               : [],
             furnishingItemIds: Array.isArray(u?.furnishingItemIds)
               ? u.furnishingItemIds
@@ -1416,9 +1453,15 @@ export function ProjectForm({
                     },
                   ]
                 : []
-              : u.roomDimensions.filter(
-                  (r) => r.name.trim() && r.dimensions.trim(),
-                ),
+              : u.roomDimensions
+                  .filter((r) => r.name.trim() && r.dimensions.trim())
+                  // The API only accepts { name, dimensions } (whitelist
+                  // validation rejects the lengthFt/widthFt form columns),
+                  // so strip them here — dimensions already carries "L × W ft".
+                  .map((r) => ({
+                    name: r.name.trim(),
+                    dimensions: r.dimensions.trim(),
+                  })),
             price: u.price
               ? parseIndianCurrency(u.price) || undefined
               : undefined,
@@ -3382,7 +3425,7 @@ export function ProjectForm({
                           {unit.roomDimensions.map((r, rIdx) => (
                             <div
                               key={rIdx}
-                              className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-4 items-end"
+                              className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-4 items-start"
                             >
                               <div className="space-y-2">
                                 <label className={labelClass}>Room</label>
@@ -3403,33 +3446,39 @@ export function ProjectForm({
                                 />
                               </div>
                               <div className="space-y-2">
-                                <label className={labelClass}>Dimensions</label>
-                                <FormSelect
-                                  name={`roomDims-${idx}-${rIdx}`}
-                                  options={withLegacyOption(
-                                    formData.roomDimensions.map((rd) => {
-                                      const dims =
-                                        formatRoomDimension(
-                                          rd.lengthFt,
-                                          rd.widthFt,
-                                        ) ?? rd.value;
-                                      return {
-                                        value: dims,
-                                        label:
-                                          rd.label !== dims
-                                            ? `${rd.label} (${dims})`
-                                            : dims,
-                                      };
-                                    }),
-                                    r.dimensions,
-                                  )}
-                                  value={r.dimensions || null}
-                                  onValueChange={(v) =>
+                                <label className={labelClass}>Length (ft)</label>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step={0.5}
+                                  inputMode="decimal"
+                                  value={r.lengthFt}
+                                  onChange={(e) =>
                                     updateUnitRoom(idx, rIdx, {
-                                      dimensions: v || "",
+                                      lengthFt: e.target.value,
                                     })
                                   }
-                                  placeholder="Select dimensions"
+                                  placeholder="12"
+                                  aria-label="Length in feet"
+                                  className={roomInputClass}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <label className={labelClass}>Width (ft)</label>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step={0.5}
+                                  inputMode="decimal"
+                                  value={r.widthFt}
+                                  onChange={(e) =>
+                                    updateUnitRoom(idx, rIdx, {
+                                      widthFt: e.target.value,
+                                    })
+                                  }
+                                  placeholder="15"
+                                  aria-label="Width in feet"
+                                  className={roomInputClass}
                                 />
                               </div>
                               <div className="space-y-2">

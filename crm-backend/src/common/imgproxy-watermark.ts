@@ -15,7 +15,7 @@ const IMGPROXY_BASE =
 
 export function buildWatermarkedImageUrl(
   sourceUrl: string,
-  scale = 0.3,
+  scale = 0.2,
 ): string {
   return (
     `${IMGPROXY_BASE}/insecure/rs:fit:1920:1080:0/q:85/` +
@@ -25,7 +25,7 @@ export function buildWatermarkedImageUrl(
 
 export async function fetchWatermarkedImage(
   sourceUrl: string,
-  scale = 0.3,
+  scale = 0.2,
   timeoutMs = 15000,
 ): Promise<Buffer> {
   const res = await fetch(buildWatermarkedImageUrl(sourceUrl, scale), {
