@@ -147,7 +147,7 @@ export default function PropertyViewPage() {
       const result = await propertiesApi.toggleVisibility(Number(id));
       if (result && result.success !== false) {
         const nextStatus = result.data?.status ?? result.status;
-        setProperty((prev: any) => prev ? { ...prev, status: nextStatus } : prev);
+        setProperty((prev: any) => prev ? { ...prev, status: nextStatus, approvalStatus: result.data?.approvalStatus ?? result.approvalStatus ?? prev.approvalStatus } : prev);
         toast.success(nextStatus === "available" ? "Property is now live on the site." : "Property hidden from the site.");
       } else {
         toast.error("Failed to update visibility.");
@@ -185,7 +185,8 @@ export default function PropertyViewPage() {
   if (!property) return null;
 
   const statusKey = (property.status || "").toLowerCase();
-  const isLive = statusKey === "available";
+  const isLive = statusKey === "available" && property.approvalStatus === "Approved";
+  const isOwnerReview = property.source === "owner-post" && property.approvalStatus !== "Approved";
   const isTerminalStatus = statusKey === "sold" || statusKey === "rented";
   const det = property.propertyDetails ?? {};
   const images: any[] = property.propertyImages ?? property.images ?? [];
@@ -238,7 +239,7 @@ export default function PropertyViewPage() {
             ) : (
               <Button onClick={handleVisibility} disabled={isTogglingVisibility} className="rounded-full px-8 py-5 bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md" title="Show this property on the public site">
                 <Eye className="h-4 w-4 mr-2" />
-                {isTogglingVisibility ? "Updating…" : "Publish"}
+                {isTogglingVisibility ? "Updating…" : isOwnerReview ? "Approve & Publish" : "Publish"}
               </Button>
             )
           )}
@@ -262,7 +263,7 @@ export default function PropertyViewPage() {
             className={isLive ? "h-11 rounded-xl font-semibold" : "h-11 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC] font-semibold"}
             variant={isLive ? "outline" : undefined}
           >
-            {isLive ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />} {isTogglingVisibility ? "Updating…" : isLive ? "Unpublish" : "Publish"}
+            {isLive ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />} {isTogglingVisibility ? "Updating…" : isLive ? "Unpublish" : isOwnerReview ? "Approve & Publish" : "Publish"}
           </Button>
         )}
         <div className="grid grid-cols-2 gap-3">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -17,11 +17,13 @@ import { MobileHeader } from "@/components/layout/mobile-header";
 import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
+import { propertiesApi } from "@/lib/properties-api";
+import { PROPERTY_TABS } from "@/lib/property-tabs";
 import { usePropertiesList } from "@/hooks/use-properties-list";
 import { canViewPropertyContacts } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
-import { Edit, Eye, Filter, Lock, Plus, RefreshCw, Search, X } from "lucide-react";
+import { Check, Edit, Eye, Filter, Lock, Plus, RefreshCw, Search, X } from "lucide-react";
 
 const PROPERTY_TYPE_OPTIONS = [
   { value: "apartment", label: "Apartment" },
@@ -75,7 +77,9 @@ export default function PropertiesPage() {
     } catch { /* ignore */ }
   }, []);
 
-  const tabs = ["Available", "Archived"];
+  const tabs = PROPERTY_TABS;
+  const isReviewQueue = activeTab === "Review Queue";
+  const canApprove = ["Admin", "Super Admin", "Manager"].includes(role);
 
   useEffect(() => {
     fetchProperties({ pagination, debouncedSearchQuery, activeTab, filters });
@@ -104,6 +108,21 @@ export default function PropertiesPage() {
       fetchProperties({ pagination, debouncedSearchQuery, activeTab, filters });
     }
     setIsToggling(false);
+  };
+
+  const handleApprove = async (id: number) => {
+    setIsToggling(true);
+    try {
+      await propertiesApi.approve(id);
+      toast.success("Property approved and moved to Available.");
+      // Reset pagination if the last row on a later queue page was approved.
+      if (pagination.pageIndex > 0 && properties.length === 1) resetPage();
+      else await fetchProperties({ pagination, debouncedSearchQuery, activeTab, filters });
+    } catch {
+      toast.error("Failed to approve property.");
+    } finally {
+      setIsToggling(false);
+    }
   };
 
   const columns: ColumnDef<any>[] = [
@@ -269,17 +288,19 @@ export default function PropertiesPage() {
               <Button variant="outline" size="sm" onClick={() => router.push(`/properties/new?edit=${row.id}`)}>
                 <Edit className="h-3.5 w-3.5 mr-1.5" /> Edit
               </Button>
-              <Button
-                variant="outline"
+              {canApprove && <Button
+                variant={isReviewQueue ? "default" : "outline"}
                 size="sm"
                 disabled={isToggling}
                 onClick={async () => {
-                  await handleToggleVisibility(row.id);
+                  if (isReviewQueue) await handleApprove(row.id);
+                  else await handleToggleVisibility(row.id);
                   clearSelection();
                 }}
               >
-                <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Toggle Visibility
-              </Button>
+                {isReviewQueue ? <Check className="h-3.5 w-3.5 mr-1.5" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+                {isToggling ? "Updating…" : isReviewQueue ? "Approve & Publish" : "Toggle Visibility"}
+              </Button>}
             </>
           )}
         </>
@@ -373,6 +394,7 @@ export default function PropertiesPage() {
         return (
           <button
             key={tab}
+            aria-pressed={activeTab === tab}
             onClick={() => { setActiveTab(tab); resetPage(); }}
             className={cn(
               "px-5 h-10 rounded-full text-[14px] font-semibold whitespace-nowrap transition-all border active:scale-95",
@@ -388,7 +410,7 @@ export default function PropertiesPage() {
 
   const tableSection = (
     <div className="w-full max-w-full min-w-0 md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col">
-      {isLoading ? <TableSkeleton columns={11} rows={10} flush /> : <DataTable {...tableProps} />}
+      {isLoading ? <TableSkeleton columns={11} rows={10} flush /> : <DataTable key={activeTab} {...tableProps} />}
     </div>
   );
 
@@ -399,6 +421,7 @@ export default function PropertiesPage() {
           {tabs.map((tab) => (
             <button
               key={tab}
+              aria-pressed={activeTab === tab}
               onClick={() => { setActiveTab(tab); resetPage(); }}
               className={"relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " + (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")}
             >

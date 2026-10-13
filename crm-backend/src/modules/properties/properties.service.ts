@@ -714,21 +714,28 @@ export class PropertiesService {
     if (s === 'sold' || s === 'rented') {
       throw new BadRequestException(`Cannot toggle visibility for ${s} properties`);
     }
-    const newStatus = s === 'available' ? 'unavailable' : 'available';
+    const isLive = s === 'available' && existing.approvalStatus === 'Approved';
+    const newStatus = isLive ? 'unavailable' : 'available';
     await this.siteApi.patch(
       `/admin/properties/${existing.propertyType}/${id}/status`,
       { status: newStatus },
     );
-    return { id, status: newStatus };
+    return { id, status: newStatus, approvalStatus: newStatus === 'available' ? 'Approved' : existing.approvalStatus };
   }
 
   // ── setApprovalStatus ──────────────────────────────────────────────────
   async setApprovalStatus(id: number, approvalStatus: 'Approved' | 'Pending') {
     const existing = await this.findOne(id);
-    await this.siteApi.patch(
-      `/admin/properties/${existing.propertyType}/${id}`,
-      { approvalStatus },
-    );
+    if (approvalStatus === 'Approved' && existing.source === 'owner-post') {
+      if (['sold', 'rented'].includes(String(existing.status).toLowerCase())) {
+        throw new BadRequestException('Cannot publish sold or rented properties');
+      }
+      // Reuse the publishing endpoint so approval updates visibility, search,
+      // and public listing caches together in one mutation.
+      await this.siteApi.patch(`/admin/properties/${existing.propertyType}/${id}/status`, { status: 'available' });
+    } else {
+      await this.siteApi.patch(`/admin/properties/${existing.propertyType}/${id}`, { approvalStatus });
+    }
     return { id, approvalStatus };
   }
 

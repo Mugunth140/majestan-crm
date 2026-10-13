@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { toast } from "sonner";
+import { propertyTabStatus } from "@/lib/property-tabs";
 import { propertiesApi } from "@/lib/properties-api";
 
 interface UsePropertiesListArgs {
@@ -48,7 +49,7 @@ export function usePropertiesList() {
         limit: pagination.pageSize,
       };
       if (debouncedSearchQuery.trim()) params.search = debouncedSearchQuery.trim();
-      params.status = activeTab === "Archived" ? "archived" : "available";
+      params.status = propertyTabStatus(activeTab);
       if (filters.propertyType) params.propertyType = filters.propertyType;
       if (filters.listingType) params.listingType = filters.listingType;
       if (filters.cityId) params.cityId = filters.cityId;
