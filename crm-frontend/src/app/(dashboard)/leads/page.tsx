@@ -277,7 +277,7 @@ export default function LeadsPage() {
   const actionFilters = [...ACTION_FILTERS];
 
     const [totalCount, setTotalCount] = useState(0);
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 15 });
   const resetPage = () => setPagination((prev) => (prev.pageIndex === 0 ? prev : resetPageIndex(prev)));
   const updateFilters = (updater: (prev: typeof filters) => typeof filters) => {
     setFilters(updater);
