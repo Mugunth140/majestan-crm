@@ -277,7 +277,7 @@ export default function LeadsPage() {
   const actionFilters = [...ACTION_FILTERS];
 
     const [totalCount, setTotalCount] = useState(0);
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 15 });
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const resetPage = () => setPagination((prev) => (prev.pageIndex === 0 ? prev : resetPageIndex(prev)));
   const updateFilters = (updater: (prev: typeof filters) => typeof filters) => {
     setFilters(updater);
@@ -1317,7 +1317,7 @@ export default function LeadsPage() {
   return (
     <>
       <MobileHeader title="Leads Dashboard" />
-      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:flex-1 md:min-h-0">
+      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:h-full">
         <Device
           mobile={null}
           desktop={
