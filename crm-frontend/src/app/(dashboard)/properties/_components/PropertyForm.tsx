@@ -2129,9 +2129,11 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 </label>
                 <Input
                   type="number"
+                  step="any"
+                  inputMode="decimal"
                   value={brokerageValue}
                   onChange={(e) => setBrokerageValue(e.target.value)}
-                  placeholder={brokerageType === "percentage" ? "e.g. 2" : "e.g. 15"}
+                  placeholder={brokerageType === "percentage" ? "e.g. 2.5" : "e.g. 15"}
                   min={0}
                   className={inputClass}
                 />
