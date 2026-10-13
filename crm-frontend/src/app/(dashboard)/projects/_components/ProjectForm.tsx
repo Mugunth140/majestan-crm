@@ -884,17 +884,24 @@ export function ProjectForm({
     try {
       const result = await propertiesApi.uploadImages(files);
       const uploaded = result?.data ?? [];
-      if (!result?.success || uploaded.length === 0)
-        throw new Error("Upload failed");
+      const previews = new Map(files.map((f) => [f.name, URL.createObjectURL(f)]));
       setGallery((prev) => [
         ...prev,
-        ...uploaded.map((u: any, i: number) => ({
+        ...uploaded.map((u: any) => ({
           key: u.imageKey,
-          preview: URL.createObjectURL(files[i]),
+          preview: previews.get(u.fileName) ?? "",
         })),
       ]);
+      const failed = result?.failed ?? [];
+      if (failed.length > 0) {
+        const names = failed.slice(0, 3).join(", ");
+        const more = failed.length > 3 ? ` and ${failed.length - 3} more` : "";
+        toast.error(`Could not upload ${names}${more}. Please try again.`);
+      } else if (uploaded.length === 0) {
+        throw new Error("Upload failed");
+      }
     } catch {
-      toast.error("Failed to upload gallery images. Please try again.");
+      toast.error("Could not upload gallery images. Please try again.");
     } finally {
       setUploadingGallery(false);
     }

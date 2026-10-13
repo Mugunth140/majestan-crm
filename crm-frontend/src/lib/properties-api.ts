@@ -17,10 +17,26 @@ export const propertiesApi = {
     const q = new URLSearchParams({ fileName, fileType });
     return apiJson(`${BASE}/presigned-url?${q}`);
   },
-  uploadImages: (files: File[]) => {
-    const form = new FormData();
-    files.forEach((f) => form.append('images', f));
-    return apiJson(`${BASE}/upload`, { method: 'POST', body: form });
+  // One request per file: a single oversized or aborted upload must not
+  // take down the whole batch. Resolves successes; lists failed names.
+  uploadImages: async (files: File[]) => {
+    const data: { imageKey: string; fileName: string }[] = [];
+    const failed: string[] = [];
+    await Promise.all(
+      files.map(async (f) => {
+        const form = new FormData();
+        form.append('images', f);
+        try {
+          const res: any = await apiJson(`${BASE}/upload`, { method: 'POST', body: form });
+          const items = res?.data ?? [];
+          if (res?.success && items.length > 0) data.push(...items);
+          else failed.push(f.name);
+        } catch {
+          failed.push(f.name);
+        }
+      })
+    );
+    return { success: failed.length === 0, data, failed };
   },
   uploadDocs: (files: File[]) => {
     const form = new FormData();

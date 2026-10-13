@@ -1258,10 +1258,10 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
     const newImages: UploadedImage[] = [];
 
     try {
-      // Single direct upload: files in, R2 keys out — no URLs involved
+      // Per-file uploads: files in, R2 keys out — successes attach even if
+      // siblings fail. Failures get one generic toast, no server internals.
       const result = await propertiesApi.uploadImages(files);
       const uploaded = result?.data ?? [];
-      if (!result?.success || uploaded.length === 0) throw new Error("Upload failed");
       const previews = new Map(files.map((f) => [f.name, URL.createObjectURL(f)]));
       for (const item of uploaded) {
         newImages.push({
@@ -1271,9 +1271,17 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           previewUrl: previews.get(item.fileName) ?? "",
         });
       }
+      const failed = result?.failed ?? [];
+      if (failed.length > 0) {
+        const names = failed.slice(0, 3).join(", ");
+        const more = failed.length > 3 ? ` and ${failed.length - 3} more` : "";
+        toast.error(`Could not upload ${names}${more}. Please try again.`);
+      } else if (uploaded.length === 0) {
+        throw new Error("Upload failed");
+      }
       setUploadingCount(0);
     } catch {
-      toast.error("Failed to upload images. Please try again.");
+      toast.error("Could not upload images. Please try again.");
       setUploadingCount(0);
     }
 

@@ -47,7 +47,8 @@ export class PropertiesController {
   @UseInterceptors(
     FilesInterceptor('images', 10, {
       storage: memoryStorage(),
-      limits: { fileSize: 5 * 1024 * 1024, files: 10 },
+      // Phone photos routinely exceed 5 MB — 15 MB per-file cap (matches docs).
+      limits: { fileSize: 15 * 1024 * 1024, files: 10 },
     }),
   )
   async uploadImages(@UploadedFiles() files: Express.Multer.File[]) {
