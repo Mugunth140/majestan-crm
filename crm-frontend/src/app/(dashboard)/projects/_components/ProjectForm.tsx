@@ -346,6 +346,20 @@ interface GalleryItem {
   preview: string;
 }
 
+/**
+ * Immutable reorder for the draggable gallery. Out-of-range indices return
+ * the list untouched. (Mirrors PropertyForm's helper.)
+ */
+function moveListItem<T>(list: T[], from: number, to: number): T[] {
+  if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) {
+    return list;
+  }
+  const next = [...list];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}
+
 // Unsaved-draft persistence: every keystroke-level field state is snapshotted
 // to localStorage (debounced) so a refresh never loses entered data. The
 // snapshot only ever holds plain JSON (keys, not object URLs or Files).
@@ -905,6 +919,32 @@ export function ProjectForm({
     } finally {
       setUploadingGallery(false);
     }
+  };
+
+  // ---- Draggable gallery (drop position sets order; first photo is primary) ----
+  const galleryDrag = useRef<number | null>(null);
+  const [draggingGallery, setDraggingGallery] = useState<number | null>(null);
+
+  const onGalleryDragStart = (index: number) => (e: React.DragEvent) => {
+    galleryDrag.current = index;
+    setDraggingGallery(index);
+    e.dataTransfer.effectAllowed = "move";
+  };
+  const onGalleryDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+  const onGalleryDrop = (index: number) => (e: React.DragEvent) => {
+    e.preventDefault();
+    const from = galleryDrag.current;
+    galleryDrag.current = null;
+    setDraggingGallery(null);
+    if (from == null || from === index) return;
+    setGallery((prev) => moveListItem(prev, from, index));
+  };
+  const onGalleryDragEnd = () => {
+    galleryDrag.current = null;
+    setDraggingGallery(null);
   };
 
   const handleFloorPlanFiles = async (
@@ -2415,7 +2455,15 @@ export function ProjectForm({
               {gallery.map((g, i) => (
                 <div
                   key={`${g.key}-${i}`}
-                  className="relative h-28 rounded-xl overflow-hidden border border-border/60 bg-muted/20"
+                  draggable
+                  onDragStart={onGalleryDragStart(i)}
+                  onDragOver={onGalleryDragOver}
+                  onDrop={onGalleryDrop(i)}
+                  onDragEnd={onGalleryDragEnd}
+                  title="Drag to reorder — first photo is primary"
+                  className={`relative h-28 rounded-xl overflow-hidden border border-border/60 bg-muted/20 cursor-grab active:cursor-grabbing transition-opacity ${
+                    draggingGallery === i ? "opacity-40" : ""
+                  }`}
                 >
                   {g.preview || g.key.startsWith("http") ? (
                     <img
@@ -2426,6 +2474,11 @@ export function ProjectForm({
                   ) : (
                     <span className="flex h-full items-center justify-center p-2 text-[11px] text-muted-foreground truncate">
                       {g.key}
+                    </span>
+                  )}
+                  {i === 0 && (
+                    <span className="absolute top-1.5 left-1.5 bg-[#0052FF] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                      Primary
                     </span>
                   )}
                   <button
