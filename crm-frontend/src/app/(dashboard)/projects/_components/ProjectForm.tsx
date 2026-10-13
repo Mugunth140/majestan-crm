@@ -2110,6 +2110,7 @@ export function ProjectForm({
                 <Input
                   type="number"
                   min={0}
+                  step="any"
                   value={projectAreaSqft}
                   onChange={(e) => setProjectAreaSqft(e.target.value)}
                   placeholder="e.g. 50000"
@@ -2124,7 +2125,25 @@ export function ProjectForm({
                     value: u.value,
                   }))}
                   value={projectAreaUnit}
-                  onValueChange={(v) => setProjectAreaUnit(v || "sqft")}
+                  onValueChange={(v) => {
+                    const next = v || "sqft";
+                    // Keep the physical area constant: convert the displayed
+                    // number from the old unit to the new one instead of
+                    // reinterpreting it (which silently corrupts saved data
+                    // on edit, e.g. stored sqft re-saved as acres).
+                    setProjectAreaSqft((prev) => {
+                      const n = Number(prev);
+                      if (!prev || !Number.isFinite(n)) return prev;
+                      const from =
+                        PROJECT_AREA_UNITS.find((u) => u.value === projectAreaUnit)
+                          ?.factor ?? 1;
+                      const to =
+                        PROJECT_AREA_UNITS.find((u) => u.value === next)
+                          ?.factor ?? 1;
+                      return String(Math.round(((n * from) / to) * 100) / 100);
+                    });
+                    setProjectAreaUnit(next);
+                  }}
                 />
               </div>
             </div>
