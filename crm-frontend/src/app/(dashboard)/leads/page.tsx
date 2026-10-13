@@ -1317,7 +1317,7 @@ export default function LeadsPage() {
   return (
     <>
       <MobileHeader title="Leads Dashboard" />
-      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:h-full">
+      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:flex-1 md:min-h-0">
         <Device
           mobile={null}
           desktop={
