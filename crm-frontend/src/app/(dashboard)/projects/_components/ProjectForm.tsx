@@ -2952,7 +2952,9 @@ export function ProjectForm({
                             </>
                           )}
                           <div className="space-y-2">
-                            <label className={labelClass}>Facing</label>
+                            <label className={labelClass}>
+                              {isPlotProject(projectType) ? "Plot Facing" : "Facing"}
+                            </label>
                             <FormSelect
                               name={`facing-${idx}`}
                               options={FACING_OPTIONS}
