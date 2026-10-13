@@ -287,6 +287,7 @@ export default function PropertiesPage() {
     },
     manualPagination: true,
     pageCount: Math.ceil(totalCount / pagination.pageSize),
+    totalCount,
     pagination,
     onPaginationChange: setPagination,
   };

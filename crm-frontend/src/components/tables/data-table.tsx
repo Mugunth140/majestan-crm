@@ -46,6 +46,8 @@ interface DataTableProps<TData, TValue> {
   pageSize?: number;
   manualPagination?: boolean;
   pageCount?: number;
+  /** Server-side total for the footer. Without it the footer counts only the current page rows. */
+  totalCount?: number;
   pagination?: {
     pageIndex: number;
     pageSize: number;
@@ -67,6 +69,7 @@ export function DataTable<TData, TValue>({
   pageSize = 10,
   manualPagination,
   pageCount,
+  totalCount,
   pagination,
   onPaginationChange,
   onSelectionChange,
@@ -229,16 +232,17 @@ export function DataTable<TData, TValue>({
         flush ? "px-6 border-t border-border/40" : ""
       )}>
         <div className="text-sm text-muted-foreground">
-          Showing{" "}
-          {table.getFilteredRowModel().rows.length > 0
-            ? table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1
-            : 0}{" "}
-          to{" "}
-          {Math.min(
-            (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
-            table.getFilteredRowModel().rows.length
-          )}{" "}
-          of {table.getFilteredRowModel().rows.length} entries
+          {(() => {
+            // Server-paginated tables only hold one page of rows: count the
+            // server total when provided, otherwise fall back to page rows.
+            const pageRows = table.getFilteredRowModel().rows.length;
+            const total = totalCount ?? pageRows;
+            const from = pageRows > 0 ? table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1 : 0;
+            const to = pageRows > 0
+              ? Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, total)
+              : 0;
+            return <>Showing {from} to {to} of {total} entries</>;
+          })()}
         </div>
         <div className="flex items-center space-x-2">
           <Button

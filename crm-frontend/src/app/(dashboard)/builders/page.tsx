@@ -248,6 +248,7 @@ export default function BuildersPage() {
     },
     manualPagination: true,
     pageCount: Math.ceil(totalCount / pagination.pageSize) || 1,
+    totalCount,
     pagination,
     onPaginationChange: setPagination,
   };
