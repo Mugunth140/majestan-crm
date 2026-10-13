@@ -228,7 +228,7 @@ export function DataTable<TData, TValue>({
 
       {!hidePagination && (
       <div className={cn(
-        "flex items-center justify-between md:mt-auto sticky bottom-0 bg-card z-30 pb-24 pt-4 md:pb-4 md:pt-4 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none",
+        "flex items-center justify-between sticky bottom-0 bg-card z-30 pb-24 pt-4 md:pb-4 md:pt-4 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none",
         flush ? "px-6 border-t border-border/40" : ""
       )}>
         <div className="text-sm text-muted-foreground">
