@@ -1524,7 +1524,10 @@ export function ProjectForm({
             unitGuestParking: !isPlotUnit ? u.unitGuestParking : undefined,
             balconies:
               !isPlotUnit && u.balconies ? Number(u.balconies) : undefined,
-            floorNo: !isPlotUnit && u.floorNo.trim() ? u.floorNo.trim() : undefined,
+            floorNo:
+              !isPlotUnit && !isVillaUnit && u.floorNo.trim()
+                ? u.floorNo.trim()
+                : undefined,
             totalFloors:
               !isPlotUnit && u.totalFloors ? Number(u.totalFloors) : undefined,
             poojaRoom: !isPlotUnit ? u.poojaRoom : undefined,
@@ -3036,16 +3039,18 @@ export function ProjectForm({
                                   placeholder="Any"
                                 />
                               </div>
-                              <div className="space-y-2">
-                                <label className={labelClass}>Floor Nos</label>
-                                <FloorNosInput
-                                  value={unit.floorNo}
-                                  onChange={(val) =>
-                                    updateUnit(idx, { floorNo: val })
-                                  }
-                                  placeholder="e.g. 8, 12, 13"
-                                />
-                              </div>
+                              {!isVillaProject(projectType) && (
+                                <div className="space-y-2">
+                                  <label className={labelClass}>Floor Nos</label>
+                                  <FloorNosInput
+                                    value={unit.floorNo}
+                                    onChange={(val) =>
+                                      updateUnit(idx, { floorNo: val })
+                                    }
+                                    placeholder="e.g. 8, 12, 13"
+                                  />
+                                </div>
+                              )}
                               <div className="space-y-2">
                                 <label className={labelClass}>
                                   Total Floors
