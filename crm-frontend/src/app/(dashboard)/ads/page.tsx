@@ -18,6 +18,7 @@ import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
 import { adsApi } from "@/lib/ads-api";
+import { ADS_PLACEMENTS, getPlacement } from "@/lib/ads-link-presets";
 import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
 import { ChevronDown, ChevronUp, Edit, Plus, RefreshCw, Search, X } from "lucide-react";
@@ -31,6 +32,7 @@ interface AdItem {
   linkPreset?: string;
   linkCustom?: string;
   placement?: string;
+  audience?: string | null;
   sortOrder: number;
   isActive: boolean;
   updatedAt?: string;
@@ -40,6 +42,8 @@ interface AdItem {
 export default function AdsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = usePersistedState<string>("ads:tab", "Active", { allowed: ["Active", "Inactive"] });
+  const [placement, setPlacement] = usePersistedState<string>("ads:placement", "hero", { allowed: ADS_PLACEMENTS.map((p) => p.value) });
+  const placementSpec = getPlacement(placement);
   const [ads, setAds] = useState<AdItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isTogglingId, setIsTogglingId] = useState<number | null>(null);
@@ -63,7 +67,7 @@ export default function AdsPage() {
   const fetchAds = useCallback(async () => {
     try {
       setIsLoading(true);
-      const res = await adsApi.list({ placement: "hero" });
+      const res = await adsApi.list({ placement });
       const items =
         res?.data?.items ?? res?.data?.data ?? (Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []);
       setAds(Array.isArray(items) ? items : []);
@@ -73,7 +77,7 @@ export default function AdsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [placement]);
 
   useEffect(() => {
     fetchAds();
@@ -182,6 +186,7 @@ export default function AdsPage() {
       cell: ({ row }) => {
         const rawSrc = row.original.desktopImage;
         const src = rawSrc && rawSrc.startsWith("http") ? rawSrc : null;
+        const [rw, rh] = placementSpec.desktop.ratio;
         return (
           <div className="flex items-center justify-center">
             {src ? (
@@ -189,7 +194,8 @@ export default function AdsPage() {
               <img
                 src={src}
                 alt={row.original.title || "Advertisement"}
-                className="h-10 w-20 rounded-md border border-border/60 object-cover bg-muted"
+                style={{ aspectRatio: `${rw} / ${rh}` }}
+                className="h-10 w-auto max-w-36 rounded-md border border-border/60 object-cover bg-muted"
                 loading="lazy"
               />
             ) : (
@@ -213,15 +219,26 @@ export default function AdsPage() {
         );
       },
     },
-    {
-      accessorKey: "placement",
-      header: "Placement",
-      cell: ({ row }) => (
-        <Badge className="bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 font-medium shadow-sm border capitalize">
-          {row.original.placement || "hero"}
-        </Badge>
-      ),
-    },
+    ...(placementSpec.audiences.length
+      ? [
+          {
+            id: "audience",
+            header: "Shows on",
+            cell: ({ row }) => {
+              const match = placementSpec.audiences.find((x) => x.value === row.original.audience);
+              return match ? (
+                <Badge className="bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 font-medium shadow-sm border">
+                  {match.label}
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="bg-muted/40 text-muted-foreground border-border/60" title="Shown wherever no targeted ad is active">
+                  All — fallback
+                </Badge>
+              );
+            },
+          } satisfies ColumnDef<AdItem>,
+        ]
+      : []),
     {
       accessorKey: "sortOrder",
       header: "Order",
@@ -326,6 +343,26 @@ export default function AdsPage() {
     </div>
   );
 
+  const placementPicker = (isMobile: boolean) => (
+    <div className={cn("flex items-center gap-2 overflow-x-auto scrollbar-hide", isMobile ? "pb-1 -mx-4 px-4" : "pb-4 shrink-0")}>
+      {ADS_PLACEMENTS.map((p) => (
+        <button
+          key={p.value}
+          onClick={() => setPlacement(p.value)}
+          title={p.description}
+          className={cn(
+            "h-9 px-4 rounded-full text-[13px] font-medium whitespace-nowrap transition-all duration-200 border active:scale-95",
+            placement === p.value
+              ? "bg-[#0052FF] text-white border-[#0052FF] shadow-sm"
+              : "bg-background text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground"
+          )}
+        >
+          {p.label}
+        </button>
+      ))}
+    </div>
+  );
+
   const pillTabs = (
     <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 -mx-4 px-4">
       {tabs.map((tab) => {
@@ -369,10 +406,12 @@ export default function AdsPage() {
             </button>
           ))}
         </div>
+        {placementPicker(false)}
       </div>
 
       <div className="flex flex-wrap items-center gap-3 px-6 py-4 border-b bg-background">
         <div className="flex-1 min-w-[240px] max-w-md">{searchBar(false)}</div>
+        <p className="text-xs text-muted-foreground max-w-md">{placementSpec.description}</p>
         {searchQuery && (
           <Button variant="ghost" size="icon" onClick={() => setSearchQuery("")} className="h-10 w-10 rounded-full text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors" title="Clear Search">
             <X className="h-4 w-4" />
@@ -389,10 +428,12 @@ export default function AdsPage() {
       <div className="flex items-center gap-2">
         {searchBar(true)}
       </div>
-      <Link href="/ads/new" className="flex h-11 w-full rounded-xl bg-[#0052FF] px-4 text-[14px] font-semibold text-white shadow-md hover:bg-[#0052FF]/90 items-center justify-center gap-2 transition-transform active:scale-95">
+      <Link href={`/ads/new?placement=${placement}`} className="flex h-11 w-full rounded-xl bg-[#0052FF] px-4 text-[14px] font-semibold text-white shadow-md hover:bg-[#0052FF]/90 items-center justify-center gap-2 transition-transform active:scale-95">
         <Plus size={18} />
         Add Advertisement
       </Link>
+      {placementPicker(true)}
+      <p className="text-xs text-muted-foreground">{placementSpec.description}</p>
       {pillTabs}
     </div>
   );
@@ -413,7 +454,7 @@ export default function AdsPage() {
                 <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={() => fetchAds()} title="Refresh">
                   <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
                 </Button>
-                <Link href="/ads/new" className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
+                <Link href={`/ads/new?placement=${placement}`} className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
                   <Plus size={18} />
                   Add Advertisement
                 </Link>

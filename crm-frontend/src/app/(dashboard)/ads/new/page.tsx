@@ -22,6 +22,7 @@ function AdFormPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const editId = searchParams.get("edit");
+  const placementParam = searchParams.get("placement") ?? undefined;
 
   const [initialData, setInitialData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(!!editId);
@@ -49,7 +50,7 @@ function AdFormPage() {
   if (isLoading) return <AdFormLoader />;
   if (editId && !initialData) return null;
 
-  return <AdForm mode={editId ? "edit" : "create"} initial={initialData ?? undefined} />;
+  return <AdForm mode={editId ? "edit" : "create"} initial={initialData ?? undefined} defaultPlacement={placementParam} />;
 }
 
 export default function NewAdPage() {
