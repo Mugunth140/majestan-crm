@@ -1,4 +1,4 @@
-import { apiFetch } from './api-fetch';
+import { apiFetch, apiJson } from './api-fetch';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 const BASE = `${API_URL}/projects`;
@@ -20,11 +20,11 @@ export const projectsApi = {
       body: JSON.stringify(body),
     }).then(r => r.json()),
   update: (id: number, body: any) =>
-    apiFetch(`${BASE}/${id}`, {
+    apiJson(`${BASE}/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    }).then(r => r.json()),
+    }),
   updateStatus: (id: number, status: string) =>
     apiFetch(`${BASE}/${id}/status`, {
       method: 'PATCH',

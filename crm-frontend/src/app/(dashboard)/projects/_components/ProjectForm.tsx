@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { PROJECT_DRAFT_VERSION, archiveProjectDraft, canRestoreProjectDraft, projectDraftKey, readProjectDraft, type ProjectDraft } from "./project-form-draft";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -369,25 +370,12 @@ function moveListItem<T>(list: T[], from: number, to: number): T[] {
 // Unsaved-draft persistence: every keystroke-level field state is snapshotted
 // to localStorage (debounced) so a refresh never loses entered data. The
 // snapshot only ever holds plain JSON (keys, not object URLs or Files).
-const DRAFT_VERSION = 1;
+const DRAFT_VERSION = PROJECT_DRAFT_VERSION;
 const draftKeyFor = (mode: "create" | "edit", id: unknown) =>
   mode === "edit" && id != null
     ? `project-form-draft:edit:${id}`
     : "project-form-draft:new";
 
-function loadDraft(key: string): Record<string, any> | null {
-  try {
-    if (typeof window === "undefined") return null;
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || parsed.v !== DRAFT_VERSION || typeof parsed.data !== "object")
-      return null;
-    return parsed.data;
-  } catch {
-    return null;
-  }
-}
 
 interface ProjectFormProps {
   mode: "create" | "edit";
@@ -404,11 +392,15 @@ export function ProjectForm({
   const d = initialData as any;
   // Draft key is stable for this mount (edit page only renders once data
   // loads; create mode has no id). The snapshot is read exactly once.
-  const draftKey = draftKeyFor(mode, d?.id);
+  const legacyDraftKey = draftKeyFor(mode, d?.id);
+  const draftKeyRef = useRef("");
+  const baseRevisionRef = useRef<number | undefined>(d?.revision);
+  const draftWritesBlocked = useRef(false);
+  const initialSnapshotRef = useRef("");
+  const draftRestoreRan = useRef(false);
   // Two-pass draft restore: the first render (SSR + client hydration) must
   // be identical, so localStorage is only read in a post-mount effect.
   const [draftHydrated, setDraftHydrated] = useState(false);
-  const [draftRestored, setDraftRestored] = useState(false);
   const submittedRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedRef = useRef<string>("");
@@ -1127,14 +1119,17 @@ export function ProjectForm({
   });
 
   const flushDraft = (snapshot: string) => {
+    if (!draftKeyRef.current || draftWritesBlocked.current) return false;
     try {
       window.localStorage.setItem(
-        draftKey,
-        JSON.stringify({ v: DRAFT_VERSION, data: JSON.parse(snapshot) }),
+        draftKeyRef.current,
+        JSON.stringify({ v: DRAFT_VERSION, baseRevision: baseRevisionRef.current, data: JSON.parse(snapshot) }),
       );
       lastSavedRef.current = snapshot;
+      return true;
     } catch {
       /* storage full or unavailable — draft stays in memory */
+      return false;
     }
   };
 
@@ -1143,7 +1138,29 @@ export function ProjectForm({
   // hydration — so the server and the initial client render always show the
   // pristine/server state, and the draft is applied here, client-only.
   useEffect(() => {
-    const saved = loadDraft(draftKey);
+    if (draftRestoreRan.current) return;
+    draftRestoreRan.current = true;
+    initialSnapshotRef.current = JSON.stringify(collectDraft());
+    lastSavedRef.current = initialSnapshotRef.current;
+    let userId: unknown;
+    try { userId = JSON.parse(window.localStorage.getItem("crm_user") || "{}").id; } catch { /* unavailable */ }
+    if (!userId) { draftWritesBlocked.current = true; setDraftHydrated(true); return; }
+    const draftKey = projectDraftKey(mode, d?.id, userId);
+    draftKeyRef.current = draftKey;
+    const currentDraft = readProjectDraft(window.localStorage.getItem(draftKey));
+    const legacy = currentDraft ? null : readProjectDraft(window.localStorage.getItem(legacyDraftKey));
+    const stored = currentDraft ?? legacy;
+    if (stored && !canRestoreProjectDraft(stored, mode, baseRevisionRef.current)) {
+      // Preserve old work separately; never put an old unit list over fresh server data.
+      if (currentDraft && !archiveProjectDraft(window.localStorage, draftKey, currentDraft)) draftWritesBlocked.current = true;
+      toast.warning("Older unsaved changes were not restored", {
+        id: `project-draft:${draftKey}`,
+        description: "The latest project is loaded. Your older draft is kept for recovery so another staff member’s units are safe.",
+        duration: Infinity,
+        action: { label: "Download draft", onClick: () => downloadDraft(stored) },
+      });
+    }
+    const saved = stored && canRestoreProjectDraft(stored, mode, baseRevisionRef.current) ? stored.data : null;
     if (saved) {
       const str = (v: unknown, fallback = "") =>
         v === undefined || v === null ? fallback : String(v);
@@ -1190,7 +1207,7 @@ export function ProjectForm({
       setBrochureName(str(saved.brochureName, brochureName));
       if (typeof saved.status === "string" && saved.status)
         setStatus(saved.status);
-      if (Array.isArray(saved.towerDetails) && saved.towerDetails.length > 0)
+      if (Array.isArray(saved.towerDetails))
         setTowerDetails(
           saved.towerDetails.map((t: any) => ({
             tower: t.tower ?? "",
@@ -1198,20 +1215,20 @@ export function ProjectForm({
             units: t.units != null ? String(t.units) : "",
           })),
         );
-      if (Array.isArray(saved.specifications) && saved.specifications.length > 0)
+      if (Array.isArray(saved.specifications))
         setSpecifications(
           saved.specifications.map((s: any) => ({
             label: s.label ?? "",
             value: s.value ?? "",
           })),
         );
-      if (Array.isArray(saved.amenityIds) && saved.amenityIds.length > 0)
+      if (Array.isArray(saved.amenityIds))
         setAmenityIds(
           saved.amenityIds
             .map((n: any) => Number(n))
             .filter((n: number) => Number.isFinite(n)),
         );
-      if (Array.isArray(saved.gallery) && saved.gallery.length > 0)
+      if (Array.isArray(saved.gallery))
         setGallery(
           saved.gallery.map((g: any) => ({
             key: typeof g === "string" ? g : (g.key ?? ""),
@@ -1221,7 +1238,7 @@ export function ProjectForm({
       if (Array.isArray(saved.videos) || Array.isArray(saved.videoUrls)) {
         setVideos(toVideoRows(saved));
       }
-      if (Array.isArray(saved.connectivity) && saved.connectivity.length > 0)
+      if (Array.isArray(saved.connectivity))
         setConnectivity(
           saved.connectivity.map((c: any) => ({
             icon: c.icon ?? "",
@@ -1231,14 +1248,14 @@ export function ProjectForm({
         );
       if (Array.isArray(saved.nearbyCategories))
         setNearbyCategories(saved.nearbyCategories);
-      if (Array.isArray(saved.faqs) && saved.faqs.length > 0)
+      if (Array.isArray(saved.faqs))
         setFaqs(
           saved.faqs.map((f: any) => ({
             question: f.question ?? "",
             answer: f.answer ?? "",
           })),
         );
-      if (Array.isArray(saved.units) && saved.units.length > 0)
+      if (Array.isArray(saved.units))
         setUnits(
           saved.units.map((u: any) => ({
             ...emptyUnit(),
@@ -1251,7 +1268,12 @@ export function ProjectForm({
               : [],
           })),
         );
-      setDraftRestored(true);
+      toast.info("Unsaved changes restored", {
+        duration: 8000,
+        id: `project-draft:${draftKey}`,
+        description: "Your draft matches the current project version.",
+        action: { label: "Discard", onClick: discardDraft },
+      });
     }
     setDraftHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1297,16 +1319,28 @@ export function ProjectForm({
   }, []);
 
   const discardDraft = () => {
+    submittedRef.current = true;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     try {
-      window.localStorage.removeItem(draftKey);
+      window.localStorage.removeItem(draftKeyRef.current);
     } catch {
       /* ignore */
     }
     window.location.reload();
   };
 
+  const downloadDraft = (saved: ProjectDraft) => {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(saved, null, 2)], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url; link.download = `project-${d?.id ?? "new"}-unsaved-draft.json`; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (mode === "edit" && (!Number.isInteger(baseRevisionRef.current) || !baseRevisionRef.current)) {
+      toast.error("Reload the latest project before saving."); return;
+    }
     if (!name.trim()) {
       toast.error("Project name is required.");
       return;
@@ -1549,7 +1583,7 @@ export function ProjectForm({
       if (mode === "create") {
         result = await projectsApi.create(payload);
       } else {
-        result = await projectsApi.update(d.id, payload);
+        result = await projectsApi.update(d.id, { ...payload, expectedRevision: baseRevisionRef.current });
       }
       if (result && result.success === false) {
         toast.error(result.message ?? `Failed to ${mode} project.`);
@@ -1562,7 +1596,7 @@ export function ProjectForm({
       submittedRef.current = true;
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       try {
-        window.localStorage.removeItem(draftKey);
+        window.localStorage.removeItem(draftKeyRef.current);
       } catch {
         /* ignore */
       }
@@ -1571,8 +1605,19 @@ export function ProjectForm({
       } else {
         router.push("/projects");
       }
-    } catch {
-      toast.error("An unexpected error occurred.");
+    } catch (error) {
+      if ((error as { status?: number }).status === 409) {
+        // Persist the unsaved work with its ORIGINAL revision, never retag it
+        // as current or retry a destructive write automatically.
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        const snapshot = collectDraft();
+        const kept = flushDraft(JSON.stringify(snapshot));
+        toast.warning("Project changed on another device", {
+          description: kept ? "Nothing was overwritten. Your draft is kept. Reload to review the latest units before saving." : "Nothing was overwritten. This device could not store your draft. Download it before reloading.",
+          duration: Infinity,
+          action: kept ? { label: "Reload latest", onClick: () => window.location.reload() } : { label: "Download draft", onClick: () => downloadDraft({ v: DRAFT_VERSION, baseRevision: baseRevisionRef.current, data: snapshot }) },
+        });
+      } else toast.error(error instanceof Error ? error.message : "An unexpected error occurred.");
     } finally {
       setIsLoading(false);
     }
@@ -1601,21 +1646,6 @@ export function ProjectForm({
             {mode === "create" ? "Add New Project" : "Edit Project"}
           </h1>
         </div>
-        {draftHydrated && draftRestored && (
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm dark:border-amber-900/50 dark:bg-amber-900/20">
-            <p className="font-medium text-amber-900 dark:text-amber-200">
-              Unsaved draft restored — your previously entered data is back.
-            </p>
-            <button
-              type="button"
-              onClick={discardDraft}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-amber-900 hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-900/40"
-            >
-              <X className="h-3.5 w-3.5" />
-              Discard
-            </button>
-          </div>
-        )}
         {preview.unitsCount > 0 && (
           <p className="text-muted-foreground text-sm">
             {`${formatPriceRange(preview.minPrice, preview.maxPrice)} · ${preview.bhk.length ? preview.bhk.map((b) => `${b}BHK`).join(", ") : "No BHK"} · ${preview.unitsCount} unit${preview.unitsCount > 1 ? "s" : ""}`}

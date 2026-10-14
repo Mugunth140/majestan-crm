@@ -28,10 +28,12 @@ function ProjectFormPage() {
 
   useEffect(() => {
     if (!editId) return;
+    let active = true;
     setIsLoading(true);
     projectsApi
       .getOne(Number(editId))
       .then((result) => {
+        if (!active) return;
         if (result && result.success !== false) {
           setInitialData(result.data ?? result);
         } else {
@@ -40,16 +42,18 @@ function ProjectFormPage() {
         }
       })
       .catch(() => {
+        if (!active) return;
         toast.error("Failed to load project.");
         router.push("/projects");
       })
-      .finally(() => setIsLoading(false));
+      .finally(() => { if (active) setIsLoading(false); });
+    return () => { active = false; };
   }, [editId, router]);
 
   if (isLoading) return <ProjectFormLoader />;
   if (editId && !initialData) return null;
 
-  return <ProjectForm mode={editId ? "edit" : "create"} initialData={initialData ?? undefined} />;
+  return <ProjectForm key={editId ?? "create"} mode={editId ? "edit" : "create"} initialData={initialData ?? undefined} />;
 }
 
 export default function NewProjectPage() {

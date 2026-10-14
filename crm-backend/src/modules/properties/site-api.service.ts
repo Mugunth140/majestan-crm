@@ -81,7 +81,7 @@ export class SiteApiService {
   private toError(status: number, data: any): HttpException {
     const raw = data && (data.message || data.error);
     const message = Array.isArray(raw) ? raw.join(', ') : (raw ?? `Site API request failed with status ${status}`);
-    const mapped = status === 404 ? 404 : status === 401 || status === 403 ? status : status === 400 ? 400 : 502;
+    const mapped = status === 404 ? 404 : status === 401 || status === 403 ? status : status === 400 ? 400 : status === 409 ? 409 : 502;
     return new HttpException(String(message), mapped);
   }
 
