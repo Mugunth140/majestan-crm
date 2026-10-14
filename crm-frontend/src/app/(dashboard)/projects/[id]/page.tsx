@@ -256,7 +256,20 @@ export default function ProjectDetailPage({
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   {project.specifications.map((s: any, i: number) => (
-                    <Field key={i} label={s.label} value={s.value} />
+                    <Field
+                      key={i}
+                      label={s.label}
+                      value={
+                        <ul className="list-disc pl-4 space-y-0.5">
+                          {String(s.value ?? "")
+                            .split("\n")
+                            .filter((point: string) => point.trim())
+                            .map((point: string, k: number) => (
+                              <li key={k}>{point}</li>
+                            ))}
+                        </ul>
+                      }
+                    />
                   ))}
                 </div>
               </>

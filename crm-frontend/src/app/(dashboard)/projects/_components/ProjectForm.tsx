@@ -365,12 +365,27 @@ const emptyTowerDetail = (): TowerDetailRow => ({
   units: "",
 });
 
+/**
+ * One specification label with up to five points. Stored as the project's
+ * existing `{ label, value }` JSON, the points joined by newlines, so no
+ * schema change is needed and the website splits them back into a list.
+ */
 interface SpecificationRow {
   label: string;
-  value: string;
+  points: string[];
 }
 
-const emptySpecification = (): SpecificationRow => ({ label: "", value: "" });
+const MAX_SPEC_POINTS = 5;
+
+const emptySpecification = (): SpecificationRow => ({ label: "", points: [""] });
+
+function specificationRowFrom(spec: any): SpecificationRow {
+  const points = String(spec?.value ?? "")
+    .split("\n")
+    .map((point) => point.trim())
+    .filter(Boolean);
+  return { label: spec?.label ?? "", points: points.length ? points : [""] };
+}
 
 interface GalleryItem {
   key: string;
@@ -586,10 +601,7 @@ export function ProjectForm({
     () => {
       const existing = d?.specifications ?? [];
       if (!Array.isArray(existing) || existing.length === 0) return [];
-      return existing.map((s: any) => ({
-        label: s.label ?? "",
-        value: s.value ?? "",
-      }));
+      return existing.map(specificationRowFrom);
     },
   );
 
@@ -1272,10 +1284,7 @@ export function ProjectForm({
         );
       if (Array.isArray(saved.specifications))
         setSpecifications(
-          saved.specifications.map((s: any) => ({
-            label: s.label ?? "",
-            value: s.value ?? "",
-          })),
+          saved.specifications.map(specificationRowFrom),
         );
       if (Array.isArray(saved.amenityIds))
         setAmenityIds(
@@ -1513,8 +1522,14 @@ export function ProjectForm({
           projectType === "plot"
             ? undefined
             : specifications
-                .filter((s) => s.label.trim() && s.value.trim())
-                .map((s) => ({ label: s.label.trim(), value: s.value.trim() })),
+                .map((s) => ({
+                  label: s.label.trim(),
+                  value: s.points
+                    .map((point) => point.trim())
+                    .filter(Boolean)
+                    .join("\n"),
+                }))
+                .filter((s) => s.label && s.value),
         coverImageUrl: coverImageUrl.trim() || undefined,
         mobileCoverImageUrl: mobileCoverImageUrl.trim() || undefined,
         brochureKey: brochureKey.trim() || undefined,
@@ -2490,7 +2505,7 @@ export function ProjectForm({
                 {specifications.map((s, i) => (
                   <div
                     key={i}
-                    className="grid grid-cols-1 md:grid-cols-[1fr_2fr_auto] gap-4 items-end"
+                    className="grid grid-cols-1 md:grid-cols-[1fr_2fr_auto] gap-4 items-start border-b pb-4 last:border-b-0"
                   >
                     <div className="space-y-2">
                       <label className={labelClass}>Label</label>
@@ -2515,19 +2530,80 @@ export function ProjectForm({
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className={labelClass}>Value</label>
-                      <Input
-                        value={s.value}
-                        onChange={(e) =>
-                          setSpecifications((prev) =>
-                            prev.map((row, j) =>
-                              j === i ? { ...row, value: e.target.value } : row,
-                            ),
-                          )
-                        }
-                        placeholder="e.g. Vitrified tiles"
-                        className={inputClass}
-                      />
+                      <label className={labelClass}>
+                        Points ({s.points.length}/{MAX_SPEC_POINTS})
+                      </label>
+                      <div className="space-y-2">
+                        {s.points.map((point, k) => (
+                          <div key={k} className="flex items-center gap-2">
+                            <Input
+                              value={point}
+                              onChange={(e) =>
+                                setSpecifications((prev) =>
+                                  prev.map((row, j) =>
+                                    j === i
+                                      ? {
+                                          ...row,
+                                          points: row.points.map((p, m) =>
+                                            m === k ? e.target.value : p,
+                                          ),
+                                        }
+                                      : row,
+                                  ),
+                                )
+                              }
+                              placeholder={
+                                k === 0
+                                  ? "e.g. Vitrified tiles in living and dining"
+                                  : "Another point"
+                              }
+                              className={inputClass}
+                            />
+                            {s.points.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() =>
+                                  setSpecifications((prev) =>
+                                    prev.map((row, j) =>
+                                      j === i
+                                        ? {
+                                            ...row,
+                                            points: row.points.filter(
+                                              (_, m) => m !== k,
+                                            ),
+                                          }
+                                        : row,
+                                    ),
+                                  )
+                                }
+                                className="h-10 w-10 shrink-0 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                                aria-label={`Remove point ${k + 1}`}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                        {s.points.length < MAX_SPEC_POINTS && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() =>
+                              setSpecifications((prev) =>
+                                prev.map((row, j) =>
+                                  j === i
+                                    ? { ...row, points: [...row.points, ""] }
+                                    : row,
+                                ),
+                              )
+                            }
+                            className="h-8 rounded-full px-3 text-xs"
+                          >
+                            <Plus className="h-3.5 w-3.5 mr-1" /> Add point
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <span
