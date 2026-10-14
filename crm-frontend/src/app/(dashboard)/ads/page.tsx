@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DataTable } from "@/components/tables/data-table";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -38,7 +39,7 @@ interface AdItem {
 
 export default function AdsPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("Active");
+  const [activeTab, setActiveTab] = usePersistedState<string>("ads:tab", "Active", { allowed: ["Active", "Inactive"] });
   const [ads, setAds] = useState<AdItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isTogglingId, setIsTogglingId] = useState<number | null>(null);
@@ -47,7 +48,7 @@ export default function AdsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [role, setRole] = useState("");
 
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = usePersistedState("ads:search", "");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   useEffect(() => {

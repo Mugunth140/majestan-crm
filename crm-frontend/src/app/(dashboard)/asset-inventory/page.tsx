@@ -4,6 +4,7 @@ import { apiFetch } from "@/lib/api-fetch";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { DataTable } from "@/components/tables/data-table";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -34,8 +35,8 @@ export default function AssetInventoryPage() {
   const router = useRouter();
   const [assets, setAssets] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filters, setFilters] = useState({ status: "" });
+  const [searchQuery, setSearchQuery] = usePersistedState("assets:search", "");
+  const [filters, setFilters] = usePersistedState("assets:filters", { status: "" });
 
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);

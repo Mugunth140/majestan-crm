@@ -3,6 +3,7 @@
 import { apiFetch } from "@/lib/api-fetch";
 import { useState, useEffect, useCallback } from "react";
 import { DataTable } from "@/components/tables/data-table";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -38,7 +39,7 @@ const emptyForm = { city_name: "", state_name: "", country_name: "India", countr
 
 export default function MasterCitiesPage() {
   const [cities, setCities] = useState<any[]>([]);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = usePersistedState("master-cities:search", "");
   const [isLoading, setIsLoading] = useState(true);
 
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -72,7 +73,7 @@ export default function MasterCitiesPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => { fetchCities(""); }, []);
+  useEffect(() => { fetchCities(search); }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount only, with any restored search
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { DataTable } from "@/components/tables/data-table";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,11 +40,11 @@ export default function HrPage() {
   const [candidates, setCandidates] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const [activeTab, setActiveTab] = useState("All Candidates");
-  const [actionFilter, setActionFilter] = useState("Today");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = usePersistedState<string>("hr:tab", "All Candidates", { allowed: ["All Candidates", "Action Required", "Rejected"] });
+  const [actionFilter, setActionFilter] = usePersistedState<string>("hr:actionFilter", "Today", { allowed: ACTION_FILTERS });
+  const [searchQuery, setSearchQuery] = usePersistedState("hr:search", "");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
-  const [todayViewMode, setTodayViewMode] = useState<"pending" | "completed">("pending");
+  const [todayViewMode, setTodayViewMode] = usePersistedState<"pending" | "completed">("hr:todayViewMode", "pending", { allowed: ["pending", "completed"] });
 
   const [role, setRole] = useState<string>("");
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
@@ -58,7 +59,7 @@ export default function HrPage() {
     }
   }, []);
 
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = usePersistedState("hr:filters", {
     dateFrom: "",
     dateTo: "",
     department: "",

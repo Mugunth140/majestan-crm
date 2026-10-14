@@ -4,6 +4,7 @@ import { apiFetch } from "@/lib/api-fetch";
 
 import { useState, useEffect, useCallback } from "react";
 import { DataTable } from "@/components/tables/data-table";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +41,7 @@ const emptyForm = { name: "", category: "other", icon_key: "", is_active: true }
 
 export default function AmenitiesMasterPage() {
   const [amenities, setAmenities] = useState<any[]>([]);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = usePersistedState("master-amenities:search", "");
   const [isLoading, setIsLoading] = useState(true);
 
   const [isAddOpen, setIsAddOpen] = useState(false);

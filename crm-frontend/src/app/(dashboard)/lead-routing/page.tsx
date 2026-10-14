@@ -2,10 +2,11 @@
 
 import { apiFetch } from "@/lib/api-fetch";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { DataTable } from "@/components/tables/data-table";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
@@ -229,31 +230,37 @@ function MatchedLeadDialog({
   );
 }
 
+const reviveDate = (v: unknown) => {
+  if (typeof v !== "string") return undefined;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? undefined : d;
+};
+
 export default function LeadRoutingPage() {
   const router = useRouter();
   const [role, setRole] = useState<string>("");
   const [userDept, setUserDept] = useState<string>("");
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
-  const [mainTab, setMainTab] = useState<MainTab>("queue");
-  const [deptTab, setDeptTab] = useState<DeptTab>("telecalling");
+  const [mainTab, setMainTab] = usePersistedState<MainTab>("routing:tab", "queue", { allowed: ["queue", "enquiry", "history"] });
+  const [deptTab, setDeptTab] = usePersistedState<DeptTab>("routing:dept", "telecalling", { allowed: ["telecalling", "sales"] });
 
   // Queue state
   const [queue, setQueue] = useState<QueueLead[]>([]);
   const [queueLoading, setQueueLoading] = useState(false);
-  const [queuePage, setQueuePage] = useState(1);
+  const [queuePage, setQueuePage] = usePersistedState("routing:queuePage", 1);
   const [queueTotal, setQueueTotal] = useState(0);
   const LIMIT = 10;
 
   // Enquiry queue state
   const [enquiry, setEnquiry] = useState<EnquiryLead[]>([]);
   const [enquiryLoading, setEnquiryLoading] = useState(false);
-  const [enquiryPage, setEnquiryPage] = useState(1);
+  const [enquiryPage, setEnquiryPage] = usePersistedState("routing:enquiryPage", 1);
   const [enquiryTotal, setEnquiryTotal] = useState(0);
-  const [enquiryTypeFilter, setEnquiryTypeFilter] = useState("");
-  const [enquiryIntentFilter, setEnquiryIntentFilter] = useState("");
-  const [enquiryDateFrom, setEnquiryDateFrom] = useState<Date | undefined>(undefined);
-  const [enquiryDateTo, setEnquiryDateTo] = useState<Date | undefined>(undefined);
+  const [enquiryTypeFilter, setEnquiryTypeFilter] = usePersistedState("routing:enquiryType", "");
+  const [enquiryIntentFilter, setEnquiryIntentFilter] = usePersistedState("routing:enquiryIntent", "");
+  const [enquiryDateFrom, setEnquiryDateFrom] = usePersistedState<Date | undefined>("routing:enquiryFrom", undefined, { deserialize: reviveDate });
+  const [enquiryDateTo, setEnquiryDateTo] = usePersistedState<Date | undefined>("routing:enquiryTo", undefined, { deserialize: reviveDate });
   const enquiryHasFilters =
     enquiryTypeFilter !== "" || enquiryIntentFilter !== "" ||
     enquiryDateFrom !== undefined || enquiryDateTo !== undefined;
@@ -265,11 +272,11 @@ export default function LeadRoutingPage() {
   // History state
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPage, setHistoryPage] = usePersistedState("routing:historyPage", 1);
   const [historyTotal, setHistoryTotal] = useState(0);
-  const [historyEventFilter, setHistoryEventFilter] = useState("");
-  const [historyDateFrom, setHistoryDateFrom] = useState<Date | undefined>(undefined);
-  const [historyDateTo, setHistoryDateTo] = useState<Date | undefined>(undefined);
+  const [historyEventFilter, setHistoryEventFilter] = usePersistedState("routing:historyEvent", "");
+  const [historyDateFrom, setHistoryDateFrom] = usePersistedState<Date | undefined>("routing:historyFrom", undefined, { deserialize: reviveDate });
+  const [historyDateTo, setHistoryDateTo] = usePersistedState<Date | undefined>("routing:historyTo", undefined, { deserialize: reviveDate });
 
   // Assign lead modal
   const [assignLeadIds, setAssignLeadIds] = useState<number[]>([]);
@@ -396,10 +403,14 @@ export default function LeadRoutingPage() {
     if (mainTab === "history") fetchHistory();
   }, [mainTab, fetchHistory]);
 
-  // When dept tab changes, reset page and refetch
+  // When dept tab changes, reset page and refetch — but not on mount, or the
+  // restored page would be wiped every time staff come back to this screen.
+  const prevDeptTabRef = useRef(deptTab);
   useEffect(() => {
+    if (prevDeptTabRef.current === deptTab) return;
+    prevDeptTabRef.current = deptTab;
     setQueuePage(1);
-  }, [deptTab]);
+  }, [deptTab, setQueuePage]);
 
   // ── Enquiry queue: event decisions ─────────────────────────────────────────
   // Unmatched event → Convert creates an UNASSIGNED lead (lands in the
@@ -1178,6 +1189,7 @@ export default function LeadRoutingPage() {
                   flush={true}
                   hidePagination={true}
                   pageSize={100}
+                  persistKey="queue"
                   columns={queueColumns} 
                   data={queue} 
                   showToolbar={true}
@@ -1276,6 +1288,7 @@ export default function LeadRoutingPage() {
                   flush={true}
                   hidePagination={true}
                   pageSize={100}
+                  persistKey="enquiry"
                   columns={enquiryColumns}
                   data={groupedEnquiry}
                   showToolbar={true}
@@ -1411,7 +1424,7 @@ export default function LeadRoutingPage() {
             ) : (
               <>
                 <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col pt-2">
-                  <DataTable flush={true} hidePagination={true} pageSize={100} columns={historyColumns} data={history} />
+                  <DataTable flush={true} hidePagination={true} pageSize={100} persistKey="history" columns={historyColumns} data={history} />
                 {/* Server-side pagination */}
                 {true && (
                   <div className="flex items-center justify-between px-6 pb-24 pt-4 md:py-4 border-t border-border/40 mt-auto sticky bottom-0 bg-card z-30 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none">

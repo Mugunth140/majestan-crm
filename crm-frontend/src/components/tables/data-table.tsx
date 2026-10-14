@@ -11,8 +11,11 @@ import {
   ColumnFiltersState,
   getFilteredRowModel,
   RowSelectionState,
+  PaginationState,
 } from "@tanstack/react-table";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 
 declare module "@tanstack/react-table" {
   interface ColumnMeta<TData, TValue> {
@@ -54,6 +57,12 @@ interface DataTableProps<TData, TValue> {
   };
   onPaginationChange?: (updater: any) => void;
   onSelectionChange?: (selectedRows: TData[]) => void;
+  /**
+   * Remembers sort + (client-side) page per route so returning from a detail
+   * page lands on the same rows. Defaults on, keyed by pathname; pass a name
+   * when one route swaps between different tables, or false to opt out.
+   */
+  persistKey?: string | false;
 }
 
 export function DataTable<TData, TValue>({
@@ -73,8 +82,18 @@ export function DataTable<TData, TValue>({
   pagination,
   onPaginationChange,
   onSelectionChange,
+  persistKey,
 }: DataTableProps<TData, TValue>) {
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const pathname = usePathname();
+  const stateKey = `table:${pathname}:${persistKey || "main"}`;
+  const [savedSorting, setSavedSorting] = usePersistedState<SortingState>(`${stateKey}:sort`, []);
+  const [localSorting, setLocalSorting] = useState<SortingState>([]);
+  const [sorting, setSorting] = persistKey === false ? [localSorting, setLocalSorting] : [savedSorting, setSavedSorting];
+  // Client-side page only: server-paginated tables get pagination from the parent.
+  const [savedPageIndex, setSavedPageIndex] = usePersistedState<number>(`${stateKey}:page`, 0);
+  const [localPageIndex, setLocalPageIndex] = useState(0);
+  const [pageIndex, setPageIndex] = persistKey === false ? [localPageIndex, setLocalPageIndex] : [savedPageIndex, setSavedPageIndex];
+  const clientPagination: PaginationState = { pageIndex, pageSize };
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
@@ -92,17 +111,42 @@ export function DataTable<TData, TValue>({
       sorting,
       columnFilters,
       rowSelection,
-      ...(manualPagination && pagination ? { pagination } : {})
+      pagination: manualPagination && pagination ? pagination : clientPagination,
     },
-    initialState: {
-      pagination: { pageSize },
-    },
-    ...(manualPagination && {
-      manualPagination: true,
-      pageCount: pageCount ?? -1,
-      onPaginationChange,
-    })
+    ...(manualPagination
+      ? {
+          manualPagination: true,
+          pageCount: pageCount ?? -1,
+          onPaginationChange,
+        }
+      : {
+          // Page resets are handled below so the restored page survives the first load
+          autoResetPageIndex: false,
+          onPaginationChange: (updater: PaginationState | ((old: PaginationState) => PaginationState)) => {
+            const next = typeof updater === "function" ? updater(clientPagination) : updater;
+            setPageIndex(next.pageIndex);
+          },
+        })
   });
+
+  // The first non-empty data is the restore point: keep the saved page, but
+  // pull it back if the list shrank. Any later data change (tab/search/filter
+  // on the parent) returns to page 1, like TanStack's default auto-reset.
+  const seenDataRef = useRef<TData[] | null>(null);
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    if (manualPagination || seenDataRef.current === data) return;
+    seenDataRef.current = data;
+    if (data.length === 0) return;
+    if (!restoredRef.current) {
+      restoredRef.current = true;
+      const lastPage = Math.max(0, Math.ceil(table.getPrePaginationRowModel().rows.length / pageSize) - 1);
+      if (pageIndex > lastPage) setPageIndex(lastPage);
+      return;
+    }
+    setPageIndex(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, manualPagination]);
 
   // Lift selection up when a parent needs it (e.g. review banner actions)
   const selectionKey = Object.keys(rowSelection).sort().join(",");

@@ -9,12 +9,18 @@ import { MobileGlassHeader } from "@/components/layout/mobile-glass-header";
 import { MobileHeaderProvider } from "@/components/layout/mobile-header-context";
 import { MainScrollArea } from "@/components/layout/mobile-main-scroller";
 import { NotificationProvider } from "@/context/notification-context";
+import { useIsClient } from "@/hooks/use-is-client";
+import DashboardLoading from "./loading";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Pages restore their saved tabs/filters/page from sessionStorage on first
+  // render, which the server can't see — so mount them client-side only. In-app
+  // navigation is unaffected; a hard reload shows the loading skeleton a frame.
+  const isClient = useIsClient();
   return (
     <NotificationProvider>
       <SidebarProvider>
@@ -27,7 +33,7 @@ export default function DashboardLayout({
               <Topbar />
               <MobileGlassHeader />
               <MainScrollArea>
-                {children}
+                {isClient ? children : <DashboardLoading />}
               </MainScrollArea>
               <MobileNavbar />
             </div>

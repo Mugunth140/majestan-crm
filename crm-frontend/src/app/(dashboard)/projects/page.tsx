@@ -16,6 +16,7 @@ import { MobileHeader } from "@/components/layout/mobile-header";
 import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useClampedPage, usePersistedState } from "@/hooks/use-persisted-state";
 import { useProjectsList } from "@/hooks/use-projects-list";
 import { computeProjectRanges, formatPriceRange } from "@/lib/project-ranges";
 import { apiFetch } from "@/lib/api-fetch";
@@ -54,20 +55,23 @@ const PROJECT_TYPE_STYLES: Record<string, string> = {
   plot: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400",
 };
 
+const PROJECT_TABS = ["All", "Published", "Draft", "Booked", "Archived"];
+
 export default function ProjectsPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("All");
+  const [activeTab, setActiveTab] = usePersistedState<string>("projects:tab", "All", { allowed: PROJECT_TABS });
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = usePersistedState("projects:search", "");
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
-  const [filters, setFilters] = useState({ projectType: "", minPrice: "", maxPrice: "", bhk: [] as number[], locality: "", minUnits: "" });
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [filters, setFilters] = usePersistedState("projects:filters", { projectType: "", minPrice: "", maxPrice: "", bhk: [] as number[], locality: "", minUnits: "" });
+  const [pagination, setPagination] = usePersistedState("projects:page", { pageIndex: 0, pageSize: 10 });
   const [role, setRole] = useState("");
   const [localityOptions, setLocalityOptions] = useState<{ value: string; label: string }[]>([]);
 
   const { projects, totalCount, isLoading, fetchProjects, deleteBulk } = useProjectsList();
+  useClampedPage(pagination, setPagination, totalCount, isLoading);
 
   useEffect(() => {
     try {
@@ -94,7 +98,7 @@ export default function ProjectsPage() {
     })();
   }, []);
 
-  const tabs = ["All", "Published", "Draft", "Booked", "Archived"];
+  const tabs = PROJECT_TABS;
 
   useEffect(() => {
     fetchProjects({ pagination, debouncedSearchQuery, activeTab, filters });

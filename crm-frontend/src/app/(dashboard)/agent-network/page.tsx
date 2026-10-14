@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/tables/data-table";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -38,8 +39,8 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default function AgentsPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("All Agents");
-  const [actionFilter, setActionFilter] = useState("Today");
+  const [activeTab, setActiveTab] = usePersistedState<string>("agents:tab", "All Agents", { allowed: ["All Agents", "Action Required"] });
+  const [actionFilter, setActionFilter] = usePersistedState<string>("agents:actionFilter", "Today", { allowed: ACTION_FILTERS });
   const [agents, setAgents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -47,11 +48,11 @@ export default function AgentsPage() {
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
   const [role, setRole] = useState<string>("");
-  const [todayViewMode, setTodayViewMode] = useState<"pending" | "completed">("pending");
+  const [todayViewMode, setTodayViewMode] = usePersistedState<"pending" | "completed">("agents:todayViewMode", "pending", { allowed: ["pending", "completed"] });
 
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = usePersistedState("agents:search", "");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
-  const [filters, setFilters] = useState({ partnerType: "", status: "" });
+  const [filters, setFilters] = usePersistedState("agents:filters", { partnerType: "", status: "" });
 
   const tabs = ["All Agents", "Action Required"];
   const actionFilters = [...ACTION_FILTERS];

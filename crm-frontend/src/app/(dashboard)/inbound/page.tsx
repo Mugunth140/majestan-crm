@@ -4,6 +4,7 @@ import { apiFetch } from "@/lib/api-fetch";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { DataTable } from "@/components/tables/data-table";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -41,8 +42,8 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default function InboundPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("All Inbound");
-  const [actionFilter, setActionFilter] = useState("Today");
+  const [activeTab, setActiveTab] = usePersistedState<string>("inbound:tab", "All Inbound", { allowed: ["All Inbound", "Action Required", "Closed"] });
+  const [actionFilter, setActionFilter] = usePersistedState<string>("inbound:actionFilter", "Today", { allowed: ACTION_FILTERS });
   const [inbounds, setInbounds] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -59,9 +60,9 @@ export default function InboundPage() {
     }
   }, []);
 
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = usePersistedState("inbound:search", "");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = usePersistedState("inbound:filters", {
     dateFrom: "",
     dateTo: "",
     category: "",
@@ -69,7 +70,7 @@ export default function InboundPage() {
     status: "",
   });
 
-  const [todayViewMode, setTodayViewMode] = useState<"pending" | "completed">("pending");
+  const [todayViewMode, setTodayViewMode] = usePersistedState<"pending" | "completed">("inbound:todayViewMode", "pending", { allowed: ["pending", "completed"] });
 
   const tabs = ["All Inbound", "Action Required", "Closed"];
   const actionFilters = [...ACTION_FILTERS];

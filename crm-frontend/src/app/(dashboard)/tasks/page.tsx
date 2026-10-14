@@ -6,6 +6,7 @@ import { Plus, Target, RefreshCw, Search, X } from "lucide-react";
 import { motion } from "motion/react";
 import { apiFetch } from "@/lib/api-fetch";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Device } from "@/components/shared/device";
 import { TaskCard } from "@/components/tasks/task-card";
 import { TaskMetricRow } from "@/components/tasks/task-metric-row";
@@ -26,8 +27,8 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [myTasks, setMyTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("Active");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = usePersistedState<string>("tasks:tab", "Active", { allowed: ["Active", "Archived"] });
+  const [searchQuery, setSearchQuery] = usePersistedState("tasks:search", "");
   const [logModal, setLogModal] = useState<{
     open: boolean;
     templateId: number;

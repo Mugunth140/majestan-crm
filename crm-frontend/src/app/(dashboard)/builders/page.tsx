@@ -16,6 +16,7 @@ import { MobileHeader } from "@/components/layout/mobile-header";
 import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useClampedPage, usePersistedState } from "@/hooks/use-persisted-state";
 import { apiFetch } from "@/lib/api-fetch";
 import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
@@ -26,13 +27,13 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 export default function BuildersPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"Active" | "Inactive">("Active");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = usePersistedState<"Active" | "Inactive">("builders:tab", "Active", { allowed: ["Active", "Inactive"] });
+  const [searchQuery, setSearchQuery] = usePersistedState("builders:search", "");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [pagination, setPagination] = usePersistedState("builders:page", { pageIndex: 0, pageSize: 10 });
 
   // Filters state
-  const [hasContactFilter, setHasContactFilter] = useState<string>("");
+  const [hasContactFilter, setHasContactFilter] = usePersistedState<string>("builders:contactFilter", "");
 
   const [builders, setBuilders] = useState<BuilderRecord[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -91,6 +92,7 @@ export default function BuildersPage() {
   useEffect(() => {
     fetchBuilders();
   }, [fetchBuilders]);
+  useClampedPage(pagination, setPagination, totalCount, isLoading);
 
   useEffect(() => {
     window.scrollTo(0, 0);

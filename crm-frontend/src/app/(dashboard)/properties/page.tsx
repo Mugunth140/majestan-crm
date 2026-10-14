@@ -17,6 +17,7 @@ import { MobileHeader } from "@/components/layout/mobile-header";
 import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useClampedPage, usePersistedState } from "@/hooks/use-persisted-state";
 import { propertiesApi } from "@/lib/properties-api";
 import { PROPERTY_TABS } from "@/lib/property-tabs";
 import { usePropertiesList } from "@/hooks/use-properties-list";
@@ -57,18 +58,19 @@ function formatPrice(price: number): string {
 
 export default function PropertiesPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("Available");
+  const [activeTab, setActiveTab] = usePersistedState<string>("properties:tab", "Available", { allowed: PROPERTY_TABS });
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
 
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = usePersistedState("properties:search", "");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
-  const [filters, setFilters] = useState({ propertyType: "", listingType: "", cityId: "" });
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [filters, setFilters] = usePersistedState("properties:filters", { propertyType: "", listingType: "", cityId: "" });
+  const [pagination, setPagination] = usePersistedState("properties:page", { pageIndex: 0, pageSize: 10 });
   const [role, setRole] = useState("");
 
   const { properties, totalCount, isLoading, cities, fetchProperties, toggleVisibility, deleteBulk } = usePropertiesList();
+  useClampedPage(pagination, setPagination, totalCount, isLoading);
 
   useEffect(() => {
     try {

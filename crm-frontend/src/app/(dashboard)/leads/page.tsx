@@ -31,6 +31,7 @@ import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
 import { getBulkImportDestination, mapImportSheetRow, normalizeIndianMobile, partitionPendingImports, resolveStaffAssignments } from "@/lib/lead-import";
 import type { DuplicateLeadInfo, PendingImportRow, StaffOption } from "@/lib/lead-import";
 import { resetPageIndex } from "@/lib/pagination";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 
 // The row shape produced by mapImportSheetRow, plus the legacy optional fields
 // this page still reads (or older rows still carry) from imported leads. Aliasing
@@ -57,10 +58,27 @@ type PendingImport = PendingImportRow & {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
+const LEADS_TABS = ["All Leads", "Open Pipeline", "Action Required", "Unqualified"];
+// Open Pipeline only shows an in-memory import review that doesn't survive
+// navigation, so it's never restored — that would land on an empty placeholder.
+const RESTORABLE_LEADS_TABS = LEADS_TABS.filter((t) => t !== "Open Pipeline");
+const EMPTY_LEADS_FILTERS = {
+  dateFrom: "",
+  dateTo: "",
+  category: "",
+  type: "",
+  staff: "",
+  status: "",
+  source: "",
+  priority: "",
+  minBudgetLakh: "",
+  maxBudgetLakh: "",
+};
+
 export default function LeadsPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("All Leads");
-  const [actionFilter, setActionFilter] = useState("Today");
+  const [activeTab, setActiveTab] = usePersistedState<string>("leads:tab", "All Leads", { allowed: RESTORABLE_LEADS_TABS });
+  const [actionFilter, setActionFilter] = usePersistedState<string>("leads:actionFilter", "Today", { allowed: ACTION_FILTERS });
   const [leads, setLeads] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -218,28 +236,19 @@ export default function LeadsPage() {
     setPendingImports((prev) => prev.filter((p) => p.rawId !== rawId));
   };
 
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = usePersistedState("leads:search", "");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
-  const [filters, setFilters] = useState({
-    dateFrom: "",
-    dateTo: "",
-    category: "",
-    type: "",
-    staff: "",
-    status: "",
-    source: "",
-    priority: "",
-    minBudgetLakh: "",
-    maxBudgetLakh: "",
-  });
+  const [filters, setFilters] = usePersistedState("leads:filters", EMPTY_LEADS_FILTERS);
 
-  const [todayViewMode, setTodayViewMode] = useState<"pending" | "completed">("pending");
+  const [todayViewMode, setTodayViewMode] = usePersistedState<"pending" | "completed">("leads:todayViewMode", "pending", { allowed: ["pending", "completed"] });
+  const [totalCount, setTotalCount] = useState(0);
+  const [pagination, setPagination] = usePersistedState("leads:page", { pageIndex: 0, pageSize: 10 });
 
   // Role-based state
   const [role, setRole] = useState<string>("");
   const [userDept, setUserDept] = useState<string>("");
   const [userId, setUserId] = useState<number | null>(null);
-  const [deptFilter, setDeptFilter] = useState<"telecalling" | "sales">("telecalling");
+  const [deptFilter, setDeptFilter] = usePersistedState<"telecalling" | "sales">("leads:dept", "telecalling", { allowed: ["telecalling", "sales"] });
 
   // Assign lead modal state
   const [assignLeadId, setAssignLeadId] = useState<number | null>(null);
@@ -273,11 +282,9 @@ export default function LeadsPage() {
     }
   }, []);
 
-  const tabs = ["All Leads", "Open Pipeline", "Action Required", "Unqualified"];
+  const tabs = [...LEADS_TABS];
   const actionFilters = [...ACTION_FILTERS];
 
-    const [totalCount, setTotalCount] = useState(0);
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const resetPage = () => setPagination((prev) => (prev.pageIndex === 0 ? prev : resetPageIndex(prev)));
   const updateFilters = (updater: (prev: typeof filters) => typeof filters) => {
     setFilters(updater);
@@ -322,8 +329,15 @@ export default function LeadsPage() {
       const res = await apiFetch(API_URL + "/leads?" + params.toString());
       const data = await res.json();
       if (data.success) {
+        const total = data.meta?.total || 0;
+        // A restored page can now be past the end (leads reassigned/closed)
+        const lastPage = Math.max(0, Math.ceil(total / pagination.pageSize) - 1);
+        if (pagination.pageIndex > lastPage) {
+          setPagination((prev) => ({ ...prev, pageIndex: lastPage }));
+          return;
+        }
         setLeads(data.data);
-        setTotalCount(data.meta?.total || 0);
+        setTotalCount(total);
       }
     } catch {
       toast.error("Failed to load leads.");
@@ -843,7 +857,7 @@ export default function LeadsPage() {
   const activeFiltersCount = Object.values(filters).filter(v => v !== "").length;
 
   const clearFilters = () => {
-    setFilters({ dateFrom: "", dateTo: "", category: "", type: "", staff: "", status: "", source: "", priority: "", minBudgetLakh: "", maxBudgetLakh: "" });
+    setFilters(EMPTY_LEADS_FILTERS);
     resetPage();
   };
 

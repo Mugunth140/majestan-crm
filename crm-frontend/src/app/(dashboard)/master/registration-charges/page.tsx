@@ -4,6 +4,7 @@ import { apiFetch } from "@/lib/api-fetch";
 
 import { useState, useEffect, useCallback } from "react";
 import { DataTable } from "@/components/tables/data-table";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +21,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 export default function RegistrationChargesMasterPage() {
   const [charges, setCharges] = useState<any[]>([]);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = usePersistedState("master-registration-charges:search", "");
   const [isLoading, setIsLoading] = useState(true);
 
   const [isAddOpen, setIsAddOpen] = useState(false);
