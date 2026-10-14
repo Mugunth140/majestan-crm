@@ -17,6 +17,21 @@ export const FAQ_SECTIONS = [
 
 export type FaqSectionId = (typeof FAQ_SECTIONS)[number]["id"];
 
+/**
+ * Project sub-page keys. Same pages as properties except the plan page,
+ * which is plural here (/{slug}/floor-plans) — filing a project FAQ under
+ * the singular property key would strand it where the site never reads.
+ */
+export const PROJECT_FAQ_SECTIONS = [
+  { id: "overview", label: "Overview" },
+  { id: "amenities", label: "Amenities" },
+  { id: "floor-plans", label: "Floor Plan" },
+  { id: "locality", label: "Locality" },
+  { id: "photos", label: "Photos" },
+] as const;
+
+export type ProjectFaqSectionId = (typeof PROJECT_FAQ_SECTIONS)[number]["id"];
+
 export type FaqRow = {
   question?: string;
   answer?: string;
@@ -43,9 +58,12 @@ export function sectionOf(faq: FaqRow | null | undefined): string {
 /**
  * Display grouping: rows with an unknown section file under overview so no
  * saved row can vanish from the form. Display-only — save preserves the
- * original section value.
+ * original section value. Pass the project tabs when grouping project rows.
  */
-export function displaySectionOf(faq: FaqRow | null | undefined): string {
+export function displaySectionOf(
+  faq: FaqRow | null | undefined,
+  sections: readonly { id: string }[] = FAQ_SECTIONS,
+): string {
   const section = sectionOf(faq);
-  return FAQ_SECTIONS.some((tab) => tab.id === section) ? section : "overview";
+  return sections.some((tab) => tab.id === section) ? section : "overview";
 }

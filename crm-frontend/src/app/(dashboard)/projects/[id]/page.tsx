@@ -11,6 +11,10 @@ import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { Edit, Loader2, ChevronDown, Download, Play } from "lucide-react";
 import { projectsApi } from "@/lib/projects-api";
 import {
+  PROJECT_FAQ_SECTIONS,
+  sectionOf,
+} from "@/lib/faq-sections";
+import {
   computeProjectRanges,
   formatPrice,
   formatPriceRange,
@@ -817,6 +821,9 @@ export default function ProjectDetailPage({
                     </p>
                     <p className="text-[14px] text-muted-foreground mt-1 whitespace-pre-wrap">
                       A: {f.answer}
+                    </p>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground/70 mt-2">
+                      {PROJECT_FAQ_SECTIONS.find((tab) => tab.id === sectionOf(f))?.label ?? "Overview"}
                     </p>
                   </div>
                 ),

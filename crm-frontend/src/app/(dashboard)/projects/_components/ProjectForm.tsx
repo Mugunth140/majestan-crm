@@ -34,6 +34,10 @@ import {
 } from "@/lib/nearby-places";
 import { FurnishingIcon } from "@/components/shared/furnishing-icons";
 import { FloorNosInput } from "@/components/shared/floor-nos-input";
+import {
+  PROJECT_FAQ_SECTIONS,
+  displaySectionOf,
+} from "@/lib/faq-sections";
 import { parseIndianCurrency } from "@/lib/indian-currency";
 import { computeProjectRanges, formatPriceRange } from "@/lib/project-ranges";
 import {
@@ -344,9 +348,10 @@ const emptyConnectivity = (): ConnectivityRow => ({
 interface FaqRow {
   question: string;
   answer: string;
+  section?: string;
 }
 
-const emptyFaq = (): FaqRow => ({ question: "", answer: "" });
+const emptyFaq = (): FaqRow => ({ question: "", answer: "", section: "overview" });
 
 interface TowerDetailRow {
   tower: string;
@@ -631,8 +636,18 @@ export function ProjectForm({
     return existing.map((f: any) => ({
       question: f.question ?? "",
       answer: f.answer ?? "",
+      section:
+        typeof f.section === "string" && f.section ? f.section : "overview",
     }));
   });
+
+  // Every project type is multi-page, so FAQs are always curated per
+  // sub-page tab. Rows keep their real indices so tabbed edits and deletes
+  // hit the right row; unknown sections display under overview.
+  const [faqTab, setFaqTab] = useState("overview");
+  const visibleFaqs = faqs
+    .map((faq, idx) => ({ faq, idx }))
+    .filter(({ faq }) => displaySectionOf(faq, PROJECT_FAQ_SECTIONS) === faqTab);
 
   const [units, setUnits] = useState<UnitRow[]>(() => {
     const existing = d?.units ?? d?.__units__ ?? [];
@@ -1293,6 +1308,8 @@ export function ProjectForm({
           saved.faqs.map((f: any) => ({
             question: f.question ?? "",
             answer: f.answer ?? "",
+            section:
+              typeof f.section === "string" && f.section ? f.section : "overview",
           })),
         );
       if (Array.isArray(saved.units))
@@ -1542,6 +1559,7 @@ export function ProjectForm({
             .map((f) => ({
               question: f.question.trim(),
               answer: f.answer.trim(),
+              section: f.section || "overview",
             }));
           const hadInitial = (d?.projectFaqs ?? d?.faqs ?? []).length > 0;
           return rows.length > 0 || (mode === "edit" && hadInitial)
@@ -3711,19 +3729,46 @@ export function ProjectForm({
             <Button
               type="button"
               variant="outline"
-              onClick={() => setFaqs((prev) => [...prev, emptyFaq()])}
+              onClick={() =>
+                setFaqs((prev) => [...prev, { ...emptyFaq(), section: faqTab }])
+              }
               className="h-9 rounded-full px-4"
             >
               <Plus className="h-4 w-4 mr-1" /> Add FAQ
             </Button>
           </div>
-          {faqs.length === 0 ? (
+          <p className="text-sm text-muted-foreground mb-4">
+            Add specific FAQs for each page section.
+          </p>
+          <div className="flex flex-wrap gap-2 mb-6">
+            {PROJECT_FAQ_SECTIONS.map((tab) => {
+              const count = faqs.filter(
+                (f) => displaySectionOf(f, PROJECT_FAQ_SECTIONS) === tab.id,
+              ).length;
+              const active = faqTab === tab.id;
+              return (
+                <Button
+                  key={tab.id}
+                  type="button"
+                  variant={active ? "default" : "outline"}
+                  onClick={() => setFaqTab(tab.id)}
+                  className="h-8 px-3 text-xs"
+                >
+                  {tab.label}
+                  <span className="ml-1.5 rounded-full bg-muted px-1.5 text-[11px]">
+                    {count}
+                  </span>
+                </Button>
+              );
+            })}
+          </div>
+          {visibleFaqs.length === 0 ? (
             <p className="text-sm text-muted-foreground italic">
               No FAQs added yet.
             </p>
           ) : (
             <div className="space-y-5">
-              {faqs.map((f, i) => (
+              {visibleFaqs.map(({ faq: f, idx: i }) => (
                 <div
                   key={i}
                   className="border border-border/60 rounded-2xl p-5 space-y-4 bg-muted/10"
