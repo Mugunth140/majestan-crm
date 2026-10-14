@@ -21,6 +21,8 @@ import { MobileHeader } from "@/components/layout/mobile-header";
 import { apiFetch, ApiError } from "@/lib/api-fetch";
 import { parseIndianCurrency } from "@/lib/indian-currency";
 import { propertiesApi } from "@/lib/properties-api";
+import { getFloorPlans, restoreLegacyFloorPlans, toPropertyDocumentPayload } from "./property-form-documents";
+import PropertyFloorPlansSection, { type PropertyFloorPlan } from "./PropertyFloorPlansSection";
 import { fetchNearbyCategories, fetchPostalCode, resolveCenterFromText, type LocalityCategory } from "@/lib/nearby-places";
 import { canViewPropertyContacts } from "@/lib/permissions";
 export interface Property {
@@ -596,13 +598,17 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   }
   const DOC_SLOTS = [
     { key: "brochure", label: "Brochure" },
-    { key: "floor_plan", label: "Floor Plan" },
     { key: "legal_document", label: "Legal Document" },
     { key: "ownership_proof", label: "Ownership Proof" },
     { key: "approval_certificate", label: "Approval Certificate" },
     { key: "tax_receipt", label: "Tax Receipt" },
   ];
   const initialDocs: Record<string, DocSlot | null> = {};
+  const initialFloorPlans = getFloorPlans(d?.documents ?? []).map((plan: any) => ({
+    ...plan, fileKey: String(plan.fileKey), fileName: String(plan.fileName || plan.title || "Floor plan"),
+  }));
+  const [floorPlans, setFloorPlans] = useState<PropertyFloorPlan[]>(initialFloorPlans);
+  const [uploadingFloorPlans, setUploadingFloorPlans] = useState(false);
   for (const slot of DOC_SLOTS) {
     const found = (d?.documents ?? []).find((x: any) => x.documentType === slot.key);
     initialDocs[slot.key] = found
@@ -649,7 +655,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
     `majestan:property-form:${mode}:${mode === "edit" ? ((initialData as any)?.id ?? "unknown") : "new"}`;
   const restoredDraftRef = useRef(false);
 
-  type DraftKind = "s" | "b" | "a" | "listing" | "amenityIds" | "furnishingItemIds" | "images" | "docs" | "uploads";
+  type DraftKind = "s" | "b" | "a" | "listing" | "amenityIds" | "furnishingItemIds" | "images" | "docs" | "uploads" | "plans";
   const draftFields: Array<{ key: string; kind: DraftKind; get: () => unknown; set: (v: any) => void }> = [
     { key: "title", kind: "s", get: () => title, set: setTitle },
     { key: "listingType", kind: "listing", get: () => listingType, set: setListingType },
@@ -854,6 +860,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
     { key: "description", kind: "s", get: () => description, set: setDescription },
     { key: "existingImages", kind: "images", get: () => existingImages, set: setExistingImages },
     { key: "documents", kind: "docs", get: () => documents, set: setDocuments },
+    { key: "floorPlans", kind: "plans", get: () => floorPlans, set: setFloorPlans },
     { key: "uploadedImages", kind: "uploads", get: () => uploadedImages, set: setUploadedImages },
   ];
 
@@ -868,6 +875,10 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             .filter((img: any) => img && img.imageKey)
             .map((img: any) => ({ imageUrl: img.imageUrl ?? "", imageKey: img.imageKey ?? "", fileName: img.fileName ?? "" }));
           data[f.key] = kept;
+        } else if (f.kind === "plans") {
+          data[f.key] = (Array.isArray(v) ? v : []).map((plan: PropertyFloorPlan) => ({
+            ...plan, fileUrl: plan.fileUrl?.startsWith("blob:") ? undefined : plan.fileUrl,
+          }));
         } else {
           data[f.key] = v ?? null;
         }
@@ -888,11 +899,23 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
   const applyDraft = (data: Record<string, any>): boolean => {
     let applied = 0;
+    if (!Array.isArray(data.floorPlans) && data.documents && Object.hasOwn(data.documents, "floor_plan")) {
+      setFloorPlans(restoreLegacyFloorPlans(data.documents, initialFloorPlans).map((plan) => ({
+        ...plan, fileKey: String(plan.fileKey), fileName: String(plan.fileName || plan.title || "Floor plan"),
+        mimeType: plan.mimeType ?? undefined, fileSize: plan.fileSize ?? undefined, title: plan.title ?? undefined,
+      })));
+    }
     for (const f of draftFields) {
       if (!(f.key in data)) continue;
       const v = data[f.key];
       try {
         switch (f.kind) {
+          case "plans":
+            if (Array.isArray(v)) {
+              f.set(v.filter((plan: any) => plan && typeof plan.fileKey === "string" && plan.fileKey && typeof plan.fileName === "string"));
+              applied++;
+            }
+            break;
           case "s":
             f.set(v == null ? "" : String(v));
             applied++;
@@ -1374,6 +1397,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   // ---- Submit ----
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading || uploadingFloorPlans || uploadingDoc || uploadingCount > 0) return;
     const validationErrors = validate();
     if (validationErrors.length > 0) {
       const map: Record<string, string> = {};
@@ -1535,7 +1559,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             documentType: key,
             title: label,
           }];
-        }),
+        }).concat(floorPlans.map(toPropertyDocumentPayload)),
       };
 
       // Apartment / Villa / Individual Portion fields
@@ -4832,6 +4856,12 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             </Button>
           </div>
         </div>
+        <PropertyFloorPlansSection
+          plans={floorPlans}
+          onChange={setFloorPlans}
+          disabled={isLoading}
+          onUploadingChange={setUploadingFloorPlans}
+        />
         <div className="bg-card border rounded-2xl p-8 shadow-sm">
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Documents</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -4907,7 +4937,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
           <Button
             type="submit"
-            disabled={isLoading || uploadingCount > 0}
+            disabled={isLoading || uploadingCount > 0 || uploadingFloorPlans || !!uploadingDoc}
             className="h-12 px-8 rounded-xl bg-[#0052FF] hover:bg-[#0052FF]/90 font-medium shadow-md"
           >
             {isLoading ? (
