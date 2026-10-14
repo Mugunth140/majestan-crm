@@ -508,6 +508,11 @@ export default function ProjectDetailPage({
                   {units.map((u: any, idx: number) => {
                     const key = String(u.id ?? u.unitCode ?? idx);
                     const open = expandedUnits[key] ?? false;
+                    const floorPlans: Array<{ floorName: string; imageKey?: string; imageUrl?: string }> = Array.isArray(u.floorPlans)
+                      ? u.floorPlans
+                      : (u.floorPlanImageUrl || u.floorPlanImageKey)
+                        ? [{ floorName: "Existing plan", imageKey: u.floorPlanImageKey ?? u.floorPlanImageUrl, imageUrl: u.floorPlanImageUrl }]
+                        : [];
                     return (
                       <Fragment key={u.id ?? u.unitCode}>
                         <tr
@@ -691,7 +696,7 @@ export default function ProjectDetailPage({
                                 if (
                                   details.length === 0 &&
                                   !(u.roomDimensions ?? []).length &&
-                                  !u.floorPlanImageUrl
+                                  floorPlans.length === 0
                                 ) {
                                   return (
                                     <p className="text-sm text-muted-foreground italic">
@@ -737,18 +742,29 @@ export default function ProjectDetailPage({
                                     </div>
                                   </div>
                                 )}
-                              {u.floorPlanImageUrl && (
+                              {floorPlans.length > 0 && (
                                 <div className="mt-4">
                                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
                                     {project.projectType === "plot"
                                       ? "Plot Layout"
-                                      : "Floor Plan"}
+                                      : "Floor Plans"}
                                   </p>
-                                  <img
-                                    src={u.floorPlanImageUrl}
-                                    alt={`${project.projectType === "plot" ? "Plot layout" : "Floor plan"} ${u.unitCode}`}
-                                    className="h-40 rounded-xl object-contain border border-border/60 bg-white"
-                                  />
+                                  <div className="flex flex-wrap gap-4">
+                                    {floorPlans.map((plan, planIndex) => {
+                                      const image = plan.imageUrl || plan.imageKey;
+                                      if (!image) return null;
+                                      return (
+                                        <div key={`${plan.floorName}-${planIndex}`} className="space-y-2">
+                                          <p className="text-sm font-medium">{plan.floorName || "Existing plan"}</p>
+                                          <img
+                                            src={image}
+                                            alt={`${plan.floorName || "Floor plan"} for ${u.unitCode}`}
+                                            className="h-40 max-w-full rounded-xl object-contain border border-border/60 bg-white"
+                                          />
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
                               )}
                               {Array.isArray(u.furnishingItems) &&

@@ -36,6 +36,15 @@ import { FurnishingIcon } from "@/components/shared/furnishing-icons";
 import { FloorNosInput } from "@/components/shared/floor-nos-input";
 import { parseIndianCurrency } from "@/lib/indian-currency";
 import { computeProjectRanges, formatPriceRange } from "@/lib/project-ranges";
+import {
+  duplicateFloorNameIndex,
+  floorPlanFileError,
+  floorPlanRowError,
+  floorPlansFromUnit,
+  floorPlansPayload,
+  legacyFloorPlanPayload,
+  type ProjectFloorPlanDraft,
+} from "@/lib/project-floor-plans";
 
 const labelClass =
   "text-xs font-bold uppercase tracking-wider text-muted-foreground";
@@ -141,6 +150,7 @@ interface RoomDimensionRow {
 }
 
 interface UnitRow {
+  clientId: string;
   unitCode: string;
   title: string;
   unitType: string;
@@ -170,6 +180,7 @@ interface UnitRow {
   furnishingItemIds: number[];
   floorPlanImageUrl: string;
   floorPlanImageKey: string;
+  floorPlans: ProjectFloorPlanDraft[];
   status: string;
 }
 
@@ -278,6 +289,7 @@ const withLegacyOption = (
 };
 
 const emptyUnit = (): UnitRow => ({
+  clientId: createClientId(),
   unitCode: "",
   title: "",
   unitType: "",
@@ -307,8 +319,15 @@ const emptyUnit = (): UnitRow => ({
   furnishingItemIds: [],
   floorPlanImageUrl: "",
   floorPlanImageKey: "",
+  floorPlans: [],
   status: "available",
 });
+
+function createClientId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 interface ConnectivityRow {
   icon: string;
@@ -536,14 +555,11 @@ export function ProjectForm({
   const [brochureName, setBrochureName] = useState(d?.brochureName ?? "");
   const [uploadingBrochure, setUploadingBrochure] = useState(false);
   const brochureInputRef = useRef<HTMLInputElement>(null);
-  const [floorPlanPreviews, setFloorPlanPreviews] = useState<
-    Record<number, string>
-  >({});
+  const [floorPlanPreviews, setFloorPlanPreviews] = useState<Record<string, string>>({});
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingMobileCover, setUploadingMobileCover] = useState(false);
-  const [uploadingFloorPlanIdx, setUploadingFloorPlanIdx] = useState<
-    number | null
-  >(null);
+  const [uploadingFloorPlanId, setUploadingFloorPlanId] = useState<string | null>(null);
+  const uploadingFloorPlanRef = useRef<string | null>(null);
   const [uploadingGallery, setUploadingGallery] = useState(false);
   const [locating, setLocating] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -622,6 +638,7 @@ export function ProjectForm({
     const existing = d?.units ?? d?.__units__ ?? [];
     if (existing.length === 0) return [emptyUnit()];
     return existing.map((u: any) => ({
+      clientId: createClientId(),
       unitCode: u.unitCode ?? "",
       title: u.title ?? "",
       unitType: u.unitType ?? "",
@@ -660,6 +677,7 @@ export function ProjectForm({
         : [],
       floorPlanImageUrl: u.floorPlanImageUrl ?? "",
       floorPlanImageKey: u.floorPlanImageKey ?? "",
+      floorPlans: floorPlansFromUnit(u, createClientId),
       status: u.status ?? "available",
     }));
   });
@@ -791,7 +809,8 @@ export function ProjectForm({
     u.studyRoom ||
     u.boundaryWall ||
     u.unitGuestParking ||
-    u.roomDimensions.length > 0;
+    u.roomDimensions.length > 0 ||
+    u.floorPlans.length > 0;
 
   const handleCoverFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -947,29 +966,50 @@ export function ProjectForm({
 
   const handleFloorPlanFiles = async (
     e: React.ChangeEvent<HTMLInputElement>,
-    idx: number,
+    unitId: string,
+    planId: string,
   ) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    setUploadingFloorPlanIdx(idx);
+    if (uploadingFloorPlanRef.current !== null) {
+      toast.error("Wait for the current floor plan upload to finish.");
+      return;
+    }
+    const fileError = floorPlanFileError(file);
+    if (fileError) {
+      toast.error(fileError);
+      return;
+    }
+    uploadingFloorPlanRef.current = planId;
+    setUploadingFloorPlanId(planId);
     try {
       const result = await propertiesApi.uploadImages([file]);
       const uploaded = result?.data ?? [];
       if (!result?.success || uploaded.length === 0)
         throw new Error("Upload failed");
-      updateUnit(idx, {
-        floorPlanImageUrl: uploaded[0].imageKey,
-        floorPlanImageKey: uploaded[0].imageKey,
-      });
-      setFloorPlanPreviews((prev) => ({
-        ...prev,
-        [idx]: URL.createObjectURL(file),
+      setUnits((prev) => prev.map((unit) => {
+        if (unit.clientId !== unitId) return unit;
+        if (planId.startsWith("plot-layout:")) return {
+          ...unit,
+          floorPlanImageUrl: uploaded[0].imageKey,
+          floorPlanImageKey: uploaded[0].imageKey,
+        };
+        return {
+          ...unit,
+          floorPlans: unit.floorPlans.map((plan) => plan.id !== planId ? plan : {
+            ...plan,
+            imageKey: uploaded[0].imageKey,
+            imageUrl: uploaded[0].imageKey,
+          }),
+        };
       }));
+      setFloorPlanPreviews((prev) => ({ ...prev, [planId]: URL.createObjectURL(file) }));
     } catch {
       toast.error("Failed to upload floor plan. Please try again.");
     } finally {
-      setUploadingFloorPlanIdx(null);
+      uploadingFloorPlanRef.current = null;
+      setUploadingFloorPlanId(null);
     }
   };
 
@@ -1260,6 +1300,8 @@ export function ProjectForm({
           saved.units.map((u: any) => ({
             ...emptyUnit(),
             ...u,
+            clientId: typeof u?.clientId === "string" ? u.clientId : createClientId(),
+            floorPlans: floorPlansFromUnit(u, createClientId),
             roomDimensions: Array.isArray(u?.roomDimensions)
               ? u.roomDimensions.map(toRoomRow)
               : [],
@@ -1338,6 +1380,10 @@ export function ProjectForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (uploadingFloorPlanRef.current !== null) {
+      toast.error("Wait for the floor plan image to finish uploading before saving.");
+      return;
+    }
     if (mode === "edit" && (!Number.isInteger(baseRevisionRef.current) || !baseRevisionRef.current)) {
       toast.error("Reload the latest project before saving."); return;
     }
@@ -1361,6 +1407,25 @@ export function ProjectForm({
       setOpenUnits((prev) => ({ ...prev, [incompleteIdx]: true }));
       toast.error(`Unit ${incompleteIdx + 1} has details but no unit code.`);
       return;
+    }
+    for (let unitIndex = 0; unitIndex < validUnits.length; unitIndex += 1) {
+      if (isPlotProject(projectType)) continue;
+      const unit = validUnits[unitIndex];
+      const duplicateIndex = duplicateFloorNameIndex(unit.floorPlans);
+      if (duplicateIndex >= 0) {
+        const actualIndex = units.indexOf(unit);
+        setOpenUnits((prev) => ({ ...prev, [actualIndex]: true }));
+        toast.error(`Unit ${unit.unitCode.trim()} has duplicate floor names.`);
+        return;
+      }
+      const incompletePlan = unit.floorPlans.find((plan) => floorPlanRowError(plan));
+      if (incompletePlan) {
+        const actualIndex = units.indexOf(unit);
+        setOpenUnits((prev) => ({ ...prev, [actualIndex]: true }));
+        setUnitTabs((prev) => ({ ...prev, [actualIndex]: "price" }));
+        toast.error(floorPlanRowError(incompletePlan) ?? "Complete each floor plan.");
+        return;
+      }
     }
     const badVideo = videos.findIndex(
       (v) => v.url.trim() !== "" && !YOUTUBE_URL_RE.test(v.url.trim()),
@@ -1562,14 +1627,12 @@ export function ProjectForm({
               !isPlotUnit && u.furnishingItemIds.length > 0
                 ? u.furnishingItemIds
                 : undefined,
-            floorPlanImageUrl:
-              !isPlotUnit && u.floorPlanImageUrl.trim()
-                ? u.floorPlanImageUrl.trim()
-                : undefined,
-            floorPlanImageKey:
-              !isPlotUnit && u.floorPlanImageKey.trim()
-                ? u.floorPlanImageKey.trim()
-                : undefined,
+            ...legacyFloorPlanPayload(
+              u.floorPlanImageUrl,
+              u.floorPlanImageKey,
+              isPlotUnit,
+            ),
+            floorPlans: !isPlotUnit ? floorPlansPayload(u.floorPlans) : undefined,
             status: u.status || undefined,
           };
         }),
@@ -3436,89 +3499,80 @@ export function ProjectForm({
                             />
                           </div>
                         </div>
-                        <p className={unitSectionTitle}>
-                          {isPlotProject(projectType)
-                            ? "Plot Layout"
-                            : "Floor Plan"}
-                        </p>
-                        <div className="grid grid-cols-1 gap-4">
-                          <div className="space-y-2 md:col-span-2">
-                            <label className={labelClass}>
-                              {isPlotProject(projectType)
-                                ? "Plot Layout Image"
-                                : "Floor Plan Image"}
-                            </label>
-                            <input
-                              type="file"
-                              accept="image/jpeg,image/png,image/webp,image/gif"
-                              className="hidden"
-                              data-floorplan-idx={idx}
-                              onChange={(e) => handleFloorPlanFiles(e, idx)}
-                            />
+                        <div className="flex items-center justify-between border-b border-border/40 pb-2">
+                          <p className={unitSectionTitle}>
+                            {isPlotProject(projectType) ? "Plot Layout" : "Floor Plans"}
+                          </p>
+                          {!isPlotProject(projectType) && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => updateUnit(idx, { floorPlans: [...unit.floorPlans, { id: createClientId(), floorName: "", imageKey: "" }] })}
+                              className="h-8 rounded-lg text-xs"
+                            >
+                              <Plus className="mr-1 h-3.5 w-3.5" /> Add floor
+                            </Button>
+                          )}
+                        </div>
+                        {isPlotProject(projectType) ? (
+                          <div className="space-y-2">
+                            <label className={labelClass}>Plot Layout Image</label>
+                            <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => handleFloorPlanFiles(e, unit.clientId, `plot-layout:${unit.clientId}`)} />
                             {unit.floorPlanImageUrl ? (
                               <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 p-2">
-                                {(floorPlanPreviews[idx] ||
-                                  unit.floorPlanImageUrl.startsWith(
-                                    "http",
-                                  )) && (
-                                  <img
-                                    src={
-                                      floorPlanPreviews[idx] ||
-                                      unit.floorPlanImageUrl
-                                    }
-                                    alt="Floor plan"
-                                    className="h-16 w-16 rounded-lg object-cover bg-white"
-                                  />
-                                )}
-                                <span className="flex-1 truncate text-xs text-muted-foreground">
-                                  {unit.floorPlanImageUrl}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    updateUnit(idx, {
-                                      floorPlanImageUrl: "",
-                                      floorPlanImageKey: "",
-                                    });
-                                    setFloorPlanPreviews((prev) => {
-                                      const next = { ...prev };
-                                      delete next[idx];
-                                      return next;
-                                    });
-                                  }}
-                                  className="p-2 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50"
-                                  aria-label="Remove floor plan"
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
+                                {(floorPlanPreviews[`plot-layout:${unit.clientId}`] || /^https?:/i.test(unit.floorPlanImageUrl)) && <img src={floorPlanPreviews[`plot-layout:${unit.clientId}`] || unit.floorPlanImageUrl} alt="Plot layout" className="h-16 w-16 rounded-lg object-cover bg-white" />}
+                                <span className="flex-1 truncate text-xs text-muted-foreground">{unit.floorPlanImageUrl}</span>
+                                <Button type="button" variant="outline" size="sm" disabled={uploadingFloorPlanId !== null} onClick={(e) => (e.currentTarget.parentElement?.parentElement?.querySelector("input[type=file]") as HTMLInputElement | null)?.click()}>Replace image</Button>
+                                <Button type="button" variant="ghost" size="sm" aria-label="Remove plot layout" onClick={() => updateUnit(idx, { floorPlanImageUrl: "", floorPlanImageKey: "" })}><X className="h-4 w-4" /></Button>
                               </div>
                             ) : (
-                              <button
-                                type="button"
-                                disabled={uploadingFloorPlanIdx === idx}
-                                onClick={(e) => {
-                                  const input =
-                                    (e.currentTarget.parentElement?.querySelector(
-                                      "input[type=file]",
-                                    ) as HTMLInputElement) ?? null;
-                                  input?.click();
-                                }}
-                                className="w-full h-14 rounded-xl border-2 border-dashed border-border/60 flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:border-[#0052FF]/50 hover:text-[#0052FF] transition-colors disabled:opacity-60"
-                              >
-                                {uploadingFloorPlanIdx === idx ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <ImagePlus className="h-4 w-4" />
-                                )}
-                                {uploadingFloorPlanIdx === idx
-                                  ? "Uploading..."
-                                  : isPlotProject(projectType)
-                                    ? "Upload plot layout"
-                                    : "Upload floor plan"}
-                              </button>
+                              <Button type="button" variant="outline" disabled={uploadingFloorPlanId !== null} onClick={(e) => (e.currentTarget.parentElement?.querySelector("input[type=file]") as HTMLInputElement | null)?.click()} className="h-11 w-full border-dashed">
+                                {uploadingFloorPlanId === `plot-layout:${unit.clientId}` ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />}
+                                {uploadingFloorPlanId === `plot-layout:${unit.clientId}` ? "Uploading..." : "Upload plot layout"}
+                              </Button>
                             )}
                           </div>
-                        </div>
+                        ) : unit.floorPlans.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">Add one image for each floor in this unit configuration.</p>
+                        ) : (
+                          <div className="space-y-3">
+                            {unit.floorPlans.map((plan) => {
+                              const preview = floorPlanPreviews[plan.id] || plan.imageUrl || plan.imageKey;
+                              return (
+                                <div key={plan.id} className="rounded-xl border border-border/60 bg-muted/20 p-3 space-y-3">
+                                  <div className="flex items-end gap-3">
+                                    <div className="flex-1 space-y-2">
+                                      <label className={labelClass}>Floor name</label>
+                                      <Input value={plan.floorName} onChange={(e) => updateUnit(idx, { floorPlans: unit.floorPlans.map((row) => row.id === plan.id ? { ...row, floorName: e.target.value } : row) })} placeholder="e.g. Basement, Ground, First" className={inputClass} />
+                                    </div>
+                                    <Button type="button" variant="ghost" onClick={() => {
+                                      updateUnit(idx, { floorPlans: unit.floorPlans.filter((row) => row.id !== plan.id) });
+                                      setFloorPlanPreviews((prev) => { const next = { ...prev }; delete next[plan.id]; return next; });
+                                    }} className="h-12 w-12 shrink-0 text-muted-foreground hover:text-red-600" aria-label={`Remove ${plan.floorName || "unnamed"} floor plan`}>
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    {plan.imageKey ? (
+                                      <>
+                                        {(floorPlanPreviews[plan.id] || /^https?:/i.test(preview)) && <img src={preview} alt={`${plan.floorName || "Floor"} plan`} className="h-16 w-16 rounded-lg object-cover bg-white" />}
+                                        <span className="flex-1 truncate text-xs text-muted-foreground">{plan.imageKey}</span>
+                                        <Button type="button" variant="outline" size="sm" disabled={uploadingFloorPlanId !== null} onClick={(e) => (e.currentTarget.parentElement?.querySelector("input[type=file]") as HTMLInputElement | null)?.click()}>Replace image</Button>
+                                      </>
+                                    ) : (
+                                      <Button type="button" variant="outline" disabled={uploadingFloorPlanId !== null} onClick={(e) => (e.currentTarget.parentElement?.querySelector("input[type=file]") as HTMLInputElement | null)?.click()} className="h-11 w-full border-dashed">
+                                        {uploadingFloorPlanId === plan.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />}
+                                        {uploadingFloorPlanId === plan.id ? "Uploading..." : "Upload floor image"}
+                                      </Button>
+                                    )}
+                                    <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => handleFloorPlanFiles(e, unit.clientId, plan.id)} />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </>
                     )}
                     {unitTab(idx) === "areas" &&
@@ -3739,7 +3793,7 @@ export function ProjectForm({
           </Button>
           <Button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || uploadingFloorPlanId !== null}
             className="h-11 rounded-full bg-[#0052FF] px-6 text-white hover:bg-[#0052FF]/90"
           >
             {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
