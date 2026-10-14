@@ -78,7 +78,8 @@ export async function apiJson<T = any>(input: RequestInfo | URL, init: RequestIn
     );
   }
   if (!res.ok) {
-    const raw = data?.message ?? `Request failed (${res.status})`;
+    // NestJS validation sends `message`; this backend's exception filter sends `error`.
+    const raw = data?.message ?? data?.error ?? `Request failed (${res.status})`;
     const details = Array.isArray(data?.message) ? data.message.map(String) : undefined;
     throw new ApiError(res.status, Array.isArray(raw) ? raw.join(', ') : String(raw), url, details);
   }

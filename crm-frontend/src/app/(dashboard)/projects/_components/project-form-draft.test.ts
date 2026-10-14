@@ -34,3 +34,46 @@ describe("project draft safety", () => {
     expect(readProjectDraft('{"v":2,"data":[]}')).toBeNull();
   });
 });
+
+import { changedUnitCodes, draftIsPristine, editRequestBody, rebaseDraft } from "./project-form-draft";
+
+describe("sending only what changed", () => {
+  const base = { name: "Emerald", city: "Coimbatore", projectType: "apartment", units: [{ unitCode: "A", price: 1 }, { unitCode: "B", price: 2 }] };
+
+  it("sends changed fields, clears with null, and always names the type", () => {
+    const body = editRequestBody(base, { ...base, name: "Emerald Heights", city: undefined });
+    expect(body.changedFields).toEqual(["name", "city"]);
+    expect(body).toMatchObject({ name: "Emerald Heights", city: null, projectType: "apartment" });
+    expect(body).not.toHaveProperty("units");
+  });
+
+  it("names the units a save touched", () => {
+    const mine = { ...base, units: [{ unitCode: "A", price: 1 }, { unitCode: "B", price: 3 }, { unitCode: "C", price: 4 }] };
+    expect(editRequestBody(base, mine).changedUnitCodes).toEqual(["B", "C"]);
+    expect(changedUnitCodes([{ unitCode: "A" }, { unitCode: "A" }], [])).toBeUndefined();
+  });
+});
+
+describe("rebasing a draft onto newer server data", () => {
+  const base = { name: "Emerald", description: "Old", units: [{ unitCode: "A", price: 1 }] };
+
+  it("keeps my edits and their edits when they touch different things", () => {
+    const draft = { v: 3, base, data: { ...base, description: "Mine", units: [...base.units, { unitCode: "B", price: 2 }] } };
+    const latest = { ...base, name: "Theirs", units: [{ unitCode: "A", price: 5 }] };
+    const { merged, conflicts } = rebaseDraft(draft, latest);
+    expect(conflicts).toEqual([]);
+    expect(merged).toEqual({ name: "Theirs", description: "Mine", units: [{ unitCode: "A", price: 5 }, { unitCode: "B", price: 2 }] });
+  });
+
+  it("keeps the server value where both changed the same thing", () => {
+    const draft = { v: 3, base, data: { ...base, name: "Mine", units: [{ unitCode: "A", price: 9 }] } };
+    const latest = { ...base, name: "Theirs", units: [{ unitCode: "A", price: 5 }] };
+    const { merged, conflicts } = rebaseDraft(draft, latest);
+    expect(conflicts).toEqual(["name", "unit A"]);
+    expect(merged.name).toBe("Theirs");
+  });
+
+  it("recognises a draft with no edits", () => {
+    expect(draftIsPristine({ v: 3, base, data: { ...base } })).toBe(true);
+  });
+});

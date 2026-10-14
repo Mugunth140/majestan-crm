@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { PROJECT_DRAFT_VERSION, archiveProjectDraft, canRestoreProjectDraft, projectDraftKey, readProjectDraft, type ProjectDraft } from "./project-form-draft";
+import { PROJECT_DRAFT_VERSION_REBASABLE, archiveProjectDraft, canRestoreProjectDraft, draftIsPristine, editRequestBody, projectDraftKey, pruneRecoveryCopies, readProjectDraft, rebaseDraft, type ProjectDraft, type RebasableDraft } from "./project-form-draft";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -409,7 +409,7 @@ function moveListItem<T>(list: T[], from: number, to: number): T[] {
 // Unsaved-draft persistence: every keystroke-level field state is snapshotted
 // to localStorage (debounced) so a refresh never loses entered data. The
 // snapshot only ever holds plain JSON (keys, not object URLs or Files).
-const DRAFT_VERSION = PROJECT_DRAFT_VERSION;
+const DRAFT_VERSION = PROJECT_DRAFT_VERSION_REBASABLE;
 const draftKeyFor = (mode: "create" | "edit", id: unknown) =>
   mode === "edit" && id != null
     ? `project-form-draft:edit:${id}`
@@ -436,6 +436,9 @@ export function ProjectForm({
   const baseRevisionRef = useRef<number | undefined>(d?.revision);
   const draftWritesBlocked = useRef(false);
   const initialSnapshotRef = useRef("");
+  // The request body for the untouched server state; an edit sends only the
+  // fields that differ from it.
+  const basePayloadRef = useRef<Record<string, unknown> | null>(null);
   const draftRestoreRan = useRef(false);
   // Two-pass draft restore: the first render (SSR + client hydration) must
   // be identical, so localStorage is only read in a post-mount effect.
@@ -1188,9 +1191,23 @@ export function ProjectForm({
   const flushDraft = (snapshot: string) => {
     if (!draftKeyRef.current || draftWritesBlocked.current) return false;
     try {
+      // Nothing edited (or edits undone): no draft, so opening the project
+      // later never warns about "unsaved changes" that were never made.
+      if (snapshot === initialSnapshotRef.current) {
+        window.localStorage.removeItem(draftKeyRef.current);
+        lastSavedRef.current = snapshot;
+        return true;
+      }
       window.localStorage.setItem(
         draftKeyRef.current,
-        JSON.stringify({ v: DRAFT_VERSION, baseRevision: baseRevisionRef.current, data: JSON.parse(snapshot) }),
+        JSON.stringify({
+          v: DRAFT_VERSION,
+          baseRevision: baseRevisionRef.current,
+          // The server state this draft started from, so it can be merged
+          // onto a newer version instead of being refused.
+          base: JSON.parse(initialSnapshotRef.current),
+          data: JSON.parse(snapshot),
+        }),
       );
       lastSavedRef.current = snapshot;
       return true;
@@ -1214,20 +1231,53 @@ export function ProjectForm({
     if (!userId) { draftWritesBlocked.current = true; setDraftHydrated(true); return; }
     const draftKey = projectDraftKey(mode, d?.id, userId);
     draftKeyRef.current = draftKey;
+    basePayloadRef.current = JSON.parse(JSON.stringify(buildPayload()));
     const currentDraft = readProjectDraft(window.localStorage.getItem(draftKey));
     const legacy = currentDraft ? null : readProjectDraft(window.localStorage.getItem(legacyDraftKey));
+    // The pre-user-scoped key is read once and then dropped; left in place it
+    // re-raised the same warning on every visit.
+    try { window.localStorage.removeItem(legacyDraftKey); } catch { /* unavailable */ }
+    pruneRecoveryCopies(window.localStorage, draftKey);
     const stored = currentDraft ?? legacy;
-    if (stored && !canRestoreProjectDraft(stored, mode, baseRevisionRef.current)) {
-      // Preserve old work separately; never put an old unit list over fresh server data.
+    const current = JSON.parse(initialSnapshotRef.current) as Record<string, unknown>;
+    let saved: Record<string, unknown> | null = null;
+    let restoredNote = "Your draft matches the current project version.";
+    const rebasable = stored && stored.v === DRAFT_VERSION && "base" in stored && stored.base && typeof stored.base === "object"
+      ? (stored as RebasableDraft) : null;
+
+    if (rebasable && draftIsPristine(rebasable)) {
+      // A draft with no edits in it: nothing to restore or warn about.
+      try { window.localStorage.removeItem(draftKey); } catch { /* unavailable */ }
+    } else if (stored && canRestoreProjectDraft(stored, mode, baseRevisionRef.current)) {
+      saved = stored.data;
+    } else if (rebasable) {
+      // Someone saved since this draft was made: merge it onto their version.
+      const { merged, conflicts } = rebaseDraft(rebasable, current);
+      // Everything in the draft is already in the latest version.
+      saved = JSON.stringify(merged) === initialSnapshotRef.current ? null : merged;
+      if (!saved) { try { window.localStorage.removeItem(draftKey); } catch { /* unavailable */ } }
+      restoredNote = "Merged onto the latest version saved by your team.";
+      if (conflicts.length) {
+        archiveProjectDraft(window.localStorage, draftKey, stored!);
+        toast.warning("Some unsaved changes clashed with newer edits", {
+          id: `project-draft-conflict:${draftKey}`,
+          description: `Kept the latest saved version for: ${conflicts.slice(0, 5).join(", ")}${conflicts.length > 5 ? "…" : ""}. Your other changes were restored. Your full draft is kept for recovery.`,
+          duration: 15000,
+          action: { label: "Download draft", onClick: () => downloadDraft(stored!) },
+        });
+      }
+    } else if (stored) {
+      // An older draft without its starting point can't be merged safely.
+      // Keep it for recovery and say so once; it is moved out of the active
+      // slot, so the warning does not come back on the next visit.
       if (currentDraft && !archiveProjectDraft(window.localStorage, draftKey, currentDraft)) draftWritesBlocked.current = true;
       toast.warning("Older unsaved changes were not restored", {
         id: `project-draft:${draftKey}`,
-        description: "The latest project is loaded. Your older draft is kept for recovery so another staff member’s units are safe.",
-        duration: Infinity,
+        description: "The latest project is loaded. Your older draft is kept for recovery.",
+        duration: 15000,
         action: { label: "Download draft", onClick: () => downloadDraft(stored) },
       });
     }
-    const saved = stored && canRestoreProjectDraft(stored, mode, baseRevisionRef.current) ? stored.data : null;
     if (saved) {
       const str = (v: unknown, fallback = "") =>
         v === undefined || v === null ? fallback : String(v);
@@ -1339,7 +1389,7 @@ export function ProjectForm({
       toast.info("Unsaved changes restored", {
         duration: 8000,
         id: `project-draft:${draftKey}`,
-        description: "Your draft matches the current project version.",
+        description: restoredNote,
         action: { label: "Discard", onClick: discardDraft },
       });
     }
@@ -1402,6 +1452,221 @@ export function ProjectForm({
     const link = document.createElement("a");
     link.href = url; link.download = `project-${d?.id ?? "new"}-unsaved-draft.json`; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  // The request body for the current form state. Also built once from the
+  // untouched server state, so an edit can send only what changed.
+  const buildPayload = (): Record<string, any> => {
+    const validUnits = units.filter((u) => u.unitCode.trim());
+    const payload: Record<string, any> = {
+      name: name.trim(),
+      projectType,
+      builderId: builderId ? Number(builderId) : undefined,
+      builderName: builderName.trim() || undefined,
+      reraNumber: reraNumber.trim() || undefined,
+      possessionDate: possessionDate || undefined,
+      possessionStatus,
+      city: city.trim(),
+      state: state.trim() || undefined,
+      sublocation: sublocation.trim() || undefined,
+      address: address.trim() || undefined,
+      pincode: pincode.trim() || undefined,
+      latitude:
+        latitude !== "" && !isNaN(Number(latitude))
+          ? Number(latitude)
+          : undefined,
+      longitude:
+        longitude !== "" && !isNaN(Number(longitude))
+          ? Number(longitude)
+          : undefined,
+      towers:
+        projectType === "apartment" && towers ? Number(towers) : undefined,
+      totalFloors:
+        projectType === "apartment" && totalFloors
+          ? Number(totalFloors)
+          : undefined,
+      totalUnits: totalUnits ? Number(totalUnits) : undefined,
+      projectAreaSqft: (() => {
+        if (!projectAreaSqft || isNaN(Number(projectAreaSqft)))
+          return undefined;
+        const factor =
+          PROJECT_AREA_UNITS.find((u) => u.value === projectAreaUnit)
+            ?.factor ?? 1;
+        return Math.round(Number(projectAreaSqft) * factor * 100) / 100;
+      })(),
+      towerDetails:
+        projectType !== "apartment"
+          ? undefined
+          : towerDetails
+              .filter((t) => t.tower.trim() || t.floors || t.units)
+              .map((t) => ({
+                tower: t.tower.trim() || undefined,
+                floors: t.floors ? Number(t.floors) : undefined,
+                units: t.units ? Number(t.units) : undefined,
+              })),
+      description: description.trim() || undefined,
+      highlights:
+        projectType === "plot" ? undefined : highlights.trim() || undefined,
+      specifications:
+        projectType === "plot"
+          ? undefined
+          : specifications
+              .map((s) => ({
+                label: s.label.trim(),
+                value: s.points
+                  .map((point) => point.trim())
+                  .filter(Boolean)
+                  .join("\n"),
+              }))
+              .filter((s) => s.label && s.value),
+      coverImageUrl: coverImageUrl.trim() || undefined,
+      mobileCoverImageUrl: mobileCoverImageUrl.trim() || undefined,
+      brochureKey: brochureKey.trim() || undefined,
+      brochureName: brochureKey.trim()
+        ? brochureName.trim() || undefined
+        : undefined,
+      galleryImageUrls:
+        gallery.length > 0 ? gallery.map((g) => g.key) : undefined,
+      // Always sent, even empty: omitting it meant a removed video could
+      // never be cleared on update.
+      videos: videos
+        .filter((v) => v.url.trim() !== "")
+        .map((v) => ({
+          title: v.title.trim() || undefined,
+          url: v.url.trim(),
+        })),
+      status,
+      amenities: amenityIds.map((id) => ({ amenityId: id })),
+      connectivity: (() => {
+        const rows = connectivity
+          .filter((c) => c.label.trim() || c.detail.trim())
+          .map((c) => ({
+            icon: c.icon || undefined,
+            label: c.label.trim(),
+            detail: c.detail.trim(),
+          }));
+        const hadInitial = (d?.connectivity ?? []).length > 0;
+        return rows.length > 0 || (mode === "edit" && hadInitial)
+          ? rows
+          : undefined;
+      })(),
+      nearbyCategories: (() => {
+        const hadInitial =
+          (d?.nearbyCategories ?? d?.nearby_categories ?? []).length > 0;
+        return nearbyCategories.length > 0 || (mode === "edit" && hadInitial)
+          ? nearbyCategories
+          : undefined;
+      })(),
+      faqs: (() => {
+        const rows = faqs
+          .filter((f) => f.question.trim() && f.answer.trim())
+          .map((f) => ({
+            question: f.question.trim(),
+            answer: f.answer.trim(),
+            section: f.section || "overview",
+          }));
+        const hadInitial = (d?.projectFaqs ?? d?.faqs ?? []).length > 0;
+        return rows.length > 0 || (mode === "edit" && hadInitial)
+          ? rows
+          : undefined;
+      })(),
+      units: validUnits.map((u) => {
+        // Plot units are land parcels: strip every building-only key so
+        // legacy apartment data can't ride along after a type switch.
+        const isPlotUnit = projectType === "plot";
+        const isVillaUnit = projectType === "villa";
+        return {
+          unitCode: u.unitCode.trim(),
+          title: u.title.trim() || undefined,
+          unitType: u.unitType || undefined,
+          bedrooms:
+            !isPlotUnit && u.bedrooms ? Number(u.bedrooms) : undefined,
+          bathrooms:
+            !isPlotUnit && u.bathrooms ? Number(u.bathrooms) : undefined,
+          carpetAreaSqft:
+            !isPlotUnit && u.carpetAreaSqft
+              ? Number(u.carpetAreaSqft)
+              : undefined,
+          builtupAreaSqft:
+            !isPlotUnit && u.builtupAreaSqft
+              ? Number(u.builtupAreaSqft)
+              : undefined,
+          superBuiltupAreaSqft:
+            !isPlotUnit && u.superBuiltupAreaSqft
+              ? Number(u.superBuiltupAreaSqft)
+              : undefined,
+          udsAreaSqft:
+            isVillaUnit && u.udsAreaSqft ? Number(u.udsAreaSqft) : undefined,
+          plotAreaSqft:
+            isVillaUnit && u.plotAreaSqft
+              ? Number(u.plotAreaSqft)
+              : undefined,
+          plotAreaCents:
+            isPlotUnit && u.plotAreaCents
+              ? Number(u.plotAreaCents)
+              : undefined,
+          parking: !isPlotUnit && u.parking ? Number(u.parking) : undefined,
+          parkingType:
+            !isPlotUnit && u.parkingType ? u.parkingType : undefined,
+          unitGuestParking: !isPlotUnit ? u.unitGuestParking : undefined,
+          balconies:
+            !isPlotUnit && u.balconies ? Number(u.balconies) : undefined,
+          floorNo:
+            !isPlotUnit && !isVillaUnit && u.floorNo.trim()
+              ? u.floorNo.trim()
+              : undefined,
+          totalFloors:
+            !isPlotUnit && u.totalFloors ? Number(u.totalFloors) : undefined,
+          poojaRoom: !isPlotUnit ? u.poojaRoom : undefined,
+          studyRoom: !isPlotUnit ? u.studyRoom : undefined,
+          openSides: u.openSides ? Number(u.openSides) : undefined,
+          boundaryWall: u.boundaryWall,
+          roomDimensions: isPlotUnit
+            ? u.plotDimensions.trim()
+              ? [
+                  {
+                    name: PLOT_DIMENSIONS_ROW_NAME,
+                    dimensions: u.plotDimensions.trim(),
+                  },
+                ]
+              : []
+            : u.roomDimensions
+                .filter((r) => r.name.trim() && r.dimensions.trim())
+                // The API only accepts { name, dimensions } (whitelist
+                // validation rejects the lengthFt/widthFt form columns),
+                // so strip them here — dimensions already carries "L × W ft".
+                .map((r) => ({
+                  name: r.name.trim(),
+                  dimensions: r.dimensions.trim(),
+                })),
+          price: u.price
+            ? parseIndianCurrency(u.price) || undefined
+            : undefined,
+          facing: u.facing || undefined,
+          furnishedStatus:
+            !isPlotUnit && u.furnishedStatus ? u.furnishedStatus : undefined,
+          furnishingItemIds:
+            !isPlotUnit && u.furnishingItemIds.length > 0
+              ? u.furnishingItemIds
+              : undefined,
+          ...legacyFloorPlanPayload(
+            u.floorPlanImageUrl,
+            u.floorPlanImageKey,
+            isPlotUnit,
+          ),
+          floorPlans: !isPlotUnit ? floorPlansPayload(u.floorPlans) : undefined,
+          status: u.status || undefined,
+        };
+      }),
+    };
+    if (!payload.towerDetails || payload.towerDetails.length === 0)
+      delete payload.towerDetails;
+    if (!payload.specifications || payload.specifications.length === 0)
+      delete payload.specifications;
+    Object.keys(payload).forEach((k) => {
+      if (payload[k] === undefined) delete payload[k];
+    });
+    return payload;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1469,220 +1734,18 @@ export function ProjectForm({
     }
     setIsLoading(true);
     try {
-      const payload: Record<string, any> = {
-        name: name.trim(),
-        projectType,
-        builderId: builderId ? Number(builderId) : undefined,
-        builderName: builderName.trim() || undefined,
-        reraNumber: reraNumber.trim() || undefined,
-        possessionDate: possessionDate || undefined,
-        possessionStatus,
-        city: city.trim(),
-        state: state.trim() || undefined,
-        sublocation: sublocation.trim() || undefined,
-        address: address.trim() || undefined,
-        pincode: pincode.trim() || undefined,
-        latitude:
-          latitude !== "" && !isNaN(Number(latitude))
-            ? Number(latitude)
-            : undefined,
-        longitude:
-          longitude !== "" && !isNaN(Number(longitude))
-            ? Number(longitude)
-            : undefined,
-        towers:
-          projectType === "apartment" && towers ? Number(towers) : undefined,
-        totalFloors:
-          projectType === "apartment" && totalFloors
-            ? Number(totalFloors)
-            : undefined,
-        totalUnits: totalUnits ? Number(totalUnits) : undefined,
-        projectAreaSqft: (() => {
-          if (!projectAreaSqft || isNaN(Number(projectAreaSqft)))
-            return undefined;
-          const factor =
-            PROJECT_AREA_UNITS.find((u) => u.value === projectAreaUnit)
-              ?.factor ?? 1;
-          return Math.round(Number(projectAreaSqft) * factor * 100) / 100;
-        })(),
-        towerDetails:
-          projectType !== "apartment"
-            ? undefined
-            : towerDetails
-                .filter((t) => t.tower.trim() || t.floors || t.units)
-                .map((t) => ({
-                  tower: t.tower.trim() || undefined,
-                  floors: t.floors ? Number(t.floors) : undefined,
-                  units: t.units ? Number(t.units) : undefined,
-                })),
-        description: description.trim() || undefined,
-        highlights:
-          projectType === "plot" ? undefined : highlights.trim() || undefined,
-        specifications:
-          projectType === "plot"
-            ? undefined
-            : specifications
-                .map((s) => ({
-                  label: s.label.trim(),
-                  value: s.points
-                    .map((point) => point.trim())
-                    .filter(Boolean)
-                    .join("\n"),
-                }))
-                .filter((s) => s.label && s.value),
-        coverImageUrl: coverImageUrl.trim() || undefined,
-        mobileCoverImageUrl: mobileCoverImageUrl.trim() || undefined,
-        brochureKey: brochureKey.trim() || undefined,
-        brochureName: brochureKey.trim()
-          ? brochureName.trim() || undefined
-          : undefined,
-        galleryImageUrls:
-          gallery.length > 0 ? gallery.map((g) => g.key) : undefined,
-        // Always sent, even empty: omitting it meant a removed video could
-        // never be cleared on update.
-        videos: videos
-          .filter((v) => v.url.trim() !== "")
-          .map((v) => ({
-            title: v.title.trim() || undefined,
-            url: v.url.trim(),
-          })),
-        status,
-        amenities: amenityIds.map((id) => ({ amenityId: id })),
-        connectivity: (() => {
-          const rows = connectivity
-            .filter((c) => c.label.trim() || c.detail.trim())
-            .map((c) => ({
-              icon: c.icon || undefined,
-              label: c.label.trim(),
-              detail: c.detail.trim(),
-            }));
-          const hadInitial = (d?.connectivity ?? []).length > 0;
-          return rows.length > 0 || (mode === "edit" && hadInitial)
-            ? rows
-            : undefined;
-        })(),
-        nearbyCategories: (() => {
-          const hadInitial =
-            (d?.nearbyCategories ?? d?.nearby_categories ?? []).length > 0;
-          return nearbyCategories.length > 0 || (mode === "edit" && hadInitial)
-            ? nearbyCategories
-            : undefined;
-        })(),
-        faqs: (() => {
-          const rows = faqs
-            .filter((f) => f.question.trim() && f.answer.trim())
-            .map((f) => ({
-              question: f.question.trim(),
-              answer: f.answer.trim(),
-              section: f.section || "overview",
-            }));
-          const hadInitial = (d?.projectFaqs ?? d?.faqs ?? []).length > 0;
-          return rows.length > 0 || (mode === "edit" && hadInitial)
-            ? rows
-            : undefined;
-        })(),
-        units: validUnits.map((u) => {
-          // Plot units are land parcels: strip every building-only key so
-          // legacy apartment data can't ride along after a type switch.
-          const isPlotUnit = projectType === "plot";
-          const isVillaUnit = projectType === "villa";
-          return {
-            unitCode: u.unitCode.trim(),
-            title: u.title.trim() || undefined,
-            unitType: u.unitType || undefined,
-            bedrooms:
-              !isPlotUnit && u.bedrooms ? Number(u.bedrooms) : undefined,
-            bathrooms:
-              !isPlotUnit && u.bathrooms ? Number(u.bathrooms) : undefined,
-            carpetAreaSqft:
-              !isPlotUnit && u.carpetAreaSqft
-                ? Number(u.carpetAreaSqft)
-                : undefined,
-            builtupAreaSqft:
-              !isPlotUnit && u.builtupAreaSqft
-                ? Number(u.builtupAreaSqft)
-                : undefined,
-            superBuiltupAreaSqft:
-              !isPlotUnit && u.superBuiltupAreaSqft
-                ? Number(u.superBuiltupAreaSqft)
-                : undefined,
-            udsAreaSqft:
-              isVillaUnit && u.udsAreaSqft ? Number(u.udsAreaSqft) : undefined,
-            plotAreaSqft:
-              isVillaUnit && u.plotAreaSqft
-                ? Number(u.plotAreaSqft)
-                : undefined,
-            plotAreaCents:
-              isPlotUnit && u.plotAreaCents
-                ? Number(u.plotAreaCents)
-                : undefined,
-            parking: !isPlotUnit && u.parking ? Number(u.parking) : undefined,
-            parkingType:
-              !isPlotUnit && u.parkingType ? u.parkingType : undefined,
-            unitGuestParking: !isPlotUnit ? u.unitGuestParking : undefined,
-            balconies:
-              !isPlotUnit && u.balconies ? Number(u.balconies) : undefined,
-            floorNo:
-              !isPlotUnit && !isVillaUnit && u.floorNo.trim()
-                ? u.floorNo.trim()
-                : undefined,
-            totalFloors:
-              !isPlotUnit && u.totalFloors ? Number(u.totalFloors) : undefined,
-            poojaRoom: !isPlotUnit ? u.poojaRoom : undefined,
-            studyRoom: !isPlotUnit ? u.studyRoom : undefined,
-            openSides: u.openSides ? Number(u.openSides) : undefined,
-            boundaryWall: u.boundaryWall,
-            roomDimensions: isPlotUnit
-              ? u.plotDimensions.trim()
-                ? [
-                    {
-                      name: PLOT_DIMENSIONS_ROW_NAME,
-                      dimensions: u.plotDimensions.trim(),
-                    },
-                  ]
-                : []
-              : u.roomDimensions
-                  .filter((r) => r.name.trim() && r.dimensions.trim())
-                  // The API only accepts { name, dimensions } (whitelist
-                  // validation rejects the lengthFt/widthFt form columns),
-                  // so strip them here — dimensions already carries "L × W ft".
-                  .map((r) => ({
-                    name: r.name.trim(),
-                    dimensions: r.dimensions.trim(),
-                  })),
-            price: u.price
-              ? parseIndianCurrency(u.price) || undefined
-              : undefined,
-            facing: u.facing || undefined,
-            furnishedStatus:
-              !isPlotUnit && u.furnishedStatus ? u.furnishedStatus : undefined,
-            furnishingItemIds:
-              !isPlotUnit && u.furnishingItemIds.length > 0
-                ? u.furnishingItemIds
-                : undefined,
-            ...legacyFloorPlanPayload(
-              u.floorPlanImageUrl,
-              u.floorPlanImageKey,
-              isPlotUnit,
-            ),
-            floorPlans: !isPlotUnit ? floorPlansPayload(u.floorPlans) : undefined,
-            status: u.status || undefined,
-          };
-        }),
-      };
-      if (!payload.towerDetails || payload.towerDetails.length === 0)
-        delete payload.towerDetails;
-      if (!payload.specifications || payload.specifications.length === 0)
-        delete payload.specifications;
-      Object.keys(payload).forEach((k) => {
-        if (payload[k] === undefined) delete payload[k];
-      });
+      const payload = buildPayload();
 
       let result: any;
       if (mode === "create") {
         result = await projectsApi.create(payload);
       } else {
-        result = await projectsApi.update(d.id, { ...payload, expectedRevision: baseRevisionRef.current });
+        // Only what changed, so staff editing other fields or other units of
+        // this project at the same time don't block or overwrite each other.
+        const body = basePayloadRef.current
+          ? editRequestBody(basePayloadRef.current, payload)
+          : payload;
+        result = await projectsApi.update(d.id, { ...body, expectedRevision: baseRevisionRef.current });
       }
       if (result && result.success === false) {
         toast.error(result.message ?? `Failed to ${mode} project.`);
@@ -1711,8 +1774,9 @@ export function ProjectForm({
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
         const snapshot = collectDraft();
         const kept = flushDraft(JSON.stringify(snapshot));
-        toast.warning("Project changed on another device", {
-          description: kept ? "Nothing was overwritten. Your draft is kept. Reload to review the latest units before saving." : "Nothing was overwritten. This device could not store your draft. Download it before reloading.",
+        const reason = error instanceof Error && error.message && !/^Request failed/.test(error.message) ? error.message : "Someone else changed the same details since you opened this project. Reload to merge your draft with their version.";
+        toast.warning("Not saved: the same details were changed by someone else", {
+          description: kept ? reason : `${reason} This device could not store your draft. Download it before reloading.`,
           duration: Infinity,
           action: kept ? { label: "Reload latest", onClick: () => window.location.reload() } : { label: "Download draft", onClick: () => downloadDraft({ v: DRAFT_VERSION, baseRevision: baseRevisionRef.current, data: snapshot }) },
         });
