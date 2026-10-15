@@ -32,6 +32,7 @@ import { PropertiesModule } from './modules/properties/properties.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { BuildersModule } from './modules/builders/builders.module';
 import { AdsModule } from './modules/ads/ads.module';
+import { ShowcasesModule } from './modules/showcases/showcases.module';
 
 import { ActivityLog } from './database/entities/activity-log.entity';
 import { Department } from './database/entities/department.entity';
@@ -163,6 +164,7 @@ import { CommunicationsModule } from './modules/communications/communications.mo
     ProjectsModule,
     BuildersModule,
     AdsModule,
+    ShowcasesModule,
     MailModule,
     CommunicationsModule,
   ],
