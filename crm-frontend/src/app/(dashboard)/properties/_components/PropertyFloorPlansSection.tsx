@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight, FileText, Loader2, Plus, Trash2, UploadCloud } f
 import { toast } from "sonner";
 import { propertiesApi } from "@/lib/properties-api";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { getFloorPlanTitle } from "./property-form-documents";
 
 export interface PropertyFloorPlan {
   fileKey: string;
@@ -141,7 +142,7 @@ export default function PropertyFloorPlansSection({
           fileUrl: item.fileUrl,
           mimeType: item.mimeType || file.type,
           fileSize: item.fileSize ?? file.size,
-          title: item.title || item.fileName || file.name,
+          title: getFloorPlanTitle({ title: item.title, fileName: item.fileName || file.name }),
         } satisfies PropertyFloorPlan;
       });
       setLocalPreviewUrls({ ...localPreviewUrlsRef.current });
@@ -219,7 +220,7 @@ export default function PropertyFloorPlansSection({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 id="property-floor-plans-title" className="text-lg font-semibold text-foreground">Floor plans</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Add up to five plans. PDF, JPG, PNG, or WebP, up to 15 MB each.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Add up to five plans and name each floor. PDF, JPG, PNG, or WebP, up to 15 MB each.</p>
         </div>
         <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground" aria-live="polite">
           {plans.length} of {MAX_FLOOR_PLANS}
@@ -234,8 +235,19 @@ export default function PropertyFloorPlansSection({
                 <FileText className="h-5 w-5" aria-hidden="true" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-foreground">{plan.fileName || plan.title}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{formatFileSize(plan.fileSize)}</p>
+                <label htmlFor={`pf-floorPlanName-${index}`} className="block text-xs font-medium text-muted-foreground">Floor name</label>
+                <input
+                  id={`pf-floorPlanName-${index}`}
+                  name={`floorPlanName-${index}`}
+                  value={plan.title ?? getFloorPlanTitle(plan)}
+                  onChange={(event) => onChange(plans.map((other, otherIndex) => otherIndex === index ? { ...other, title: event.target.value } : other))}
+                  placeholder="e.g. Ground floor"
+                  maxLength={255}
+                  required
+                  disabled={disabled || uploading}
+                  className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                />
+                <p className="mt-1 truncate text-xs text-muted-foreground" title={plan.fileName}>{plan.fileName} · {formatFileSize(plan.fileSize)}</p>
               </div>
               <button
                 type="button"
@@ -288,14 +300,14 @@ export default function PropertyFloorPlansSection({
       <Dialog open={Boolean(previewPlan)} onOpenChange={(open) => { if (!open) closePreview(); }}>
         {previewPlan && (
           <DialogContent
-            className="flex h-[min(90dvh,900px)] w-[min(96vw,1200px)] max-w-none flex-col gap-3 overflow-hidden p-3 sm:max-w-none sm:p-5"
+            className="flex h-dvh w-screen max-w-none flex-col gap-3 overflow-hidden rounded-none border-0 p-3 sm:max-w-none sm:p-5"
             onKeyDown={(event) => {
               if (event.key === "ArrowLeft") { event.preventDefault(); movePreview(-1); }
               if (event.key === "ArrowRight") { event.preventDefault(); movePreview(1); }
             }}
           >
             <DialogHeader className="shrink-0 pr-9">
-              <DialogTitle className="truncate">{previewPlan.fileName || previewPlan.title || "Floor plan"}</DialogTitle>
+              <DialogTitle className="truncate">{getFloorPlanTitle(previewPlan) || "Floor plan"}</DialogTitle>
               <DialogDescription className="sr-only">Floor plan preview. Use the previous and next buttons or left and right arrow keys to browse plans.</DialogDescription>
             </DialogHeader>
             <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg bg-muted/40">
@@ -315,9 +327,17 @@ export default function PropertyFloorPlansSection({
                 <p role="alert" className="px-6 text-center text-sm text-muted-foreground">A preview is not available for this floor plan.</p>
               )}
             </div>
+            <div className="flex shrink-0 gap-2 overflow-x-auto py-1" role="group" aria-label="Choose a floor plan">
+              {plans.map((plan) => (
+                <button key={plan.fileKey} type="button" onClick={() => openPreview(plan)} aria-pressed={plan.fileKey === previewPlan.fileKey}
+                  className={`shrink-0 rounded-lg border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${plan.fileKey === previewPlan.fileKey ? "border-primary/30 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-muted"}`}>
+                  {getFloorPlanTitle(plan) || "Floor plan"}
+                </button>
+              ))}
+            </div>
             <div className="flex shrink-0 items-center justify-between gap-3">
               <button type="button" onClick={() => movePreview(-1)} disabled={plans.length < 2} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50" aria-label="Previous floor plan"><ArrowLeft className="h-4 w-4" aria-hidden="true" />Previous</button>
-              <span className="min-w-0 truncate text-center text-xs text-muted-foreground" aria-live="polite">{previewIndex + 1} of {plans.length} · {previewPlan.fileName || previewPlan.title}</span>
+              <span className="min-w-0 truncate text-center text-xs text-muted-foreground" aria-live="polite">{previewIndex + 1} of {plans.length} · {getFloorPlanTitle(previewPlan)}</span>
               <button type="button" onClick={() => movePreview(1)} disabled={plans.length < 2} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50" aria-label="Next floor plan">Next<ArrowRight className="h-4 w-4" aria-hidden="true" /></button>
             </div>
           </DialogContent>

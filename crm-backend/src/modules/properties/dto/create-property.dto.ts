@@ -1,10 +1,12 @@
 import {
   IsArray,
   IsBoolean,
+  IsInt,
   IsNumber,
   IsObject,
   IsOptional,
   IsString,
+  Min,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
@@ -89,6 +91,11 @@ export class CreatePropertyDto {
 
   @IsOptional() @IsArray()
   amenityIds?: number[];
+
+  // Must be declared for the whitelist pipe; [] explicitly clears selections.
+  @IsOptional() @IsArray() @Type(() => Number)
+  @IsInt({ each: true }) @Min(1, { each: true })
+  furnishingItemIds?: number[];
 
   @IsOptional() @IsArray()
   faqs?: { question: string; answer: string; section?: string }[];

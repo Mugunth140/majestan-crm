@@ -20,6 +20,18 @@ const plans: PropertyFloorPlan[] = Array.from({ length: 5 }, (_, index) => ({
 }));
 
 describe("PropertyFloorPlansSection", () => {
+  it("provides a separate floor-name field for each uploaded file", () => {
+    const markup = renderToStaticMarkup(createElement(PropertyFloorPlansSection, {
+      plans: [{ ...plans[0], title: "Ground floor" }, { ...plans[1], title: "First floor" }],
+      onChange: () => undefined,
+    }));
+    expect(markup).toContain('value="Ground floor"');
+    expect(markup).toContain('value="First floor"');
+    expect(markup).toContain('name="floorPlanName-0"');
+    expect(markup).toContain('name="floorPlanName-1"');
+    expect(markup).toContain("level-1.pdf");
+    expect(markup).toContain("level-2.pdf");
+  });
   it("renders every supplied plan with an in-app preview button and the current count", () => {
     const markup = renderToStaticMarkup(
       createElement(PropertyFloorPlansSection, { plans, onChange: () => undefined }),

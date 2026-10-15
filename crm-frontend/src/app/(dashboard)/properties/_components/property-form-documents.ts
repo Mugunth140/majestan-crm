@@ -8,6 +8,11 @@ export interface PropertyDocumentInput {
   title?: string | null;
 }
 
+/** Keep custom floor names separate from the original uploaded filename. */
+export function getFloorPlanTitle(document: Pick<PropertyDocumentInput, "title" | "fileName">): string {
+  return (document.title ?? document.fileName?.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ") ?? "Floor Plan").trim();
+}
+
 export function getFloorPlans<T extends PropertyDocumentInput>(documents: T[] = []): T[] {
   return documents.filter((document) => document.documentType === "floor_plan" && document.fileKey);
 }
@@ -26,6 +31,6 @@ export function toPropertyDocumentPayload(document: PropertyDocumentInput) {
     mimeType: document.mimeType ?? undefined,
     fileSize: document.fileSize ?? undefined,
     documentType: "floor_plan",
-    title: document.title || document.fileName || "Floor Plan",
+    title: getFloorPlanTitle(document) || "Floor Plan",
   };
 }

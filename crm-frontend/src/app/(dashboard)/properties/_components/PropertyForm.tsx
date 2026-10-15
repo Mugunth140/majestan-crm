@@ -21,7 +21,23 @@ import { MobileHeader } from "@/components/layout/mobile-header";
 import { apiFetch, ApiError } from "@/lib/api-fetch";
 import { parseIndianCurrency } from "@/lib/indian-currency";
 import { propertiesApi } from "@/lib/properties-api";
-import { getFloorPlans, restoreLegacyFloorPlans, toPropertyDocumentPayload } from "./property-form-documents";
+import { getFloorPlans, getFloorPlanTitle, restoreLegacyFloorPlans, toPropertyDocumentPayload } from "./property-form-documents";
+import {
+  PROPERTY_DRAFT_VERSION,
+  fieldList,
+  isDraftOutdated,
+  legacyPropertyDraftKey,
+  propertyDraftKey,
+  readPropertyDraft,
+  reviewDraft,
+  type DraftReview,
+  type FormSnapshot,
+  type PropertyDraft,
+} from "./property-form-draft";
+import { useLeaveGuard } from "@/hooks/use-leave-guard";
+import { timeAgo } from "@/lib/time-ago";
+import { guardNavigation } from "@/lib/leave-guard";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import PropertyFloorPlansSection, { type PropertyFloorPlan } from "./PropertyFloorPlansSection";
 import { fetchNearbyCategories, fetchPostalCode, resolveCenterFromText, type LocalityCategory } from "@/lib/nearby-places";
 import { canViewPropertyContacts } from "@/lib/permissions";
@@ -644,16 +660,38 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   const imgInputRef = useRef<HTMLInputElement>(null);
 
   // ---- Draft persistence (localStorage) — form survives refresh ----
-  // Snapshots the whole form (debounced) so a refresh/PWA restart restores
-  // exactly what was on screen. Uploads in flight can't persist (blob URLs
-  // and File objects die with the page) — only fully-uploaded images
-  // (server keys) are kept. Cleared on successful submit.
-  const DRAFT_VERSION = 1;
-  const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+  // Snapshots the whole form (debounced) so a refresh/PWA restart keeps
+  // unsaved edits. Uploads in flight can't persist (blob URLs and File
+  // objects die with the page) — only fully-uploaded images (server keys)
+  // are kept. A draft is only written once something actually differs from
+  // the saved version, and it records that version, so reopening the
+  // property asks before restoring it over newer saves by other staff
+  // (see property-form-draft.ts). Cleared on successful submit.
   const editReady = mode === "create" || (initialData as any)?.id != null;
-  const draftKey =
-    `majestan:property-form:${mode}:${mode === "edit" ? ((initialData as any)?.id ?? "unknown") : "new"}`;
-  const restoredDraftRef = useRef(false);
+  const draftKeyRef = useRef("");
+  // The saved form state edits are measured against; null until the form settles.
+  const baselineRef = useRef<string | null>(null);
+  const baselineDataRef = useRef<FormSnapshot | null>(null);
+  // Set after a save/discard so the unmount flush can't write the draft back.
+  const draftWritesStoppedRef = useRef(false);
+  // Until the user touches the form, every change is the form filling itself
+  // in (e.g. city derived once localities load) — those move the baseline
+  // instead of counting as unsaved edits.
+  const userEditedRef = useRef(false);
+  const markUserEdited = () => {
+    userEditedRef.current = true;
+  };
+  /** Keep the baseline equal to the form while only the form itself has changed it. */
+  const syncBaselineIfUntouched = (data: FormSnapshot) => {
+    if (userEditedRef.current || baselineRef.current === null) return;
+    baselineDataRef.current = data;
+    baselineRef.current = JSON.stringify(data);
+  };
+  const [draftOffer, setDraftOffer] = useState<{ draft: PropertyDraft; review: DraftReview } | null>(null);
+  // The record version this edit started from (its updatedAt). Drafts carry it,
+  // and every save sends it so the server can refuse to overwrite a newer one.
+  const loadedUpdatedAtRef = useRef<string | null>((initialData as any)?.updatedAt ? String((initialData as any).updatedAt) : null);
+  const [saveConflict, setSaveConflict] = useState<{ message: string } | null>(null);
 
   type DraftKind = "s" | "b" | "a" | "listing" | "amenityIds" | "furnishingItemIds" | "images" | "docs" | "uploads" | "plans";
   const draftFields: Array<{ key: string; kind: DraftKind; get: () => unknown; set: (v: any) => void }> = [
@@ -889,14 +927,6 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
     return data;
   };
 
-  const DRAFT_CONTENT_KEYS = ["title", "price", "description", "address", "ownerPhone", "ownerName", "bookingAmount", "expectedSalePrice", "monthlyRent", "bedrooms", "areaSqft", "cityId", "sublocationId", "reraNumber", "projectName"];
-  const draftHasContent = (data: Record<string, any>): boolean =>
-    DRAFT_CONTENT_KEYS.some((k) => {
-      const v = data[k];
-      if (Array.isArray(v)) return v.length > 0;
-      return v !== null && v !== undefined && String(v).trim() !== "";
-    });
-
   const applyDraft = (data: Record<string, any>): boolean => {
     let applied = 0;
     if (!Array.isArray(data.floorPlans) && data.documents && Object.hasOwn(data.documents, "floor_plan")) {
@@ -991,19 +1021,24 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   };
 
   const saveDraft = () => {
-    if (!editReady) return;
+    const key = draftKeyRef.current;
+    if (!key || baselineRef.current === null || draftWritesStoppedRef.current || draftOffer) return;
     try {
-      const snapshot = collectDraft();
-      if (!draftHasContent(snapshot)) {
-        // Form effectively empty — don't leave a stale/empty draft behind.
-        try {
-          localStorage.removeItem(draftKey);
-        } catch {
-          /* ignore */
-        }
+      const data = collectDraft();
+      syncBaselineIfUntouched(data);
+      if (JSON.stringify(data) === baselineRef.current) {
+        // Nothing edited (or edits undone) — no draft, so reopening never asks.
+        localStorage.removeItem(key);
         return;
       }
-      localStorage.setItem(draftKey, JSON.stringify({ v: DRAFT_VERSION, savedAt: Date.now(), data: snapshot }));
+      const draft: PropertyDraft = {
+        v: PROPERTY_DRAFT_VERSION,
+        savedAt: Date.now(),
+        baseVersion: loadedUpdatedAtRef.current,
+        base: baselineDataRef.current ?? undefined,
+        data,
+      };
+      localStorage.setItem(key, JSON.stringify(draft));
     } catch {
       /* quota/private-mode → ignore */
     }
@@ -1011,37 +1046,76 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
   const clearDraft = () => {
     try {
-      localStorage.removeItem(draftKey);
+      if (draftKeyRef.current) localStorage.removeItem(draftKeyRef.current);
     } catch {
       /* ignore */
     }
   };
 
-  // Restore once when the form becomes ready (create, or edit with server data).
+  const isDirty = () => {
+    if (draftWritesStoppedRef.current || baselineRef.current === null) return false;
+    const data = collectDraft();
+    syncBaselineIfUntouched(data);
+    return JSON.stringify(data) !== baselineRef.current;
+  };
+
+  // Once the form has loaded and settled (option lists, normalising effects),
+  // record the saved state, then look for an unsaved draft of this property.
+  // A draft with real edits is offered in a dialog instead of being applied
+  // silently over what is saved now.
   useEffect(() => {
-    if (!editReady || restoredDraftRef.current) return;
-    restoredDraftRef.current = true;
-    try {
-      const raw = localStorage.getItem(draftKey);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (!parsed || parsed.v !== DRAFT_VERSION || !parsed.data) return;
-      if (typeof parsed.savedAt === "number" && Date.now() - parsed.savedAt > DRAFT_TTL_MS) {
-        try {
-          localStorage.removeItem(draftKey);
-        } catch {
-          /* ignore */
+    if (!editReady || isLoadingFormData || baselineRef.current !== null) return;
+    const t = setTimeout(() => {
+      const current = collectDraft();
+      baselineDataRef.current = current;
+      baselineRef.current = JSON.stringify(current);
+      let userId: unknown = "anon";
+      try {
+        userId = JSON.parse(localStorage.getItem("crm_user") || "{}")?.id ?? "anon";
+      } catch {
+        /* ignore */
+      }
+      const id = (initialData as any)?.id;
+      const key = propertyDraftKey(mode, id, userId);
+      draftKeyRef.current = key;
+      try {
+        const legacyKey = legacyPropertyDraftKey(mode, id);
+        const draft = readPropertyDraft(localStorage.getItem(key)) ?? readPropertyDraft(localStorage.getItem(legacyKey));
+        localStorage.removeItem(legacyKey);
+        if (draft && isDraftOutdated(draft, loadedUpdatedAtRef.current)) {
+          // The database is newer than this draft: never apply it. The form
+          // already shows the latest saved data.
+          localStorage.removeItem(key);
+          toast.info("This record has been updated by another staff member. The latest saved data has been loaded.", {
+            id: `property-draft-outdated:${key}`,
+            duration: 10000,
+          });
+          return;
         }
-        return;
+        const review = draft ? reviewDraft(draft, current) : null;
+        if (draft && review && review.changed.length > 0) setDraftOffer({ draft, review });
+        else localStorage.removeItem(key);
+      } catch {
+        /* corrupt draft / storage unavailable → ignore */
       }
-      if (applyDraft(parsed.data)) {
-        toast.info("Previous unsaved draft restored.");
-      }
-    } catch {
-      /* corrupt draft → ignore */
-    }
+    }, 400);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editReady]);
+  }, [editReady, isLoadingFormData]);
+
+  const restoreDraft = () => {
+    if (!draftOffer) return;
+    userEditedRef.current = true;
+    applyDraft(draftOffer.review.merged);
+    setDraftOffer(null);
+    toast.success("Your unsaved changes are back. Save to keep them.");
+  };
+
+  const discardDraft = () => {
+    clearDraft();
+    setDraftOffer(null);
+    toast.info("Draft discarded — showing the saved version.");
+  };
 
   // Debounced save after every render + synchronous flush on unload/refresh.
   useEffect(() => {
@@ -1054,6 +1128,17 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
       window.removeEventListener("beforeunload", onUnload);
     };
   });
+
+  // Flush on unmount too (in-app navigation), so the last 800ms of edits
+  // aren't lost when the debounced save above is cancelled.
+  const saveDraftRef = useRef(saveDraft);
+  useEffect(() => {
+    saveDraftRef.current = saveDraft;
+  });
+  useEffect(() => () => saveDraftRef.current(), []);
+
+  // Ask before leaving with unsaved changes (sidebar links, back buttons, tab close).
+  const { pendingLeave, cancelLeave } = useLeaveGuard(isDirty);
 
   // ---- Load form data (cities & sublocations) ----
   useEffect(() => {
@@ -1391,13 +1476,24 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         errs.push({ field, message: `${label} is not a valid amount.` });
       }
     }
+    floorPlans.forEach((plan, index) => {
+      if (!getFloorPlanTitle(plan)) errs.push({ field: `floorPlanName-${index}`, message: `Enter a floor name for plan ${index + 1}.` });
+    });
     return errs;
   };
 
   // ---- Submit ----
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isLoading || uploadingFloorPlans || uploadingDoc || uploadingCount > 0) return;
+    void submit();
+  };
+
+  /**
+   * Validate and save. `after` replaces the default redirect (used by "Save &
+   * leave"). Never saves over a newer save by someone else.
+   */
+  const submit = async (opts: { after?: () => void } = {}): Promise<"saved" | "invalid" | "conflict" | "failed"> => {
+    if (isLoading || uploadingFloorPlans || uploadingDoc || uploadingCount > 0) return "invalid";
     const validationErrors = validate();
     if (validationErrors.length > 0) {
       const map: Record<string, string> = {};
@@ -1407,7 +1503,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
       setFieldErrors(map);
       validationErrors.slice(0, 3).forEach((err) => toast.error(err.message));
       scrollToFieldError(validationErrors[0].field);
-      return;
+      return "invalid";
     }
     setFieldErrors({});
 
@@ -1496,7 +1592,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
         // Arrays — master amenities are hidden for land, never submit them.
         amenityIds: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : amenityIds.length > 0 ? amenityIds : undefined,
-        furnishingItemIds: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : furnishingItemIds.length > 0 ? furnishingItemIds : undefined,
+        furnishingItemIds: LAND_PROPERTY_TYPES.includes(propertyType) ? undefined : furnishingItemIds,
         faqs: faqs.filter((f) => f.question && f.answer).length > 0 ? faqs : undefined,
         
         // Owner
@@ -1733,22 +1829,35 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
       if (mode === "create") {
         result = await propertiesApi.create(payload);
       } else {
-        result = await propertiesApi.update(initialData!.id, payload);
+        // The server checks this version inside the save and answers 409 if
+        // someone else saved since — nothing is overwritten.
+        result = await propertiesApi.update(initialData!.id, {
+          ...payload,
+          ...(loadedUpdatedAtRef.current ? { expectedUpdatedAt: loadedUpdatedAtRef.current } : {}),
+        });
       }
 
       if (result && result.success === false) {
         toast.error(result.message ?? `Failed to ${mode} property.`);
-        return;
+        return "failed";
       }
 
       toast.success(`Property ${mode === "create" ? "created" : "updated"} successfully!`);
+      draftWritesStoppedRef.current = true;
       clearDraft();
-      if (onSuccess) {
+      if (opts.after) {
+        opts.after();
+      } else if (onSuccess) {
         onSuccess();
       } else {
         router.push("/properties");
       }
+      return "saved";
     } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setSaveConflict({ message: err.message });
+        return "conflict";
+      }
       // Field-mapped errors: toast the exact field + show it inline.
       if (err instanceof ApiError && err.details && err.details.length > 0) {
         const parsed = parseServerFieldErrors(err.details);
@@ -1764,9 +1873,42 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
       } else {
         toast.error("An unexpected error occurred.");
       }
+      return "failed";
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // ---- Leave / conflict dialog actions ----
+  const saveAndLeave = async () => {
+    const proceed = pendingLeave;
+    if (!proceed) return;
+    const outcome = await submit({ after: proceed });
+    if (outcome !== "saved") cancelLeave(); // show the errors / conflict dialog
+  };
+
+  const leaveKeepingDraft = () => {
+    const proceed = pendingLeave;
+    saveDraft();
+    draftWritesStoppedRef.current = true;
+    cancelLeave();
+    proceed?.();
+  };
+
+  const leaveDiscarding = () => {
+    const proceed = pendingLeave;
+    draftWritesStoppedRef.current = true;
+    clearDraft();
+    cancelLeave();
+    proceed?.();
+  };
+
+  // Reload the latest saved version. The draft is kept just long enough for
+  // the reopened form to recognise it as outdated, discard it and say so.
+  const loadLatestVersion = () => {
+    saveDraft();
+    draftWritesStoppedRef.current = true;
+    window.location.reload();
   };
 
   // ---- Render ----
@@ -1792,7 +1934,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           variant="outline"
           size="icon"
           className="h-10 w-10 rounded-full"
-          onClick={() => router.push("/properties")}
+          onClick={() => guardNavigation(() => router.push("/properties"))}
         >
           <ArrowLeft className="h-5 w-5 text-muted-foreground" />
         </Button>
@@ -1810,6 +1952,10 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
       <form
         onSubmit={handleSubmit}
+        onInputCapture={markUserEdited}
+        onChangeCapture={markUserEdited}
+        onKeyDownCapture={markUserEdited}
+        onPointerDownCapture={markUserEdited}
         onKeyDown={(e) => {
           if (e.key === "Enter" && e.target instanceof HTMLInputElement) {
             e.preventDefault();
@@ -4930,7 +5076,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             type="button"
             variant="outline"
             className="h-12 px-6 rounded-xl font-medium shadow-sm hover:bg-muted"
-            onClick={() => router.push("/properties")}
+            onClick={() => guardNavigation(() => router.push("/properties"))}
           >
             Cancel
           </Button>
@@ -4954,6 +5100,87 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           </Button>
         </div>
       </form>
+
+      {/* Unsaved draft of the CURRENT version found when opening (outdated
+          drafts are discarded before this). The saved version is the default. */}
+      <Dialog open={draftOffer !== null} onOpenChange={(open) => { if (!open) discardDraft(); }}>
+        <DialogContent className="sm:max-w-[480px]" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Restore your unsaved changes?</DialogTitle>
+            <DialogDescription>
+              You left this {mode === "edit" ? "property" : "new property"} with unsaved changes
+              {draftOffer?.draft.savedAt ? ` ${timeAgo(new Date(draftOffer.draft.savedAt).toISOString())}` : ""}.
+            </DialogDescription>
+          </DialogHeader>
+          {draftOffer && (
+            <div className="space-y-3 text-sm">
+              <p>
+                <span className="font-medium">Your changes:</span>{" "}
+                <span className="text-muted-foreground">{fieldList(draftOffer.review.changed)}</span>
+              </p>
+            </div>
+          )}
+          <DialogFooter className="mt-2 gap-2">
+            <Button variant="outline" onClick={restoreDraft}>
+              Restore my changes
+            </Button>
+            <Button onClick={discardDraft} className="bg-[#0052FF] hover:bg-[#0052FF]/90">
+              Keep saved version
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Leaving with unsaved changes. */}
+      <Dialog open={pendingLeave !== null && !isLoading} onOpenChange={(open) => { if (!open) cancelLeave(); }}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Save changes before leaving?</DialogTitle>
+            <DialogDescription>
+              This {mode === "edit" ? "property" : "new property"} has unsaved changes. Save them now, keep them as a
+              draft on this device to finish later, or discard them.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-2 gap-2 sm:justify-between">
+            <Button variant="ghost" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={leaveDiscarding}>
+              Discard
+            </Button>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row">
+              <Button variant="outline" onClick={leaveKeepingDraft}>
+                Keep as draft
+              </Button>
+              <Button onClick={saveAndLeave} className="bg-[#0052FF] hover:bg-[#0052FF]/90">
+                <Save className="mr-2 h-4 w-4" />
+                Save &amp; leave
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Someone else saved while this was being edited. */}
+      <Dialog open={saveConflict !== null} onOpenChange={(open) => { if (!open) setSaveConflict(null); }}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>This property was changed by someone else</DialogTitle>
+            <DialogDescription>
+              Another staff member saved it after you opened it, so your changes were not saved over their version.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Loading the latest version discards your unsaved changes on this page. Note anything you still need before
+            continuing.
+          </p>
+          <DialogFooter className="mt-2 gap-2">
+            <Button variant="outline" onClick={() => setSaveConflict(null)}>
+              Cancel
+            </Button>
+            <Button onClick={loadLatestVersion} className="bg-[#0052FF] hover:bg-[#0052FF]/90">
+              Load latest version
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

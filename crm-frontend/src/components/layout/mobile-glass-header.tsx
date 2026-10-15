@@ -6,6 +6,7 @@ import { ChevronLeft } from "lucide-react";
 import { useMobileHeader } from "./mobile-header-context";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { guardNavigation } from "@/lib/leave-guard";
 
 export function MobileGlassHeader() {
   const router = useRouter();
@@ -45,7 +46,7 @@ export function MobileGlassHeader() {
           <div className="z-10 flex items-center">
             {showBack && (
               <button
-                onClick={() => router.back()}
+                onClick={() => guardNavigation(() => router.back())}
                 className="flex items-center text-[#007AFF] dark:text-[#0A84FF] active:opacity-70 -ml-2 shrink-0"
               >
                 <ChevronLeft className="w-[28px] h-[28px]" strokeWidth={2.5} />

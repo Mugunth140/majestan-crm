@@ -660,8 +660,9 @@ export class PropertiesService {
       payload.amenities = ((dto as any).amenityIds as number[]).map(id => ({ amenityId: id }));
     }
 
-    if ((dto as any).furnishingItemIds !== undefined) {
-      payload.furnishingItems = ((dto as any).furnishingItemIds as number[]).map(id => ({ furnishingItemId: id }));
+    const furnishingItemIds = dto.furnishingItemIds as number[] | null | undefined;
+    if (furnishingItemIds != null) {
+      payload.furnishingItems = furnishingItemIds.map(id => ({ furnishingItemId: id }));
     }
 
     if ((dto as any).faqs !== undefined) {
@@ -703,6 +704,7 @@ export class PropertiesService {
     }
     const payload = await this.buildSitePayload(body);
     delete (payload as any).propertyType;
+    if (body.expectedUpdatedAt) payload.expectedUpdatedAt = body.expectedUpdatedAt;
     await this.siteApi.patch(`/admin/properties/${existing.propertyType}/${id}`, payload);
     return this.findOne(id, reqUser);
   }

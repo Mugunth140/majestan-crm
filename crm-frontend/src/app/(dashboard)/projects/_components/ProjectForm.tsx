@@ -4,8 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { PROJECT_DRAFT_VERSION_REBASABLE, archiveProjectDraft, canRestoreProjectDraft, draftIsPristine, editRequestBody, projectDraftKey, pruneRecoveryCopies, readProjectDraft, rebaseDraft, type ProjectDraft, type RebasableDraft } from "./project-form-draft";
+import { PROJECT_DRAFT_VERSION_REBASABLE, canRestoreProjectDraft, draftIsPristine, editRequestBody, projectDraftKey, pruneRecoveryCopies, readProjectDraft, type ProjectDraft, type RebasableDraft } from "./project-form-draft";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useLeaveGuard } from "@/hooks/use-leave-guard";
+import { guardNavigation } from "@/lib/leave-guard";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -444,6 +447,14 @@ export function ProjectForm({
   // be identical, so localStorage is only read in a post-mount effect.
   const [draftHydrated, setDraftHydrated] = useState(false);
   const submittedRef = useRef(false);
+  // A same-version draft waiting for the user's choice in the restore dialog.
+  const [draftOffer, setDraftOffer] = useState<ProjectDraft | null>(null);
+  const draftOfferRef = useRef<ProjectDraft | null>(null);
+  useEffect(() => {
+    draftOfferRef.current = draftOffer;
+  }, [draftOffer]);
+  // Set when the server refused a save because someone else saved first.
+  const [saveConflict, setSaveConflict] = useState<string | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedRef = useRef<string>("");
   const isLandProject = (projectTypeValue: string) =>
@@ -1189,7 +1200,7 @@ export function ProjectForm({
   });
 
   const flushDraft = (snapshot: string) => {
-    if (!draftKeyRef.current || draftWritesBlocked.current) return false;
+    if (!draftKeyRef.current || draftWritesBlocked.current || draftOfferRef.current) return false;
     try {
       // Nothing edited (or edits undone): no draft, so opening the project
       // later never warns about "unsaved changes" that were never made.
@@ -1239,9 +1250,6 @@ export function ProjectForm({
     try { window.localStorage.removeItem(legacyDraftKey); } catch { /* unavailable */ }
     pruneRecoveryCopies(window.localStorage, draftKey);
     const stored = currentDraft ?? legacy;
-    const current = JSON.parse(initialSnapshotRef.current) as Record<string, unknown>;
-    let saved: Record<string, unknown> | null = null;
-    let restoredNote = "Your draft matches the current project version.";
     const rebasable = stored && stored.v === DRAFT_VERSION && "base" in stored && stored.base && typeof stored.base === "object"
       ? (stored as RebasableDraft) : null;
 
@@ -1249,36 +1257,24 @@ export function ProjectForm({
       // A draft with no edits in it: nothing to restore or warn about.
       try { window.localStorage.removeItem(draftKey); } catch { /* unavailable */ }
     } else if (stored && canRestoreProjectDraft(stored, mode, baseRevisionRef.current)) {
-      saved = stored.data;
-    } else if (rebasable) {
-      // Someone saved since this draft was made: merge it onto their version.
-      const { merged, conflicts } = rebaseDraft(rebasable, current);
-      // Everything in the draft is already in the latest version.
-      saved = JSON.stringify(merged) === initialSnapshotRef.current ? null : merged;
-      if (!saved) { try { window.localStorage.removeItem(draftKey); } catch { /* unavailable */ } }
-      restoredNote = "Merged onto the latest version saved by your team.";
-      if (conflicts.length) {
-        archiveProjectDraft(window.localStorage, draftKey, stored!);
-        toast.warning("Some unsaved changes clashed with newer edits", {
-          id: `project-draft-conflict:${draftKey}`,
-          description: `Kept the latest saved version for: ${conflicts.slice(0, 5).join(", ")}${conflicts.length > 5 ? "…" : ""}. Your other changes were restored. Your full draft is kept for recovery.`,
-          duration: 15000,
-          action: { label: "Download draft", onClick: () => downloadDraft(stored!) },
-        });
-      }
+      // Same version as the database: ask before restoring (see the dialog).
+      setDraftOffer(stored);
     } else if (stored) {
-      // An older draft without its starting point can't be merged safely.
-      // Keep it for recovery and say so once; it is moved out of the active
-      // slot, so the warning does not come back on the next visit.
-      if (currentDraft && !archiveProjectDraft(window.localStorage, draftKey, currentDraft)) draftWritesBlocked.current = true;
-      toast.warning("Older unsaved changes were not restored", {
-        id: `project-draft:${draftKey}`,
-        description: "The latest project is loaded. Your older draft is kept for recovery.",
-        duration: 15000,
-        action: { label: "Download draft", onClick: () => downloadDraft(stored) },
+      // The database has a newer version than this draft (someone else saved
+      // since, or the draft predates versioning): never apply it. The form
+      // already shows the latest saved data.
+      try { window.localStorage.removeItem(draftKey); } catch { /* unavailable */ }
+      toast.info("This record has been updated by another staff member. The latest saved data has been loaded.", {
+        id: `project-draft-outdated:${draftKey}`,
+        duration: 10000,
       });
     }
-    if (saved) {
+    setDraftHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Put a draft's values into the form (from the restore dialog).
+  const applySnapshot = (saved: Record<string, any>) => {
       const str = (v: unknown, fallback = "") =>
         v === undefined || v === null ? fallback : String(v);
       setState(str(saved.state, state));
@@ -1386,16 +1382,7 @@ export function ProjectForm({
               : [],
           })),
         );
-      toast.info("Unsaved changes restored", {
-        duration: 8000,
-        id: `project-draft:${draftKey}`,
-        description: restoredNote,
-        action: { label: "Discard", onClick: discardDraft },
-      });
-    }
-    setDraftHydrated(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  };
 
   // Debounced write after every render that changed field state. Plain
   // compare-then-schedule: cheap, and never writes when nothing changed.
@@ -1436,7 +1423,61 @@ export function ProjectForm({
     return () => window.removeEventListener("pagehide", onHide);
   }, []);
 
-  const discardDraft = () => {
+  // Restore dialog: "Keep saved version" (default) / "Restore my changes".
+  const keepSavedVersion = () => {
+    try {
+      window.localStorage.removeItem(draftKeyRef.current);
+    } catch {
+      /* ignore */
+    }
+    setDraftOffer(null);
+    toast.info("Draft discarded — showing the saved version.");
+  };
+
+  const restoreDraft = () => {
+    if (!draftOffer) return;
+    applySnapshot(draftOffer.data as Record<string, any>);
+    setDraftOffer(null);
+    toast.success("Your unsaved changes are back. Save to keep them.");
+  };
+
+  const hasUnsavedChanges = () => {
+    if (submittedRef.current || !hydratedRef.current || !initialSnapshotRef.current) return false;
+    try {
+      return JSON.stringify(collectRef.current()) !== initialSnapshotRef.current;
+    } catch {
+      return false;
+    }
+  };
+  const { pendingLeave, cancelLeave } = useLeaveGuard(hasUnsavedChanges);
+
+  const flushNow = () => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    try {
+      flushDraft(JSON.stringify(collectDraft()));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // Leave dialog actions.
+  const saveAndLeave = async () => {
+    const proceed = pendingLeave;
+    if (!proceed) return;
+    const saved = await submit({ after: proceed });
+    if (!saved) cancelLeave(); // show the errors / conflict dialog
+  };
+
+  const leaveKeepingDraft = () => {
+    const proceed = pendingLeave;
+    flushNow();
+    submittedRef.current = true;
+    cancelLeave();
+    proceed?.();
+  };
+
+  const leaveDiscarding = () => {
+    const proceed = pendingLeave;
     submittedRef.current = true;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     try {
@@ -1444,14 +1485,16 @@ export function ProjectForm({
     } catch {
       /* ignore */
     }
-    window.location.reload();
+    cancelLeave();
+    proceed?.();
   };
 
-  const downloadDraft = (saved: ProjectDraft) => {
-    const url = URL.createObjectURL(new Blob([JSON.stringify(saved, null, 2)], { type: "application/json" }));
-    const link = document.createElement("a");
-    link.href = url; link.download = `project-${d?.id ?? "new"}-unsaved-draft.json`; link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  // Save conflict: reload the latest version. The draft is kept just long
+  // enough for the reopened form to see it's outdated, discard it and say so.
+  const loadLatestVersion = () => {
+    flushNow();
+    submittedRef.current = true;
+    window.location.reload();
   };
 
   // The request body for the current form state. Also built once from the
@@ -1669,26 +1712,31 @@ export function ProjectForm({
     return payload;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    void submit();
+  };
+
+  /** Validate and save; `after` replaces the default redirect ("Save & leave"). True when saved. */
+  const submit = async (opts: { after?: () => void } = {}): Promise<boolean> => {
     if (uploadingFloorPlanRef.current !== null) {
       toast.error("Wait for the floor plan image to finish uploading before saving.");
-      return;
+      return false;
     }
     if (mode === "edit" && (!Number.isInteger(baseRevisionRef.current) || !baseRevisionRef.current)) {
-      toast.error("Reload the latest project before saving."); return;
+      toast.error("Reload the latest project before saving."); return false;
     }
     if (!name.trim()) {
       toast.error("Project name is required.");
-      return;
+      return false;
     }
     if (!city.trim()) {
       toast.error("City is required.");
-      return;
+      return false;
     }
     if (!sublocation.trim()) {
       toast.error("Locality is required.");
-      return;
+      return false;
     }
     const validUnits = units.filter((u) => u.unitCode.trim());
     const incompleteIdx = units.findIndex(
@@ -1697,7 +1745,7 @@ export function ProjectForm({
     if (incompleteIdx >= 0) {
       setOpenUnits((prev) => ({ ...prev, [incompleteIdx]: true }));
       toast.error(`Unit ${incompleteIdx + 1} has details but no unit code.`);
-      return;
+      return false;
     }
     for (let unitIndex = 0; unitIndex < validUnits.length; unitIndex += 1) {
       if (isPlotProject(projectType)) continue;
@@ -1707,7 +1755,7 @@ export function ProjectForm({
         const actualIndex = units.indexOf(unit);
         setOpenUnits((prev) => ({ ...prev, [actualIndex]: true }));
         toast.error(`Unit ${unit.unitCode.trim()} has duplicate floor names.`);
-        return;
+        return false;
       }
       const incompletePlan = unit.floorPlans.find((plan) => floorPlanRowError(plan));
       if (incompletePlan) {
@@ -1715,7 +1763,7 @@ export function ProjectForm({
         setOpenUnits((prev) => ({ ...prev, [actualIndex]: true }));
         setUnitTabs((prev) => ({ ...prev, [actualIndex]: "price" }));
         toast.error(floorPlanRowError(incompletePlan) ?? "Complete each floor plan.");
-        return;
+        return false;
       }
     }
     const badVideo = videos.findIndex(
@@ -1723,14 +1771,14 @@ export function ProjectForm({
     );
     if (badVideo >= 0) {
       toast.error(`Video ${badVideo + 1}: the link is not a valid YouTube link.`);
-      return;
+      return false;
     }
     const untitledLinkless = videos.findIndex(
       (v) => v.title.trim() !== "" && v.url.trim() === "",
     );
     if (untitledLinkless >= 0) {
       toast.error(`Video ${untitledLinkless + 1} has a title but no link.`);
-      return;
+      return false;
     }
     setIsLoading(true);
     try {
@@ -1749,7 +1797,7 @@ export function ProjectForm({
       }
       if (result && result.success === false) {
         toast.error(result.message ?? `Failed to ${mode} project.`);
-        return;
+        return false;
       }
       toast.success(
         `Project ${mode === "create" ? "created" : "updated"} successfully!`,
@@ -1762,25 +1810,21 @@ export function ProjectForm({
       } catch {
         /* ignore */
       }
-      if (onSuccess) {
+      if (opts.after) {
+        opts.after();
+      } else if (onSuccess) {
         onSuccess();
       } else {
         router.push("/projects");
       }
+      return true;
     } catch (error) {
       if ((error as { status?: number }).status === 409) {
-        // Persist the unsaved work with its ORIGINAL revision, never retag it
-        // as current or retry a destructive write automatically.
-        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-        const snapshot = collectDraft();
-        const kept = flushDraft(JSON.stringify(snapshot));
-        const reason = error instanceof Error && error.message && !/^Request failed/.test(error.message) ? error.message : "Someone else changed the same details since you opened this project. Reload to merge your draft with their version.";
-        toast.warning("Not saved: the same details were changed by someone else", {
-          description: kept ? reason : `${reason} This device could not store your draft. Download it before reloading.`,
-          duration: Infinity,
-          action: kept ? { label: "Reload latest", onClick: () => window.location.reload() } : { label: "Download draft", onClick: () => downloadDraft({ v: DRAFT_VERSION, baseRevision: baseRevisionRef.current, data: snapshot }) },
-        });
+        // Nothing was written. Ask the user to load the latest version.
+        // "" = no server detail; the dialog shows its own wording then.
+        setSaveConflict(error instanceof Error && error.message && !/^Request failed/.test(error.message) ? error.message : "");
       } else toast.error(error instanceof Error ? error.message : "An unexpected error occurred.");
+      return false;
     } finally {
       setIsLoading(false);
     }
@@ -1799,7 +1843,7 @@ export function ProjectForm({
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => router.push("/projects")}
+            onClick={() => guardNavigation(() => router.push("/projects"))}
             className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border/60 text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
             aria-label="Back to projects"
           >
@@ -3972,7 +4016,7 @@ export function ProjectForm({
             type="button"
             variant="outline"
             className="h-11 rounded-full px-5"
-            onClick={() => router.push("/projects")}
+            onClick={() => guardNavigation(() => router.push("/projects"))}
           >
             <X className="h-4 w-4 mr-2" /> Cancel
           </Button>
@@ -3986,6 +4030,78 @@ export function ProjectForm({
           </Button>
         </div>
       </form>
+
+      {/* Unsaved draft of the CURRENT version found when opening (outdated
+          drafts are discarded before this). The saved version is the default. */}
+      <Dialog open={draftOffer !== null} onOpenChange={(open) => { if (!open) keepSavedVersion(); }}>
+        <DialogContent className="sm:max-w-[480px]" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Restore your unsaved changes?</DialogTitle>
+            <DialogDescription>
+              You left this {mode === "edit" ? "project" : "new project"} with unsaved changes. Nobody has saved it
+              since, so they can be restored.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-2 gap-2">
+            <Button variant="outline" onClick={restoreDraft}>
+              Restore my changes
+            </Button>
+            <Button onClick={keepSavedVersion} className="bg-[#0052FF] hover:bg-[#0052FF]/90">
+              Keep saved version
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Leaving with unsaved changes. */}
+      <Dialog open={pendingLeave !== null && !isLoading} onOpenChange={(open) => { if (!open) cancelLeave(); }}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Save changes before leaving?</DialogTitle>
+            <DialogDescription>
+              This {mode === "edit" ? "project" : "new project"} has unsaved changes. Save them now, keep them as a
+              draft on this device to finish later, or discard them.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-2 gap-2 sm:justify-between">
+            <Button variant="ghost" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={leaveDiscarding}>
+              Discard
+            </Button>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row">
+              <Button variant="outline" onClick={leaveKeepingDraft}>
+                Keep as draft
+              </Button>
+              <Button onClick={saveAndLeave} className="bg-[#0052FF] hover:bg-[#0052FF]/90">
+                Save &amp; leave
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* The server refused the save: someone else saved first. */}
+      <Dialog open={saveConflict !== null} onOpenChange={(open) => { if (!open) setSaveConflict(null); }}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>This project was changed by someone else</DialogTitle>
+            <DialogDescription>
+              {saveConflict || "Another staff member saved it after you opened it, so your changes were not saved over their version."}
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Loading the latest version discards your unsaved changes on this page. Note anything you still need before
+            continuing.
+          </p>
+          <DialogFooter className="mt-2 gap-2">
+            <Button variant="outline" onClick={() => setSaveConflict(null)}>
+              Cancel
+            </Button>
+            <Button onClick={loadLatestVersion} className="bg-[#0052FF] hover:bg-[#0052FF]/90">
+              Load latest version
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

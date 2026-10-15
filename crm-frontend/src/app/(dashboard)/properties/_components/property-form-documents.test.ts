@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { getFloorPlans, restoreLegacyFloorPlans, toPropertyDocumentPayload } from "./property-form-documents";
+import { getFloorPlans, getFloorPlanTitle, restoreLegacyFloorPlans, toPropertyDocumentPayload } from "./property-form-documents";
 
 describe("property form floor plans", () => {
+  it("keeps custom floor names separate from filenames when saving multiple plans", () => {
+    const plans = [
+      { fileKey: "ground", fileName: "drawing-01.pdf", title: " Ground floor " },
+      { fileKey: "first", fileName: "drawing-02.png", title: "First floor" },
+    ];
+    expect(plans.map(toPropertyDocumentPayload)).toMatchObject([
+      { fileKey: "ground", fileName: "drawing-01.pdf", title: "Ground floor", documentType: "floor_plan" },
+      { fileKey: "first", fileName: "drawing-02.png", title: "First floor", documentType: "floor_plan" },
+    ]);
+    expect(getFloorPlanTitle({ fileName: "second_floor.png" })).toBe("second floor");
+    expect(getFloorPlanTitle({ fileName: "drawing.png", title: " " })).toBe("");
+  });
   it("loads every floor plan into the separate section", () => {
     const documents = [
       { id: 1, fileKey: "plan-1", documentType: "floor_plan" },
