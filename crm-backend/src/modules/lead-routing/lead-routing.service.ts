@@ -9,6 +9,7 @@ import { LeadFollowUp } from '../../database/entities/lead-follow-up.entity';
 import { WebsiteEnquiryEvent } from '../../database/entities/website-enquiry-event.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NON_QUEUEABLE_LEAD_STATUSES } from '../leads/lead-statuses';
+import { PROPERTY_PAGE_SOURCE } from '../leads/website-sources';
 
 @Injectable()
 export class LeadRoutingService {
@@ -96,7 +97,7 @@ export class LeadRoutingService {
   async getEnquiryQueue(
     page: number,
     limit: number,
-    filters?: { propertyType?: string; intent?: string; dateFrom?: string; dateTo?: string },
+    filters?: { propertyType?: string; intent?: string; source?: string; dateFrom?: string; dateTo?: string },
   ) {
     const skip = (page - 1) * limit;
 
@@ -109,6 +110,11 @@ export class LeadRoutingService {
     if (filters?.intent === 'enquiry' || filters?.intent === 'site_visit') {
       filterConds += ' AND e.intent = ?';
       filterParams.push(filters.intent);
+    }
+    // Older rows have no source; they are all property-page enquiries.
+    if (filters?.source) {
+      filterConds += ' AND COALESCE(e.source, ?) = ?';
+      filterParams.push(PROPERTY_PAGE_SOURCE, filters.source);
     }
     if (filters?.dateFrom) {
       filterConds += ' AND DATE(e.created_at) >= ?';
@@ -134,6 +140,7 @@ export class LeadRoutingService {
       `SELECT e.id AS enquiry_id, e.created_at AS enquiry_at, e.name AS event_name,
               e.mobile_number, e.email, e.property_id, e.property_code, e.property_slug,
               e.property_type, e.intent, e.visit_date, e.visit_slot,
+              e.source AS enquiry_source, e.message,
               e.matched_lead_id, e.status,
               l.id, l.name, l.mobile_number AS lead_mobile, l.email AS lead_email,
               l.status AS lead_status, l.department, l.lead_source,
@@ -202,6 +209,9 @@ export class LeadRoutingService {
         visit_date: r.visit_date ?? null,
         // visit_slot is SQL TIME: mysql2 returns 'HH:MM:SS'; the frontend slices it.
         visit_slot: r.visit_slot ?? null,
+        // The form the enquiry came from, and what the visitor typed.
+        source: r.enquiry_source ?? PROPERTY_PAGE_SOURCE,
+        message: r.message ?? null,
       };
     });
 
@@ -583,6 +593,23 @@ export class LeadRoutingService {
     );
   }
 
+  // A general enquiry's message (service-page and contact forms) is kept as a
+  // note on the lead, the same way createLead stores a forwarded `notes`.
+  private async messageNote(manager: EntityManager, leadId: number, event: any) {
+    if (!event.message) return null;
+    const repo = manager.getRepository(LeadFollowUp);
+    return repo.save(repo.create({ lead_id: leadId, notes: event.message }));
+  }
+
+  // Notification wording: property enquiries name the property, the others
+  // name the form they came from.
+  private enquiryLabel(event: any): string {
+    if (event.property_id || event.property_code || event.property_slug) {
+      return `for property ${event.property_code ?? event.property_slug ?? `#${event.property_id}`}`;
+    }
+    return `from ${(event.source ?? PROPERTY_PAGE_SOURCE).replace(/^Website – /, '')}`;
+  }
+
   // History shape mirrors assignLead (from/to/actioned_by) with to_user_id
   // null for queue-level events; attach/acknowledge point at the current
   // owner so the trail shows whose lead was touched.
@@ -634,6 +661,7 @@ export class LeadRoutingService {
       if (meanwhile) {
         const inquiry = await this.inquiryFromEvent(manager, meanwhile.id, event, false);
         await this.visitFollowUp(manager, meanwhile.id, event);
+        await this.messageNote(manager, meanwhile.id, event);
         await eventRepo.save({
           ...event,
           status: 'attached',
@@ -653,7 +681,7 @@ export class LeadRoutingService {
           email: event.email ?? null,
           whatsapp_number: event.whatsapp_number ?? null,
           city: event.city ?? null,
-          lead_source: 'Website – Property page',
+          lead_source: event.source ?? PROPERTY_PAGE_SOURCE,
           status: event.intent === 'site_visit' ? 'Site Visit Scheduled' : 'New Lead',
         }),
       );
@@ -669,6 +697,7 @@ export class LeadRoutingService {
       for (const sibling of siblings) {
         await this.inquiryFromEvent(manager, lead.id, sibling, true);
         await this.visitFollowUp(manager, lead.id, sibling);
+        await this.messageNote(manager, lead.id, sibling);
         await eventRepo.save({
           ...sibling,
           status: 'converted',
@@ -698,6 +727,7 @@ export class LeadRoutingService {
 
       const inquiry = await this.inquiryFromEvent(manager, lead.id, event, false);
       await this.visitFollowUp(manager, lead.id, event);
+      await this.messageNote(manager, lead.id, event);
       // Lead status deliberately untouched — even Dropped/Converted: attaching
       // evidence must never resurrect or rewrite lifecycle state.
       await manager.getRepository(WebsiteEnquiryEvent).save({
@@ -708,12 +738,11 @@ export class LeadRoutingService {
         decided_at: new Date(),
       });
       await this.writeEventHistory(manager, lead, 'Enquiry Attached', requestingUserId, true);
-      const label = event.property_code ?? event.property_slug ?? `#${event.property_id ?? 'N/A'}`;
       await this.notifyLeadOwner(
         lead,
         requestingUserId,
         'Website enquiry attached',
-        `Website enquiry for property ${label} attached to Lead #${lead.id}`,
+        `Website enquiry ${this.enquiryLabel(event)} attached to Lead #${lead.id}`,
         'lead_enquiry_attached',
       );
       return { leadId: lead.id, inquiryId: inquiry.id };
@@ -744,12 +773,11 @@ export class LeadRoutingService {
       });
       if (event.matched_lead_id && lead) {
         await this.writeEventHistory(manager, lead, 'Enquiry Acknowledged', requestingUserId, true);
-        const label = event.property_code ?? event.property_slug ?? `#${event.property_id ?? 'N/A'}`;
         await this.notifyLeadOwner(
           lead,
           requestingUserId,
           'Website enquiry acknowledged',
-          `Website enquiry for property ${label} acknowledged on Lead #${lead.id}`,
+          `Website enquiry ${this.enquiryLabel(event)} acknowledged on Lead #${lead.id}`,
           'lead_enquiry_acknowledged',
         );
       }

@@ -60,7 +60,26 @@ interface EnquiryLead {
   intent: string;
   visit_date: string | null;
   visit_slot: string | null;
+  /** Website form it came from, e.g. "Website – Liaisoning page". */
+  source: string;
+  /** What the visitor typed (service-page and contact forms only). */
+  message: string | null;
 }
+
+/** Website forms that feed the enquiry queue; values match the CRM's lead sources. */
+const ENQUIRY_SOURCE_OPTIONS = [
+  "Website – Property page",
+  "Website – Liaisoning page",
+  "Website – Property Management page",
+  "Website – Brokerage page",
+  "Website – NRI Services page",
+  "Website – Financial Assistance page",
+  "Website – Contact page",
+  "Website – Enquiry form",
+].map((value) => ({ label: value.replace(/^Website – /, ""), value }));
+
+/** "Website – Liaisoning page" → "Liaisoning page". */
+const sourceLabel = (source: string) => source.replace(/^Website – /, "");
 
 interface MatchedLead {
   name: string;
@@ -188,9 +207,12 @@ function MatchedLeadDialog({
                 </span>
               </div>
               <p className="text-sm font-medium">
-                {event?.property_title || "—"}
+                {event?.property_title || (event?.property_code ? null : event ? sourceLabel(event.source) : "—")}
                 {event?.property_code ? <span className="ml-1 font-mono text-xs text-muted-foreground">{event.property_code}</span> : null}
               </p>
+              {event?.message ? (
+                <p className="whitespace-pre-line text-sm text-muted-foreground">&ldquo;{event.message}&rdquo;</p>
+              ) : null}
               {visitBits ? <p className="text-xs text-muted-foreground">Visit: {visitBits}</p> : null}
             </div>
             {conflict && (
@@ -259,13 +281,15 @@ export default function LeadRoutingPage() {
   const [enquiryTotal, setEnquiryTotal] = useState(0);
   const [enquiryTypeFilter, setEnquiryTypeFilter] = usePersistedState("routing:enquiryType", "");
   const [enquiryIntentFilter, setEnquiryIntentFilter] = usePersistedState("routing:enquiryIntent", "");
+  const [enquirySourceFilter, setEnquirySourceFilter] = usePersistedState("routing:enquirySource", "");
   const [enquiryDateFrom, setEnquiryDateFrom] = usePersistedState<Date | undefined>("routing:enquiryFrom", undefined, { deserialize: reviveDate });
   const [enquiryDateTo, setEnquiryDateTo] = usePersistedState<Date | undefined>("routing:enquiryTo", undefined, { deserialize: reviveDate });
   const enquiryHasFilters =
-    enquiryTypeFilter !== "" || enquiryIntentFilter !== "" ||
+    enquiryTypeFilter !== "" || enquiryIntentFilter !== "" || enquirySourceFilter !== "" ||
     enquiryDateFrom !== undefined || enquiryDateTo !== undefined;
   const enquiryActiveFilterCount =
     (enquiryTypeFilter !== "" ? 1 : 0) + (enquiryIntentFilter !== "" ? 1 : 0) +
+    (enquirySourceFilter !== "" ? 1 : 0) +
     (enquiryDateFrom !== undefined ? 1 : 0) + (enquiryDateTo !== undefined ? 1 : 0);
   const [enquiryFilterOpen, setEnquiryFilterOpen] = useState(false);
 
@@ -349,6 +373,7 @@ export default function LeadRoutingPage() {
       });
       if (enquiryTypeFilter) params.set("propertyType", enquiryTypeFilter);
       if (enquiryIntentFilter) params.set("intent", enquiryIntentFilter);
+      if (enquirySourceFilter) params.set("source", enquirySourceFilter);
       if (enquiryDateFrom) params.set("dateFrom", format(enquiryDateFrom, "yyyy-MM-dd"));
       if (enquiryDateTo) params.set("dateTo", format(enquiryDateTo, "yyyy-MM-dd"));
       const res = await apiFetch(`${API_URL}/lead-routing/enquiry-queue?${params}`);
@@ -364,7 +389,7 @@ export default function LeadRoutingPage() {
     } finally {
       setEnquiryLoading(false);
     }
-  }, [enquiryPage, enquiryTypeFilter, enquiryIntentFilter, enquiryDateFrom, enquiryDateTo]);
+  }, [enquiryPage, enquiryTypeFilter, enquiryIntentFilter, enquirySourceFilter, enquiryDateFrom, enquiryDateTo]);
 
   const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -835,10 +860,26 @@ export default function LeadRoutingPage() {
     },
     {
       id: "property",
-      header: "Property",
+      header: "Property / Source",
       cell: ({ row }) => {
         const ev = row.original;
-        if (!ev.property_title) return <span>—</span>;
+        // General website enquiries have no property: show the form they came
+        // from and what the visitor wrote.
+        if (!ev.property_title && !ev.property_code) {
+          return (
+            <div className="flex max-w-[260px] flex-col">
+              <span className="text-sm font-medium">{sourceLabel(ev.source)}</span>
+              {ev.message && (
+                <span className="line-clamp-2 text-xs text-muted-foreground" title={ev.message}>
+                  {ev.message}
+                </span>
+              )}
+            </div>
+          );
+        }
+        if (!ev.property_title) {
+          return <span className="text-xs text-muted-foreground font-mono">{ev.property_code}</span>;
+        }
         const slot = ev.intent === "site_visit" && ev.visit_slot ? ` ${ev.visit_slot.slice(0, 5)}` : "";
         return (
           <div className="flex flex-col">
@@ -1117,6 +1158,16 @@ export default function LeadRoutingPage() {
                       />
                     </div>
                     <div className="space-y-1.5">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Source</p>
+                      <FormSelect
+                        name="enquirySource"
+                        options={ENQUIRY_SOURCE_OPTIONS}
+                        value={enquirySourceFilter}
+                        onValueChange={(v) => { setEnquirySourceFilter(v || ""); setEnquiryPage(1); }}
+                        placeholder="All Sources"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
                       <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Purpose</p>
                       <FormSelect
                         name="enquiryIntent"
@@ -1155,6 +1206,7 @@ export default function LeadRoutingPage() {
                         onClick={() => {
                           setEnquiryTypeFilter("");
                           setEnquiryIntentFilter("");
+                          setEnquirySourceFilter("");
                           setEnquiryDateFrom(undefined);
                           setEnquiryDateTo(undefined);
                           setEnquiryPage(1);

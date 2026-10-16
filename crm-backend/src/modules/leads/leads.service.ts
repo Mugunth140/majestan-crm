@@ -1,6 +1,7 @@
 import { Injectable, ConflictException, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In } from 'typeorm';
+import { isQueuedWebsiteSource } from './website-sources';
 import { Lead } from '../../database/entities/lead.entity';
 import { LeadFollowUp } from '../../database/entities/lead-follow-up.entity';
 import { LeadInquiry } from '../../database/entities/lead-inquiry.entity';
@@ -612,7 +613,7 @@ export class LeadsService {
     const normalised = { ...body, mobile };
 
     return this.dataSource.transaction(async (manager: EntityManager) => {
-      if (normalised.source === 'Website – Property page') {
+      if (isQueuedWebsiteSource(normalised.source)) {
         // Decide-first intake: hold everything as a pending event. Nothing
         // auto-creates here; Convert/Attach/Acknowledge (lead-routing) resolve it.
         const eventRepo = manager.getRepository(WebsiteEnquiryEvent);
@@ -633,6 +634,8 @@ export class LeadsService {
           email: normalised.email || null,
           city: normalised.city || null,
           whatsapp_number: normalised.whatsapp || null,
+          source: normalised.source,
+          message: typeof normalised.notes === 'string' && normalised.notes.trim() ? normalised.notes.trim() : null,
           property_id: normalised.propertyId ?? null,
           property_code: normalised.propertyCode ?? null,
           property_slug: normalised.propertySlug ?? null,

@@ -190,6 +190,37 @@ describe('createLead intent mapping', () => {
     expect(result.eventId).toBe(1);
   });
 
+  it('holds a service-page callback in the queue with its source and message', async () => {
+    const result = await service.createLead({
+      name: 'Meena', mobile: '9123456780',
+      source: 'Website – Liaisoning page',
+      notes: '  DTCP approval for a 2-acre layout in Annur ',
+    } as any);
+
+    expect(saved.Lead).toEqual([]);
+    expect(saved.LeadFollowUp).toEqual([]);
+    expect(saved.WebsiteEnquiryEvent).toHaveLength(1);
+    expect(saved.WebsiteEnquiryEvent[0]).toEqual(expect.objectContaining({
+      mobile_number: '9123456780',
+      source: 'Website – Liaisoning page',
+      message: 'DTCP approval for a 2-acre layout in Annur',
+      property_id: null,
+      intent: 'enquiry',
+      status: 'open',
+    }));
+    expect(result.eventId).toBe(1);
+  });
+
+  it('still creates the WhatsApp popup lead directly, outside the queue', async () => {
+    await service.createLead({
+      name: 'Meena', mobile: '9123456780', source: 'Website – WhatsApp popup',
+    } as any);
+
+    expect(saved.WebsiteEnquiryEvent).toEqual([]);
+    expect(saved.Lead).toHaveLength(1);
+    expect(saved.Lead[0]).toEqual(expect.objectContaining({ lead_source: 'Website – WhatsApp popup' }));
+  });
+
   it('holds a repeat website enquiry as an open event linked to the matched lead', async () => {
     const existingLead = {
       id: 1, _entityKey: 'Lead',

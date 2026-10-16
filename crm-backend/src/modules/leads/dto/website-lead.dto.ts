@@ -48,6 +48,13 @@ export class WebsiteLeadDto {
   @IsObject()
   preferences?: Record<string, unknown>;
 
+  // What the visitor typed into a general enquiry form (service pages, contact
+  // page). createLead stores it as a note on the lead's follow-up.
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  notes?: string;
+
   // Property link + visit intent forwarded by the public website.
   // Must be declared here or the global whitelist ValidationPipe (main.ts)
   // strips them and the enquiry is saved with no property attached.

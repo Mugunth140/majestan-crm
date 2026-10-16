@@ -26,6 +26,15 @@ export class WebsiteEnquiryEvent {
   @Column({ type: 'varchar', length: 32, nullable: true })
   whatsapp_number: string;
 
+  // Which website form sent it (migration 034). NULL on older rows, which are
+  // all property-page enquiries.
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  source: string | null;
+
+  // What the visitor typed, for forms that have a message field.
+  @Column({ type: 'text', nullable: true })
+  message: string | null;
+
   @Column({ name: 'property_id', type: 'int', unsigned: true, nullable: true })
   property_id: number | null;
 

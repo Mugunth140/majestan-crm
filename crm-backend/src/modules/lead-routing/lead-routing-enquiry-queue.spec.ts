@@ -63,6 +63,26 @@ describe('LeadRoutingService enquiry queue (event-sourced)', () => {
     expect(sql).toContain('mobile_number = e.mobile_number');
   });
 
+  it('returns each event\'s source and message, defaulting older rows to the property page', async () => {
+    queryMock
+      .mockResolvedValueOnce([{ total: 2 }])
+      .mockResolvedValueOnce([
+        { enquiry_id: 41, enquiry_at: '2026-10-17', event_name: 'Meena', mobile_number: '9123456780', matched_lead_id: null, enquiry_source: 'Website – Liaisoning page', message: 'DTCP approval for a layout', repeat_count: '1' },
+        { enquiry_id: 40, enquiry_at: '2026-10-16', event_name: 'Rahul', mobile_number: '9876543210', matched_lead_id: null, property_code: 'AP018', enquiry_source: null, message: null, repeat_count: '1' },
+      ]);
+    const result = await service.getEnquiryQueue(1, 10);
+    expect(result.items[0]).toEqual(expect.objectContaining({ source: 'Website – Liaisoning page', message: 'DTCP approval for a layout' }));
+    expect(result.items[1]).toEqual(expect.objectContaining({ source: 'Website – Property page', message: null }));
+  });
+
+  it('filters by source, counting source-less rows as property-page enquiries', async () => {
+    queryMock.mockResolvedValueOnce([{ total: 0 }]);
+    await service.getEnquiryQueue(1, 10, { source: 'Website – Property page' });
+    const [sql, params] = queryMock.mock.calls[0];
+    expect(sql).toContain('COALESCE(e.source, ?) = ?');
+    expect(params).toEqual(['Website – Property page', 'Website – Property page']);
+  });
+
   it('types unmatched events as New and matched events as Repeat', async () => {
     queryMock
       .mockResolvedValueOnce([{ total: 3 }])

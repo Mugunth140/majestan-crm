@@ -347,4 +347,56 @@ describe('enquiry events: convert/accept/acknowledge', () => {
 
     expect(result).toEqual({ leadId: 1, inquiryId: 1 });
   });
+  // ── General (non-property) website enquiries ─────────────────────────────
+
+  const serviceEvent = (overrides: any = {}) =>
+    openEvent({
+      property_id: null,
+      property_code: null,
+      property_slug: null,
+      property_type: null,
+      source: 'Website – Liaisoning page',
+      message: 'DTCP approval for a 2-acre layout in Annur',
+      ...overrides,
+    });
+
+  it('convert of a service-page enquiry labels the lead with its page and keeps the message as a note', async () => {
+    saved.WebsiteEnquiryEvent.push(serviceEvent());
+
+    await service.convertEvent(1, 10, 'Staff');
+
+    expect(saved.Lead[0]).toEqual(expect.objectContaining({ lead_source: 'Website – Liaisoning page' }));
+    expect(saved.LeadInquiry[0]).toEqual(expect.objectContaining({ property_id: null, intent: 'enquiry' }));
+    expect(saved.LeadFollowUp).toEqual([
+      expect.objectContaining({ lead_id: 1, notes: 'DTCP approval for a 2-acre layout in Annur' }),
+    ]);
+  });
+
+  it('convert of an older event with no source still labels it a property-page lead', async () => {
+    saved.WebsiteEnquiryEvent.push(openEvent({ source: null, message: null }));
+
+    await service.convertEvent(1, 10, 'Staff');
+
+    expect(saved.Lead[0].lead_source).toBe('Website – Property page');
+    expect(saved.LeadFollowUp).toEqual([]);
+  });
+
+  it('accept of a service-page enquiry adds the note and names the page in the notification', async () => {
+    saved.Lead.push({ id: 1, name: 'Priya', mobile_number: '8888888888', status: 'New Lead', department: 'telecalling', assigned_staff_id: 20 });
+    saved.WebsiteEnquiryEvent.push(serviceEvent({ mobile_number: '8888888888', matched_lead_id: 1 }));
+
+    await service.acceptEvent(1, 30, 'Team Lead');
+
+    expect(saved.LeadFollowUp).toEqual([
+      expect.objectContaining({ lead_id: 1, notes: 'DTCP approval for a 2-acre layout in Annur' }),
+    ]);
+    expect(notifyMock).toHaveBeenCalledWith(
+      20,
+      'Website enquiry attached',
+      'Website enquiry from Liaisoning page attached to Lead #1',
+      'lead_enquiry_attached',
+      1,
+      'lead',
+    );
+  });
 });

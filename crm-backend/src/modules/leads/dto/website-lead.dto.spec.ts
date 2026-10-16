@@ -84,6 +84,18 @@ describe('WebsiteLeadDto whitelist', () => {
 
   // Guards the two tests above from passing vacuously: if an undeclared key
   // survived the pipe, "declared fields survive" would prove nothing.
+  it('keeps the message a general enquiry form forwards as notes', async () => {
+    const result = await run({
+      name: 'Priya',
+      mobile: '9876543210',
+      source: 'Website – Liaisoning page',
+      notes: 'DTCP approval for a 2-acre layout in Annur',
+    });
+
+    expect(result.notes).toBe('DTCP approval for a 2-acre layout in Annur');
+    expect(await captureErrors({ name: 'Priya', mobile: '9876543210', notes: 'x'.repeat(2001) })).not.toBeNull();
+  });
+
   it('strips a key the DTO does not declare', async () => {
     const result = await run({
       name: 'Rahul',

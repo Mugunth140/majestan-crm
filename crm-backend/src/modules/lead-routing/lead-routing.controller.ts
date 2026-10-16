@@ -32,6 +32,7 @@ export class LeadRoutingController {
     @Query('limit') limit: string = '25',
     @Query('propertyType') propertyType?: string,
     @Query('intent') intent?: string,
+    @Query('source') source?: string,
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
   ) {
@@ -41,6 +42,7 @@ export class LeadRoutingController {
       {
         propertyType: propertyType || undefined,
         intent: intent || undefined,
+        source: source || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
       },
