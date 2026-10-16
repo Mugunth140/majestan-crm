@@ -198,12 +198,12 @@ const emptyRoomDimension = (): RoomDimensionRow => ({
   dimensions: "",
 });
 
-// Reads a stored "12 × 15 ft" (or "12x15", "12 * 15") back into two numbers,
-// so rows saved before length and width were separate still open filled in.
+// Reads a stored dimension ("12.5′ × 13.2′", "12 × 15 ft", "12x15",
+// "12 * 15") back into two numbers, so older saves still open filled in.
 const parseRoomDimension = (dimensions: unknown): { lengthFt: string; widthFt: string } => {
   const match =
     typeof dimensions === "string"
-      ? dimensions.match(/(\d+(?:\.\d+)?)\s*[x×*]\s*(\d+(?:\.\d+)?)/i)
+      ? dimensions.match(/(\d+(?:\.\d+)?)\s*′?\s*[x×*]\s*(\d+(?:\.\d+)?)\s*′?/i)
       : null;
   return match ? { lengthFt: match[1], widthFt: match[2] } : { lengthFt: "", widthFt: "" };
 };
@@ -225,7 +225,7 @@ const toRoomRow = (
   };
 };
 
-// Mirrors PropertyForm: "12" + "10" → "12 × 10 ft", null when incomplete.
+// Mirrors PropertyForm: "12.5" + "13.2" → "12.5′ × 13.2′ ft", null when incomplete.
 const formatRoomDimension = (
   lengthFt: unknown,
   widthFt: unknown,
@@ -244,7 +244,7 @@ const formatRoomDimension = (
         : NaN;
   if (!Number.isFinite(l) || l <= 0 || !Number.isFinite(w) || w <= 0)
     return null;
-  return `${String(parseFloat(l.toFixed(2)))} × ${String(parseFloat(w.toFixed(2)))} ft`;
+  return `${String(parseFloat(l.toFixed(2)))}′ × ${String(parseFloat(w.toFixed(2)))}′ ft`;
 };
 
 // Plot dimensions round-trip through the unit roomDimensions JSON column as
@@ -1677,7 +1677,7 @@ export function ProjectForm({
                 .filter((r) => r.name.trim() && r.dimensions.trim())
                 // The API only accepts { name, dimensions } (whitelist
                 // validation rejects the lengthFt/widthFt form columns),
-                // so strip them here — dimensions already carries "L × W ft".
+                // so strip them here — dimensions already carries "L′ × W′ ft".
                 .map((r) => ({
                   name: r.name.trim(),
                   dimensions: r.dimensions.trim(),
@@ -3828,7 +3828,7 @@ export function ProjectForm({
                                 <Input
                                   type="number"
                                   min={0}
-                                  step={0.5}
+                                  step="any"
                                   inputMode="decimal"
                                   value={r.lengthFt}
                                   onChange={(e) =>
@@ -3846,7 +3846,7 @@ export function ProjectForm({
                                 <Input
                                   type="number"
                                   min={0}
-                                  step={0.5}
+                                  step="any"
                                   inputMode="decimal"
                                   value={r.widthFt}
                                   onChange={(e) =>
