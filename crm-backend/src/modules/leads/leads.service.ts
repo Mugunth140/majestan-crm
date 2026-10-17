@@ -814,13 +814,18 @@ export class LeadsService {
       roleFilter = `AND l.assigned_staff_id IS NOT NULL`;
     }
 
-    const params: any[] = [];
-    let filterConds = '';
+    // Scope (role/tab/pipeline) also drives the filter-dropdown option lists,
+    // so it is kept apart from the user's own search/filter conditions.
+    const scopeParams: any[] = [];
+    let scopeConds = '';
 
     if (query?.dept) {
-      filterConds += ' AND l.department = ?';
-      params.push(query.dept);
+      scopeConds += ' AND l.department = ?';
+      scopeParams.push(query.dept);
     }
+
+    const params: any[] = [];
+    let filterConds = '';
 
     if (query?.search) {
       const rawSearch = String(query.search).trim();
@@ -902,9 +907,9 @@ export class LeadsService {
     }
 
     if (query?.tab === 'Unqualified') {
-      filterConds += ' AND l.is_unqualified = 1';
+      scopeConds += ' AND l.is_unqualified = 1';
     } else {
-      filterConds += ' AND l.is_unqualified = 0';
+      scopeConds += ' AND l.is_unqualified = 0';
     }
 
     // Action required filters
@@ -914,28 +919,28 @@ export class LeadsService {
        const tomorrow = new Date(Date.now() + 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
        if (query.actionFilter === 'Overdue') {
-         filterConds += ` AND latest_f.next_follow_up_date < '${today}'`;
+         scopeConds += ` AND latest_f.next_follow_up_date < '${today}'`;
        } else if (query.actionFilter === 'Yesterday') {
-         filterConds += ` AND EXISTS (SELECT 1 FROM lead_follow_ups f WHERE f.lead_id = l.id AND DATE(f.follow_up_date) = '${yesterday}')`;
+         scopeConds += ` AND EXISTS (SELECT 1 FROM lead_follow_ups f WHERE f.lead_id = l.id AND DATE(f.follow_up_date) = '${yesterday}')`;
         } else if (query.actionFilter === 'Today') {
           if (query.todayViewMode === 'completed') {
-            filterConds += ` AND EXISTS (SELECT 1 FROM lead_follow_ups f WHERE f.lead_id = l.id AND DATE(f.follow_up_date) = '${today}')`;
-            filterConds += ` AND (latest_f.next_follow_up_date IS NULL OR DATE(latest_f.next_follow_up_date) != '${today}')`;
+            scopeConds += ` AND EXISTS (SELECT 1 FROM lead_follow_ups f WHERE f.lead_id = l.id AND DATE(f.follow_up_date) = '${today}')`;
+            scopeConds += ` AND (latest_f.next_follow_up_date IS NULL OR DATE(latest_f.next_follow_up_date) != '${today}')`;
           } else {
-            filterConds += ` AND DATE(latest_f.next_follow_up_date) = '${today}'`;
+            scopeConds += ` AND DATE(latest_f.next_follow_up_date) = '${today}'`;
           }
        } else if (query.actionFilter === 'Tomorrow') {
-         filterConds += ` AND DATE(latest_f.next_follow_up_date) = '${tomorrow}'`;
+         scopeConds += ` AND DATE(latest_f.next_follow_up_date) = '${tomorrow}'`;
        } else if (query.actionFilter === 'All Scheduled') {
-         filterConds += ` AND DATE(latest_f.next_follow_up_date) > '${tomorrow}'`;
+         scopeConds += ` AND DATE(latest_f.next_follow_up_date) > '${tomorrow}'`;
        }
     }
 
     // Closed leads never queue for action — but an explicit status filter
     // always wins, so staff can still list them on purpose.
     if (!query?.status && (query?.tab === 'Action Required' || query?.actionFilter)) {
-      filterConds += ` AND l.status NOT IN (${NON_QUEUEABLE_LEAD_STATUSES.map(() => '?').join(', ')})`;
-      params.push(...NON_QUEUEABLE_LEAD_STATUSES);
+      scopeConds += ` AND l.status NOT IN (${NON_QUEUEABLE_LEAD_STATUSES.map(() => '?').join(', ')})`;
+      scopeParams.push(...NON_QUEUEABLE_LEAD_STATUSES);
     }
 
     // Because action required relies on follow_up subqueries, we need them in count query as well.
@@ -959,14 +964,37 @@ export class LeadsService {
       ) latest_actual_f ON latest_actual_f.lead_id = l.id AND latest_actual_f.rn = 1
     `;
 
+    // Scope-only WHERE for the option lists: the user's own filters are
+    // deliberately absent so the dropdowns stay stable while filtering.
+    const scopeWhere = `WHERE 1=1 ${roleFilter} ${scopeConds}`;
+    const listWhere = `WHERE 1=1 ${roleFilter} ${scopeConds} ${filterConds}`;
+    const listParams = [...scopeParams, ...params];
+
     const countSql = `
       SELECT COUNT(*) as count 
       FROM leads l 
       ${joinClauses} 
-      WHERE 1=1 ${roleFilter} ${filterConds}
+      ${listWhere}
     `;
 
-    const countResult = await this.dataSource.query(countSql, params);
+    // Distinct values for the filter dropdowns, scoped like the list (role,
+    // tab, pipeline) so no offered value yields an empty result page.
+    const optionsSql = `
+      SELECT 'status' AS kind, l.status AS value FROM leads l ${joinClauses} ${scopeWhere} AND l.status IS NOT NULL AND l.status <> ''
+      UNION ALL
+      SELECT 'source' AS kind, l.lead_source AS value FROM leads l ${joinClauses} ${scopeWhere} AND l.lead_source IS NOT NULL AND l.lead_source <> ''
+      UNION ALL
+      SELECT 'category' AS kind, i.property_category AS value FROM leads l ${joinClauses} ${scopeWhere} AND i.property_category IS NOT NULL AND i.property_category <> ''
+      UNION ALL
+      SELECT 'type' AS kind, i.property_type AS value FROM leads l ${joinClauses} ${scopeWhere} AND i.property_type IS NOT NULL AND i.property_type <> ''
+      UNION ALL
+      SELECT 'staff' AS kind, s.name AS value FROM leads l ${joinClauses} ${scopeWhere} AND s.name IS NOT NULL AND s.name <> ''
+    `;
+
+    const [countResult, optionRows] = await Promise.all([
+      this.dataSource.query(countSql, listParams),
+      this.dataSource.query(optionsSql, [...scopeParams, ...scopeParams, ...scopeParams, ...scopeParams, ...scopeParams]),
+    ]);
     const total = Number(countResult[0]?.count || 0);
 
     const dataSql = `
@@ -992,12 +1020,12 @@ export class LeadsService {
         latest_actual_f.notes as lastFollowedUpNotes
       FROM leads l
       ${joinClauses}
-      WHERE 1=1 ${roleFilter} ${filterConds}
+      ${listWhere}
       ORDER BY l.created_at DESC
       LIMIT ? OFFSET ?
     `;
 
-    const rawLeads = await this.dataSource.query(dataSql, [...params, limit, offset]);
+    const rawLeads = await this.dataSource.query(dataSql, [...listParams, limit, offset]);
 
     const data = rawLeads.map((row: any, index: number) => ({
       sno: offset + index + 1,
@@ -1029,13 +1057,31 @@ export class LeadsService {
       isUnqualified: Boolean(row.isUnqualified),
     }));
 
+    const optionSets = {
+      status: new Set<string>(),
+      source: new Set<string>(),
+      category: new Set<string>(),
+      type: new Set<string>(),
+      staff: new Set<string>(),
+    };
+    for (const row of optionRows) {
+      if (row.value) optionSets[row.kind as keyof typeof optionSets].add(String(row.value));
+    }
+
     return {
       data,
       meta: {
         total,
         page,
         limit,
-        totalPages: Math.ceil(total / limit)
+        totalPages: Math.ceil(total / limit),
+        filterOptions: {
+          statuses: [...optionSets.status].sort(),
+          sources: [...optionSets.source].sort(),
+          categories: [...optionSets.category].sort(),
+          types: [...optionSets.type].sort(),
+          staff: [...optionSets.staff].sort(),
+        },
       }
     };
   }

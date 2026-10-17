@@ -15,6 +15,7 @@ describe('LeadsService', () => {
   beforeEach(async () => {
     queryMock = jest.fn()
       .mockResolvedValueOnce([{ count: 0 }])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
 
     const module: TestingModule = await Test.createTestingModule({
@@ -134,5 +135,46 @@ describe('LeadsService', () => {
     const params = queryMock.mock.calls[0][1];
     expect(countQuery).toContain('l.id = ?');
     expect(params).toContain(25);
+  });
+
+  it('returns filter dropdown options for the whole scope, ignoring the user filters', async () => {
+    queryMock.mockReset();
+    queryMock
+      .mockResolvedValueOnce([{ count: 3 }])
+      .mockResolvedValueOnce([
+        { kind: 'status', value: 'Contacted' },
+        { kind: 'status', value: 'New Lead' },
+        { kind: 'status', value: 'New Lead' },
+        { kind: 'source', value: 'Website' },
+        { kind: 'category', value: 'Residential' },
+        { kind: 'type', value: 'Villa' },
+        { kind: 'staff', value: 'Anita' },
+        { kind: 'status', value: '' },
+      ])
+      .mockResolvedValueOnce([]);
+
+    const result = await service.getLeads(
+      { role: 'Admin', id: 99 },
+      { dept: 'sales', tab: 'Unqualified', status: 'Contacted', staff: 'Anita' },
+    );
+
+    // Second query is the options query; it is scoped (role + tab + pipeline)...
+    const optionsQuery = queryMock.mock.calls[1][0];
+    const optionsParams = queryMock.mock.calls[1][1];
+    expect(optionsQuery).toContain('l.assigned_staff_id IS NOT NULL');
+    expect(optionsQuery).toContain('l.department = ?');
+    expect(optionsQuery).toContain('l.is_unqualified = 1');
+    expect(optionsParams).toEqual(['sales', 'sales', 'sales', 'sales', 'sales']);
+    // ...but not narrowed by the user's own filters.
+    expect(optionsQuery).not.toContain('l.status = ?');
+    expect(optionsQuery).not.toContain('s.name = ?');
+    // Deduped, sorted, empty values dropped.
+    expect(result.meta.filterOptions).toEqual({
+      statuses: ['Contacted', 'New Lead'],
+      sources: ['Website'],
+      categories: ['Residential'],
+      types: ['Villa'],
+      staff: ['Anita'],
+    });
   });
 });

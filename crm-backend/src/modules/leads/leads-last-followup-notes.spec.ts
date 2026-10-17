@@ -17,7 +17,8 @@ describe('LeadsService.getLeads — last follow-up notes', () => {
   let service: LeadsService;
   let queryMock: jest.Mock;
 
-  // The data query is the second query issued: first comes COUNT(*).
+  // The data query is found by content: COUNT(*) and the filter-options query
+  // are issued first.
   const dataSql = () =>
     queryMock.mock.calls.map((c) => c[0] as string).find((sql) => sql.includes('latest_actual_f.follow_up_date as lastFollowedUpDate'));
 
@@ -28,6 +29,7 @@ describe('LeadsService.getLeads — last follow-up notes', () => {
   beforeEach(async () => {
     queryMock = jest.fn()
       .mockResolvedValueOnce([{ count: 0 }])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
 
     const module: TestingModule = await Test.createTestingModule({
@@ -87,6 +89,7 @@ describe('LeadsService.getLeads — last follow-up notes', () => {
     queryMock.mockReset();
     queryMock
       .mockResolvedValueOnce([{ count: 2 }])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         {
           rawId: 1,

@@ -75,6 +75,17 @@ const EMPTY_LEADS_FILTERS = {
   maxBudgetLakh: "",
 };
 
+// Filter-dropdown values for the whole scoped list, delivered by the server
+// with each fetch (see getLeads meta.filterOptions).
+type LeadsFilterOptions = {
+  statuses: string[];
+  sources: string[];
+  categories: string[];
+  types: string[];
+  staff: string[];
+};
+const EMPTY_FILTER_OPTIONS: LeadsFilterOptions = { statuses: [], sources: [], categories: [], types: [], staff: [] };
+
 export default function LeadsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = usePersistedState<string>("leads:tab", "All Leads", { allowed: RESTORABLE_LEADS_TABS });
@@ -239,6 +250,7 @@ export default function LeadsPage() {
   const [searchQuery, setSearchQuery] = usePersistedState("leads:search", "");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [filters, setFilters] = usePersistedState("leads:filters", EMPTY_LEADS_FILTERS);
+  const [filterOptions, setFilterOptions] = useState<LeadsFilterOptions>(EMPTY_FILTER_OPTIONS);
 
   const [todayViewMode, setTodayViewMode] = usePersistedState<"pending" | "completed">("leads:todayViewMode", "pending", { allowed: ["pending", "completed"] });
   const [totalCount, setTotalCount] = useState(0);
@@ -338,6 +350,7 @@ export default function LeadsPage() {
         }
         setLeads(data.data);
         setTotalCount(total);
+        setFilterOptions(data.meta?.filterOptions ?? EMPTY_FILTER_OPTIONS);
       }
     } catch {
       toast.error("Failed to load leads.");
@@ -848,12 +861,6 @@ export default function LeadsPage() {
     }
   };
 
-  const uniqueCategories = Array.from(new Set(leads.map(l => l.propertyCategory).filter(c => c && c !== "—")));
-  const uniqueTypes = Array.from(new Set(leads.map(l => l.propertyType).filter(t => t && t !== "—")));
-  const uniqueStaff = Array.from(new Set(leads.map(l => l.staff).filter(s => s && s !== "Unassigned")));
-  const uniqueStatuses = Array.from(new Set(leads.map(l => l.status).filter(Boolean)));
-  const uniqueSources = Array.from(new Set(leads.map(l => l.source).filter(Boolean)));
-
   const activeFiltersCount = Object.values(filters).filter(v => v !== "").length;
 
   const clearFilters = () => {
@@ -914,23 +921,23 @@ export default function LeadsPage() {
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Status</label>
-                    <FormSelect name="status" options={uniqueStatuses.map(s => ({label: s, value: s}))} value={filters.status} onValueChange={v => updateFilters(f => ({...f, status: v || ""}))} placeholder="All Statuses" />
+                    <FormSelect name="status" options={filterOptions.statuses.map(s => ({label: s, value: s}))} value={filters.status} onValueChange={v => updateFilters(f => ({...f, status: v || ""}))} placeholder="All Statuses" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Staff</label>
-                    <FormSelect name="staff" options={uniqueStaff.map(s => ({label: s, value: s}))} value={filters.staff} onValueChange={v => updateFilters(f => ({...f, staff: v || ""}))} placeholder="All Staff" />
+                    <FormSelect name="staff" options={filterOptions.staff.map(s => ({label: s, value: s}))} value={filters.staff} onValueChange={v => updateFilters(f => ({...f, staff: v || ""}))} placeholder="All Staff" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Lead Source</label>
-                    <FormSelect name="source" options={uniqueSources.map(s => ({label: s, value: s}))} value={filters.source} onValueChange={v => updateFilters(f => ({...f, source: v || ""}))} placeholder="All Sources" />
+                    <FormSelect name="source" options={filterOptions.sources.map(s => ({label: s, value: s}))} value={filters.source} onValueChange={v => updateFilters(f => ({...f, source: v || ""}))} placeholder="All Sources" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Property Category</label>
-                    <FormSelect name="category" options={uniqueCategories.map(s => ({label: s, value: s}))} value={filters.category} onValueChange={v => updateFilters(f => ({...f, category: v || ""}))} placeholder="All Categories" />
+                    <FormSelect name="category" options={filterOptions.categories.map(s => ({label: s, value: s}))} value={filters.category} onValueChange={v => updateFilters(f => ({...f, category: v || ""}))} placeholder="All Categories" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Property Type</label>
-                    <FormSelect name="type" options={uniqueTypes.map(s => ({label: s, value: s}))} value={filters.type} onValueChange={v => updateFilters(f => ({...f, type: v || ""}))} placeholder="All Types" />
+                    <FormSelect name="type" options={filterOptions.types.map(s => ({label: s, value: s}))} value={filters.type} onValueChange={v => updateFilters(f => ({...f, type: v || ""}))} placeholder="All Types" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Priority</label>
