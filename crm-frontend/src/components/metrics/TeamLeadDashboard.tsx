@@ -95,6 +95,7 @@ export function TeamLeadDashboard({ user }: { user: any }) {
   const tlm = summary?.teamLeadMetrics ?? {};
   const busy = loadingSummary || refreshing;
   const best = tlm.bestPerformer as { name?: string; pct?: number } | undefined;
+  const needsAttention = tlm.needsAttention as { name?: string; pct?: number } | undefined;
 
   return (
     <div className="space-y-8 metrics-stagger">
@@ -131,8 +132,8 @@ export function TeamLeadDashboard({ user }: { user: any }) {
           {best ? (
             <MetricCard label="Best Performer" value={`${best.name ?? '--'} (${best.pct ?? '--'}%)`} loading={loadingSummary} />
           ) : null}
-          {tlm.needsAttention ? (
-            <MetricCard label="Needs Attention" value={n(tlm.needsAttention)} loading={loadingSummary} />
+          {needsAttention ? (
+            <MetricCard label="Needs Attention" value={`${needsAttention.name ?? '--'} (${needsAttention.pct ?? '--'}%)`} loading={loadingSummary} />
           ) : null}
           <MetricCard label="Weekly Progress" value={tlm.weeklyAchieved != null || tlm.weeklyTarget != null ? `${n(tlm.weeklyAchieved)} / ${n(tlm.weeklyTarget)}` : '--'} loading={loadingSummary} />
           <MetricCard label="Monthly Progress" value={tlm.monthlyAchieved != null || tlm.monthlyTarget != null ? `${n(tlm.monthlyAchieved)} / ${n(tlm.monthlyTarget)}` : '--'} loading={loadingSummary} />
