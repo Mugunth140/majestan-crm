@@ -141,7 +141,7 @@ export class LeadRoutingService {
       `SELECT e.id AS enquiry_id, e.created_at AS enquiry_at, e.name AS event_name,
               e.mobile_number, e.email, e.property_id, e.property_code, e.property_slug,
               e.property_type, e.intent, e.visit_date, e.visit_slot,
-              e.source AS enquiry_source, e.message,
+              e.source AS enquiry_source, e.message, e.preferences,
               e.matched_lead_id, e.status,
               l.id, l.name, l.mobile_number AS lead_mobile, l.email AS lead_email,
               l.status AS lead_status, l.department, l.lead_source,
@@ -178,9 +178,32 @@ export class LeadRoutingService {
       }
     }
 
+    // Project context lives in the existing preferences JSON and survives
+    // Convert/Attach. Resolve titles separately to avoid property ID collisions.
+    const preferencesById = new Map<number, Record<string, any>>();
+    for (const row of rows) {
+      let preferences = row.preferences;
+      if (typeof preferences === 'string') {
+        try { preferences = JSON.parse(preferences); } catch { preferences = null; }
+      }
+      preferencesById.set(row.enquiry_id, preferences && typeof preferences === 'object' ? preferences : {});
+    }
+    const projectIds = [...new Set([...preferencesById.values()]
+      .map(p => p.projectId).filter(id => Number.isInteger(id) && id > 0))];
+    let projectsById: Record<number, any> = {};
+    if (projectIds.length) {
+      try {
+        const projects = await this.siteDataSource.query(
+          'SELECT id, name AS title FROM projects WHERE id IN (?)', [projectIds],
+        );
+        for (const project of projects) projectsById[project.id] = project;
+      } catch { projectsById = {}; }
+    }
+
     const items = rows.map((r: any) => {
       const repeatCount = Number(r.repeat_count);
       const prop = r.property_id ? propertiesById[r.property_id] : null;
+      const context = preferencesById.get(r.enquiry_id) ?? {};
       const matched = r.matched_lead_id != null;
       return {
         // Matched lead id, or null for unmatched events (frontend uses
@@ -204,8 +227,8 @@ export class LeadRoutingService {
         // Per-event typing: unmatched => New, matched => Repeat.
         type: matched ? 'Repeat' : 'New',
         repeat_count: repeatCount,
-        property_code: r.property_code ?? null,
-        property_title: prop?.title ?? null,
+        property_code: r.property_code ?? context.projectCode ?? null,
+        property_title: prop?.title ?? projectsById[context.projectId]?.title ?? null,
         intent: r.intent ?? 'enquiry',
         visit_date: r.visit_date ?? null,
         // visit_slot is SQL TIME: mysql2 returns 'HH:MM:SS'; the frontend slices it.

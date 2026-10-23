@@ -190,6 +190,24 @@ describe('createLead intent mapping', () => {
     expect(result.eventId).toBe(1);
   });
 
+  it.each(['enquiry', 'site_visit'])('queues a project %s for an existing customer with its project context', async (intent) => {
+    saved.Lead.push({ id: 1, _entityKey: 'Lead', name: 'Buyer', mobile_number: '8888888888' });
+    await service.createLead({
+      name: 'Buyer', mobile: '8888888888', source: 'Website – Project page',
+      projectId: 19, projectCode: 'PA0019', projectSlug: 'premier-aria-square-pa0019',
+      propertyType: 'Apartment', intent,
+      ...(intent === 'site_visit' ? { visitDate: '2026-10-25', visitSlot: '14:00' } : {}),
+    });
+    expect(saved.Lead).toHaveLength(1);
+    expect(saved.LeadInquiry).toEqual([]);
+    expect(saved.WebsiteEnquiryEvent).toEqual([expect.objectContaining({
+      source: 'Website – Project page', status: 'open', matched_lead_id: 1,
+      property_id: null, intent,
+      preferences: { projectId: 19, projectCode: 'PA0019', projectSlug: 'premier-aria-square-pa0019' },
+      visit_date: intent === 'site_visit' ? '2026-10-25' : null,
+    })]);
+  });
+
   it('holds a service-page callback in the queue with its source and message', async () => {
     const result = await service.createLead({
       name: 'Meena', mobile: '9123456780',

@@ -40,6 +40,15 @@ describe('WebsiteLeadDto whitelist', () => {
     expect(result.visitSlot).toBe('11:00');
   });
 
+  it('preserves project identity without converting it to a property identity', async () => {
+    const result = await run({ name: 'Buyer', mobile: '9876543210', source: 'Website – Project page',
+      projectId: 19, projectCode: 'PA0019', projectSlug: 'premier-aria-square-pa0019' });
+    expect(result.projectId).toBe(19);
+    expect(result.projectCode).toBe('PA0019');
+    expect(result.projectSlug).toBe('premier-aria-square-pa0019');
+    expect(result.propertyId).toBeUndefined();
+  });
+
   it('still enforces the declared constraints on those fields', async () => {
     const errors = await captureErrors({
       name: 'R',

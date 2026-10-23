@@ -75,6 +75,22 @@ export class WebsiteLeadDto {
   @MaxLength(512)
   propertySlug?: string;
 
+  // Projects use their own identity; never treat a project ID as a property ID.
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  projectId?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  projectCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(512)
+  projectSlug?: string;
+
   @IsOptional()
   @IsIn(['enquiry', 'site_visit'])
   intent?: string;

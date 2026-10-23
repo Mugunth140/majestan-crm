@@ -7,10 +7,12 @@
  * The WhatsApp popup is deliberately not here: it still creates a lead
  * directly.
  */
+export const PROJECT_PAGE_SOURCE = 'Website – Project page';
 export const PROPERTY_PAGE_SOURCE = 'Website – Property page';
 
 export const QUEUED_WEBSITE_SOURCES: ReadonlySet<string> = new Set([
   PROPERTY_PAGE_SOURCE,
+  PROJECT_PAGE_SOURCE,
   'Website – Liaisoning page',
   'Website – Property Management page',
   'Website – Brokerage page',

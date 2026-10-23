@@ -667,7 +667,12 @@ export class LeadsService {
           intent: normalised.intent ?? 'enquiry',
           visit_date: normalised.visitDate ?? null,
           visit_slot: normalised.visitSlot ?? null,
-          preferences: normalised.preferences || null,
+          preferences: normalised.projectId ? {
+            ...normalised.preferences,
+            projectId: normalised.projectId,
+            projectCode: normalised.projectCode ?? null,
+            projectSlug: normalised.projectSlug ?? null,
+          } : normalised.preferences || null,
           matched_lead_id: matchedLead ? matchedLead.id : null,
           status: 'open',
         });

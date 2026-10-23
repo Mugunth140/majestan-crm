@@ -36,6 +36,21 @@ describe('LeadRoutingService enquiry queue (event-sourced)', () => {
     service = module.get<LeadRoutingService>(LeadRoutingService);
   });
 
+  it('shows project context and visit details without looking up a property with the same ID', async () => {
+    queryMock.mockResolvedValueOnce([{ total: 1 }]).mockResolvedValueOnce([{
+      enquiry_id: 90, property_id: null, enquiry_source: 'Website – Project page',
+      preferences: JSON.stringify({ projectId: 19, projectCode: 'PA0019' }),
+      intent: 'site_visit', visit_date: '2026-10-25', visit_slot: '14:00:00',
+    }]);
+    siteQueryMock.mockResolvedValue([{ id: 19, title: 'Premier Aria Square' }]);
+    const result = await service.getEnquiryQueue(1, 20);
+    expect(siteQueryMock).toHaveBeenCalledTimes(1);
+    expect(siteQueryMock).toHaveBeenCalledWith(expect.stringContaining('FROM projects'), [[19]]);
+    expect(result.items[0]).toMatchObject({ property_title: 'Premier Aria Square',
+      property_code: 'PA0019', source: 'Website – Project page', intent: 'site_visit',
+      visit_date: '2026-10-25', visit_slot: '14:00:00' });
+  });
+
   it('returns one row per open event, newest first', async () => {
     queryMock
       .mockResolvedValueOnce([{ total: 2 }])
