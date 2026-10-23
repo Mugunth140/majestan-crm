@@ -328,6 +328,9 @@ export class LeadRoutingService {
     const leadRepo = this.dataSource.getRepository(Lead);
     const lead = await leadRepo.findOne({ where: { id: leadId } });
     if (!lead) throw new NotFoundException('Lead not found');
+    // The status PUT already performs the transfer; an old tab's follow-up
+    // POST arrives after the lead is in sales and must be a no-op, not a 400.
+    if (lead.department === 'sales') return;
     if (lead.department !== 'telecalling') {
       throw new BadRequestException('Lead is not in the telecalling department');
     }
