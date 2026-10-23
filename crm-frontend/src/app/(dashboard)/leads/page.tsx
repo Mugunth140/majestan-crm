@@ -1,6 +1,7 @@
 "use client";
 
 import { apiFetch, apiJson } from "@/lib/api-fetch";
+import { normalizeDepartment } from "@/lib/department";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { DataTable } from "@/components/tables/data-table";
@@ -280,13 +281,13 @@ export default function LeadsPage() {
       try {
         const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
         const roleName = user?.role?.name || user?.role || "";
-        const deptName = (user?.department?.name || user?.department || "").toLowerCase();
+        const deptName = normalizeDepartment(user?.department?.name || user?.department);
         setRole(roleName);
         setUserDept(deptName);
         setUserId(user?.id || null);
         // Staff see only their dept
         if (roleName === "Staff") {
-          setDeptFilter(deptName === "sales" ? "sales" : "telecalling");
+          setDeptFilter(deptName);
         }
       } catch {
         // ignore
@@ -875,7 +876,7 @@ export default function LeadsPage() {
 
   // Staff only see their own dept tab
   const visiblePipelines = role === "Staff"
-    ? deptPipelines.filter((d) => d.value === (userDept === "sales" ? "sales" : "telecalling"))
+    ? deptPipelines.filter((d) => d.value === (userDept || "telecalling"))
     : deptPipelines;
 
 

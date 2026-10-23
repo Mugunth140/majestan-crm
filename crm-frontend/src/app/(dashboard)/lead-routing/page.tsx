@@ -1,6 +1,7 @@
 "use client";
 
 import { apiFetch } from "@/lib/api-fetch";
+import { normalizeDepartment } from "@/lib/department";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -328,12 +329,12 @@ export default function LeadRoutingPage() {
       try {
         const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
         const roleName = user?.role?.name || user?.role || "";
-        const deptName = (user?.department?.name || user?.department || "").toLowerCase();
+        const deptName = normalizeDepartment(user?.department?.name || user?.department);
         if (user?.id != null) setCurrentUserId(Number(user.id));
         setRole(roleName);
         setUserDept(deptName);
         if (roleName === "Staff") {
-          setDeptTab(deptName === "sales" ? "sales" : "telecalling");
+          setDeptTab(deptName);
         }
       } catch {
         // ignore
@@ -1039,7 +1040,7 @@ export default function LeadRoutingPage() {
   ];
 
   const visibleDeptTabs = role === "Staff"
-    ? deptTabs.filter((d) => d.value === (userDept === "sales" ? "sales" : "telecalling"))
+    ? deptTabs.filter((d) => d.value === (userDept || "telecalling"))
     : deptTabs;
 
   const totalQueuePages = Math.max(1, Math.ceil(queueTotal / LIMIT));

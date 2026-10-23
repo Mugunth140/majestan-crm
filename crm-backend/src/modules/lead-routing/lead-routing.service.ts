@@ -357,7 +357,7 @@ export class LeadRoutingService {
       .createQueryBuilder('u')
       .leftJoinAndSelect('u.department', 'dept')
       .leftJoinAndSelect('u.role', 'role')
-      .where('dept.name = :deptName', { deptName: 'Sales' })
+      .where('LOWER(dept.name) LIKE :deptName', { deptName: '%sales%' })
       .andWhere('u.is_active = 1')
       .getMany();
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { apiFetch } from "@/lib/api-fetch";
+import { normalizeDepartment } from "@/lib/department";
 import { recordNotInterested } from "@/lib/not-interested";
 import { NotInterestedDialog } from "./not-interested-dialog";
 
@@ -238,7 +239,7 @@ function LeadDetail() {
       try {
         const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
         setRole(user?.role?.name || user?.role || "");
-        setUserDept((user?.department?.name || user?.department || "").toLowerCase());
+        setUserDept(normalizeDepartment(user?.department?.name || user?.department));
         setUserDeptId(
           typeof user?.department_id === "number"
             ? user.department_id
