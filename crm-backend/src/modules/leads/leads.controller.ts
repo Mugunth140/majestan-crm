@@ -75,9 +75,13 @@ export class LeadsController {
   }
 
   @Put(':id/status')
-  async updateLeadStatus(@Param('id') id: string, @Body() body: UpdateLeadStatusDto) {
-    const data = await this.leadsService.updateLeadStatus(Number(id), body);
-    return { success: true, data };
+  async updateLeadStatus(@Param('id') id: string, @Body() body: UpdateLeadStatusDto, @Request() req: any) {
+    const { lead, transferredToSales } = await this.leadsService.updateLeadStatus(
+      Number(id),
+      body,
+      req.user?.id ?? null,
+    );
+    return { success: true, data: lead, transferredToSales };
   }
 
   @Get(':id/auto-match')

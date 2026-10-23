@@ -50,6 +50,39 @@ describe('LeadsService', () => {
     expect(countQuery).toContain('l.assigned_staff_id IS NOT NULL');
   });
 
+  it('scopes a Team Lead to their lead pipeline, not their staff', async () => {
+    await service.getLeads(
+      { role: 'Team Lead', id: 42, department_id: 2, department: 'Sales' },
+      { dept: 'sales' },
+    );
+
+    const countQuery = queryMock.mock.calls[0][0];
+    expect(countQuery).toContain("l.department = 'sales'");
+    expect(countQuery).toContain('l.assigned_staff_id IS NOT NULL');
+    expect(countQuery).not.toContain('department_id = 2');
+  });
+
+  it('keeps the owner-department scope for a Team Lead outside the lead pipelines', async () => {
+    await service.getLeads(
+      { role: 'Team Lead', id: 42, department_id: 5, department: 'HR' },
+      {},
+    );
+
+    const countQuery = queryMock.mock.calls[0][0];
+    expect(countQuery).toContain('department_id = 5');
+    expect(countQuery).not.toContain("l.department = 'sales'");
+  });
+
+  it('falls back to the owner-department scope when the token has no department name', async () => {
+    await service.getLeads(
+      { role: 'Team Lead', id: 42, department_id: 2 },
+      {},
+    );
+
+    const countQuery = queryMock.mock.calls[0][0];
+    expect(countQuery).toContain('department_id = 2');
+  });
+
   it('should filter by latest follow-up priority', async () => {
     await service.getLeads({ role: 'Admin', id: 99 }, { priority: 'High' });
 

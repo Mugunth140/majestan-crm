@@ -9,7 +9,8 @@ import { ContactLog } from '../../database/entities/contact-log.entity';
 import { User } from '../../database/entities/user.entity';
 import { LeadDocument } from '../../database/entities/lead-document.entity';
 import { WebsiteEnquiryEvent } from '../../database/entities/website-enquiry-event.entity';
-import { NON_QUEUEABLE_LEAD_STATUSES } from './lead-statuses';
+import { NON_QUEUEABLE_LEAD_STATUSES, SALES_PIPELINE_STATUSES } from './lead-statuses';
+import { transferLeadToSales } from '../lead-routing/transfer-to-sales';
 import { NotificationsService } from '../notifications/notifications.service';
 import { TasksService } from '../tasks/tasks.service';
 import { S3Client } from 'bun';
@@ -267,7 +268,11 @@ export class LeadsService {
     });
   }
 
-  async updateLeadStatus(id: number, body: { status_name?: string; is_unqualified?: boolean; drop_reason?: string }) {
+  async updateLeadStatus(
+    id: number,
+    body: { status_name?: string; is_unqualified?: boolean; drop_reason?: string },
+    actionedById: number | null = null,
+  ) {
     const leadRepo = this.dataSource.getRepository(Lead);
     const existingLead = await leadRepo.findOne({ where: { id } });
     if (!existingLead) throw new NotFoundException('Lead not found');
@@ -284,16 +289,35 @@ export class LeadsService {
       existingLead.drop_reason = body.drop_reason || null;
     }
 
-    const saved = await leadRepo.save(existingLead);
+    // A telecalling lead at or past the site visit belongs to Sales, even when
+    // the "Site Visit Completed" status itself was skipped.
+    const entersSales =
+      !!body.status_name &&
+      existingLead.department !== 'sales' &&
+      SALES_PIPELINE_STATUSES.includes(body.status_name);
+
+    // Snapshot before the department changes, so the metric still credits the
+    // pipeline that did the work.
+    const metricLead = { ...existingLead };
+
+    const saved = entersSales
+      ? await transferLeadToSales(
+          this.dataSource,
+          this.notificationsService,
+          existingLead,
+          actionedById,
+          `Auto-transferred: status set to ${body.status_name}`,
+        )
+      : await leadRepo.save(existingLead);
 
     // Auto-increment task metrics based on new lead status
-    if (body.status_name && existingLead.assigned_staff_id) {
-      this.tasksService.autoIncrementFromLeadStatus(saved, body.status_name).catch(err => {
+    if (body.status_name && metricLead.assigned_staff_id) {
+      this.tasksService.autoIncrementFromLeadStatus(metricLead, body.status_name).catch(err => {
         console.error('Task auto-increment error (non-fatal):', err?.message);
       });
     }
 
-    return saved;
+    return { lead: saved, transferredToSales: entersSales };
   }
 
   async updateLead(id: number, body: any) {
@@ -809,7 +833,16 @@ export class LeadsService {
     if (user && user.role === 'Staff') {
       roleFilter = `AND l.assigned_staff_id = ${Number(user.id)}`;
     } else if (user && user.role === 'Team Lead') {
-      roleFilter = `AND l.assigned_staff_id IN (SELECT id FROM users WHERE department_id = ${Number(user.department_id)})`;
+      // A Team Lead owns a pipeline, not a staff list: a lead moved to Sales
+      // keeps its old owner, so filtering by the owner's department would hide
+      // it from Sales. Unknown departments keep the old owner-based scope.
+      const deptName = String(user.department ?? '');
+      const leadDept = /sales/i.test(deptName) ? 'sales'
+        : /telecalling/i.test(deptName) ? 'telecalling'
+        : null;
+      roleFilter = leadDept
+        ? `AND l.department = '${leadDept}' AND l.assigned_staff_id IS NOT NULL`
+        : `AND l.assigned_staff_id IN (SELECT id FROM users WHERE department_id = ${Number(user.department_id)})`;
     } else {
       roleFilter = `AND l.assigned_staff_id IS NOT NULL`;
     }

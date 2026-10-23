@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeDepartment } from './department';
+import { normalizeDepartment, pipelineOf } from './department';
 
 describe('normalizeDepartment', () => {
   it('maps the seeded Sales department name to the sales pipeline', () => {
@@ -17,5 +17,21 @@ describe('normalizeDepartment', () => {
     expect(normalizeDepartment('')).toBe('telecalling');
     expect(normalizeDepartment(null)).toBe('telecalling');
     expect(normalizeDepartment(undefined)).toBe('telecalling');
+  });
+});
+
+describe('pipelineOf', () => {
+  it('maps the two lead departments', () => {
+    expect(pipelineOf('Sales')).toBe('sales');
+    expect(pipelineOf('Sales Department')).toBe('sales');
+    expect(pipelineOf('Telecalling')).toBe('telecalling');
+    expect(pipelineOf('Telecalling Department')).toBe('telecalling');
+  });
+
+  it('returns null for departments without a lead pipeline', () => {
+    expect(pipelineOf('HR')).toBeNull();
+    expect(pipelineOf('Management')).toBeNull();
+    expect(pipelineOf(null)).toBeNull();
+    expect(pipelineOf(undefined)).toBeNull();
   });
 });

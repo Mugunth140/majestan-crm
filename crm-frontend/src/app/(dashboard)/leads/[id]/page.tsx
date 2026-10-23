@@ -1,7 +1,7 @@
 "use client";
 
 import { apiFetch } from "@/lib/api-fetch";
-import { normalizeDepartment } from "@/lib/department";
+import { normalizeDepartment, pipelineOf } from "@/lib/department";
 import { recordNotInterested } from "@/lib/not-interested";
 import { NotInterestedDialog } from "./not-interested-dialog";
 
@@ -213,7 +213,7 @@ function LeadDetail() {
   // Convert Lead state
   const [role, setRole] = useState<string>("");
   const [userDept, setUserDept] = useState<string>("");
-  const [userDeptId, setUserDeptId] = useState<number | null>(null);
+  const [userDeptName, setUserDeptName] = useState<string>("");
   const [currentUserId, setCurrentUserId] = useState<number>(0);
   const [isConvertOpen, setIsConvertOpen] = useState(false);
   const [convertTo, setConvertTo] = useState<"inbound" | "agent" | "">("");
@@ -238,15 +238,10 @@ function LeadDetail() {
     if (typeof window !== "undefined") {
       try {
         const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
+        const deptName = user?.department?.name || user?.department || "";
         setRole(user?.role?.name || user?.role || "");
-        setUserDept(normalizeDepartment(user?.department?.name || user?.department));
-        setUserDeptId(
-          typeof user?.department_id === "number"
-            ? user.department_id
-            : typeof user?.department?.id === "number"
-              ? user.department.id
-              : null
-        );
+        setUserDept(normalizeDepartment(deptName));
+        setUserDeptName(typeof deptName === "string" ? deptName : "");
         setCurrentUserId(user?.id || 0);
       } catch {
         // ignore
@@ -506,16 +501,14 @@ function LeadDetail() {
   const nextRnrValue = `rnr${nextRnrNumber}`;
   const isRnrMaxed = highestRnr >= 5;
 
-  // Department purview for Manager / Team Lead: unassigned leads, or leads
-  // assigned to staff in their own department (mirrors the staff-list
-  // picker scope). Works for telecalling and sales alike.
-  const assigneeDeptId =
-    typeof (lead?.assigned_staff as any)?.department_id === "number"
-      ? (lead?.assigned_staff as any).department_id
-      : null;
+  // Department purview for Manager / Team Lead: unassigned leads, or leads in
+  // the user's own pipeline. The owner's department is not used: a lead moved
+  // to Sales keeps its old owner until a Sales Team Lead reassigns it.
+  const userLeadDept = pipelineOf(userDeptName);
+  const leadPipeline = String(lead?.department || "").toLowerCase();
   const inDeptPurview =
     lead?.assigned_staff == null ||
-    (userDeptId != null && assigneeDeptId === userDeptId);
+    (userLeadDept != null && leadPipeline === userLeadDept);
 
   // Access model: Admin and Manager share everything except delete
   // (delete stays Admin-only). Team Leads are scoped to their department.
@@ -730,26 +723,7 @@ function LeadDetail() {
                           });
                           const data = await res.json();
                           if (data.success) {
-                            toast.success("Lead status updated.");
-                            
-                            // Auto-route to Sales if telecalling staff marks it as Site Visit Completed
-                            if (v === "Site Visit Completed" && lead.department === "telecalling") {
-                              const routeRes = await apiFetch(`${API_URL}/lead-routing/site-visit-complete/${id}`, {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ 
-                                  feedback: "Auto-transferred to Sales upon Site Visit completion",
-                                  actioned_by_id: currentUserId 
-                                })
-                              });
-                              if (routeRes.ok) {
-                                toast.success("Lead transferred to Sales Queue.");
-                              } else {
-                                const errorData = await routeRes.json();
-                                toast.error(errorData.message || "Failed to route to sales queue");
-                              }
-                            }
-                            
+                            toast.success(data.transferredToSales ? "Lead moved to the Sales pipeline." : "Lead status updated.");
                             fetchLead(true);
                           } else toast.error("Failed to update status");
                         } catch {

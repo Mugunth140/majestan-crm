@@ -10,6 +10,7 @@ import { WebsiteEnquiryEvent } from '../../database/entities/website-enquiry-eve
 import { NotificationsService } from '../notifications/notifications.service';
 import { NON_QUEUEABLE_LEAD_STATUSES } from '../leads/lead-statuses';
 import { PROPERTY_PAGE_SOURCE } from '../leads/website-sources';
+import { transferLeadToSales } from './transfer-to-sales';
 
 @Injectable()
 export class LeadRoutingService {
@@ -334,47 +335,13 @@ export class LeadRoutingService {
       throw new BadRequestException('Lead status must be "Site Visit Completed"');
     }
 
-    const prevAssignedId = lead.assigned_staff_id;
-
-    lead.department = 'sales';
-    lead.assigned_staff_id = null as unknown as number;
-    await leadRepo.save(lead);
-
-    const rh = this.dataSource.getRepository(RoutingHistory).create({
-      lead_id: leadId,
-      event_type: 'Auto-transferred',
-      from_user_id: prevAssignedId ?? null,
-      to_user_id: null,
-      actioned_by_id: requestingUserId,
+    await transferLeadToSales(
+      this.dataSource,
+      this.notificationsService,
+      lead,
+      requestingUserId,
       feedback,
-      department: 'sales',
-    });
-    await this.dataSource.getRepository(RoutingHistory).save(rh);
-
-    // Notify all Sales department users + their team leads
-    const salesDeptUsers = await this.dataSource
-      .getRepository(User)
-      .createQueryBuilder('u')
-      .leftJoinAndSelect('u.department', 'dept')
-      .leftJoinAndSelect('u.role', 'role')
-      .where('LOWER(dept.name) LIKE :deptName', { deptName: '%sales%' })
-      .andWhere('u.is_active = 1')
-      .getMany();
-
-    const salesTeamLeadIds = new Set<number>();
-    for (const u of salesDeptUsers) {
-      await this.notificationsService.createNotification(
-        u.id,
-        'New Lead in Sales Queue',
-        `Lead #${leadId} has been transferred to Sales — Site Visit Completed`,
-        'lead_transferred',
-        leadId,
-        'lead',
-      );
-      if ((u as any).role?.name === 'Team Lead') {
-        salesTeamLeadIds.add(u.id);
-      }
-    }
+    );
   }
 
   // ── RNR5 Release ───────────────────────────────────────────────────────────
