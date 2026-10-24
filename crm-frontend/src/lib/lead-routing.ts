@@ -1,8 +1,14 @@
 // lead-routing.ts
 const SELF_CLAIM_ROLES = ['Staff', 'Team Lead', 'Manager'];
+const CONVERT_ROLES   = ['Staff', 'Team Lead', 'Manager', 'Admin'];
 
 export function canTakeLeadFromQueue(role: string | null | undefined): boolean {
   return !!role && SELF_CLAIM_ROLES.includes(role);
+}
+
+// Admins can convert enquiries to leads but cannot self-claim from the queue.
+export function canConvertEnquiry(role: string | null | undefined): boolean {
+  return !!role && CONVERT_ROLES.includes(role);
 }
 
 export interface BulkAssignResult {

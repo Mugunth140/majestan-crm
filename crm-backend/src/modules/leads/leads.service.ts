@@ -630,7 +630,7 @@ export class LeadsService {
   }
 
   async createLead(body: any): Promise<CreateLeadResult> {    // Normalise: frontend sends 'mobile', legacy DTO used 'mobile_number'
-    const mobile = (body.mobile ?? body.mobile_number ?? '').toString().trim();
+    const mobile = this.normalizeMobileForCheck(body.mobile ?? body.mobile_number ?? '');
     if (!mobile) {
       throw new BadRequestException('mobile is required');
     }

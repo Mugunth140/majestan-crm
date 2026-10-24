@@ -1438,20 +1438,9 @@ export default function LeadsPage() {
                   <h3 className="text-lg font-bold text-foreground mb-2">No Imported Leads</h3>
                 </div>
               ) : (
-                <MobileLeadList
-                  leads={displayedLeads}
-                  isLoading={isLoading}
-                  onCardClick={(lead) => { if (!lead.isPendingImport) router.push("/leads/" + lead.rawId); }}
-                  onCall={(lead) => openMobileContact("call", lead)}
-                  onWhatsApp={(lead) => openMobileContact("whatsapp", lead)}
-                  existingByMobile={isReviewingImports ? existingByMobile : undefined}
-                  onRemovePending={isReviewingImports ? removePendingRow : undefined}
-                  pendingAssignments={isReviewingImports ? pendingAssignments : undefined}
-                  onAssignPending={isReviewingImports && role !== "Staff" ? (rawId) => {
-                    setPendingAssignTargets([rawId]);
-                    setIsPendingAssignOpen(true);
-                  } : undefined}
-                />
+                <div className="w-full overflow-x-auto">
+                  {isLoading ? <TableSkeleton /> : <DataTable key={isReviewingImports ? `review-${reviewEpoch}` : "leads"} {...tableProps} />}
+                </div>
               )}
             </div>
           }

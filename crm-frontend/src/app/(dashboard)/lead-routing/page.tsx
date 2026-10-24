@@ -21,7 +21,7 @@ import { FormSelect } from "@/components/shared/form-select";
 import { DatePicker } from "@/components/shared/date-picker";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { Device } from "@/components/shared/device";
-import { canTakeLeadFromQueue, assignRoutingLeads } from "@/lib/lead-routing";
+import { canTakeLeadFromQueue, canConvertEnquiry, assignRoutingLeads } from "@/lib/lead-routing";
 import { timeAgo } from "@/lib/time-ago";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
@@ -923,7 +923,7 @@ export default function LeadRoutingPage() {
         return (
           <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             {ev.id == null ? (
-              canTakeLeadFromQueue(role) ? (
+              canConvertEnquiry(role) ? (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1351,7 +1351,7 @@ export default function LeadRoutingPage() {
                     return (
                       <>
                         <span className="text-sm text-muted-foreground">{selectedRows.length} selected</span>
-                        {canTakeLeadFromQueue(role) && (
+                        {canConvertEnquiry(role) && (
                           <Button
                             variant="outline"
                             size="sm"

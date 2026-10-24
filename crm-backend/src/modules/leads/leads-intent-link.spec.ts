@@ -290,4 +290,22 @@ describe('createLead intent mapping', () => {
       status: 'open',
     }));
   });
+
+  it('normalises a formatted +91 mobile before storing a new manual lead', async () => {
+    await service.createLead({ name: 'Rahul', mobile: '+91 98765 43210', source: 'Manual' } as any);
+    expect(saved.Lead).toHaveLength(1);
+    expect(saved.Lead[0].mobile_number).toBe('9876543210');
+  });
+
+  it('matches a queued website enquiry to a lead created with a formatted mobile', async () => {
+    // Lead stored with +91-formatted mobile normalises to 9876543210.
+    await service.createLead({ name: 'Rahul', mobile: '+91 98765 43210', source: 'Manual' } as any);
+    // Website event comes in with the same 10-digit mobile — should match the lead.
+    await service.createLead({
+      name: 'Rahul', mobile: '9876543210', source: 'Website – Contact page',
+    } as any);
+    expect(saved.Lead).toHaveLength(1);
+    expect(saved.WebsiteEnquiryEvent).toHaveLength(1);
+    expect(saved.WebsiteEnquiryEvent[0].matched_lead_id).toBe(1);
+  });
 });
