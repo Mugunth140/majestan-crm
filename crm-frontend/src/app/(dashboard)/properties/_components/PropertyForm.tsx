@@ -1,5 +1,7 @@
 "use client";
 
+import { propertyStatusValue } from "@/lib/property-status";
+
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -366,7 +368,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
     d?.listingType === "Rent" ? "Rent" : "Buy"
   );
   const [propertyType, setPropertyType] = useState(d?.propertyType ?? "");
-  const [status, setStatus] = useState(d?.status ?? "available");
+  const [status, setStatus] = useState(propertyStatusValue(d?.status, d?.approvalStatus));
   const [availableFrom, setAvailableFrom] = useState(d?.availableFrom ? new Date(d.availableFrom).toISOString().split('T')[0] : "");
   const [availableUntil, setAvailableUntil] = useState(d?.availableUntil ? new Date(d.availableUntil).toISOString().split('T')[0] : "");
   const [propertyCondition, setPropertyCondition] = useState(d?.propertyCondition ?? "");
@@ -2038,7 +2040,8 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   { label: "Available", value: "available" },
                   { label: "Sold", value: "sold" },
                   { label: "Rented", value: "rented" },
-                  { label: "Unavailable", value: "unavailable" },
+                  { label: "Archived", value: "archived" },
+                  ...(status === "unavailable" ? [{label: "Pending review", value: "unavailable"}] : []),
                 ]}
                 value={status || null}
                 onValueChange={setStatus}

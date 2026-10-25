@@ -717,7 +717,7 @@ export class PropertiesService {
       throw new BadRequestException(`Cannot toggle visibility for ${s} properties`);
     }
     const isLive = s === 'available' && existing.approvalStatus === 'Approved';
-    const newStatus = isLive ? 'unavailable' : 'available';
+    const newStatus = isLive ? 'archived' : 'available';
     await this.siteApi.patch(
       `/admin/properties/${existing.propertyType}/${id}/status`,
       { status: newStatus },

@@ -78,7 +78,7 @@ export class CreatePropertyDto {
   description?: string;
 
   @IsOptional() @IsString()
-  status?: 'available' | 'sold' | 'rented' | 'unavailable';
+  status?: 'available' | 'sold' | 'rented' | 'archived' | 'unavailable';
 
   @IsOptional() @IsBoolean()
   negotiable?: boolean;

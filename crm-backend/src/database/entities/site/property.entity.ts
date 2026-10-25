@@ -29,6 +29,7 @@ export enum PropertyStatus {
   SOLD = 'sold',
   RENTED = 'rented',
   UNAVAILABLE = 'unavailable',
+  ARCHIVED = 'archived',
 }
 
 @Entity('properties')

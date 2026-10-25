@@ -1,5 +1,7 @@
 "use client";
 
+import { propertyStatusLabel } from "@/lib/property-status";
+
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -39,7 +41,7 @@ const PROPERTY_TYPE_OPTIONS = [
 
 const STATUS_STYLES: Record<string, string> = {
   available: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
-  unavailable: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400",
+  archived: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400",
   sold: "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400",
   rented: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
 };
@@ -247,7 +249,7 @@ export default function PropertiesPage() {
       cell: ({ row }) => {
         const s = (row.original.status || "").toLowerCase();
         const cls = STATUS_STYLES[s] ?? "bg-gray-100 text-gray-800 border-gray-200";
-        return <Badge className={"font-medium shadow-sm border whitespace-nowrap capitalize " + cls}>{s || "-"}</Badge>;
+        return <Badge className={"font-medium shadow-sm border whitespace-nowrap capitalize " + cls}>{propertyStatusLabel(row.original.status, row.original.approvalStatus)}</Badge>;
       },
     },
     {

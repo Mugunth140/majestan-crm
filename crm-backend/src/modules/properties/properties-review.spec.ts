@@ -39,7 +39,7 @@ describe('owner property review workflow', () => {
 
   it('unpublishes approved available listings and returns pending owner listings to review on revocation', async () => {
     const { service, siteApi } = make({ approvalStatus: 'Approved' });
-    expect(await service.toggleVisibility(7)).toMatchObject({ status: 'unavailable', approvalStatus: 'Approved' });
+    expect(await service.toggleVisibility(7)).toMatchObject({ status: 'archived', approvalStatus: 'Approved' });
     await service.setApprovalStatus(7, 'Pending');
     expect(siteApi.patch).toHaveBeenLastCalledWith('/admin/properties/plot/7', { approvalStatus: 'Pending' });
   });

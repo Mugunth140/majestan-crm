@@ -1,5 +1,7 @@
 "use client";
 
+import { propertyStatusLabel } from "@/lib/property-status";
+
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -97,7 +99,7 @@ function formatDate(v: any): string | undefined {
 
 const STATUS_BADGE: Record<string, string> = {
   available: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
-  unavailable: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400",
+  archived: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400",
   sold: "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400",
   rented: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
 };
@@ -221,8 +223,8 @@ export default function PropertyViewPage() {
             <h1 className="text-2xl font-bold tracking-tight text-foreground">
               {property.title || `Property #${property.id}`}
             </h1>
-            <Badge className={`capitalize ${STATUS_BADGE[statusKey] ?? STATUS_BADGE["unavailable"]}`}>
-              {property.status}
+            <Badge className={`capitalize ${STATUS_BADGE[statusKey] ?? STATUS_BADGE["archived"]}`}>
+              {propertyStatusLabel(property.status, property.approvalStatus)}
             </Badge>
           </div>
         </div>
@@ -253,7 +255,7 @@ export default function PropertyViewPage() {
       {/* ── Mobile Summary Strip ── */}
       <div className="md:hidden flex flex-col gap-3 px-4 pb-4">
         <div className="flex items-center gap-2 flex-wrap">
-          <Badge className={`capitalize ${STATUS_BADGE[statusKey] ?? STATUS_BADGE["unavailable"]}`}>{property.status}</Badge>
+          <Badge className={`capitalize ${STATUS_BADGE[statusKey] ?? STATUS_BADGE["archived"]}`}>{propertyStatusLabel(property.status, property.approvalStatus)}</Badge>
           <span className="text-sm font-semibold text-muted-foreground">{formatPrice(Number(property.price))}</span>
         </div>
         {canApprove && !isTerminalStatus && (
@@ -285,7 +287,7 @@ export default function PropertyViewPage() {
             <SectionField label="Legacy Source Id" value={property.legacySourceId} />
             <SectionField label="Property Type" value={formatPropertyType(property.propertyType)} />
             <SectionField label="Listing Type" value={property.listingType === "Sell" ? "Buy" : property.listingType} />
-            <SectionField label="Status" value={property.status} />
+            <SectionField label="Status" value={propertyStatusLabel(property.status, property.approvalStatus)} />
             <SectionField label="Price" value={formatPrice(Number(property.price))} />
             <SectionField label="Negotiable" value={bool(property.negotiable)} />
             {!isPlotLike && (<>
