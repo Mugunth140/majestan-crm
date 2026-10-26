@@ -1,3 +1,4 @@
+export const MANAGE_BLOG = 'blog.manage';
 export const VIEW_PROPERTY_CONTACTS = 'properties.view_contacts';
 export const INBOUND_CALL_TRACKING = 'inbounds.call_tracking';
 

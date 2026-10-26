@@ -4,8 +4,9 @@ import { useRouter } from "next/navigation";
 import { 
   User, Building2, Layers, Users, TrendingUp, Route, 
   Inbox, Network, Briefcase, Package, UserPen, Target, 
-  Activity, Settings, Database, Contact, Home
+  Activity, Settings, Database, Contact, Home, BookOpen
 } from "lucide-react";
+import { can } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-fetch";
 
@@ -76,6 +77,7 @@ export default function DashboardPage() {
             </MenuSection>
 
             <MenuSection title="Inventory & Projects">
+              {can("blog.manage", user) && <MenuCard icon={BookOpen} label="Blog" onClick={() => router.push("/blog")} color="text-blue-600" bg="bg-blue-500/10" />}
               <MenuCard icon={Briefcase} label="Projects" onClick={() => router.push('/projects')} color="text-rose-600" bg="bg-rose-500/10" />
               <MenuCard icon={Home} label="Properties" onClick={() => router.push('/properties')} color="text-teal-600" bg="bg-teal-500/10" />
               <MenuCard icon={Package} label="Asset Inventory" onClick={() => router.push('/asset-inventory')} color="text-amber-600" bg="bg-amber-500/10" />

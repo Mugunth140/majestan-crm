@@ -1,0 +1,100 @@
+.blog-admin .blog-field {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+.blog-admin .blog-field > input,
+.blog-admin .blog-field > textarea {
+  font-weight: 400;
+  color: var(--foreground);
+}
+.blog-admin .blog-input {
+  border-color: var(--border);
+}
+.blog-admin .blog-input:focus-visible {
+  border-color: var(--ring);
+}
+.blog-admin .blog-prose {
+  color: var(--foreground);
+  background: var(--card);
+}
+.blog-admin .blog-prose {
+  font-size: 16px;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+.blog-admin .blog-prose p {
+  margin: 0 0 16px;
+}
+.blog-admin .blog-prose h2 {
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 600;
+  margin: 32px 0 16px;
+}
+.blog-admin .blog-prose h3 {
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 600;
+  margin: 24px 0 12px;
+}
+.blog-admin .blog-prose h4 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 24px 0 12px;
+}
+.blog-admin .blog-prose ul {
+  list-style: disc;
+  padding-left: 24px;
+}
+.blog-admin .blog-prose ol {
+  list-style: decimal;
+  padding-left: 24px;
+}
+.blog-admin .blog-prose li {
+  margin: 8px 0;
+}
+.blog-admin .blog-prose blockquote {
+  border: 1px solid var(--border, #ddd);
+  padding: 24px;
+  margin: 24px 0;
+  border-radius: 8px;
+}
+.blog-admin .blog-prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 24px 0;
+}
+.blog-admin .blog-prose table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 24px 0;
+  table-layout: fixed;
+}
+.blog-admin .blog-prose th,
+.blog-admin .blog-prose td {
+  border: 1px solid var(--border, #ddd);
+  padding: 12px;
+  vertical-align: top;
+}
+.blog-admin .blog-prose th {
+  font-weight: 600;
+}
+.blog-admin .blog-prose a {
+  color: #0052ff;
+  text-decoration: underline;
+}
+.blog-admin .blog-prose pre {
+  background: #181818;
+  color: white;
+  padding: 24px;
+  overflow-x: auto;
+  border-radius: 8px;
+}
+.blog-admin .blog-prose hr {
+  margin: 32px 0;
+}
+.blog-admin .blog-prose strong {
+  font-weight: 700;
+}

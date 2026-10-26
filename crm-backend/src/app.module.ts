@@ -1,3 +1,4 @@
+import { BlogModule } from './modules/blog/blog.module';
 import { Module } from '@nestjs/common';
 import { MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
@@ -165,6 +166,7 @@ import { CommunicationsModule } from './modules/communications/communications.mo
     BuildersModule,
     AdsModule,
     ShowcasesModule,
+    BlogModule,
     MailModule,
     CommunicationsModule,
   ],

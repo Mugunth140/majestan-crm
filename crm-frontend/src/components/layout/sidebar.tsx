@@ -26,8 +26,10 @@ import {
   PhoneIncoming,
   Megaphone,
   Hammer,
-  Sparkles
+  Sparkles,
+  BookOpen
 } from "lucide-react";
+import { can } from "@/lib/permissions";
 import { canViewAds } from "@/lib/ads-access";
 import Image from "next/image";
 
@@ -41,6 +43,7 @@ const navigation = [
   { name: "Properties", href: "/properties", icon: Home },
   { name: "Builder", href: "/builders", icon: Hammer },
   { name: "Advertisement", href: "/ads", icon: Megaphone, adsAccess: true },
+  { name: "Blog", href: "/blog", icon: BookOpen, blogAccess: true },
   { name: "Showcases", href: "/showcases", icon: Sparkles, adsAccess: true },
   { name: "Asset Inventory", href: "/asset-inventory", icon: Package },
   { name: "HR Panel", href: "/hr", icon: UserPen },
@@ -79,6 +82,7 @@ export function Sidebar() {
   const searchParams = useSearchParams();
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [blogAccess, setBlogAccess] = useState(false);
   const [userDept, setUserDept] = useState<string>("");
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -88,6 +92,7 @@ export function Sidebar() {
       const userStr = localStorage.getItem("crm_user");
       if (userStr) {
         const user = JSON.parse(userStr);
+        setBlogAccess(can("blog.manage", user));
         setUserRole(user?.role?.name || user?.role || "");
         setUserDept(((user?.department as any)?.name ?? user?.department ?? "") as string);
       }
@@ -240,6 +245,7 @@ export function Sidebar() {
       <div className="sidebar-scroll flex-1 overflow-x-hidden overflow-y-auto py-3 scrollbar-none">
         <nav className="grid items-start px-2 gap-1 text-[14px] font-medium">
           {navigation.map((item: any) => {
+            if (item.blogAccess && !blogAccess) return null;
             if (item.adminOnly && !isAdmin) return null;
             if (item.adminOrManager && !canViewLogger) return null;
             if ((item as any).adsAccess && !canViewAds({ role: userRole ?? "", department: userDept })) return null;

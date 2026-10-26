@@ -111,6 +111,24 @@ export class SiteApiService {
     return this.unwrap(data);
   }
 
+  /** Authenticated binary upload; credentials and service JWT stay on the server. */
+  async uploadImage(path: string, bytes: Buffer, contentType: string, retry = true): Promise<any> {
+    if (!this.token) await this.login();
+    let response: Response;
+    try {
+      response = await fetch(`${this.base}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': contentType, Authorization: `Bearer ${this.token}` },
+        body: new Blob([new Uint8Array(bytes)], { type: contentType }),
+        signal: AbortSignal.timeout(30000),
+      });
+    } catch { throw new HttpException('Site image upload is unavailable', 502); }
+    if (response.status === 401 && retry) { this.token = null; return this.uploadImage(path, bytes, contentType, false); }
+    const data = await response.json().catch(() => null);
+    if (!response.ok) throw this.toError(response.status, data);
+    return this.unwrap(data);
+  }
+
   get(path: string): Promise<any> {
     return this.request('GET', path);
   }

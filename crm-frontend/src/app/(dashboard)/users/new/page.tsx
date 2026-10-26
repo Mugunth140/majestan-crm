@@ -11,11 +11,11 @@ import { toast } from "sonner";
 import { FormSelect } from "@/components/shared/form-select";
 import { Switch } from "@/components/ui/switch";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { VIEW_PROPERTY_CONTACTS, INBOUND_CALL_TRACKING } from "@/lib/permissions";
+import { VIEW_PROPERTY_CONTACTS, INBOUND_CALL_TRACKING, MANAGE_BLOG } from "@/lib/permissions";
 
-// Permission keys managed by the two toggles on this form. Everything else
+// Permission keys managed by the toggles on this form. Everything else
 // already granted to the user is preserved verbatim on submit.
-const MANAGED_PERMISSION_KEYS = [VIEW_PROPERTY_CONTACTS, INBOUND_CALL_TRACKING];
+const MANAGED_PERMISSION_KEYS = [VIEW_PROPERTY_CONTACTS, INBOUND_CALL_TRACKING, MANAGE_BLOG];
 
 // Inbound is not departmental, so its call-tracking toggle only applies to
 // the roles that need an explicit grant (Admin/Manager bypass by default).
@@ -50,6 +50,7 @@ function UserFormContent() {
     is_active: true,
     can_view_contacts: false,
     can_track_inbound: false,
+    can_manage_blog: false,
     permissionKeys: [] as string[],
   });
 
@@ -104,6 +105,7 @@ function UserFormContent() {
             is_active: data.data.is_active,
             can_view_contacts: (data.data.permissions ?? []).includes(VIEW_PROPERTY_CONTACTS),
             can_track_inbound: (data.data.permissions ?? []).includes(INBOUND_CALL_TRACKING),
+            can_manage_blog: (data.data.permissions ?? []).includes(MANAGE_BLOG),
             permissionKeys: data.data.permissions ?? [],
           });
         }
@@ -142,10 +144,12 @@ function UserFormContent() {
       const url = editId ? `${API_URL}/users/${editId}` : `${API_URL}/users`;
       const method = editId ? "PUT" : "POST";
       
-      const { can_view_contacts, can_track_inbound, permissionKeys, ...rest } = formData;
+      const { can_view_contacts, can_track_inbound, can_manage_blog, permissionKeys, ...rest } = formData;
       void can_view_contacts;
+      void can_manage_blog;
       void can_track_inbound;
       const baseKeys = (permissionKeys || []).filter((k: string) => !MANAGED_PERMISSION_KEYS.includes(k));
+      if (formData.can_manage_blog) baseKeys.push(MANAGE_BLOG);
       if (formData.can_view_contacts) baseKeys.push(VIEW_PROPERTY_CONTACTS);
       if (formData.can_track_inbound) baseKeys.push(INBOUND_CALL_TRACKING);
       const payload: Record<string, any> = {
@@ -312,6 +316,10 @@ function UserFormContent() {
                   <p className="text-[14px] font-semibold text-foreground/90">Can view owner & agent contacts</p>
                   <p className="text-xs text-muted-foreground mt-0.5">Grants access to property owner and agent phone/email in list, detail and edit views. Admins always have this.</p>
                 </div>
+              </div>
+              <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 px-4 py-4 mt-3">
+                <Switch aria-label="Manage website blog" checked={formData.can_manage_blog} onCheckedChange={v => setFormData({...formData, can_manage_blog: v})} />
+                <div><p className="text-sm font-semibold">Manage website blog</p><p className="text-xs text-muted-foreground mt-1">Create, edit, schedule and publish website articles. Admins always have access.</p></div>
               </div>
               {INBOUND_TOGGLE_ROLE_IDS.includes(formData.role_id) && (
                 <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 px-4 py-4 mt-3">
