@@ -1,6 +1,8 @@
 "use client";
 
 import { apiFetch } from "@/lib/api-fetch";
+import { useIsMobile } from "@/hooks/use-device";
+import { readImageCoordinates, readStoredCoordinates } from "@/lib/image-coordinates";
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense, useRef } from "react";
@@ -212,6 +214,12 @@ function InboundForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
+  const isMobile = useIsMobile();
+  const isQuickCapture = isMobile && !editId;
+  const metadataRequest = useRef(0);
+  const coordinateRevision = useRef(0);
+  const [isReadingMetadata, setIsReadingMetadata] = useState(false);
+  const [metadataMessage, setMetadataMessage] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -273,7 +281,8 @@ function InboundForm() {
 
   // GPS location state
   const [isGettingLocation, setIsGettingLocation] = useState(false);
-  const [googleMapLocation, setGoogleMapLocation] = useState<string>("");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
 
   useEffect(() => {
     const fetchMasterData = async () => {
@@ -348,7 +357,9 @@ function InboundForm() {
             setIsExclusive(!!data.is_exclusive);
             setIsPrimeLocation(!!data.is_prime_location);
             setDocumentsCollected(!!data.documents_collected);
-            setGoogleMapLocation(data.google_map_location || "");
+            const coordinates = readStoredCoordinates(data);
+            setLatitude(coordinates.latitude);
+            setLongitude(coordinates.longitude);
           } else {
             toast.error("Inbound not found");
             router.push("/inbound");
@@ -380,23 +391,38 @@ function InboundForm() {
     setBrokeragePaidBy(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error("File size must be less than 5MB");
-        return;
-      }
-      setSelectedFile(file);
-      // Generate preview
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
-      setUploadProgress("idle");
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size must be less than 5MB");
+      e.target.value = "";
+      return;
     }
+    setSelectedFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+    setUploadProgress("idle");
+    const request = ++metadataRequest.current;
+    const revision = coordinateRevision.current;
+    setIsReadingMetadata(true);
+    setMetadataMessage("");
+    const coordinates = await readImageCoordinates(file);
+    if (request !== metadataRequest.current) return;
+    if (coordinates && revision === coordinateRevision.current) {
+      setLatitude(String(coordinates.latitude));
+      setLongitude(String(coordinates.longitude));
+      setMetadataMessage("Latitude and longitude filled from photo metadata.");
+    } else {
+      setMetadataMessage(coordinates
+        ? "Photo ready. Your location changes have been kept."
+        : "No GPS metadata found. You can upload this photo without a location.");
+    }
+    setIsReadingMetadata(false);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (isReadingMetadata) return;
     setIsSubmitting(true);
 
     try {
@@ -468,13 +494,28 @@ function InboundForm() {
       if (payload.percentage === "") payload.percentage = null;
       if (payload.fixed_amount === "") payload.fixed_amount = null;
 
+      payload.latitude = latitude.trim() === "" ? null : Number(latitude);
+      payload.longitude = longitude.trim() === "" ? null : Number(longitude);
+      // A changed coordinate must not leave a stale legacy Maps link behind.
+      if (editId) {
+        const stored = readStoredCoordinates(inboundData || {});
+        if (latitude !== stored.latitude || longitude !== stored.longitude) {
+          payload.google_map_location = null;
+        }
+      }
+      const requestPayload = isQuickCapture ? {
+        property_category: selectedCategory,
+        latitude: payload.latitude,
+        longitude: payload.longitude,
+      } : payload;
+
       const method = editId ? "PATCH" : "POST";
       const endpoint = API_URL + (editId ? "/inbounds/" + editId : "/inbounds");
 
       const res = await apiFetch(endpoint, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(requestPayload),
       });
 
       const result = await res.json().catch(() => null);
@@ -527,8 +568,9 @@ function InboundForm() {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
-        const mapsUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
-        setGoogleMapLocation(mapsUrl);
+        coordinateRevision.current++;
+        setLatitude(String(latitude));
+        setLongitude(String(longitude));
         setIsGettingLocation(false);
         toast.success("Location captured successfully!");
       },
@@ -571,6 +613,29 @@ function InboundForm() {
 
   const showRentalBrokerage = selectedPurpose === 'Rent' || selectedPurpose === 'Lease';
 
+  const coordinateFields = (
+    <div className="space-y-3 lg:col-span-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <label htmlFor="inbound-latitude" className="text-sm font-semibold">Latitude (optional)</label>
+          <Input id="inbound-latitude" name="latitude" type="number" step="any" min={-90} max={90}
+            value={latitude} onChange={(e) => { coordinateRevision.current++; setLatitude(e.target.value); }}
+            placeholder="e.g. 11.0168" className="h-12 rounded-xl bg-muted/30" />
+        </div>
+        <div className="space-y-2">
+          <label htmlFor="inbound-longitude" className="text-sm font-semibold">Longitude (optional)</label>
+          <Input id="inbound-longitude" name="longitude" type="number" step="any" min={-180} max={180}
+            value={longitude} onChange={(e) => { coordinateRevision.current++; setLongitude(e.target.value); }}
+            placeholder="e.g. 76.9558" className="h-12 rounded-xl bg-muted/30" />
+        </div>
+      </div>
+      <Button type="button" variant="outline" onClick={handleGetLocation} disabled={isGettingLocation}>
+        {isGettingLocation ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+        {isGettingLocation ? "Getting location..." : "Use current location"}
+      </Button>
+    </div>
+  );
+
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500 px-2.5 md:px-0 mt-2 md:mt-0 mb-20 md:mb-0">
       <MobileHeader title={editId ? "Edit Inbound" : "Add Inbound"} showBack />
@@ -587,6 +652,18 @@ function InboundForm() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         
+        {isQuickCapture && (
+          <div className="bg-card border rounded-2xl p-4 space-y-6">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">Property category</label>
+              <FormSelect name="_property_category" value={selectedCategory}
+                onValueChange={setSelectedCategory} placeholder="Select category"
+                options={PROPERTY_CATEGORIES} required />
+            </div>
+            {coordinateFields}
+          </div>
+        )}
+        {!isQuickCapture && (<>
         {/* Basic Information */}
         <div className="bg-card border rounded-2xl p-5 sm:p-8 shadow-sm">
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Basic Information</h3>
@@ -786,31 +863,7 @@ function InboundForm() {
               <Input name="landmark" defaultValue={inboundData?.landmark || ""} placeholder="Enter Landmark" className="h-12 rounded-xl bg-muted/30" />
             </div>
 
-            <div className="space-y-2 lg:col-span-3">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Google Map Location</label>
-              <div className="flex items-center gap-2">
-                <Input
-                  name="google_map_location"
-                  value={googleMapLocation}
-                  onChange={(e) => setGoogleMapLocation(e.target.value)}
-                  placeholder="Paste Google Maps Link or use button →"
-                  className="h-12 rounded-xl bg-muted/30 flex-1"
-                />
-                <button
-                  type="button"
-                  onClick={handleGetLocation}
-                  disabled={isGettingLocation}
-                  className="flex-shrink-0 h-12 px-4 rounded-xl border border-border/60 bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground transition-all flex items-center gap-2 text-[13px] font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isGettingLocation ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <MapPin className="h-4 w-4" />
-                  )}
-                  {isGettingLocation ? "Getting..." : "Use Location"}
-                </button>
-              </div>
-            </div>
+            {coordinateFields}
           </div>
         </div>
 
@@ -1097,9 +1150,11 @@ function InboundForm() {
           </div>
         </div>
 
+        </>)}
+
         {/* Media & Inventory */}
         <div className="bg-card border rounded-2xl p-5 sm:p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Media & Inventory Flags</h3>
+          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">{isQuickCapture ? "Property photo" : "Media & Inventory Flags"}</h3>
           
           <div className="mb-8 border-b pb-8">
             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-3">Property Photo</label>
@@ -1116,6 +1171,9 @@ function InboundForm() {
                   <button
                     type="button"
                     onClick={() => {
+                      metadataRequest.current++;
+                      setIsReadingMetadata(false);
+                      setMetadataMessage("");
                       setSelectedFile(null);
                       setPreviewUrl(null);
                       setUploadProgress("idle");
@@ -1152,6 +1210,12 @@ function InboundForm() {
               </div>
             )}
 
+            <p className="text-sm text-muted-foreground mb-4">
+              Photo GPS metadata fills latitude and longitude when available. Location is optional.
+            </p>
+            <p role="status" aria-live="polite" className="text-sm text-muted-foreground mb-4">
+              {isReadingMetadata ? "Reading photo location..." : metadataMessage}
+            </p>
             {/* Hidden file inputs */}
             <input
               ref={fileInputRef}
@@ -1196,7 +1260,7 @@ function InboundForm() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {!isQuickCapture && <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
              <div className="flex items-center space-x-2 bg-muted/10 border border-border/40 p-4 rounded-xl">
                <Checkbox id="exclusive" checked={isExclusive} onCheckedChange={(c) => setIsExclusive(!!c)} />
                <label htmlFor="exclusive" className="text-sm font-semibold cursor-pointer">
@@ -1217,7 +1281,7 @@ function InboundForm() {
                  Documents Collected
                </label>
              </div>
-          </div>
+          </div>}
         </div>
 
         {/* Action Buttons */}
@@ -1225,7 +1289,7 @@ function InboundForm() {
           <Button type="button" variant="ghost" className="h-12 px-8 rounded-xl font-medium text-[15px] w-full sm:w-auto" onClick={() => router.push("/inbound")} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting} className="h-12 px-10 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-lg font-semibold flex items-center gap-2 text-[15px] active:scale-[0.97] w-full sm:w-auto">
+          <Button type="submit" disabled={isSubmitting || isReadingMetadata} className="h-12 px-10 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-lg font-semibold flex items-center gap-2 text-[15px] active:scale-[0.97] w-full sm:w-auto">
             {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : (editId ? <Save size={18} /> : <CheckCircle2 size={18} />)}
             {isSubmitting ? "Saving..." : (editId ? "Update Inbound" : "Create Inbound")}
           </Button>

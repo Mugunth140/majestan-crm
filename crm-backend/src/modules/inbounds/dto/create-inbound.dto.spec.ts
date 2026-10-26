@@ -59,6 +59,23 @@ function staffRentPayload(assignedStaffId: any) {
 }
 
 describe('CreateInboundDto (inbound form contract)', () => {
+  it.each([
+    { property_category: 'commercial' },
+    { property_category: 'industrial', latitude: null, longitude: null },
+    { property_category: 'residential', latitude: 0, longitude: 0 },
+    { property_category: 'agricultural', latitude: -33.86, longitude: 151.2 },
+  ])('accepts quick capture with optional coordinates: %o', async (payload) => {
+    expect(await pipeValidate(CreateInboundDto, payload)).toEqual([]);
+  });
+
+  it.each([
+    { latitude: 91 }, { latitude: -91 }, { longitude: 181 },
+    { longitude: -181 }, { latitude: 'invalid' }, { longitude: Infinity },
+  ])('rejects invalid coordinates on create and update: %o', async (payload) => {
+    expect((await pipeValidate(CreateInboundDto, payload)).length).toBeGreaterThan(0);
+    expect((await pipeValidate(UpdateInboundDto, payload)).length).toBeGreaterThan(0);
+  });
+
   it('accepts a full Staff Rent payload with string staff id', async () => {
     const payload = staffRentPayload('7');
     const errors = await pipeValidate(CreateInboundDto, payload);

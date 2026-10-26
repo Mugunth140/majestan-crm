@@ -90,6 +90,12 @@ export class Inbound {
   @Column({ type: 'text', nullable: true })
   google_map_location: string;
 
+  @Column({ type: 'decimal', precision: 10, scale: 7, nullable: true })
+  latitude: number | null;
+
+  @Column({ type: 'decimal', precision: 10, scale: 7, nullable: true })
+  longitude: number | null;
+
   @Column({ type: 'varchar', default: 'New Inbound' })
   status: string;
 
@@ -242,7 +248,7 @@ export class Inbound {
     // Property Details
     if (this.property_category && this.property_type) score += 10;
     if (this.locality || this.area) score += 10;
-    if (this.google_map_location) score += 10;
+    if ((this.latitude != null && this.longitude != null) || this.google_map_location) score += 10;
 
     // Contact details
     if (this.primary_contact) score += 5;

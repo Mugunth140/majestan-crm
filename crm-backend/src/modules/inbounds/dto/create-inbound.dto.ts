@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsInt, IsBoolean, IsNumber, IsArray, ValidateNested, MaxLength } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsBoolean, IsNumber, IsArray, ValidateNested, MaxLength, IsLatitude, IsLongitude } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 export class InboundUnitDto {
@@ -105,6 +105,16 @@ export class CreateInboundDto {
   @IsOptional()
   @IsString()
   google_map_location?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @IsLatitude()
+  latitude?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @IsLongitude()
+  longitude?: number;
 
   @IsOptional()
   @IsString()

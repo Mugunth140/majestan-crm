@@ -518,6 +518,18 @@ export default function InboundViewPage() {
                   )}
                 </div>
                 <p className="text-[14px] font-medium text-foreground/80">{inbound.address || inbound.location || "\u2014"}</p>
+                {(inbound.latitude != null || inbound.longitude != null) && (
+                  <div className="mt-3 space-y-2 text-sm">
+                    <p>Latitude: {inbound.latitude ?? "—"}</p>
+                    <p>Longitude: {inbound.longitude ?? "—"}</p>
+                    {inbound.latitude != null && inbound.longitude != null && (
+                      <a href={`https://www.google.com/maps?q=${encodeURIComponent(`${inbound.latitude},${inbound.longitude}`)}`}
+                        target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                        Open location in Maps
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
