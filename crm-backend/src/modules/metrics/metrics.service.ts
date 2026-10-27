@@ -3,6 +3,17 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import Redis from 'ioredis';
 
+// Device-synced and manual calls land in one table per entity (leads, agents,
+// inbounds, assets, HR candidates). Call counts must span all of them, or staff
+// who mostly call non-lead contacts (e.g. HR) show zero.
+const ALL_CALLS = `(
+  SELECT sent_by_id, created_at FROM contact_logs WHERE contact_type = 'call'
+  UNION ALL SELECT sent_by_id, created_at FROM agent_contact_logs WHERE contact_type = 'call'
+  UNION ALL SELECT sent_by_id, created_at FROM inbound_contact_logs WHERE contact_type = 'call'
+  UNION ALL SELECT sent_by_id, created_at FROM asset_contact_logs WHERE contact_type = 'call'
+  UNION ALL SELECT sent_by_id, created_at FROM hr_contact_logs WHERE contact_type = 'call'
+) all_calls`;
+
 @Injectable()
 export class MetricsService {
   private redis: Redis;
@@ -57,7 +68,7 @@ export class MetricsService {
       qAll(`SELECT ROUND(AVG(quality_score),1) as c FROM assets`),
       qAll(`SELECT COUNT(*) as c FROM users WHERE is_active = 1`),
       qAll(`SELECT COUNT(*) as c FROM lead_follow_ups`),
-      qAll(`SELECT COUNT(*) as c FROM contact_logs WHERE contact_type = 'call'`),
+      qAll(`SELECT COUNT(*) as c FROM ${ALL_CALLS}`),
       qAll(`SELECT COUNT(*) as c FROM contact_logs WHERE contact_type = 'whatsapp'`),
       qAll(`SELECT COUNT(*) as c FROM routing_histories`),
       qAll(`SELECT COUNT(*) as c FROM hr_candidates`),
@@ -86,7 +97,7 @@ export class MetricsService {
       this.ds.query(`SELECT COUNT(*) as c FROM users WHERE department_id = ? AND is_active = 1`, [deptId]),
       this.ds.query(`SELECT COUNT(*) as c FROM leads WHERE assigned_staff_id IN (${inClause})`),
       this.ds.query(`SELECT COUNT(*) as c FROM lead_follow_ups WHERE created_by_id IN (${inClause}) AND created_at >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)`),
-      this.ds.query(`SELECT COUNT(*) as c FROM contact_logs WHERE contact_type = 'call' AND sent_by_id IN (${inClause})`),
+      this.ds.query(`SELECT COUNT(*) as c FROM ${ALL_CALLS} WHERE sent_by_id IN (${inClause})`),
       this.ds.query(`SELECT COUNT(*) as c FROM leads WHERE status = 'Site Visit Completed' AND assigned_staff_id IN (${inClause})`),
       this.ds.query(`SELECT COUNT(*) as c FROM leads WHERE converted_to IS NOT NULL AND assigned_staff_id IN (${inClause})`),
       this.ds.query(`SELECT u.id, u.name, COALESCE(ROUND(SUM(p.achieved_count) / NULLIF(SUM(t.monthly_target),0) * 100, 1), 0) as pct FROM users u JOIN task_templates tt ON tt.assigned_to = u.id AND tt.status = 'active' JOIN task_metric_targets t ON t.task_template_id = tt.id LEFT JOIN task_metric_progress p ON p.task_template_id = tt.id AND p.metric_key = t.metric_key WHERE u.department_id = ? GROUP BY u.id, u.name ORDER BY pct DESC`, [deptId]),
@@ -112,7 +123,7 @@ export class MetricsService {
     const [ [myLeads], [followUpsToday], [callsWeek], [svMonth], activeTemplate, weekProgress, monthProgress, allStaffProgress, activityDays ] = await Promise.all([
       this.ds.query(`SELECT COUNT(*) as c FROM leads WHERE assigned_staff_id = ?`, [userId]),
       this.ds.query(`SELECT COUNT(*) as c FROM lead_follow_ups WHERE created_by_id = ? AND DATE(created_at) = ?`, [userId, todayStr]),
-      this.ds.query(`SELECT COUNT(*) as c FROM contact_logs WHERE sent_by_id = ? AND contact_type = 'call' AND created_at >= ?`, [userId, weekStart]),
+      this.ds.query(`SELECT COUNT(*) as c FROM ${ALL_CALLS} WHERE sent_by_id = ? AND created_at >= ?`, [userId, weekStart]),
       this.ds.query(`SELECT COUNT(*) as c FROM leads WHERE assigned_staff_id = ? AND status = 'Site Visit Completed' AND updated_at >= ?`, [userId, monthStart]),
       this.ds.query(`SELECT tt.id, t.metric_key, t.metric_label, t.monthly_target, COALESCE(SUM(p.achieved_count),0) as achieved FROM task_templates tt JOIN task_metric_targets t ON t.task_template_id = tt.id LEFT JOIN task_metric_progress p ON p.task_template_id = tt.id AND p.metric_key = t.metric_key WHERE tt.assigned_to = ? AND tt.status = 'active' GROUP BY tt.id, t.metric_key, t.metric_label, t.monthly_target`, [userId]),
       this.ds.query(`SELECT t.metric_key, t.metric_label, COALESCE(SUM(CASE WHEN p.week_number = CEIL(DAYOFMONTH(CURDATE())/7) THEN p.achieved_count ELSE 0 END),0) as thisWeek FROM task_metric_targets t JOIN task_templates tt ON t.task_template_id = tt.id LEFT JOIN task_metric_progress p ON p.task_template_id = tt.id AND p.metric_key = t.metric_key WHERE tt.assigned_to = ? AND tt.status = 'active' GROUP BY t.metric_key, t.metric_label`, [userId]),
@@ -183,7 +194,7 @@ export class MetricsService {
     return { type: 'dept_perf', departments: rows.map((r: any) => ({ name: r.name, achieved: Number(r.achieved), target: Number(r.target), pct: Number(r.target) > 0 ? Math.round(Number(r.achieved) / Number(r.target) * 100) : 0 })) };
   }
   private async chartScatter(from: string, to: string) {
-    const rows = await this.ds.query(`SELECT u.id as staffId, u.name, (SELECT COUNT(*) FROM contact_logs cl WHERE cl.sent_by_id = u.id AND cl.contact_type = 'call' AND cl.created_at BETWEEN ? AND ?) as calls, (SELECT COUNT(*) FROM leads l WHERE l.assigned_staff_id = u.id AND l.converted_to IS NOT NULL AND l.converted_at BETWEEN ? AND ?) as conversions, (SELECT COUNT(*) FROM lead_follow_ups lf WHERE lf.created_by_id = u.id AND lf.created_at BETWEEN ? AND ?) as followUps FROM users u WHERE u.is_active = 1`, [from, to, from, to, from, to]);
+    const rows = await this.ds.query(`SELECT u.id as staffId, u.name, COALESCE(calls.c, 0) as calls, (SELECT COUNT(*) FROM leads l WHERE l.assigned_staff_id = u.id AND l.converted_to IS NOT NULL AND l.converted_at BETWEEN ? AND ?) as conversions, (SELECT COUNT(*) FROM lead_follow_ups lf WHERE lf.created_by_id = u.id AND lf.created_at BETWEEN ? AND ?) as followUps FROM users u LEFT JOIN (SELECT sent_by_id, COUNT(*) as c FROM ${ALL_CALLS} WHERE created_at BETWEEN ? AND ? GROUP BY sent_by_id) calls ON calls.sent_by_id = u.id WHERE u.is_active = 1`, [from, to, from, to, from, to]);
     return { type: 'scatter', points: rows.map((r: any) => ({ staffId: Number(r.staffId), name: r.name, calls: Number(r.calls), conversions: Number(r.conversions), followUps: Number(r.followUps) })) };
   }
   private async chartHeatmap(from: string, to: string) {
