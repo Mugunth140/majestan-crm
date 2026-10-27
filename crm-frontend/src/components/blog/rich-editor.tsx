@@ -9,6 +9,8 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
+  AlignJustify,
+  RemoveFormatting,
   Bold,
   Italic,
   Underline,
@@ -27,6 +29,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -54,11 +57,16 @@ export function RichEditor({
     [url, setUrl] = useState(""),
     [alt, setAlt] = useState(""),
     [error, setError] = useState("");
+  const [linkText, setLinkText] = useState("");
+  const [originalLinkText, setOriginalLinkText] = useState("");
+  const [newTab, setNewTab] = useState(true);
+  const [editingLink, setEditingLink] = useState(false);
+  const [linkSelection, setLinkSelection] = useState({ from: 1, to: 1 });
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
         heading: { levels: [2, 3, 4] },
-        link: { openOnClick: false },
+        link: { openOnClick: false, defaultProtocol: "https" },
       }),
       Image,
       TableKit.configure({ table: { resizable: true } }),
@@ -70,7 +78,7 @@ export function RichEditor({
     shouldRerenderOnTransaction: true,
     editorProps: {
       attributes: {
-        class: "blog-prose min-h-96 p-4 md:p-6 outline-none",
+        class: "blog-prose p-4 md:p-6 outline-none",
         "aria-label": "Article body",
         role: "textbox",
         "aria-multiline": "true",
@@ -106,33 +114,70 @@ export function RichEditor({
     <span className="mx-1 h-5 w-px bg-border shrink-0" aria-hidden="true" />
   );
   const open = (kind: "link" | "image") => {
+    if (kind === "link") {
+      const active = editor.isActive("link");
+      if (active) editor.chain().focus().extendMarkRange("link").run();
+      const { from, to } = editor.state.selection;
+      setLinkSelection({ from, to });
+      const text = editor.state.doc.textBetween(from, to, " ");
+      setLinkText(text);
+      setOriginalLinkText(text);
+      setEditingLink(active);
+      setNewTab(
+        active ? editor.getAttributes("link").target === "_blank" : true,
+      );
+    }
     setInsert(kind);
     setUrl(kind === "link" ? editor.getAttributes("link").href || "" : "");
     setAlt("");
     setError("");
   };
   const apply = () => {
+    const destination = url.trim();
     let valid = false;
     try {
       valid = (
         insert === "image"
           ? ["http:", "https:"]
           : ["http:", "https:", "mailto:", "tel:"]
-      ).includes(new URL(url).protocol);
+      ).includes(new URL(destination).protocol);
     } catch {}
     if (!valid || (insert === "image" && !alt.trim())) {
-      setError("Enter a valid URL and descriptive image alt text.");
+      setError(
+        insert === "image"
+          ? "Enter a valid image URL and descriptive alt text."
+          : "Enter a valid https://, http://, mailto: or tel: URL.",
+      );
       return;
     }
-    if (insert === "image")
-      editor.chain().focus().setImage({ src: url, alt }).run();
-    else
+    if (insert === "image") {
       editor
         .chain()
         .focus()
-        .extendMarkRange("link")
-        .setLink({ href: url })
+        .setImage({ src: destination, alt: alt.trim() })
         .run();
+    } else {
+      const attributes = {
+        href: destination,
+        target: newTab ? "_blank" : null,
+        rel: "noopener noreferrer",
+      };
+      const chain = editor.chain().focus().setTextSelection(linkSelection);
+      if (
+        linkText !== originalLinkText ||
+        linkSelection.from === linkSelection.to
+      ) {
+        chain
+          .insertContent({
+            type: "text",
+            text: linkText.trim() || destination,
+            marks: [{ type: "link", attrs: attributes }],
+          })
+          .run();
+      } else {
+        chain.setLink(attributes).run();
+      }
+    }
     setInsert(null);
   };
   const heading = editor.isActive("heading")
@@ -140,7 +185,17 @@ export function RichEditor({
     : "Normal text";
   return (
     <div
-      className={`blog-editor ${readOnly ? "" : "rounded-xl border bg-background overflow-hidden focus-within:border-ring"}`}
+      className="blog-editor rounded-xl border bg-background overflow-hidden focus-within:border-ring"
+      onKeyDown={(event) => {
+        if (
+          !readOnly &&
+          (event.ctrlKey || event.metaKey) &&
+          event.key.toLowerCase() === "k"
+        ) {
+          event.preventDefault();
+          open("link");
+        }
+      }}
     >
       {!readOnly && (
         <div
@@ -227,6 +282,9 @@ export function RichEditor({
               () => editor.chain().focus().toggleStrike().run(),
               editor.isActive("strike"),
             )}
+            {tool("Clear formatting", <RemoveFormatting size={16} />, () =>
+              editor.chain().focus().unsetAllMarks().clearNodes().run(),
+            )}
           </div>
           {separator}
           <div
@@ -283,6 +341,12 @@ export function RichEditor({
               () => editor.chain().focus().setTextAlign("right").run(),
               editor.isActive({ textAlign: "right" }),
             )}
+            {tool(
+              "Justify text",
+              <AlignJustify size={16} />,
+              () => editor.chain().focus().setTextAlign("justify").run(),
+              editor.isActive({ textAlign: "justify" }),
+            )}
           </div>
           {separator}
           <div
@@ -291,7 +355,7 @@ export function RichEditor({
             aria-label="Insert content"
           >
             {tool(
-              "Insert link",
+              editor.isActive("link") ? "Edit link" : "Insert link",
               <Link2 size={16} />,
               () => open("link"),
               editor.isActive("link"),
@@ -379,13 +443,13 @@ export function RichEditor({
           </div>
         </div>
       )}
-      <EditorContent editor={editor} />
+      <EditorContent className="blog-editor-scroll" editor={editor} />
       {!readOnly && (
         <div className="px-4 py-2 border-t bg-muted/10 text-xs text-muted-foreground flex justify-between gap-4">
           <span>
             {editor.getText().trim().split(/\s+/).filter(Boolean).length} words
           </span>
-          <span>Ctrl B · Bold &nbsp; Ctrl Z · Undo</span>
+          <span>Ctrl B · Bold &nbsp; Ctrl K · Link &nbsp; Ctrl Z · Undo</span>
         </div>
       )}
       <Dialog
@@ -396,13 +460,27 @@ export function RichEditor({
       >
         <DialogContent className="sm:max-w-md">
           <DialogTitle>
-            {insert === "image" ? "Insert image" : "Insert link"}
+            {insert === "image"
+              ? "Insert image"
+              : editingLink
+                ? "Edit link"
+                : "Insert link"}
           </DialogTitle>
           <DialogDescription>
             {insert === "image"
               ? "Upload an image or paste its URL, then add a description."
               : "Add a URL to the selected text."}
           </DialogDescription>
+          {insert === "link" && (
+            <label className="grid gap-2 text-sm">
+              Link text
+              <Input
+                value={linkText}
+                onChange={(e) => setLinkText(e.target.value)}
+                placeholder="Text to display"
+              />
+            </label>
+          )}
           <label className="grid gap-2 text-sm">
             {insert === "image" ? "Image URL" : "Link URL"}
             <Input
@@ -420,16 +498,44 @@ export function RichEditor({
               </label>
             </>
           )}
+          {insert === "link" && (
+            <label className="flex items-center gap-3 text-sm">
+              <Checkbox
+                checked={newTab}
+                onCheckedChange={(checked) => setNewTab(!!checked)}
+              />
+              Open in a new tab
+            </label>
+          )}
           {error && (
             <p role="alert" className="text-sm text-destructive">
               {error}
             </p>
           )}
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
+            {insert === "link" && editingLink && (
+              <Button
+                variant="ghost"
+                className="mr-auto"
+                onClick={() => {
+                  editor
+                    .chain()
+                    .focus()
+                    .setTextSelection(linkSelection)
+                    .unsetLink()
+                    .run();
+                  setInsert(null);
+                }}
+              >
+                Remove link
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setInsert(null)}>
               Cancel
             </Button>
-            <Button onClick={apply}>Insert</Button>
+            <Button onClick={apply}>
+              {insert === "link" && editingLink ? "Save link" : "Insert"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

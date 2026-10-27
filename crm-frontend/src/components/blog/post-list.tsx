@@ -83,11 +83,6 @@ export function BlogPostList({
       ),
     },
     {
-      accessorKey: "author_name",
-      header: "Author",
-      meta: { hideOnMobile: true },
-    },
-    {
       id: "status",
       header: "Status",
       cell: ({ row }) => {
@@ -141,7 +136,7 @@ export function BlogPostList({
       </div>
       <div className="w-full max-w-full min-w-0 md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col">
         {loading ? (
-          <TableSkeleton columns={6} rows={10} flush />
+          <TableSkeleton columns={5} rows={10} flush />
         ) : (
           <DataTable
             key={page}

@@ -82,8 +82,8 @@
   font-weight: 600;
 }
 .blog-admin .blog-prose a {
-  color: #0052ff;
-  text-decoration: underline;
+  color: #3b82f6;
+  text-decoration: none;
 }
 .blog-admin .blog-prose pre {
   background: #181818;
@@ -97,4 +97,45 @@
 }
 .blog-admin .blog-prose strong {
   font-weight: 700;
+}
+
+.blog-admin .blog-editor-scroll {
+  height: clamp(20rem, 55dvh, 32rem);
+  overflow-y: scroll;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  /* Always reserve a full-width scrollbar for mouse users, including empty drafts. */
+  scrollbar-width: auto;
+  scrollbar-color: var(--muted-foreground) var(--muted);
+  -ms-overflow-style: auto;
+}
+.blog-admin .blog-editor-scroll::-webkit-scrollbar {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+.blog-admin .blog-editor-scroll::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+  border: 3px solid var(--muted);
+  border-radius: 8px;
+  min-height: 32px;
+}
+.blog-admin .blog-editor-scroll::-webkit-scrollbar-track {
+  background: var(--muted);
+}
+.blog-admin .blog-editor-scroll .tiptap {
+  min-height: 100%;
+}
+.blog-admin .blog-editor-scroll .tableWrapper {
+  overflow-x: auto;
+}
+.dark .blog-admin .blog-prose a {
+  color: #60a5fa;
+}
+.blog-admin .blog-prose a:hover {
+  text-decoration: none;
+}
+.blog-admin .blog-prose a:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
 }
