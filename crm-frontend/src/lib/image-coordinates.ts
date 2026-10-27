@@ -1,24 +1,3 @@
-export interface Coordinates {
-  latitude: number;
-  longitude: number;
-}
-
-function validCoordinates(value: Coordinates | undefined): value is Coordinates {
-  return !!value && Number.isFinite(value.latitude) && Number.isFinite(value.longitude)
-    && Math.abs(value.latitude) <= 90 && Math.abs(value.longitude) <= 180;
-}
-
-/** GPS is optional: missing, malformed or unsupported metadata never blocks a photo. */
-export async function readImageCoordinates(file: Blob): Promise<Coordinates | null> {
-  try {
-    const { gps } = await import("exifr");
-    const coordinates = await gps(file);
-    return validCoordinates(coordinates) ? coordinates : null;
-  } catch {
-    return null;
-  }
-}
-
 /** Keep existing coordinate-bearing Maps links editable while old records migrate. */
 export function readStoredCoordinates(data: {
   latitude?: number | string | null;

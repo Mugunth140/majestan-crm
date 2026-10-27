@@ -16,9 +16,10 @@ const IMGPROXY_BASE =
 export function buildWatermarkedImageUrl(
   sourceUrl: string,
   scale = 0.2,
+  quality = 85,
 ): string {
   return (
-    `${IMGPROXY_BASE}/insecure/rs:fit:1920:1080:0/q:85/` +
+    `${IMGPROXY_BASE}/insecure/rs:fit:1920:1080:0/q:${quality}/` +
     `wm:${WATERMARK_OPACITY}:ce:0:0:${scale}/format:webp/plain/${sourceUrl}`
   );
 }

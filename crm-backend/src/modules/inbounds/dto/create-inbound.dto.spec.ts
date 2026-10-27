@@ -59,13 +59,28 @@ function staffRentPayload(assignedStaffId: any) {
 }
 
 describe('CreateInboundDto (inbound form contract)', () => {
+  it.each([undefined, null, '', '   '])('requires a category on new submissions: %s', async (property_category) => {
+    const errors = await pipeValidate(CreateInboundDto, { property_category, mobile_number: '9876543210' });
+    expect(errors.some(e => e.property === 'property_category')).toBe(true);
+  });
+
+  it.each([undefined, '', '   ', '123', 'abcdefghij', '1234567890123456'])('requires a valid mobile number: %s', async (mobile_number) => {
+    const errors = await pipeValidate(CreateInboundDto, { property_category: 'commercial', mobile_number });
+    expect(errors.some(e => e.property === 'mobile_number')).toBe(true);
+  });
+  it('allows the same mobile number on multiple submissions', async () => {
+    const payload = { property_category: 'commercial', mobile_number: '+91 98765 43210' };
+    expect(await pipeValidate(CreateInboundDto, payload)).toEqual([]);
+    expect(await pipeValidate(CreateInboundDto, payload)).toEqual([]);
+  });
+
   it.each([
     { property_category: 'commercial' },
     { property_category: 'industrial', latitude: null, longitude: null },
     { property_category: 'residential', latitude: 0, longitude: 0 },
     { property_category: 'agricultural', latitude: -33.86, longitude: 151.2 },
   ])('accepts quick capture with optional coordinates: %o', async (payload) => {
-    expect(await pipeValidate(CreateInboundDto, payload)).toEqual([]);
+    expect(await pipeValidate(CreateInboundDto, { mobile_number: '9876543210', ...payload })).toEqual([]);
   });
 
   it.each([
@@ -90,8 +105,8 @@ describe('CreateInboundDto (inbound form contract)', () => {
     expect(errors).toEqual([]);
   });
 
-  it('accepts a minimal payload (mobile only)', async () => {
-    const errors = await pipeValidate(CreateInboundDto, { mobile_number: '+91 98765 43210' });
+  it('accepts a minimal payload with category and mobile number', async () => {
+    const errors = await pipeValidate(CreateInboundDto, { property_category: 'commercial', mobile_number: '+91 98765 43210' });
     expect(errors).toEqual([]);
   });
 

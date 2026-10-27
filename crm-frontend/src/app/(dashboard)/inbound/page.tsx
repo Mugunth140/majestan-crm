@@ -299,6 +299,17 @@ export default function InboundPage() {
       },
     },
     {
+      accessorKey: "submission_status",
+      header: "Submission",
+      cell: ({ row }) => {
+        const repeat = row.original.submission_status === "Repeat";
+        return <Badge variant="outline" title={repeat ? "This mobile number appears on an earlier inbound. Staff verification required." : "First inbound for this mobile number."}
+          className={repeat ? STATUS_STYLES["Pending Verification"] : STATUS_STYLES["Approved"]}>
+          {repeat ? "Repeat" : "New"}
+        </Badge>;
+      },
+    },
+    {
       id: "address",
       header: "Address",
       
@@ -582,7 +593,7 @@ export default function InboundPage() {
             })}
           </div>
           
-          <div className={`flex items-center h-9 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "hidden opacity-0 pointer-events-none"}`}>
+          <div className={`ml-auto shrink-0 flex items-center h-9 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "hidden opacity-0 pointer-events-none"}`}>
             {[
               { id: "pending", label: "Follow Up" },
               { id: "completed", label: "Followed Up" }

@@ -2,7 +2,7 @@
 
 import { apiFetch } from "@/lib/api-fetch";
 import { useIsMobile } from "@/hooks/use-device";
-import { readImageCoordinates, readStoredCoordinates } from "@/lib/image-coordinates";
+import { readStoredCoordinates } from "@/lib/image-coordinates";
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense, useRef } from "react";
@@ -216,10 +216,6 @@ function InboundForm() {
   const editId = searchParams.get("edit");
   const isMobile = useIsMobile();
   const isQuickCapture = isMobile && !editId;
-  const metadataRequest = useRef(0);
-  const coordinateRevision = useRef(0);
-  const [isReadingMetadata, setIsReadingMetadata] = useState(false);
-  const [metadataMessage, setMetadataMessage] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -391,38 +387,21 @@ function InboundForm() {
     setBrokeragePaidBy(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val]);
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("File size must be less than 5MB");
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("File size must be 10 MB or smaller");
       e.target.value = "";
       return;
     }
     setSelectedFile(file);
     setPreviewUrl(URL.createObjectURL(file));
     setUploadProgress("idle");
-    const request = ++metadataRequest.current;
-    const revision = coordinateRevision.current;
-    setIsReadingMetadata(true);
-    setMetadataMessage("");
-    const coordinates = await readImageCoordinates(file);
-    if (request !== metadataRequest.current) return;
-    if (coordinates && revision === coordinateRevision.current) {
-      setLatitude(String(coordinates.latitude));
-      setLongitude(String(coordinates.longitude));
-      setMetadataMessage("Latitude and longitude filled from photo metadata.");
-    } else {
-      setMetadataMessage(coordinates
-        ? "Photo ready. Your location changes have been kept."
-        : "No GPS metadata found. You can upload this photo without a location.");
-    }
-    setIsReadingMetadata(false);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (isReadingMetadata) return;
     setIsSubmitting(true);
 
     try {
@@ -433,6 +412,13 @@ function InboundForm() {
       formData.forEach((value, key) => {
         payload[key] = value;
       });
+
+      if (!selectedCategory) throw new Error("Select a property category.");
+      const mobile = String(formData.get("mobile_number") || "").trim();
+      if (!/^\+?(?:[ ()-]*\d){10,15}[ ()-]*$/.test(mobile)) {
+        throw new Error("Enter a valid mobile number with 10 to 15 digits.");
+      }
+      payload.mobile_number = mobile;
 
       // Override with controlled values
       payload.property_category = selectedCategory;
@@ -505,8 +491,7 @@ function InboundForm() {
       }
       const requestPayload = isQuickCapture ? {
         property_category: selectedCategory,
-        latitude: payload.latitude,
-        longitude: payload.longitude,
+        mobile_number: mobile,
       } : payload;
 
       const method = editId ? "PATCH" : "POST";
@@ -568,7 +553,6 @@ function InboundForm() {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
-        coordinateRevision.current++;
         setLatitude(String(latitude));
         setLongitude(String(longitude));
         setIsGettingLocation(false);
@@ -619,13 +603,13 @@ function InboundForm() {
         <div className="space-y-2">
           <label htmlFor="inbound-latitude" className="text-sm font-semibold">Latitude (optional)</label>
           <Input id="inbound-latitude" name="latitude" type="number" step="any" min={-90} max={90}
-            value={latitude} onChange={(e) => { coordinateRevision.current++; setLatitude(e.target.value); }}
+            value={latitude} onChange={(e) => { setLatitude(e.target.value); }}
             placeholder="e.g. 11.0168" className="h-12 rounded-xl bg-muted/30" />
         </div>
         <div className="space-y-2">
           <label htmlFor="inbound-longitude" className="text-sm font-semibold">Longitude (optional)</label>
           <Input id="inbound-longitude" name="longitude" type="number" step="any" min={-180} max={180}
-            value={longitude} onChange={(e) => { coordinateRevision.current++; setLongitude(e.target.value); }}
+            value={longitude} onChange={(e) => { setLongitude(e.target.value); }}
             placeholder="e.g. 76.9558" className="h-12 rounded-xl bg-muted/30" />
         </div>
       </div>
@@ -655,12 +639,17 @@ function InboundForm() {
         {isQuickCapture && (
           <div className="bg-card border rounded-2xl p-4 space-y-6">
             <div className="space-y-2">
-              <label className="text-sm font-semibold">Property category</label>
+              <label className="text-sm font-semibold">Property category *</label>
               <FormSelect name="_property_category" value={selectedCategory}
                 onValueChange={setSelectedCategory} placeholder="Select category"
                 options={PROPERTY_CATEGORIES} required />
             </div>
-            {coordinateFields}
+            <div className="space-y-2">
+              <label htmlFor="inbound-mobile" className="text-sm font-semibold">Mobile number *</label>
+              <Input id="inbound-mobile" name="mobile_number" type="tel" inputMode="tel"
+                autoComplete="tel" required minLength={10} maxLength={25}
+                placeholder="e.g. +91 98765 43210" className="h-12 rounded-xl bg-muted/30" />
+            </div>
           </div>
         )}
         {!isQuickCapture && (<>
@@ -1171,9 +1160,6 @@ function InboundForm() {
                   <button
                     type="button"
                     onClick={() => {
-                      metadataRequest.current++;
-                      setIsReadingMetadata(false);
-                      setMetadataMessage("");
                       setSelectedFile(null);
                       setPreviewUrl(null);
                       setUploadProgress("idle");
@@ -1210,12 +1196,6 @@ function InboundForm() {
               </div>
             )}
 
-            <p className="text-sm text-muted-foreground mb-4">
-              Photo GPS metadata fills latitude and longitude when available. Location is optional.
-            </p>
-            <p role="status" aria-live="polite" className="text-sm text-muted-foreground mb-4">
-              {isReadingMetadata ? "Reading photo location..." : metadataMessage}
-            </p>
             {/* Hidden file inputs */}
             <input
               ref={fileInputRef}
@@ -1289,7 +1269,7 @@ function InboundForm() {
           <Button type="button" variant="ghost" className="h-12 px-8 rounded-xl font-medium text-[15px] w-full sm:w-auto" onClick={() => router.push("/inbound")} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isSubmitting || isReadingMetadata} className="h-12 px-10 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-lg font-semibold flex items-center gap-2 text-[15px] active:scale-[0.97] w-full sm:w-auto">
+          <Button type="submit" disabled={isSubmitting} className="h-12 px-10 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-lg font-semibold flex items-center gap-2 text-[15px] active:scale-[0.97] w-full sm:w-auto">
             {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : (editId ? <Save size={18} /> : <CheckCircle2 size={18} />)}
             {isSubmitting ? "Saving..." : (editId ? "Update Inbound" : "Create Inbound")}
           </Button>

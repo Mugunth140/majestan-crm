@@ -8,6 +8,7 @@ import { InboundUnit } from '../../database/entities/inbound-unit.entity';
 import { PermissionsService } from '../permissions/permissions.service';
 import { S3Client } from 'bun';
 import { extname } from 'path';
+import { readInboundPhotoCoordinates, submissionStatuses } from './inbound-submissions';
 import { buildWatermarkedImageUrl } from '../../common/imgproxy-watermark';
 
 // Sensitive contact values masked for Team Lead / Staff without the
@@ -58,30 +59,43 @@ export class InboundsService {
   async uploadImage(id: number, file: Express.Multer.File) {
     const inbound = await this.mustFindOne(id);
 
-    if (file.size > 5 * 1024 * 1024) {
-      throw new BadRequestException('Image size exceeds 5MB limit');
+    if (file.size > 10 * 1024 * 1024) {
+      throw new BadRequestException('Image size exceeds 10MB limit');
     }
 
+    // Read the original buffer before imgproxy removes image metadata.
+    const coordinates = await readInboundPhotoCoordinates(file.buffer);
+    if (coordinates) {
+      inbound.latitude = coordinates.latitude;
+      inbound.longitude = coordinates.longitude;
+      inbound.google_map_location = '';
+    }
     const fileExt = extname(file.originalname);
     const tempFileKey = `inbounds/${inbound.property_id}/temp_${Date.now()}${fileExt}`;
 
-    const withTimeout = <T>(promise: Promise<T>, ms: number) => 
-      Promise.race([
-        promise,
-        new Promise<T>((_, reject) => setTimeout(() => reject(new Error('S3 Operation Timed Out')), ms))
-      ]);
-      
+    const withTimeout = async <T>(promise: Promise<T>, ms: number): Promise<T> => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        return await Promise.race([
+          promise,
+          new Promise<T>((_, reject) => { timer = setTimeout(() => reject(new Error('S3 Operation Timed Out')), ms); }),
+        ]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    };
+
     await withTimeout(this.s3Client.write(tempFileKey, file.buffer, {
       type: file.mimetype,
-    }), 5000);
+    }), 15000);
 
     const tempFileUrl = `${process.env.R2_PUBLIC_URL}/${tempFileKey}`;
 
     // Process image via Imgproxy (WebP + Watermark, shared faint opacity)
     try {
-      const imgproxyUrl = buildWatermarkedImageUrl(tempFileUrl);
+      const imgproxyUrl = buildWatermarkedImageUrl(tempFileUrl, 0.2, 80);
       const response = await fetch(imgproxyUrl, {
-        signal: AbortSignal.timeout(5000)
+        signal: AbortSignal.timeout(15000)
       });
       
       if (!response.ok) {
@@ -91,7 +105,7 @@ export class InboundsService {
       const processedBuffer = await response.arrayBuffer();
       const finalFileKey = `inbounds/${inbound.property_id}/image_${Date.now()}.webp`;
       
-      await withTimeout(this.s3Client.write(finalFileKey, Buffer.from(processedBuffer), { type: 'image/webp' }), 5000);
+      await withTimeout(this.s3Client.write(finalFileKey, Buffer.from(processedBuffer), { type: 'image/webp' }), 15000);
       
       // Cleanup temp file
       this.s3Client.delete(tempFileKey).catch(() => {});
@@ -179,6 +193,10 @@ export class InboundsService {
       order: { created_at: 'DESC' }
     });
 
+    const contactHistory = await this.inboundsRepository.find({
+      select: { id: true, mobile_number: true },
+    });
+    const statuses = submissionStatuses(contactHistory);
     const canSee = await this.canSeeContacts(user);
     return inbounds.map(inbound => {
       let nextFollowUpDate = null;
@@ -201,6 +219,7 @@ export class InboundsService {
 
       return {
         ...(canSee ? inbound : this.stripContacts(inbound)),
+        submission_status: statuses.get(inbound.id) || 'New',
         nextFollowUpDate,
         lastFollowedUpDate
       };

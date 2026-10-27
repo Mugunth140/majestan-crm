@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsInt, IsBoolean, IsNumber, IsArray, ValidateNested, MaxLength, IsLatitude, IsLongitude } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsBoolean, IsNumber, IsArray, ValidateNested, MaxLength, IsNotEmpty, Matches, IsLatitude, IsLongitude } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 export class InboundUnitDto {
@@ -24,15 +24,16 @@ export class InboundUnitDto {
  * Mirrors the Inbound entity columns actually sent by the inbound form
  * (crm-frontend/src/app/(dashboard)/inbound/new/page.tsx).
  *
- * Everything is optional: the form sends `null` for untouched controlled
- * selects, and required-ness is enforced by the frontend. Making anything
- * strictly required here reintroduces 400s on legitimate payloads.
+ * Category and mobile number are required on new submissions. Other fields are optional:
+ * the form sends `null` for untouched controlled selects. Requiring those
+ * fields would reject legitimate quick captures.
  */
 export class CreateInboundDto {
   // ── Basic / property ──────────────────────────────────────────────
-  @IsOptional()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsString()
-  property_category?: string;
+  @IsNotEmpty({ message: 'Select a property category' })
+  property_category!: string;
 
   @IsOptional()
   @IsString()
@@ -125,9 +126,10 @@ export class CreateInboundDto {
   @IsString()
   owner_name?: string;
 
-  @IsOptional()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsString()
-  mobile_number?: string;
+  @Matches(/^\+?(?:[ ()-]*\d){10,15}[ ()-]*$/, { message: 'Enter a valid mobile number with 10 to 15 digits' })
+  mobile_number!: string;
 
   @IsOptional()
   @IsString()

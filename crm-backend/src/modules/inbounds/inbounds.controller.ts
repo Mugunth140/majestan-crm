@@ -15,7 +15,7 @@ export class InboundsController {
 
   @Post(':id/image')
   @UseInterceptors(FileInterceptor('file', {
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB hard limit at multer layer
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB hard limit at multer layer
     fileFilter: (_req, file, cb) => {
       const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
       if (allowed.includes(file.mimetype)) {

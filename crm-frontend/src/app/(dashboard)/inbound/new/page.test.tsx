@@ -18,15 +18,19 @@ vi.mock("@/components/shared/form-select", () => ({
 }));
 
 describe("inbound form variants", () => {
-  it("shows category, photo upload and optional coordinates on mobile", () => {
+  it("shows category, required mobile and photo upload without coordinates on mobile", () => {
     device.mobile = true;
     device.edit = null;
     const html = renderToStaticMarkup(<NewInboundPage />);
     expect(html).toContain("Commercial");
     expect(html).toContain("Industrial");
     expect(html).toContain("Residential");
-    expect(html).toContain('name="latitude"');
-    expect(html).toContain('name="longitude"');
+    expect(html).not.toContain('name="latitude"');
+    expect(html).not.toContain('name="longitude"');
+    expect(html).toMatch(/<input(?=[^>]*name="mobile_number")(?=[^>]*required)[^>]*>/);
+    expect(html).toContain("Property category *");
+    expect(html).not.toContain("Existing numbers are accepted");
+    expect(html).not.toContain("Photo location is read");
     expect(html).toContain('capture="environment"');
     expect(html).toContain("Choose from Gallery");
     expect(html).not.toContain('name="property_title"');
