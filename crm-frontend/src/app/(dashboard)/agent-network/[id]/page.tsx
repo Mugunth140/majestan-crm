@@ -25,6 +25,7 @@ import {
   Briefcase, Mail, MessageSquare, Plus, ArrowUpRight,
   Clock, RefreshCw, History, Percent, Edit, ChevronLeft
 } from "lucide-react";
+import { contactLogIcon } from "@/lib/contact-log-utils";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -491,7 +492,7 @@ export default function AgentViewPage() {
                 {contactLogs.map((log: any) => (
                   <div key={log.id} className="flex gap-4 pb-4 relative">
                     <div className={`relative z-10 h-10 w-10 shrink-0 rounded-full border-2 border-background flex items-center justify-center ${CONTACT_TYPE_STYLES[log.contact_type] || "bg-gray-100"}`}>
-                      {CONTACT_TYPE_ICONS[log.contact_type] || <MessageSquare className="h-3.5 w-3.5" />}
+                      {contactLogIcon(log)}
                     </div>
                     <div className="flex-1 pt-1.5">
                       <div className="flex items-center justify-between gap-2 flex-wrap">

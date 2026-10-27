@@ -37,6 +37,7 @@ import {
   sortContactLogs,
   countByType,
   countCallDirections,
+  contactLogIcon,
 } from "@/lib/contact-log-utils";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -958,7 +959,7 @@ export default function InboundViewPage() {
                 {contactLogs.map((log: any) => (
                   <div key={log.id} className="relative flex gap-4 pb-5 last:pb-0">
                     <div className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-background ${CONTACT_TYPE_STYLES[log.contact_type] || "bg-muted text-muted-foreground"}`}>
-                      {CONTACT_TYPE_ICONS[log.contact_type] || <MessageSquare className="h-3.5 w-3.5" />}
+                      {contactLogIcon(log)}
                     </div>
                     <div className="min-w-0 flex-1 rounded-xl border bg-card px-3.5 py-3 shadow-sm">
                       <div className="flex items-start justify-between gap-3">

@@ -1,4 +1,4 @@
-import { Mail, MessageSquare, Phone, PhoneIncoming } from "lucide-react";
+import { Mail, MessageSquare, Phone, PhoneIncoming, PhoneMissed, PhoneOutgoing } from "lucide-react";
 
 // Shared contact-log presentation helpers, extracted from the leads detail
 // page (the reference implementation). Import here to keep every module's
@@ -16,6 +16,22 @@ export const CONTACT_TYPE_ICONS: Record<string, React.ReactNode> = {
   whatsapp: <Phone className="h-3.5 w-3.5" />,
   call:     <PhoneIncoming className="h-3.5 w-3.5" />,
 };
+
+const CALL_DIRECTION_ICONS: Record<string, React.ReactNode> = {
+  incoming: <PhoneIncoming className="h-3.5 w-3.5" />,
+  outgoing: <PhoneOutgoing className="h-3.5 w-3.5" />,
+  missed:   <PhoneMissed className="h-3.5 w-3.5" />,
+};
+
+// Timeline icon for one log: calls follow their direction, everything else
+// its contact type.
+export function contactLogIcon(log: { contact_type: string; call_direction?: string | null }): React.ReactNode {
+  if (log.contact_type === "call") {
+    const byDirection = CALL_DIRECTION_ICONS[(log.call_direction || "").toLowerCase()];
+    if (byDirection) return byDirection;
+  }
+  return CONTACT_TYPE_ICONS[log.contact_type] || <MessageSquare className="h-3.5 w-3.5" />;
+}
 
 export function formatTimestamp(ts: string) {
   const d = new Date(ts);
