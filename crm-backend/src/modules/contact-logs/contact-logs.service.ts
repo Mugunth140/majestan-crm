@@ -43,6 +43,9 @@ const MAX_SYNC_BATCH = 1000;
 const INBOUND_TRACK_KEY = 'inbounds.call_tracking';
 // Terminal inbound statuses — everything else counts as active for tracking.
 const INBOUND_ACTIVE_FILTER = `(status IS NULL OR status NOT IN ('Closed', 'Rejected'))`;
+// Final hiring outcomes — tracking stops once hiring is done either way.
+// 'Hold' is a pause, not an outcome, so held candidates stay tracked.
+const HR_ACTIVE_FILTER = `status NOT IN ('Joined', 'Rejected')`;
 
 const cleanDigits = (value: string | null | undefined) => (value || '').replace(/[^0-9]/g, '');
 
@@ -146,12 +149,12 @@ export class ContactLogsService {
       selectFor('agents', '', true),
       selectFor('assets', '', true),
     ]);
-    // HR candidates have no staff assignment — matched org-wide. Joined
-    // candidates are now employees: matching them would log every colleague's
-    // call with that person as candidate activity.
+    // HR candidates have no staff assignment — matched org-wide, until hiring
+    // ends. Joined candidates are employees (matching them logged every
+    // colleague's call as candidate activity); rejected ones are done.
     // NOTE: hr_candidates uses camelCase createdAt (not created_at).
     const hr = await this.dataSource.query(
-      `SELECT id, mobile, whatsapp, createdAt AS created_at FROM hr_candidates WHERE status <> 'Joined'`,
+      `SELECT id, mobile, whatsapp, createdAt AS created_at FROM hr_candidates WHERE ${HR_ACTIVE_FILTER}`,
     ).then((rows: any[]) => rows.map((row) => ({ table: 'hr_candidates', row, columns: ContactLogsService.NUMBER_COLUMNS['hr_candidates'] })));
     return [...leads, ...agents, ...inbounds, ...assets, ...hr];
   }

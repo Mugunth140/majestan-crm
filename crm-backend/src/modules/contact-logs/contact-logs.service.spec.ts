@@ -3,16 +3,22 @@ import { ContactLogsService } from './contact-logs.service';
 // Colleague's number also stored on an HR candidate (e.g. a hired candidate).
 const STAFF_NUMBER = '+91 93800 00093';
 const CANDIDATE_NUMBER = '9876543210';
+const since = '2026-09-01T00:00:00Z';
+const CANDIDATES = [
+  { id: 3, mobile: '9380000093', whatsapp: null, created_at: since, status: 'Interview Scheduled' },
+  { id: 4, mobile: CANDIDATE_NUMBER, whatsapp: null, created_at: since, status: 'Hold' },
+  { id: 5, mobile: '9000000005', whatsapp: null, created_at: since, status: 'Joined' },
+  { id: 6, mobile: '9000000006', whatsapp: null, created_at: since, status: 'Rejected' },
+];
 
 function makeService() {
   const inserted: { sql: string; params: unknown[] }[] = [];
   const query = jest.fn(async (sql: string) => {
     if (sql.includes('FROM users WHERE is_active = 1')) return [{ phone: STAFF_NUMBER, whatsapp_no: null }];
     if (sql.includes('FROM hr_candidates')) {
-      return [
-        { id: 3, mobile: '9380000093', whatsapp: null, created_at: '2026-09-01T00:00:00Z' },
-        { id: 4, mobile: CANDIDATE_NUMBER, whatsapp: null, created_at: '2026-09-01T00:00:00Z' },
-      ];
+      // Honour the service's status filter so closed candidates drop out.
+      const excluded = /status NOT IN \(([^)]*)\)/.exec(sql)?.[1] ?? '';
+      return CANDIDATES.filter((c) => !excluded.includes(`'${c.status}'`));
     }
     return [];
   });
@@ -31,6 +37,16 @@ const call = (sourceCallId: string, phoneNumber: string) => ({
 });
 
 describe('ContactLogsService staff-number guard', () => {
+  it('stops tracking candidates once hiring ends (Joined or Rejected), not on Hold', async () => {
+    const { service } = makeService();
+    const result = await service.syncCallLogs(14, [call('j', '9000000005'), call('r', '9000000006'), call('h', CANDIDATE_NUMBER)]);
+    expect(result.receipts).toEqual([
+      { sourceCallId: 'j', status: 'rejected', reason: 'no_number_match' },
+      { sourceCallId: 'r', status: 'rejected', reason: 'no_number_match' },
+      { sourceCallId: 'h', status: 'accepted' },
+    ]);
+  });
+
   it('leaves colleagues out of the device whitelist', async () => {
     const { service } = makeService();
     const numbers = (await service.getTrackableNumbers(14)).map((n) => n.number);
