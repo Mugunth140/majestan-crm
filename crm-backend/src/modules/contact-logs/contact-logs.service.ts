@@ -47,10 +47,15 @@ const INBOUND_ACTIVE_FILTER = `(status IS NULL OR status NOT IN ('Closed', 'Reje
 const cleanDigits = (value: string | null | undefined) => (value || '').replace(/[^0-9]/g, '');
 
 function numbersMatch(saved: string | null | undefined, observed: string): boolean {
-  const left = cleanDigits(saved);
-  const right = cleanDigits(observed);
+  // Leading zeros are a trunk prefix (09876…), not part of the subscriber number.
+  const left = cleanDigits(saved).replace(/^0+/, '');
+  const right = cleanDigits(observed).replace(/^0+/, '');
   if (left.length < MIN_MATCH_DIGITS || right.length < MIN_MATCH_DIGITS) return false;
   return left.endsWith(right) || right.endsWith(left);
+}
+
+function isStaffNumber(staffNumbers: string[], observed: string): boolean {
+  return staffNumbers.some((staff) => numbersMatch(staff, observed));
 }
 
 // Format a Date as UTC 'YYYY-MM-DD HH:mm:ss' for DATETIME columns.
@@ -83,12 +88,13 @@ export class ContactLogsService {
    * newer than `since`, so pre-assignment history is never sent.
    */
   async getTrackableNumbers(userId: number): Promise<{ number: string; since: string | null }[]> {
-    const rows = await this.fetchMatchRows(userId);
+    const [rows, staffNumbers] = await Promise.all([this.fetchMatchRows(userId), this.fetchStaffNumbers()]);
     const earliest = new Map<string, string | null>();
     for (const { row, columns } of rows) {
       for (const col of columns) {
         const value = row[col];
         if (typeof value !== 'string' || cleanDigits(value).length < MIN_MATCH_DIGITS) continue;
+        if (isStaffNumber(staffNumbers, value)) continue;
         const key = value.trim();
         const created = row.created_at ? new Date(row.created_at).toISOString() : null;
         const prev = earliest.get(key);
@@ -96,6 +102,20 @@ export class ContactLogsService {
       }
     }
     return Array.from(earliest.entries()).map(([number, since]) => ({ number, since }));
+  }
+
+  /**
+   * Phone numbers of active CRM users. A call to a colleague is never contact
+   * activity, even when their number also sits on a lead, candidate (e.g. a
+   * hired one) or other record — those calls are excluded from tracking.
+   */
+  private async fetchStaffNumbers(): Promise<string[]> {
+    const rows: any[] = await this.dataSource.query(
+      `SELECT phone, whatsapp_no FROM users WHERE is_active = 1`,
+    );
+    return rows
+      .flatMap((r) => [r.phone, r.whatsapp_no])
+      .filter((v): v is string => typeof v === 'string' && cleanDigits(v).length >= MIN_MATCH_DIGITS);
   }
 
   private async fetchMatchRows(userId: number) {
@@ -126,10 +146,12 @@ export class ContactLogsService {
       selectFor('agents', '', true),
       selectFor('assets', '', true),
     ]);
-    // HR candidates have no staff assignment — matched org-wide.
+    // HR candidates have no staff assignment — matched org-wide. Joined
+    // candidates are now employees: matching them would log every colleague's
+    // call with that person as candidate activity.
     // NOTE: hr_candidates uses camelCase createdAt (not created_at).
     const hr = await this.dataSource.query(
-      `SELECT id, mobile, whatsapp, createdAt AS created_at FROM hr_candidates`,
+      `SELECT id, mobile, whatsapp, createdAt AS created_at FROM hr_candidates WHERE status <> 'Joined'`,
     ).then((rows: any[]) => rows.map((row) => ({ table: 'hr_candidates', row, columns: ContactLogsService.NUMBER_COLUMNS['hr_candidates'] })));
     return [...leads, ...agents, ...inbounds, ...assets, ...hr];
   }
@@ -306,7 +328,7 @@ export class ContactLogsService {
     const receipts: LogReceipt[] = [];
     if (!Array.isArray(logs) || logs.length === 0) return { synced: 0, duplicates: 0, rejected: [], receipts };
 
-    const matchRows = await this.fetchMatchRows(userId);
+    const [matchRows, staffNumbers] = await Promise.all([this.fetchMatchRows(userId), this.fetchStaffNumbers()]);
     const seenInBatch = new Set<string>();
     const pending: { log: IncomingCallLog; table: string; entityId: number; callAt: Date }[] = [];
 
@@ -323,6 +345,10 @@ export class ContactLogsService {
       seenInBatch.add(log.sourceCallId);
 
       const callAt = new Date(log.timestamp);
+      if (isStaffNumber(staffNumbers, log.phoneNumber)) {
+        receipts.push({ sourceCallId: log.sourceCallId, status: 'rejected', reason: 'staff_number' });
+        continue;
+      }
       const match = this.matchCandidate(matchRows, log.phoneNumber);
       if (!match) {
         receipts.push({ sourceCallId: log.sourceCallId, status: 'rejected', reason: 'no_number_match' });
