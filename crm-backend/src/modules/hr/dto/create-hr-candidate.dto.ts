@@ -3,7 +3,10 @@ import {
   IsOptional,
   IsEnum,
   IsDateString,
+  IsInt,
+  Min,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { HrCandidateStatus } from '../../../database/entities/hr-candidate.entity';
 
 export class CreateHrCandidateDto {
@@ -28,6 +31,15 @@ export class CreateHrCandidateDto {
   @IsOptional()
   @IsString()
   state?: string;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1)
+  cityId?: number | null;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1)
+  hrSourceId?: number | null;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1)
+  assignedStaffId?: number | null;
 
   @IsString()
   department: string;

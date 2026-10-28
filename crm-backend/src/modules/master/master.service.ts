@@ -1,6 +1,7 @@
-import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, ConflictException, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { HrSource } from '../../database/entities/hr-source.entity';
 import { LeadSource } from '../../database/entities/lead-source.entity';
 import { PropertyType } from '../../database/entities/property-type.entity';
 import { RoomName } from '../../database/entities/room-name.entity';
@@ -169,6 +170,43 @@ export class MasterService {
     if (result.affected === 0) {
       throw new InternalServerErrorException('Source not found or could not be deleted');
     }
+    return { success: true };
+  }
+
+  async getHrSources(activeOnly = false) {
+    return this.crmDataSource.getRepository(HrSource).find({
+      ...(activeOnly ? { where: { is_active: true } } : {}), order: { name: 'ASC' },
+    });
+  }
+
+  async createHrSource(name: string) {
+    const repo = this.crmDataSource.getRepository(HrSource);
+    const existing = await repo.findOne({ where: { name } });
+    if (existing) return existing;
+    try { return await repo.save(repo.create({ name })); }
+    catch (error) {
+      if (error?.code === 'ER_DUP_ENTRY') throw new ConflictException('An HR source with this name already exists');
+      throw error;
+    }
+  }
+
+  async updateHrSource(id: number, body: { name: string; is_active?: boolean }) {
+    const repo = this.crmDataSource.getRepository(HrSource);
+    const source = await repo.findOne({ where: { id } });
+    if (!source) throw new NotFoundException('HR source not found');
+    Object.assign(source, body);
+    try { return await repo.save(source); }
+    catch (error) {
+      if (error?.code === 'ER_DUP_ENTRY') throw new ConflictException('An HR source with this name already exists');
+      throw error;
+    }
+  }
+
+  async deleteHrSource(id: number) {
+    const [usage] = await this.crmDataSource.query('SELECT COUNT(*) AS count FROM hr_candidates WHERE hrSourceId = ?', [id]);
+    if (Number(usage.count) > 0) throw new BadRequestException('HR source is in use. Deactivate it instead.');
+    const result = await this.crmDataSource.getRepository(HrSource).delete(id);
+    if (!result.affected) throw new NotFoundException('HR source not found');
     return { success: true };
   }
 

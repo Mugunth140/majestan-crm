@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Post, Put, Patch, Delete, Param, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, Patch, Delete, Param, Query, UseGuards, ParseIntPipe } from '@nestjs/common';
+import { CreateHrSourceDto, UpdateHrSourceDto } from './dto/hr-source.dto';
 import { MasterService } from './master.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -121,6 +122,25 @@ export class MasterController {
     const data = await this.masterService.deleteLeadSource(id);
     return { success: true, data };
   }
+
+  @Get('hr-sources')
+  async getHrSources() { return { success: true, data: await this.masterService.getHrSources(true) }; }
+
+  @Get('all-hr-sources')
+  async getAllHrSources() { return { success: true, data: await this.masterService.getHrSources() }; }
+
+  @Post('hr-sources') @Roles('Admin')
+  async createHrSource(@Body() body: CreateHrSourceDto) {
+    return { success: true, data: await this.masterService.createHrSource(body.name) };
+  }
+
+  @Put('hr-sources/:id') @Roles('Admin')
+  async updateHrSource(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateHrSourceDto) {
+    return { success: true, data: await this.masterService.updateHrSource(Number(id), body) };
+  }
+
+  @Delete('hr-sources/:id') @Roles('Admin')
+  async deleteHrSource(@Param('id', ParseIntPipe) id: number) { return this.masterService.deleteHrSource(Number(id)); }
 
   // ---- Road Names ----
 

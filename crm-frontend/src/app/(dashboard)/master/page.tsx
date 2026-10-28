@@ -52,6 +52,14 @@ export default function MasterRegistryOverview() {
           bg="bg-blue-500/10"
         />
         <RegistryCard
+          icon={Filter}
+          title="HR Sources"
+          description="Manage recruitment sources for HR candidates."
+          href="/master/hr-sources"
+          color="text-indigo-600"
+          bg="bg-indigo-500/10"
+        />
+        <RegistryCard
           icon={MapPin}
           title="Cities"
           description="Configure active cities for property listings and operations."

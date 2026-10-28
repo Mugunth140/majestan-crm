@@ -1,6 +1,7 @@
 "use client";
 
-import { apiFetch } from "@/lib/api-fetch";
+import { HrAssignmentDialog } from "@/components/hr/hr-assignment-dialog";
+import { apiFetch, apiJson } from "@/lib/api-fetch";
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -110,6 +111,20 @@ export default function HrDetail() {
   const params = useParams();
   const id = params?.id as string;
   const [candidate, setCandidate] = useState<any>(null);
+  const [assignmentOpen, setAssignmentOpen] = useState(false);
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [canAssign, setCanAssign] = useState(false);
+  useEffect(() => {
+    try { const user = JSON.parse(localStorage.getItem("crm_user") || "{}"); setCanAssign(["Super Admin", "Admin", "Manager", "Team Lead"].includes(user.role?.name || user.role)); } catch {}
+  }, []);
+  const assignCandidate = async (staffId: number | null) => {
+    setIsAssigning(true);
+    try {
+      await apiJson(`${API_URL}/hr/assign`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ candidateIds: [Number(id)], assignedStaffId: staffId }) });
+      setAssignmentOpen(false); toast.success("Candidate assignment updated."); await fetchCandidate();
+    } catch (reason) { toast.error(reason instanceof Error ? reason.message : "Assignment failed"); }
+    finally { setIsAssigning(false); }
+  };
   
   const [isFollowUpOpen, setIsFollowUpOpen] = useState(false);
   const [isContactLogsOpen, setIsContactLogsOpen] = useState(false);
@@ -223,6 +238,7 @@ export default function HrDetail() {
   return (
     <div className="flex flex-col md:h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
       
+      <HrAssignmentDialog open={assignmentOpen} count={1} busy={isAssigning} onClose={() => setAssignmentOpen(false)} onConfirm={assignCandidate} />
       {/* ── Mobile Header ── */}
       <MobileHeader title={candidate.name || "Candidate"} showBack />
 
@@ -243,6 +259,7 @@ export default function HrDetail() {
             <RefreshCw size={14} className="text-muted-foreground" />
           </Button>
           
+          {canAssign && <Button variant="outline" className="rounded-full" onClick={() => setAssignmentOpen(true)}>Assign Candidate</Button>}
           <Button onClick={() => router.push(`/hr/new?edit=${candidate.id}`)} className="rounded-full px-8 py-5 bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md">
             Edit Candidate
           </Button>
@@ -295,8 +312,12 @@ export default function HrDetail() {
                   <p className="text-[14px] font-medium text-foreground flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-muted-foreground" /> {[candidate.city, candidate.state].filter(Boolean).join(", ") || "—"}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Source</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">HR Source</p>
                   <p className="text-[14px] font-medium text-foreground">{candidate.recruitmentSource || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Assigned staff</p>
+                  <button type="button" disabled={!canAssign} onClick={() => setAssignmentOpen(true)} className="text-sm font-medium enabled:text-[#0052FF] enabled:hover:underline">{candidate.assignedStaff?.name || "Unassigned"}</button>
                 </div>
               </div>
             </div>

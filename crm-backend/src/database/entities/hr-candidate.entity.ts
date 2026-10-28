@@ -25,6 +25,7 @@ export class HrCandidate {
   @Column({ nullable: true }) email: string;
   @Column({ nullable: true }) city: string;
   @Column({ nullable: true }) state: string;
+  @Column({ type: 'int', nullable: true }) cityId: number | null;
 
   @Column() department: string;
   @Column() position: string;
@@ -34,6 +35,9 @@ export class HrCandidate {
   @Column({ nullable: true }) noticePeriod: string;
 
   @Column({ nullable: true }) recruitmentSource: string;
+  @Column({ type: 'int', nullable: true }) leadSourceId: number | null;
+  @Column({ type: 'int', nullable: true }) hrSourceId: number | null;
+  @Column({ type: 'int', nullable: true }) assignedStaffId: number | null;
   
   @Column({ type: 'date', nullable: true }) interviewDate: Date;
   @Column({ nullable: true }) interviewer: string;
@@ -53,6 +57,8 @@ export class HrCandidate {
   @Column({ nullable: true }) educationCertUrl: string;
   @Column({ nullable: true }) experienceCertUrl: string;
   @Column({ nullable: true }) photoUrl: string;
+
+  assignedStaff?: { id: number; name: string } | null;
 
   // follow_ups mapped manually
   

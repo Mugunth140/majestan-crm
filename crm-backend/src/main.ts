@@ -1,3 +1,4 @@
+import { hrImportJsonParser } from './common/middleware/hr-import-json';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
@@ -10,6 +11,8 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
   app.enableShutdownHooks();
+  // Allow the validated 500-row HR import without changing other JSON limits.
+  app.use('/api/v1/hr/bulk', hrImportJsonParser);
 
   // Browser calls are same-origin via the Next.js rewrite; FRONTEND_URL covers
   // any direct cross-origin use (e.g. local dev on a different port).

@@ -5,7 +5,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, Eye, Edit, Search, Filter, X, RefreshCw } from "lucide-react";
+import { Plus, Eye, Edit, Search, Filter, X, RefreshCw, FileSpreadsheet } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,10 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FormSelect } from "@/components/shared/form-select";
-import { apiFetch } from "@/lib/api-fetch";
+import { HrAssignmentDialog } from "@/components/hr/hr-assignment-dialog";
+import { HrBulkImportDialog, HrImportReview } from "@/components/hr/hr-bulk-import";
+import type { HrImportRow } from "@/lib/hr-import";
+import { apiFetch, apiJson } from "@/lib/api-fetch";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { MobileHeader } from "@/components/layout/mobile-header";
@@ -39,6 +42,8 @@ export default function HrPage() {
   const router = useRouter();
   const [candidates, setCandidates] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [pendingImports, setPendingImports] = useState<HrImportRow[]>([]);
 
   const [activeTab, setActiveTab] = usePersistedState<string>("hr:tab", "All Candidates", { allowed: ["All Candidates", "Action Required", "Rejected"] });
   const [actionFilter, setActionFilter] = usePersistedState<string>("hr:actionFilter", "Today", { allowed: ACTION_FILTERS });
@@ -46,7 +51,20 @@ export default function HrPage() {
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [todayViewMode, setTodayViewMode] = usePersistedState<"pending" | "completed">("hr:todayViewMode", "pending", { allowed: ["pending", "completed"] });
 
+  const [assignmentIds, setAssignmentIds] = useState<number[] | null>(null);
+  const [isAssigning, setIsAssigning] = useState(false);
   const [role, setRole] = useState<string>("");
+  const canAssign = ["Super Admin", "Admin", "Manager", "Team Lead"].includes(role);
+  const assignCandidates = async (staffId: number | null) => {
+    if (!assignmentIds?.length) return;
+    setIsAssigning(true);
+    try {
+      await apiJson(`${API_URL}/hr/assign`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ candidateIds: assignmentIds, assignedStaffId: staffId }) });
+      toast.success(`${assignmentIds.length} candidate(s) ${staffId === null ? "unassigned" : "assigned"}.`);
+      setAssignmentIds(null); fetchCandidates();
+    } catch (reason) { toast.error(reason instanceof Error ? reason.message : "Assignment failed"); }
+    finally { setIsAssigning(false); }
+  };
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
@@ -224,6 +242,12 @@ export default function HrPage() {
     },
     { accessorKey: "name", header: "Candidate Name" },
     { accessorKey: "mobile", header: "Mobile Number" },
+    { id: "assignee", header: "Assigned staff", cell: ({ row }: any) => (
+      <button type="button" disabled={!canAssign} onClick={() => setAssignmentIds([row.original.id])}
+        className="text-left text-sm disabled:cursor-default enabled:text-[#0052FF] enabled:hover:underline">
+        {row.original.assignedStaff ? `#${row.original.assignedStaff.id} ${row.original.assignedStaff.name}` : "Unassigned"}
+      </button>
+    ) },
     { accessorKey: "department", header: "Department" },
     { accessorKey: "position", header: "Position" },
     { accessorKey: "experience", header: "Experience" },
@@ -485,18 +509,15 @@ export default function HrPage() {
             showDeleteAction={role === "Admin"}
             onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
             renderToolbarActions={(selectedRows) => {
-              if (selectedRows.length !== 1) return null;
+              if (!selectedRows.length) return null;
               const row = selectedRows[0];
-              return (
-                <>
-                  <Button variant="outline" size="sm" onClick={() => router.push("/hr/" + row.id)}>
-                    <Eye size={15} className="mr-1.5" /> View
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => router.push("/hr/new?edit=" + row.id)}>
-                    <Edit size={15} className="mr-1.5" /> Edit
-                  </Button>
-                </>
-              );
+              return <>
+                {canAssign && <Button variant="outline" size="sm" onClick={() => setAssignmentIds(selectedRows.map(item => item.id))}>Assign Selected</Button>}
+                {selectedRows.length === 1 && <>
+                  <Button variant="outline" size="sm" onClick={() => router.push("/hr/" + row.id)}><Eye size={15} className="mr-1.5" /> View</Button>
+                  <Button variant="outline" size="sm" onClick={() => router.push("/hr/new?edit=" + row.id)}><Edit size={15} className="mr-1.5" /> Edit</Button>
+                </>}
+              </>;
             }}
           />
         )}
@@ -519,6 +540,10 @@ export default function HrPage() {
                 <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={fetchCandidates} title="Refresh">
                   <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
                 </Button>
+                <Button onClick={() => setIsImportOpen(true)} disabled={pendingImports.length > 0}
+                  className="inline-flex h-12 rounded-full bg-card px-5 text-[14px] font-medium shadow-sm border border-border/60 hover:bg-muted/50 items-center gap-2 text-foreground">
+                  <FileSpreadsheet size={16} className="text-muted-foreground" />Bulk Import
+                </Button>
                 <Link href="/hr/new" className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
                   <Plus size={18} />
                   Add New Candidate
@@ -528,6 +553,14 @@ export default function HrPage() {
           }
         />
 
+        <Device desktop={null} mobile={
+          <div className="px-4"><Button variant="outline" onClick={() => setIsImportOpen(true)} disabled={pendingImports.length > 0}
+            className="h-12 rounded-full px-5 gap-2"><FileSpreadsheet size={16} />Bulk Import</Button></div>
+        } />
+        {pendingImports.length > 0 ? (
+          <HrImportReview rows={pendingImports} existing={candidates} onCancel={() => setPendingImports([])}
+            onImported={() => { setPendingImports([]); setActiveTab("All Candidates"); setSearchQuery(""); clearFilters(); fetchCandidates(); }} />
+        ) : (<>
         {/* Filters + Table */}
         <Device mobile={mobileFilters} desktop={desktopFilters} />
 
@@ -545,25 +578,25 @@ export default function HrPage() {
                   showDeleteAction={role === "Admin"}
                   onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
                   renderToolbarActions={(selectedRows) => {
-                    if (selectedRows.length !== 1) return null;
-                    const row = selectedRows[0];
-                    return (
-                      <>
-                        <Button variant="outline" size="sm" onClick={() => router.push("/hr/" + row.id)}>
-                          <Eye size={15} className="mr-1.5" /> View
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => router.push("/hr/new?edit=" + row.id)}>
-                          <Edit size={15} className="mr-1.5" /> Edit
-                        </Button>
-                      </>
-                    );
-                  }}
+              if (!selectedRows.length) return null;
+              const row = selectedRows[0];
+              return <>
+                {canAssign && <Button variant="outline" size="sm" onClick={() => setAssignmentIds(selectedRows.map(item => item.id))}>Assign Selected</Button>}
+                {selectedRows.length === 1 && <>
+                  <Button variant="outline" size="sm" onClick={() => router.push("/hr/" + row.id)}><Eye size={15} className="mr-1.5" /> View</Button>
+                  <Button variant="outline" size="sm" onClick={() => router.push("/hr/new?edit=" + row.id)}><Edit size={15} className="mr-1.5" /> Edit</Button>
+                </>}
+              </>;
+            }}
                 />
               )}
             </div>
           }
         />
+        </>)}
       </div>
+      <HrAssignmentDialog open={assignmentIds !== null} count={assignmentIds?.length || 0} busy={isAssigning} onClose={() => setAssignmentIds(null)} onConfirm={assignCandidates} />
+      <HrBulkImportDialog open={isImportOpen} onOpenChange={setIsImportOpen} onParsed={setPendingImports} />
 
       <Dialog open={bulkDeleteIds !== null} onOpenChange={(open) => !open && setBulkDeleteIds(null)}>
         <DialogContent className="sm:max-w-[425px]">

@@ -1,3 +1,5 @@
+import { User } from '../../database/entities/user.entity';
+import { MasterModule } from '../master/master.module';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { HrCandidate } from '../../database/entities/hr-candidate.entity';
@@ -8,7 +10,7 @@ import { HrController } from './hr.controller';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([HrCandidate, HrFollowUp, HrContactLog]), AuthModule],
+  imports: [TypeOrmModule.forFeature([HrCandidate, HrFollowUp, HrContactLog, User]), AuthModule, MasterModule],
   controllers: [HrController],
   providers: [HrService],
 })

@@ -1,8 +1,10 @@
 "use client";
 
+import { loadHrMasters, type HrMasters } from "@/lib/hr-import";
+import { loadHrStates, hrSourceOptions } from "@/lib/hr-candidate-options";
 import { apiFetch } from "@/lib/api-fetch";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,17 +26,6 @@ const DEPARTMENTS = [
   { label: "Accounts", value: "Accounts" }
 ];
 
-const SOURCES = [
-  { label: "Nithra", value: "Nithra" },
-  { label: "Indeed", value: "Indeed" },
-  { label: "LinkedIn", value: "LinkedIn" },
-  { label: "Referral", value: "Referral" },
-  { label: "Walk-in", value: "Walk-in" },
-  { label: "Company Website", value: "Company Website" },
-  { label: "Consultancy", value: "Consultancy" },
-  { label: "Social Media", value: "Social Media" },
-  { label: "Other", value: "Other" }
-];
 
 function HrCandidateForm() {
   const router = useRouter();
@@ -45,12 +36,33 @@ function HrCandidateForm() {
   const [isLoading, setIsLoading] = useState(!!editId);
   
   const [formData, setFormData] = useState({
-    name: "", mobile: "", whatsapp: "", email: "", city: "", state: "",
+    name: "", mobile: "", whatsapp: "", email: "", city: "", state: "", assignedStaffId: "", hrSourceId: "",
     department: "", position: "", experience: "", currentSalary: "", expectedSalary: "", noticePeriod: "",
     recruitmentSource: "",
     interviewDate: "", interviewer: "", interviewRound: "", interviewFeedback: "",
     status: "New Application"
   });
+
+  const [masters, setMasters] = useState<HrMasters>({ sources: [], staff: [] });
+  const [states, setStates] = useState<string[]>([]);
+  const [canAssign, setCanAssign] = useState(false);
+  const [currentAssigneeName, setCurrentAssigneeName] = useState("");
+  useEffect(() => {
+    try { const user = JSON.parse(localStorage.getItem("crm_user") || "{}"); setCanAssign(["Super Admin", "Admin", "Manager", "Team Lead"].includes(user.role?.name || user.role)); } catch {}
+  }, []);
+  const [isLoadingMasters, setIsLoadingMasters] = useState(true);
+  const [masterError, setMasterError] = useState("");
+  const fetchMasters = useCallback(async () => {
+    setIsLoadingMasters(true); setMasterError("");
+    try { const [data, states] = await Promise.all([loadHrMasters(), loadHrStates()]); setMasters(data); setStates(states); }
+    catch { setMasterError("Could not load HR sources, staff and states. Please retry."); }
+    finally { setIsLoadingMasters(false); }
+  }, []);
+  useEffect(() => { void fetchMasters(); }, [fetchMasters]);
+  const stateOptions = [...new Set([...states, formData.state].filter(Boolean))].sort().map(state => ({ label: state, value: state }));
+  const staffOptions = [{ label: "Unassigned", value: "unassigned" }, ...masters.staff.map(staff => ({ label: `#${staff.id} ${staff.name}`, value: String(staff.id) }))];
+  if (formData.assignedStaffId && !masters.staff.some(staff => String(staff.id) === formData.assignedStaffId)) staffOptions.push({ label: currentAssigneeName || `#${formData.assignedStaffId}`, value: formData.assignedStaffId });
+  const sourceOptions = hrSourceOptions(masters.sources, formData);
 
   const [resumeFile, setResumeFile] = useState<File | null>(null);
 
@@ -60,8 +72,10 @@ function HrCandidateForm() {
         .then(res => res.json())
         .then(data => {
           if (data) {
+            setCurrentAssigneeName(data.assignedStaff?.name || "");
             setFormData({
               name: data.name || "", mobile: data.mobile || "", whatsapp: data.whatsapp || "", email: data.email || "", city: data.city || "", state: data.state || "",
+              assignedStaffId: data.assignedStaffId != null ? String(data.assignedStaffId) : "", hrSourceId: data.hrSourceId != null ? String(data.hrSourceId) : "",
               department: data.department || "", position: data.position || "", experience: data.experience || "", currentSalary: data.currentSalary || "", expectedSalary: data.expectedSalary || "", noticePeriod: data.noticePeriod || "",
               recruitmentSource: data.recruitmentSource || "",
               interviewDate: data.interviewDate || "", interviewer: data.interviewer || "", interviewRound: data.interviewRound || "", interviewFeedback: data.interviewFeedback || "",
@@ -82,7 +96,12 @@ function HrCandidateForm() {
       const url = editId ? `${API_URL}/hr/${editId}` : `${API_URL}/hr`;
       const method = editId ? "PATCH" : "POST";
 
-      const payload = { ...formData };
+      const payload = {
+        ...formData,
+        cityId: null,
+        hrSourceId: /^\d+$/.test(sourceOptions.value) ? Number(sourceOptions.value) : null,
+        assignedStaffId: formData.assignedStaffId ? Number(formData.assignedStaffId) : null,
+      };
       if (!payload.interviewDate) {
         (payload as Record<string, unknown>).interviewDate = null;
       }
@@ -152,6 +171,9 @@ function HrCandidateForm() {
         </div>
       </div>
 
+      {masterError && <div role="alert" className="text-sm text-destructive flex items-center gap-3">
+        {masterError}<Button type="button" variant="outline" onClick={fetchMasters}>Retry</Button>
+      </div>}
       <form onSubmit={handleSubmit} className="space-y-6">
         
         {/* Basic Information */}
@@ -176,11 +198,13 @@ function HrCandidateForm() {
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">City</label>
-              <Input name="city" value={formData.city} onChange={handleChange} placeholder="e.g. Bangalore" className="h-12 rounded-xl bg-muted/30" />
+              <Input name="city" value={formData.city} onChange={handleChange} placeholder="Enter City" className="h-12 rounded-xl bg-muted/30" />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">State</label>
-              <Input name="state" value={formData.state} onChange={handleChange} placeholder="e.g. Karnataka" className="h-12 rounded-xl bg-muted/30" />
+              <FormSelect name="state" value={formData.state}
+                onValueChange={(value: string) => setFormData(previous => ({ ...previous, state: value }))} placeholder={isLoadingMasters ? "Loading states..." : "Select State"}
+                options={stateOptions} disabled={isLoadingMasters || !!masterError} />
             </div>
           </div>
         </div>
@@ -216,13 +240,26 @@ function HrCandidateForm() {
           </div>
         </div>
 
+        {canAssign && <div className="bg-card border rounded-2xl p-8 shadow-sm">
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Assigned staff</label>
+            <FormSelect name="assignedStaffId" value={formData.assignedStaffId || "unassigned"}
+              onValueChange={(value: string) => setFormData(previous => ({ ...previous, assignedStaffId: value === "unassigned" ? "" : value }))}
+              placeholder="Select HR staff" options={staffOptions} disabled={isLoadingMasters || !!masterError} />
+          </div>
+        </div>}
+
         {/* Recruitment & Interview */}
         <div className="bg-card border rounded-2xl p-8 shadow-sm">
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Recruitment & Interview</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Recruitment Source</label>
-              <FormSelect name="recruitmentSource" value={formData.recruitmentSource} onValueChange={(val: string) => setFormData(p => ({...p, recruitmentSource: val}))} placeholder="Select Source" options={SOURCES} />
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">HR Source</label>
+              <FormSelect name="hrSourceId" value={sourceOptions.value} onValueChange={(value: string) => {
+                const source = masters.sources.find(item => String(item.id) === value);
+                if (source) setFormData(previous => ({ ...previous, hrSourceId: value, recruitmentSource: source.name }));
+              }} placeholder={isLoadingMasters ? "Loading sources..." : "Select Source"} options={sourceOptions.options}
+                disabled={isLoadingMasters || !!masterError} />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Interview Date</label>

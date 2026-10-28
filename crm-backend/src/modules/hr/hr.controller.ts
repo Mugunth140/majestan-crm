@@ -1,5 +1,9 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException, Put, UseGuards, ParseEnumPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException, Put, UseGuards, ParseEnumPipe, Request } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { AssignHrCandidatesDto } from './dto/assign-hr-candidates.dto';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { BulkImportHrDto } from './dto/bulk-import-hr.dto';
 import { HrService } from './hr.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateHrCandidateDto } from './dto/create-hr-candidate.dto';
@@ -38,13 +42,24 @@ export class HrController {
   constructor(private readonly hrService: HrService) {}
 
   @Get() findAll() { return this.hrService.findAll(); }
+
+  @Get('staff-list')
+  async staffList() { return { success: true, data: await this.hrService.getAssignableStaff() }; }
+
+  @Post('assign') @UseGuards(RolesGuard) @Roles('Admin', 'Manager', 'Team Lead')
+  assignCandidates(@Body() body: AssignHrCandidatesDto, @Request() req: any) {
+    return this.hrService.assignCandidates(body.candidateIds, body.assignedStaffId, req.user);
+  }
   
+  @Post('bulk')
+  bulkImport(@Body() body: BulkImportHrDto, @Request() req: any) { return this.hrService.bulkImport(body.candidates, req.user); }
+
   @Get(':id') findOne(@Param('id') id: string) { return this.hrService.findOne(+id); }
   
-  @Post() create(@Body() createDto: CreateHrCandidateDto) { return this.hrService.create(createDto); }
+  @Post() create(@Body() createDto: CreateHrCandidateDto, @Request() req: any) { return this.hrService.create(createDto, req.user); }
   
-  @Patch(':id') update(@Param('id') id: string, @Body() updateDto: UpdateHrCandidateDto) {
-    return this.hrService.update(+id, updateDto);
+  @Patch(':id') update(@Param('id') id: string, @Body() updateDto: UpdateHrCandidateDto, @Request() req: any) {
+    return this.hrService.update(+id, updateDto, req.user);
   }
   
   @Delete(':id') remove(@Param('id') id: string) { return this.hrService.remove(+id); }
