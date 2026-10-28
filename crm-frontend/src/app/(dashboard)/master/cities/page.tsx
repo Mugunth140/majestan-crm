@@ -221,6 +221,7 @@ export default function MasterCitiesPage() {
         </div>
       ),
     },
+    { accessorKey: "id", header: "ID" },
     {
       accessorKey: "city_name",
       header: "City",

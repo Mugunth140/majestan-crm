@@ -124,6 +124,9 @@ export class Inbound {
   @Column({ type: 'varchar', nullable: true })
   alternate_contact: string;
 
+  @Column({ type: 'text', nullable: true })
+  alternative_contact: string;
+
   @Column({ type: 'boolean', default: false })
   pan_available: boolean;
 

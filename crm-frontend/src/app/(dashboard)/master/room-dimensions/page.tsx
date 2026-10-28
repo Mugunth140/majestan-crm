@@ -215,6 +215,7 @@ export default function RoomDimensionsMasterPage() {
         </div>
       ),
     },
+    { accessorKey: "id", header: "ID" },
     {
       accessorKey: "name",
       header: "Dimensions",

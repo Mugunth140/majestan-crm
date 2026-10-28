@@ -156,6 +156,12 @@ export class CreateInboundDto {
   alternate_contact?: string;
 
   @IsOptional()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  @IsString()
+  @MaxLength(1000)
+  alternative_contact?: string;
+
+  @IsOptional()
   @IsBoolean()
   pan_available?: boolean;
 

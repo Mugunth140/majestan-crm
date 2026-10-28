@@ -186,6 +186,7 @@ export default function PropertyTypesMasterPage() {
         </div>
       ),
     },
+    { accessorKey: "id", header: "ID" },
     { 
       accessorKey: "name", 
       header: "Property Type",

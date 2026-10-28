@@ -228,6 +228,7 @@ export default function MasterSublocationsPage() {
         </div>
       ),
     },
+    { accessorKey: "id", header: "ID" },
     {
       accessorKey: "locality_name",
       header: "Sublocation",

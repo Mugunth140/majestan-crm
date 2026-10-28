@@ -424,6 +424,7 @@ function InboundForm() {
         throw new Error("Enter a valid mobile number with 10 to 15 digits.");
       }
       payload.mobile_number = mobile;
+      payload.alternative_contact = String(formData.get("alternative_contact") || "").trim() || null;
 
       // Override with controlled values
       payload.inbound_status = selectedInboundStatus;
@@ -500,6 +501,7 @@ function InboundForm() {
         mobile_number: mobile,
         inbound_status: selectedInboundStatus,
         alternate_contact: String(formData.get("alternate_contact") || "").trim() || null,
+        alternative_contact: payload.alternative_contact,
       } : payload;
 
       const method = editId ? "PATCH" : "POST";
@@ -672,7 +674,12 @@ function InboundForm() {
                 placeholder="e.g. +91 98765 43210" className="h-12 rounded-xl bg-muted/30" />
             </div>
             <div className="space-y-2">
-              <label htmlFor="inbound-alternate-contact" className="text-sm font-semibold">Alternate contact</label>
+              <label htmlFor="inbound-alternative-contact" className="text-sm font-semibold">Alternative contact</label>
+              <Input id="inbound-alternative-contact" name="alternative_contact" type="text" maxLength={1000}
+                placeholder="Name or other contact details" className="h-12 rounded-xl bg-muted/30" />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="inbound-alternate-contact" className="text-sm font-semibold">Alternate number</label>
               <Input id="inbound-alternate-contact" name="alternate_contact" type="tel" inputMode="tel"
                 autoComplete="tel" placeholder="Alternate number" className="h-12 rounded-xl bg-muted/30" />
             </div>
@@ -1004,11 +1011,19 @@ function InboundForm() {
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Email Id</label>
               <Input name="email" defaultValue={inboundData?.email || ""} type="email" placeholder="owner@example.com" className="h-12 rounded-xl bg-muted/30" />
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Alternate Contact</label>
-              <Input name="alternate_contact" defaultValue={inboundData?.alternate_contact || ""} placeholder="Alternate Number" className="h-12 rounded-xl bg-muted/30" />
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label htmlFor="desktop-alternative-contact" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Alternative Contact</label>
+                <Input id="desktop-alternative-contact" name="alternative_contact" type="text" maxLength={1000}
+                  defaultValue={inboundData?.alternative_contact || ""} placeholder="Name or other contact details"
+                  className="h-12 rounded-xl bg-muted/30" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Alternate Number</label>
+                <Input name="alternate_contact" defaultValue={inboundData?.alternate_contact || ""} placeholder="Alternate Number" className="h-12 rounded-xl bg-muted/30" />
+              </div>
             </div>
-            
+
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Preferred Contact Time</label>
               <TimePicker

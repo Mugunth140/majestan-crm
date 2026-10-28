@@ -188,6 +188,7 @@ export default function RoomNamesMasterPage() {
         </div>
       ),
     },
+    { accessorKey: "id", header: "ID" },
     {
       accessorKey: "name",
       header: "Room Name",

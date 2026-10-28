@@ -189,6 +189,7 @@ export default function FurnishingItemsMasterPage() {
         </div>
       ),
     },
+    { accessorKey: "id", header: "ID" },
     {
       accessorKey: "name",
       header: "Item",

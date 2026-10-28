@@ -222,6 +222,7 @@ export default function AmenitiesMasterPage() {
         </div>
       ),
     },
+    { accessorKey: "id", header: "ID" },
     {
       accessorKey: "name",
       header: "Amenity",

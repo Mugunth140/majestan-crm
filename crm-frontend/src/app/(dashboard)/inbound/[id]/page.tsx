@@ -808,6 +808,14 @@ export default function InboundViewPage() {
                     )}
                   </div>
                 </div>
+                <div className="flex justify-between items-start gap-4 py-2 border-b border-border/30 last:border-0">
+                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide shrink-0">Alternative Contact</span>
+                  <span className="font-medium text-sm text-right min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                    {canSeeContacts ? (inbound.alternative_contact || "\u2014") : (
+                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Lock className="h-3 w-3" /> Restricted</span>
+                    )}
+                  </span>
+                </div>
                 <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
                   <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide shrink-0">Email</span>
                   <div className="flex items-center gap-3 min-w-0">

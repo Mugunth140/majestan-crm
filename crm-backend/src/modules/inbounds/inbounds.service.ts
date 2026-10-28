@@ -19,6 +19,7 @@ const INBOUND_CONTACT_KEYS = [
   'whatsapp_number',
   'email',
   'alternate_contact',
+  'alternative_contact',
   'primary_contact_number',
   'key_contact_number',
   'manager_mobile',

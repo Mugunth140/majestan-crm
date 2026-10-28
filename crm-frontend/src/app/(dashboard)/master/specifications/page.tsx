@@ -188,6 +188,7 @@ export default function SpecificationsMasterPage() {
         </div>
       ),
     },
+    { accessorKey: "id", header: "ID" },
     {
       accessorKey: "name",
       header: "Specification",

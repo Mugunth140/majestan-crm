@@ -188,6 +188,7 @@ export default function RegistrationChargesMasterPage() {
         </div>
       ),
     },
+    { accessorKey: "id", header: "ID" },
     {
       accessorKey: "name",
       header: "Registration Charge",

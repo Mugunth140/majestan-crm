@@ -85,12 +85,13 @@ describe('inbound capture and repeat review', () => {
     expect(saved.image_url).toContain('temp_');
   });
   it('classifies repeat numbers across staff assignments without exposing restricted contacts', async () => {
-    repository.find.mockResolvedValueOnce([{ id: 7, mobile_number: '+91 9876543210', follow_ups: [] }])
+    repository.find.mockResolvedValueOnce([{ id: 7, mobile_number: '+91 9876543210', alternative_contact: 'Kavya 8765432109', follow_ups: [] }])
       .mockResolvedValueOnce([{ id: 1, mobile_number: '9876543210' }, { id: 7, mobile_number: '+91 9876543210' }]);
     const rows = await service.findAll({ id: 12, role: 'Staff' });
     expect(repository.find.mock.calls[0][0].where).toEqual({ assigned_staff_id: 12 });
     expect(repository.find.mock.calls[1][0]).toEqual({ select: { id: true, mobile_number: true } });
     expect(rows[0].submission_status).toBe('Repeat');
     expect(rows[0].mobile_number).toBeUndefined();
+    expect(rows[0].alternative_contact).toBeUndefined();
   });
 });

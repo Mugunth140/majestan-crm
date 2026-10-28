@@ -189,6 +189,7 @@ export default function UtilitiesMasterPage() {
         </div>
       ),
     },
+    { accessorKey: "id", header: "ID" },
     {
       accessorKey: "name",
       header: "Utility",

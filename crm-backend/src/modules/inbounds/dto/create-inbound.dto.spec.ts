@@ -59,6 +59,22 @@ function staffRentPayload(assignedStaffId: any) {
 }
 
 describe('CreateInboundDto (inbound form contract)', () => {
+  it('accepts free-text alternative contact on create and edit without changing the alternate number', async () => {
+    for (const dtoClass of [CreateInboundDto, UpdateInboundDto]) {
+      const dto = plainToInstance(dtoClass, { property_category: 'commercial', mobile_number: '9876543210',
+        alternate_contact: '8765432109', alternative_contact: '  Kavya, owner’s sister — call after 6 pm  ' });
+      expect(await validate(dto, { whitelist: true })).toEqual([]);
+      expect(dto.alternative_contact).toBe('Kavya, owner’s sister — call after 6 pm');
+      expect(dto.alternate_contact).toBe('8765432109');
+    }
+  });
+  it.each([null, ''])('allows clearing the optional alternative contact: %s', async alternative_contact => {
+    expect(await pipeValidate(UpdateInboundDto, { alternative_contact })).toEqual([]);
+  });
+  it.each([123, {}, 'x'.repeat(1001)])('rejects invalid alternative contact values', async alternative_contact => {
+    expect((await pipeValidate(UpdateInboundDto, { alternative_contact })).some(error => error.property === 'alternative_contact')).toBe(true);
+  });
+
   it.each(['available', 'not_available', 'fixed_verification'])('accepts inbound status %s and an alternate contact', async (inbound_status) => {
     const dto = plainToInstance(CreateInboundDto, { property_category: 'commercial', mobile_number: '9876543210', inbound_status, alternate_contact: '8765432109' });
     expect(await validate(dto, { whitelist: true })).toEqual([]);
