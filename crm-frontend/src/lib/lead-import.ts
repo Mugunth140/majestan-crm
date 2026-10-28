@@ -106,6 +106,7 @@ export interface PendingImportRow {
   mobile: string;
   email: string;
   source: string;
+  leadSourceId: number;
   commissionRemarks: string;
   staffId?: number;
   staff: string;
@@ -117,7 +118,17 @@ export interface PendingImportRow {
 // Maps one raw spreadsheet row from the import template to the pending-import
 // row shape used by the review table. Extracted so the optional Staff ID column
 // is covered by the real mapping rather than a test-local copy.
-export function mapImportSheetRow(row: ImportSheetRow, index: number): PendingImportRow {
+export interface LeadImportSource { id: number; name: string; }
+
+export function resolveLeadImportSource(raw: unknown, sources: LeadImportSource[], rowNumber: number): LeadImportSource {
+  const id = normalizeStaffId(raw);
+  const source = id ? sources.find(source => source.id === id) : undefined;
+  if (!source) throw new Error(`Row ${rowNumber}: Lead Source ID must match an active Lead Source master ID.`);
+  return source;
+}
+
+export function mapImportSheetRow(row: ImportSheetRow, index: number, sources: LeadImportSource[]): PendingImportRow {
+  const source = resolveLeadImportSource(row["Lead Source ID"], sources, index + 2);
   return {
     rawId: `import-${index}`,
     id: `IMPORT-${index + 1}`,
@@ -125,7 +136,8 @@ export function mapImportSheetRow(row: ImportSheetRow, index: number): PendingIm
     name: String(row["Customer Name"]).trim(),
     mobile: normalizeIndianMobile(String(row["Customer Number"]).trim()),
     email: String(row["Email Id"] || "").trim(),
-    source: String(row["Lead source"]).trim(),
+    source: source.name,
+    leadSourceId: source.id,
     commissionRemarks: String(row["Remarks"] || "").trim(),
     // Optional column — a malformed or absent cell leaves the
     // lead unassigned rather than aborting the file.

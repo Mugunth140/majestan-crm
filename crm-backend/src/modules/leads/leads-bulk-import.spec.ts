@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { LeadsService } from './leads.service';
+import { LeadSource } from '../../database/entities/lead-source.entity';
 import { Lead } from '../../database/entities/lead.entity';
 import { LeadFollowUp } from '../../database/entities/lead-follow-up.entity';
 import { LeadInquiry } from '../../database/entities/lead-inquiry.entity';
@@ -16,6 +17,7 @@ describe('LeadsService.bulkCreateLeads remarks', () => {
   let savedLeads: any[];
   let savedFollowUps: any[];
   let leadSeq: number;
+  const activeSources = [{ id: 3, name: "Website", is_active: true }];
 
   beforeEach(async () => {
     savedLeads = [];
@@ -55,7 +57,10 @@ describe('LeadsService.bulkCreateLeads remarks', () => {
         LeadsService,
         {
           provide: getDataSourceToken(),
-          useValue: { transaction: jest.fn(async (cb: any) => cb(manager)) },
+          useValue: { transaction: jest.fn(async (cb: any) => cb(manager)), getRepository: (entity: any) => {
+            if (entity !== LeadSource) throw new Error("unexpected repository");
+            return { find: jest.fn(async () => activeSources) };
+          } },
         },
         {
           provide: getDataSourceToken('site'),
@@ -73,6 +78,24 @@ describe('LeadsService.bulkCreateLeads remarks', () => {
     }).compile();
 
     service = module.get<LeadsService>(LeadsService);
+  });
+
+  it('resolves the master source ID on the server instead of trusting a supplied label', async () => {
+    await service.bulkCreateLeads([{ name: 'ID Buyer', mobile: '9876543210', leadSourceId: 3, source: 'Wrong label' }]);
+    expect(savedLeads[0].lead_source).toBe('Website');
+  });
+
+  it.each([999, 0, -1, 1.5, 'Website', null])('rejects unknown or invalid source ID %s before writing', async leadSourceId => {
+    await expect(service.bulkCreateLeads([{ name: 'Invalid Buyer', mobile: '9876543210', leadSourceId }])).rejects.toThrow('Row 2: Lead Source ID');
+    expect(savedLeads).toHaveLength(0);
+  });
+
+  it('aborts the whole batch when a later row has an invalid source ID', async () => {
+    await expect(service.bulkCreateLeads([
+      { name: 'Valid Buyer', mobile: '9876543210', leadSourceId: 3 },
+      { name: 'Invalid Buyer', mobile: '9876543211', leadSourceId: 999 },
+    ])).rejects.toThrow('Row 3: Lead Source ID');
+    expect(savedLeads).toHaveLength(0);
   });
 
   it('creates a follow-up note from the bulk upload remark', async () => {

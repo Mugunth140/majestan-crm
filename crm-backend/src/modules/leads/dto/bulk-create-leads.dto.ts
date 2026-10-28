@@ -1,4 +1,4 @@
-import { IsArray, ValidateNested, IsOptional, IsString, IsBoolean, IsNumber, IsInt, ArrayMaxSize } from 'class-validator';
+import { IsArray, ValidateNested, IsOptional, IsString, IsBoolean, IsNumber, IsInt, ArrayMaxSize, Min } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 
 const toTrimmedString = ({ value }: { value: any }) => {
@@ -25,6 +25,12 @@ const toBoolean = ({ value }: { value: any }) => {
 };
 
 export class BulkLeadDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  leadSourceId?: number;
+
   @IsOptional()
   @Transform(toTrimmedString)
   @IsString()

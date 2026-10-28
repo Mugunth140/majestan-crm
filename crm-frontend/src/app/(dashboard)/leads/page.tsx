@@ -29,8 +29,8 @@ import { LastFollowupCell } from "./last-followup-column";
 import { Device } from "@/components/shared/device";
 import { LEAD_STATUS_STYLES as STATUS_STYLES } from "@/lib/lead-constants";
 import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
-import { getBulkImportDestination, mapImportSheetRow, normalizeIndianMobile, partitionPendingImports, resolveStaffAssignments } from "@/lib/lead-import";
-import type { DuplicateLeadInfo, PendingImportRow, StaffOption } from "@/lib/lead-import";
+import { getBulkImportDestination, mapImportSheetRow, resolveLeadImportSource, normalizeIndianMobile, partitionPendingImports, resolveStaffAssignments } from "@/lib/lead-import";
+import type { DuplicateLeadInfo, PendingImportRow, StaffOption, LeadImportSource } from "@/lib/lead-import";
 import { resetPageIndex } from "@/lib/pagination";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 
@@ -688,7 +688,7 @@ export default function LeadsPage() {
         if (data.length > 0) {
           // 1. Header Validation
           const headers = Object.keys(data[0] || {});
-          const requiredHeaders = ["Customer Name", "Customer Number", "Email Id", "Lead source"];
+          const requiredHeaders = ["Customer Name", "Customer Number", "Email Id", "Lead Source ID"];
           const hasAllHeaders = requiredHeaders.every(h => headers.includes(h));
           
           if (!hasAllHeaders) {
@@ -697,6 +697,8 @@ export default function LeadsPage() {
             return;
           }
 
+          const sourceResponse = await apiJson<{ data: { id: number; label: string }[] }>(`${API_URL}/master/lead-sources`);
+          const sources: LeadImportSource[] = sourceResponse.data.map(source => ({ id: source.id, name: source.label }));
           // 2. Row Data Validation (Fail-Fast) + Duplicate Check
           const seenMobiles = new Map<string, number>(); // normalized mobile -> first row number
           for (let i = 0; i < data.length; i++) {
@@ -704,11 +706,10 @@ export default function LeadsPage() {
             const name = String(row["Customer Name"] || "").trim();
             const rawMobile = String(row["Customer Number"] || "").trim();
             const mobile = normalizeIndianMobile(rawMobile);
-            const source = String(row["Lead source"] || "").trim();
+            resolveLeadImportSource(row["Lead Source ID"], sources, i + 2);
 
             if (!name) { toast.error(`Row ${i + 2} is missing Customer Name. Import aborted.`); setIsImporting(false); return; }
             if (!mobile) { toast.error(`Row ${i + 2} is missing Customer Number. Import aborted.`); setIsImporting(false); return; }
-            if (!source) { toast.error(`Row ${i + 2} is missing Lead source. Import aborted.`); setIsImporting(false); return; }
 
             // Duplicate detection within the file (after normalization)
             if (seenMobiles.has(mobile)) {
@@ -728,7 +729,7 @@ export default function LeadsPage() {
             const nextChunk = Math.min(processed + chunkSize, total);
 
             for (let i = processed; i < nextChunk; i++) {
-              formattedData.push(mapImportSheetRow(data[i], i));
+              formattedData.push(mapImportSheetRow(data[i], i, sources));
             }
 
             processed = nextChunk;
@@ -754,8 +755,8 @@ export default function LeadsPage() {
           toast.error("The uploaded Excel file appears to be empty.");
           setIsImporting(false);
         }
-      } catch {
-        toast.error("Failed to parse Excel file.");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to parse Excel file.");
         setIsImporting(false);
       }
     };
@@ -802,7 +803,7 @@ export default function LeadsPage() {
           name: p.name,
           mobile: p.mobile,
           email: p.email || undefined,
-          source: p.source,
+          leadSourceId: p.leadSourceId,
           commissionRemarks: p.commissionRemarks || undefined,
           assignedStaffId: (p.rawId ? pendingAssignments[p.rawId]?.id : undefined) ?? undefined,
         }));
@@ -1316,24 +1317,34 @@ export default function LeadsPage() {
 
   const downloadTemplate = async () => {
     const XLSX = await import("xlsx");
-    // 4 required columns + optional Remarks + optional Staff ID
-    const headers = [
-      {
-        "Customer Name": "John Doe",
-        "Customer Number": "9876543210",
-        "Email Id": "john@example.com",
-        "Lead source": "Website",
-        "Remarks": "Looking for 3BHK",
-        // Optional: numeric users.id. Leave blank to import unassigned.
-        "Staff ID": 12
-      }
-    ];
-    
-    const ws = XLSX.utils.json_to_sheet(headers);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Template");
-    
-    XLSX.writeFile(wb, "Lead_Import_Template.xlsx");
+    try {
+      const response = await apiJson<{ data: { id: number; label: string }[] }>(`${API_URL}/master/lead-sources`);
+      const sources: LeadImportSource[] = response.data.map(source => ({ id: source.id, name: source.label }));
+      // 4 required columns + optional Remarks + optional Staff ID
+      const headers = [
+        {
+          "Customer Name": "John Doe",
+          "Customer Number": "9876543210",
+          "Email Id": "john@example.com",
+          "Lead Source ID": sources[0]?.id ?? "",
+          "Remarks": "Looking for 3BHK",
+          // Optional: numeric users.id. Leave blank to import unassigned.
+          "Staff ID": 12
+        }
+      ];
+
+      const ws = XLSX.utils.json_to_sheet(headers);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Template");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+        sources.map(source => ({ "Lead Source ID": source.id, "Lead Source": source.name })),
+        { header: ["Lead Source ID", "Lead Source"] },
+      ), "Lead Sources");
+
+      XLSX.writeFile(wb, "Lead_Import_Template.xlsx");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to download template.");
+    }
   };
 
   return (

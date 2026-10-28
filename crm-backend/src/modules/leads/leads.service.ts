@@ -2,6 +2,7 @@ import { Injectable, ConflictException, NotFoundException, BadRequestException, 
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { isQueuedWebsiteSource } from './website-sources';
+import { LeadSource } from '../../database/entities/lead-source.entity';
 import { Lead } from '../../database/entities/lead.entity';
 import { LeadFollowUp } from '../../database/entities/lead-follow-up.entity';
 import { LeadInquiry } from '../../database/entities/lead-inquiry.entity';
@@ -393,6 +394,23 @@ export class LeadsService {
   async bulkCreateLeads(leads: any[], actionedBy?: any) {
     if (!leads || leads.length === 0) return { count: 0, created: 0, existing: 0, assigned: 0 };
 
+    // Resolve IDs server-side so a changed/deactivated master cannot import a stale name.
+    for (const [index, row] of leads.entries()) {
+      if (row.leadSourceId !== undefined && (!Number.isSafeInteger(Number(row.leadSourceId)) || Number(row.leadSourceId) <= 0)) {
+        throw new BadRequestException(`Row ${index + 2}: Lead Source ID must match an active Lead Source master ID.`);
+      }
+    }
+    const sourceIds = [...new Set(leads.filter(row => row.leadSourceId !== undefined).map(row => Number(row.leadSourceId)))];
+    const sources = sourceIds.length ? await this.dataSource.getRepository(LeadSource).find({
+      where: { id: In(sourceIds), is_active: true },
+    }) : [];
+    const sourceNames = new Map(sources.map(source => [source.id, source.name]));
+    for (const [index, row] of leads.entries()) {
+      if (row.leadSourceId !== undefined && !sourceNames.has(Number(row.leadSourceId))) {
+        throw new BadRequestException(`Row ${index + 2}: Lead Source ID must match an active Lead Source master ID.`);
+      }
+    }
+
     // Strip +91 / 91 prefix so numbers are stored as consistent 10-digit strings.
     // India-only system — +91 is the only country code in use.
     const normalizeIndianMobile = (raw: string): string => {
@@ -406,7 +424,7 @@ export class LeadsService {
     const normalizedLeads = leads.map(body => ({
       ...body,
       mobile: body.mobile ?? body.mobile_number ?? null,
-      source: body.source ?? body.lead_source ?? null,
+      source: body.leadSourceId !== undefined ? sourceNames.get(Number(body.leadSourceId))! : body.source ?? body.lead_source ?? null,
     }))
     .filter(l => l.mobile !== null && String(l.mobile).trim() !== '')
     .map(l => ({ ...l, mobile: normalizeIndianMobile(String(l.mobile).trim()) }))
