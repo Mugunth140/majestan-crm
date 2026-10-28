@@ -80,6 +80,8 @@ import { TaskMetricTarget } from './database/entities/task-metric-target.entity'
 import { TaskMetricProgress } from './database/entities/task-metric-progress.entity';
 import { TaskActivityLog } from './database/entities/task-activity-log.entity';
 import { TaskReceipt } from './database/entities/task-receipt.entity';
+import { MailOutbox } from './database/entities/mail-outbox.entity';
+import { MailSuppression } from './database/entities/mail-suppression.entity';
 
 // Site entities
 import { Property } from './database/entities/site/property.entity';
@@ -110,7 +112,7 @@ import { CommunicationsModule } from './modules/communications/communications.mo
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('CRM_DB_NAME', 'majestan_crm'),
-        entities: [User, Role, Permission, RolePermission, UserPermission, Department, ActivityLog, LeadSource, HrSource, RoadName, RegistrationCharge, RoomName, RoomDimension, Specification, PropertyType, Lead, LeadInquiry, WebsiteEnquiryEvent, LeadFollowUp, LeadDocument, ContactLog, Agent, AgentFollowUp, AgentContactLog, Inbound, InboundFollowUp, InboundContactLog, InboundUnit, HrCandidate, HrFollowUp, HrContactLog, AssetLayout, Asset, AssetLocation, AssetFinancials, AssetFeature, AssetDocument, AssetContactLog, RoutingHistory, Notification, TaskTemplate, TaskMetricTarget, TaskMetricProgress, TaskActivityLog, TaskReceipt],
+        entities: [User, Role, Permission, RolePermission, UserPermission, Department, ActivityLog, LeadSource, HrSource, RoadName, RegistrationCharge, RoomName, RoomDimension, Specification, PropertyType, Lead, LeadInquiry, WebsiteEnquiryEvent, LeadFollowUp, LeadDocument, ContactLog, Agent, AgentFollowUp, AgentContactLog, Inbound, InboundFollowUp, InboundContactLog, InboundUnit, HrCandidate, HrFollowUp, HrContactLog, AssetLayout, Asset, AssetLocation, AssetFinancials, AssetFeature, AssetDocument, AssetContactLog, RoutingHistory, Notification, TaskTemplate, TaskMetricTarget, TaskMetricProgress, TaskActivityLog, TaskReceipt, MailOutbox, MailSuppression],
         synchronize: false, // Migrations are used instead
         extra: {
           connectionLimit: configService.get<number>('DB_CONNECTION_LIMIT', 25),

@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import { FormSelect } from "@/components/shared/form-select";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { INTERVIEW_MODE_OPTIONS, toTimeInput } from "@/lib/hr-interview";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -39,7 +40,8 @@ function HrCandidateForm() {
     name: "", mobile: "", whatsapp: "", email: "", city: "", state: "", assignedStaffId: "", hrSourceId: "",
     department: "", position: "", experience: "", currentSalary: "", expectedSalary: "", noticePeriod: "",
     recruitmentSource: "",
-    interviewDate: "", interviewer: "", interviewRound: "", interviewFeedback: "",
+    interviewDate: "", interviewTime: "", interviewMode: "", interviewLocation: "", interviewLink: "",
+    interviewer: "", interviewRound: "", interviewFeedback: "",
     status: "New Application"
   });
 
@@ -78,7 +80,8 @@ function HrCandidateForm() {
               assignedStaffId: data.assignedStaffId != null ? String(data.assignedStaffId) : "", hrSourceId: data.hrSourceId != null ? String(data.hrSourceId) : "",
               department: data.department || "", position: data.position || "", experience: data.experience || "", currentSalary: data.currentSalary || "", expectedSalary: data.expectedSalary || "", noticePeriod: data.noticePeriod || "",
               recruitmentSource: data.recruitmentSource || "",
-              interviewDate: data.interviewDate || "", interviewer: data.interviewer || "", interviewRound: data.interviewRound || "", interviewFeedback: data.interviewFeedback || "",
+              interviewDate: data.interviewDate || "", interviewTime: toTimeInput(data.interviewTime), interviewMode: data.interviewMode || "",
+              interviewLocation: data.interviewLocation || "", interviewLink: data.interviewLink || "", interviewer: data.interviewer || "", interviewRound: data.interviewRound || "", interviewFeedback: data.interviewFeedback || "",
               status: data.status || "New Application"
             });
           }
@@ -265,6 +268,27 @@ function HrCandidateForm() {
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Interview Date</label>
               <Input name="interviewDate" type="date" value={formData.interviewDate ? formData.interviewDate.split('T')[0] : ""} onChange={handleChange} className="h-12 rounded-xl bg-muted/30" />
             </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Interview Time (IST)</label>
+              <Input name="interviewTime" type="time" value={formData.interviewTime} onChange={handleChange} className="h-12 rounded-xl bg-muted/30" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Interview Mode</label>
+              <FormSelect name="interviewMode" value={formData.interviewMode} onValueChange={(value: string) => setFormData(p => ({ ...p, interviewMode: value || "" }))}
+                placeholder="Select mode" options={INTERVIEW_MODE_OPTIONS} />
+            </div>
+            {formData.interviewMode === "in_person" && (
+              <div className="space-y-2 lg:col-span-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Interview Venue</label>
+                <Input name="interviewLocation" value={formData.interviewLocation} onChange={handleChange} maxLength={500} placeholder="e.g. Majestan Realty, 47/1 Aandal Street, Coimbatore" className="h-12 rounded-xl bg-muted/30" />
+              </div>
+            )}
+            {formData.interviewMode === "video" && (
+              <div className="space-y-2 lg:col-span-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Meeting Link</label>
+                <Input name="interviewLink" type="url" value={formData.interviewLink} onChange={handleChange} maxLength={1000} placeholder="https://meet.google.com/..." className="h-12 rounded-xl bg-muted/30" />
+              </div>
+            )}
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Interviewer Name</label>
               <Input name="interviewer" value={formData.interviewer} onChange={handleChange} placeholder="e.g. Jane Smith" className="h-12 rounded-xl bg-muted/30" />

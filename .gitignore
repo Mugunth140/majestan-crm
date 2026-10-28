@@ -146,3 +146,4 @@ prod-config
 
 # Vitest JSON reporter output (regenerated every run)
 crm-frontend/.vitest/
+mail.env

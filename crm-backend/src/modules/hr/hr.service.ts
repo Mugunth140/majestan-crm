@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Optional } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from '../../database/entities/user.entity';
 import { In, Repository } from 'typeorm';
@@ -10,6 +11,12 @@ import { summarizeHrFollowUps } from './hr-follow-up-summary';
 import { HrContactLog } from '../../database/entities/hr-contact-log.entity';
 import { CreateHrCandidateDto } from './dto/create-hr-candidate.dto';
 import { UpdateHrCandidateDto } from './dto/update-hr-candidate.dto';
+import { toDateOnly, toTimeOnly } from './mail/candidate-mail-data';
+
+/** What makes an interview invitation different: used to detect a reschedule. */
+function interviewSignature(c: Partial<HrCandidate>) {
+  return [toDateOnly(c.interviewDate), toTimeOnly(c.interviewTime), c.interviewMode ?? null, c.interviewLocation?.trim() || null, c.interviewLink?.trim() || null].join('|');
+}
 
 @Injectable()
 export class HrService {
@@ -22,6 +29,8 @@ export class HrService {
     private contactLogRepo: Repository<HrContactLog>,
     private readonly master: MasterService,
     @InjectRepository(User) private readonly users: Repository<User>,
+    // Domain events for the central mail service (docs/mail-service-design.md).
+    @Optional() private readonly events?: EventEmitter2,
   ) {}
 
   async findAll() { 
@@ -133,16 +142,41 @@ export class HrService {
 
   async create(data: CreateHrCandidateDto, actor?: { id?: number; role?: string }) {
     const { interviewDate, ...rest } = await this.resolveReferences(data, undefined, actor);
-    return this.repo.save(this.repo.create({ ...rest, interviewDate: interviewDate ? new Date(interviewDate) : null } as Partial<HrCandidate>));
+    const saved = await this.repo.save(this.repo.create({ ...rest, ...this.interviewFields(rest), interviewDate: interviewDate ? new Date(interviewDate) : null } as Partial<HrCandidate>));
+    await this.events?.emitAsync('hr.candidate.created', { entityId: saved.id, actorId: actor?.id ?? null });
+    return saved;
   }
   async update(id: number, data: UpdateHrCandidateDto, actor?: { id?: number; role?: string }) {
     const current = await this.findOne(id);
     const { interviewDate, ...rest } = await this.resolveReferences(data, current, actor);
     await this.repo.update(id, {
       ...rest,
+      ...this.interviewFields(rest),
       ...(interviewDate !== undefined ? { interviewDate: interviewDate ? new Date(interviewDate) : null } : {}),
     } as Partial<HrCandidate>);
-    return this.findOne(id);
+    const updated = await this.findOne(id);
+    await this.emitChanges(current, updated, actor);
+    return updated;
+  }
+
+  /** Empty strings from the form clear the optional interview columns. */
+  private interviewFields(data: Partial<CreateHrCandidateDto>) {
+    const fields: Partial<HrCandidate> = {};
+    if (data.interviewTime !== undefined) fields.interviewTime = data.interviewTime || null;
+    if (data.interviewMode !== undefined) fields.interviewMode = data.interviewMode || null;
+    if (data.interviewLocation !== undefined) fields.interviewLocation = data.interviewLocation?.trim() || null;
+    if (data.interviewLink !== undefined) fields.interviewLink = data.interviewLink?.trim() || null;
+    return fields;
+  }
+
+  private async emitChanges(before: HrCandidate, after: HrCandidate, actor?: { id?: number }) {
+    if (!this.events) return;
+    const base = { entityId: after.id, actorId: actor?.id ?? null };
+    if (before.status !== after.status) {
+      await this.events.emitAsync('hr.candidate.status_changed', { ...base, from: before.status, to: after.status });
+    } else if (after.status === HrCandidateStatus.INTERVIEW_SCHEDULED && interviewSignature(before) !== interviewSignature(after)) {
+      await this.events.emitAsync('hr.candidate.interview_rescheduled', base);
+    }
   }
 
   async bulkImport(rows: HrImportRowDto[], actor?: { id?: number; role?: string }) {

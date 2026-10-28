@@ -40,6 +40,11 @@ export class HrCandidate {
   @Column({ type: 'int', nullable: true }) assignedStaffId: number | null;
   
   @Column({ type: 'date', nullable: true }) interviewDate: Date;
+  // Local (IST) wall-clock time, 'HH:mm:ss'. Paired with interviewDate; no TZ conversion.
+  @Column({ type: 'time', nullable: true }) interviewTime: string | null;
+  @Column({ type: 'enum', enum: ['in_person', 'phone', 'video'], nullable: true }) interviewMode: 'in_person' | 'phone' | 'video' | null;
+  @Column({ type: 'varchar', length: 500, nullable: true }) interviewLocation: string | null;
+  @Column({ type: 'varchar', length: 1000, nullable: true }) interviewLink: string | null;
   @Column({ nullable: true }) interviewer: string;
   @Column({ nullable: true }) interviewRound: string;
   @Column({ type: 'text', nullable: true }) interviewFeedback: string;

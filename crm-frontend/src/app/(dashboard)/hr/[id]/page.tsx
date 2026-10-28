@@ -1,6 +1,8 @@
 "use client";
 
 import { HrAssignmentDialog } from "@/components/hr/hr-assignment-dialog";
+import { MailPanel } from "@/components/mail/mail-panel";
+import { INTERVIEW_MODE_LABELS, formatInterviewTime } from "@/lib/hr-interview";
 import { apiFetch, apiJson } from "@/lib/api-fetch";
 
 import { useState, useEffect } from "react";
@@ -132,6 +134,8 @@ export default function HrDetail() {
   const [isSavingFu, setIsSavingFu] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState("");
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  // Bumped after saves that may create an email draft (status changes).
+  const [mailRefresh, setMailRefresh] = useState(0);
 
   // Keyboard shortcut for history slider
   useEffect(() => {
@@ -173,6 +177,7 @@ export default function HrDetail() {
       if (res.ok) {
         toast.success("Status updated to " + newStatus);
         fetchCandidate();
+        setMailRefresh((n) => n + 1);
       } else {
         toast.error("Failed to update status");
       }
@@ -480,6 +485,8 @@ export default function HrDetail() {
               </div>
             </div>
 
+            <MailPanel entityType="hr_candidate" entityId={candidate.id} refreshKey={mailRefresh} />
+
             {/* Contact activity (device-synced call history, same as leads) */}
             <div className="bg-card border rounded-2xl p-6 shadow-sm">
               <div className="flex items-center justify-between border-b pb-3 mb-5">
@@ -569,7 +576,20 @@ export default function HrDetail() {
               <div className="space-y-4">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Date & Round</p>
-                  <p className="text-[14px] font-medium">{candidate.interviewDate ? new Date(candidate.interviewDate).toLocaleDateString() : "—"} ({candidate.interviewRound || "No Round"})</p>
+                  <p className="text-[14px] font-medium">
+                    {candidate.interviewDate ? new Date(candidate.interviewDate).toLocaleDateString() : "—"}
+                    {candidate.interviewTime && `, ${formatInterviewTime(candidate.interviewTime)}`} ({candidate.interviewRound || "No Round"})
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Mode</p>
+                  <p className="text-[14px] font-medium">{candidate.interviewMode ? INTERVIEW_MODE_LABELS[candidate.interviewMode as keyof typeof INTERVIEW_MODE_LABELS] : "—"}</p>
+                  {candidate.interviewMode === "in_person" && candidate.interviewLocation && (
+                    <p className="text-[13px] text-muted-foreground mt-0.5">{candidate.interviewLocation}</p>
+                  )}
+                  {candidate.interviewMode === "video" && candidate.interviewLink && (
+                    <a href={candidate.interviewLink} target="_blank" rel="noopener noreferrer" className="text-[13px] text-[#0052FF] hover:underline break-all">{candidate.interviewLink}</a>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Interviewer</p>
