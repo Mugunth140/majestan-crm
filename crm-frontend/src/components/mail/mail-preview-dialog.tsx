@@ -151,7 +151,7 @@ function OpenMailPreviewDialog({ target, entityId, onClose, onDone }: Props & { 
               value={note}
               maxLength={1000}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="e.g. Please bring your original certificates."
+              placeholder="A line or two of your own, e.g. a thank-you or a reminder."
               className="bg-muted/30 rounded-xl resize-none text-[14px]"
               rows={2}
             />

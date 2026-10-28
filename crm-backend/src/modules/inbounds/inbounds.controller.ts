@@ -41,7 +41,7 @@ export class InboundsController {
     if (req.user && req.user.role === 'Staff') {
       createInboundDto.assigned_staff_id = req.user.id;
     }
-    return this.inboundsService.create(createInboundDto);
+    return this.inboundsService.create(createInboundDto, req.user?.id ?? null);
   }
 
   @Get()
@@ -64,8 +64,8 @@ export class InboundsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateInboundDto: UpdateInboundDto) {
-    return this.inboundsService.update(+id, updateInboundDto);
+  update(@Param('id') id: string, @Body() updateInboundDto: UpdateInboundDto, @Request() req: any) {
+    return this.inboundsService.update(+id, updateInboundDto, req.user?.id ?? null);
   }
 
   @Post(':id/follow-ups')

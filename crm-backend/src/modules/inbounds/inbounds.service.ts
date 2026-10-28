@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Optional } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Inbound } from '../../database/entities/inbound.entity';
@@ -42,6 +43,7 @@ export class InboundsService {
     @InjectRepository(InboundUnit)
     private unitsRepository: Repository<InboundUnit>,
     private readonly permissionsService: PermissionsService,
+    @Optional() private readonly events?: EventEmitter2,
   ) {}
 
   private get s3Client(): S3Client {
@@ -144,7 +146,7 @@ export class InboundsService {
       });
   }
 
-  async create(createInboundDto: Omit<Partial<Inbound>, 'units'> & { units?: any[] }): Promise<Inbound> {
+  async create(createInboundDto: Omit<Partial<Inbound>, 'units'> & { units?: any[] }, actorId: number | null = null): Promise<Inbound> {
     const { units, ...rest } = createInboundDto;
     const newInbound = this.inboundsRepository.create(rest);
     
@@ -168,6 +170,8 @@ export class InboundsService {
       (savedInbound as any).units = [];
     }
 
+    // listings@ "property received" draft (only reaches owners with an email).
+    await this.events?.emitAsync('listings.inbound.created', { entityId: savedInbound.id, actorId });
     return savedInbound;
   }
 
@@ -293,14 +297,18 @@ export class InboundsService {
     return { saved: result.affected === 1 };
   }
 
-  async update(id: number, updateInboundDto: Omit<Partial<Inbound>, 'units'> & { units?: any[] }): Promise<Inbound> {
+  async update(id: number, updateInboundDto: Omit<Partial<Inbound>, 'units'> & { units?: any[] }, actorId: number | null = null): Promise<Inbound> {
     const inbound = await this.mustFindOne(id);
+    const previousStatus = inbound.status;
 
     const { units, ...rest } = updateInboundDto;
     // update properties (TypeORM hooks will trigger on save)
     Object.assign(inbound, rest);
 
     const saved = await this.inboundsRepository.save(inbound);
+    if (saved.status !== previousStatus) {
+      await this.events?.emitAsync('listings.inbound.status_changed', { entityId: id, actorId, from: previousStatus, to: saved.status });
+    }
 
     // Full replace when the form sends its floor rows (omitted = untouched).
     if (units !== undefined) {

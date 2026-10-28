@@ -30,7 +30,7 @@ export class AgentsController {
     if (req.user && req.user.role === 'Staff' && !body.assigned_staff_id) {
       body.assigned_staff_id = req.user.id;
     }
-    const result = await this.agentsService.createAgent(body);
+    const result = await this.agentsService.createAgent(body, req.user?.id ?? null);
     return {
       success: true,
       isExistingAgent: result.isExistingAgent,
@@ -40,8 +40,8 @@ export class AgentsController {
   }
 
   @Put(':id/status')
-  async updateAgentStatus(@Param('id') id: string, @Body() body: any) {
-    const data = await this.agentsService.updateAgentStatus(Number(id), body);
+  async updateAgentStatus(@Param('id') id: string, @Body() body: any, @Request() req: any) {
+    const data = await this.agentsService.updateAgentStatus(Number(id), body, req.user?.id ?? null);
     return { success: true, data };
   }
 

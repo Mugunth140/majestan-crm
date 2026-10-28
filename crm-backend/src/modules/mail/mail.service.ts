@@ -270,7 +270,9 @@ export class MailService {
 
   // ── History and administration ─────────────────────────────────────────
 
-  async history(entityType: string, entityId: number) {
+  /** Same rule as sending: the addresses and bodies are the record's contact data. */
+  async history(entityType: string, entityId: number, actor: MailActor) {
+    await this.assertCanSend(actor, this.registry.entity(entityType).module);
     const rows = await this.outbox.find({
       where: { entity_type: entityType, entity_id: entityId },
       order: { id: 'DESC' },
@@ -279,8 +281,9 @@ export class MailService {
     return rows.map((row) => this.summary(row));
   }
 
-  async findOne(outboxId: number) {
+  async findOne(outboxId: number, actor: MailActor) {
     const row = await this.findRow(outboxId);
+    await this.assertCanSend(actor, row.module);
     return { ...this.summary(row), html: row.html, text: row.text, attachments: await this.attachments.forOutbox(row.id) };
   }
 

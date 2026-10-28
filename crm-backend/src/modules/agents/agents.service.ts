@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import { Agent } from '../../database/entities/agent.entity';
@@ -14,7 +15,10 @@ export interface CreateAgentResult {
 
 @Injectable()
 export class AgentsService {
-  constructor(@InjectDataSource() private dataSource: DataSource) {}
+  constructor(
+    @InjectDataSource() private dataSource: DataSource,
+    @Optional() private readonly events?: EventEmitter2,
+  ) {}
 
   async getAgents(user?: any): Promise<any[]> {
     let roleWhere = '1=1';
@@ -190,7 +194,14 @@ export class AgentsService {
     });
   }
 
-  async createAgent(body: any): Promise<CreateAgentResult> {
+  async createAgent(body: any, actorId: number | null = null): Promise<CreateAgentResult> {
+    const result = await this.createAgentRecord(body);
+    // partners@ "thanks for connecting" draft, after commit (only reaches partners with an email).
+    if (!result.isExistingAgent) await this.events?.emitAsync('partners.agent.created', { entityId: result.agent.id, actorId });
+    return result;
+  }
+
+  private async createAgentRecord(body: any): Promise<CreateAgentResult> {
     return this.dataSource.transaction(async (manager: EntityManager) => {
       const existingAgent = await manager.getRepository(Agent).findOne({
         where: { mobile_number: body.mobile },
@@ -259,16 +270,21 @@ export class AgentsService {
     });
   }
 
-  async updateAgentStatus(id: number, body: { status_name?: string }) {
+  async updateAgentStatus(id: number, body: { status_name?: string }, actorId: number | null = null) {
     const agentRepo = this.dataSource.getRepository(Agent);
     const existingAgent = await agentRepo.findOne({ where: { id } });
     if (!existingAgent) throw new NotFoundException('Agent not found');
 
+    const previousStatus = existingAgent.status;
     if (body.status_name) {
       existingAgent.status = body.status_name;
     }
 
-    return agentRepo.save(existingAgent);
+    const saved = await agentRepo.save(existingAgent);
+    if (saved.status !== previousStatus) {
+      await this.events?.emitAsync('partners.agent.status_changed', { entityId: id, actorId, from: previousStatus, to: saved.status });
+    }
+    return saved;
   }
 
   async updateAgent(id: number, body: any) {

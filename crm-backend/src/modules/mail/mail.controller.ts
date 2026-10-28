@@ -22,8 +22,8 @@ export class MailController {
   }
 
   @Get('history')
-  history(@Query('entityType') entityType: string, @Query('entityId', ParseIntPipe) entityId: number) {
-    return this.mail.history(entityType, entityId);
+  history(@Query('entityType') entityType: string, @Query('entityId', ParseIntPipe) entityId: number, @Request() req: any) {
+    return this.mail.history(entityType, entityId, req.user);
   }
 
   @Post('preview')
@@ -66,8 +66,8 @@ export class MailController {
   }
 
   @Get('outbox/:id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.mail.findOne(id);
+  findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.mail.findOne(id, req.user);
   }
 
   @Post('outbox/:id/preview')

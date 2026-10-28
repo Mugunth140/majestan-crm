@@ -24,6 +24,7 @@ import { MobileHeader } from "@/components/layout/mobile-header";
 import { cn } from "@/lib/utils";
 import { formatIndianCurrencyWords } from "@/lib/indian-currency";
 import { canViewInboundContacts } from "@/lib/permissions";
+import { MailPanel } from "@/components/mail/mail-panel";
 import {
   ArrowLeft, Loader2, User, Phone, MapPin, Building2,
   Briefcase, Mail, MessageSquare, Plus, ArrowUpRight,
@@ -180,6 +181,7 @@ export default function InboundViewPage() {
   const id = params.id as string;
 
   const [inbound, setInbound] = useState<any>(null);
+  const [mailRefresh, setMailRefresh] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
@@ -258,6 +260,7 @@ export default function InboundViewPage() {
       if (res.ok) {
         toast.success("Status updated to " + newStatus);
         fetchInbound(true);
+        setMailRefresh((n) => n + 1); // "Listing approved" draft
       } else {
         toast.error(data.message || "Failed to update status");
       }
@@ -898,6 +901,9 @@ export default function InboundViewPage() {
 
              </div>
             </div>
+
+            <MailPanel entityType="inbound" entityId={inbound.id} refreshKey={mailRefresh}
+              recipients={canSeeContacts && inbound.email ? [inbound.email] : []} />
 
             <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
              <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">

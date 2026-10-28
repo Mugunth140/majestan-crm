@@ -8,9 +8,11 @@ import { InboundContactLog } from '../../database/entities/inbound-contact-log.e
 import { InboundUnit } from '../../database/entities/inbound-unit.entity';
 import { AuthModule } from '../auth/auth.module';
 import { PermissionsModule } from '../permissions/permissions.module';
+import { MailModule } from '../mail/mail.module';
+import { LISTING_MAIL_EVENTS } from './mail/listing-mails';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Inbound, InboundFollowUp, InboundContactLog, InboundUnit]), AuthModule, PermissionsModule],
+  imports: [TypeOrmModule.forFeature([Inbound, InboundFollowUp, InboundContactLog, InboundUnit]), AuthModule, PermissionsModule, MailModule.forFeature(LISTING_MAIL_EVENTS)],
   controllers: [InboundsController],
   providers: [InboundsService],
   exports: [InboundsService],

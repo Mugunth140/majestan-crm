@@ -26,6 +26,7 @@ import {
   Clock, RefreshCw, History, Percent, Edit, ChevronLeft
 } from "lucide-react";
 import { contactLogIcon } from "@/lib/contact-log-utils";
+import { MailPanel } from "@/components/mail/mail-panel";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -111,6 +112,7 @@ export default function AgentViewPage() {
   const id = params.id as string;
 
   const [agent, setAgent] = useState<any>(null);
+  const [mailRefresh, setMailRefresh] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -365,6 +367,7 @@ export default function AgentViewPage() {
                       if (data.success) {
                         toast.success("Agent status updated.");
                         fetchAgent(true);
+                        setMailRefresh((n) => n + 1); // "Welcome partner" draft
                       } else toast.error("Failed to update status");
                     } catch {
                       toast.error("Failed to update status");
@@ -561,6 +564,8 @@ export default function AgentViewPage() {
                 )}
               </div>
             </div>
+
+            <MailPanel entityType="agent" entityId={agent.id} refreshKey={mailRefresh} recipients={agent.email ? [agent.email] : []} />
           </div>
         </div>
       </div>
