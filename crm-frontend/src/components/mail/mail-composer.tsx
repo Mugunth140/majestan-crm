@@ -35,6 +35,8 @@ type Props = {
   start: ComposerStart | null;
   /** The record's own address(es), shown as fixed recipients. */
   recipients?: string[];
+  /** Mailboxes this user may write from (own first). Omit to allow all of the record's. */
+  senders?: { key: string; from: string }[];
   onClose: () => void;
   onSent: () => void;
 };
@@ -46,9 +48,10 @@ export function MailComposer(props: Props) {
 const startValue = (start: ComposerStart) =>
   start.kind === "saved" ? `saved:${start.id}` : start.kind === "system" ? `system:${start.key}` : start.kind === "draft" ? `draft:${start.id}` : "blank";
 
-function OpenComposer({ entityType, entityId, start, recipients = [], onClose, onSent }: Props & { start: ComposerStart }) {
+function OpenComposer({ entityType, entityId, start, recipients = [], senders, onClose, onSent }: Props & { start: ComposerStart }) {
   const [catalog, setCatalog] = useState<MailTemplateCatalog | null>(null);
   const [source, setSource] = useState(startValue(start));
+  const [sender, setSender] = useState<string | null>(null);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("<p></p>");
   const [ccText, setCcText] = useState("");
@@ -76,9 +79,12 @@ function OpenComposer({ entityType, entityId, start, recipients = [], onClose, o
         setCatalog(next);
         const text = textFor(next, startValue(start), draft?.eventKey);
         if (text) { setSubject(text.subject); setBody(text.body); }
+        setSender(startSender(next, start, senders));
       })
       .catch(() => toast.error("Could not load email templates"));
     return () => { live = false; };
+    // senders only seeds the first choice; later changes don't reset what the user picked.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entityType, start, draft?.eventKey]);
 
   // Files uploaded but never sent are removed when the composer closes.
@@ -89,18 +95,32 @@ function OpenComposer({ entityType, entityId, start, recipients = [], onClose, o
   const cc = useMemo(() => parseAddresses(ccText), [ccText]);
   const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
 
+  const own = catalog?.senders[0]?.key ?? null;
+  const allowed = useMemo(() => senders ?? catalog?.senders ?? [], [senders, catalog]);
+  const fromOf = (key: string | null) => catalog?.senders.find((s) => s.key === key)?.from ?? catalog?.from ?? "";
+
   const sourceOptions = useMemo(() => {
     if (!catalog) return [{ label: "Blank email", value: "blank" }];
     const options = [{ label: "Blank email", value: "blank" }];
-    for (const tpl of catalog.savedTemplates.filter((t) => t.isActive)) options.push({ label: `Template: ${tpl.name}`, value: `saved:${tpl.id}` });
-    for (const email of catalog.systemEmails) options.push({ label: `Standard: ${email.label}`, value: `system:${email.key}` });
+    for (const tpl of catalog.savedTemplates.filter((t) => t.isActive && allowed.some((s) => s.key === t.sender))) {
+      const box = tpl.sender === own ? "" : ` · ${fromOf(tpl.sender).split("@")[0]}@`;
+      options.push({ label: `Template: ${tpl.name}${box}`, value: `saved:${tpl.id}` });
+    }
+    // Standard emails always go from the record's own mailbox.
+    if (allowed.some((s) => s.key === own)) {
+      for (const email of catalog.systemEmails) options.push({ label: `Standard: ${email.label}`, value: `system:${email.key}` });
+    }
     return options;
-  }, [catalog]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalog, allowed, own]);
 
   const chooseSource = (value: string) => {
     if (!catalog || value === source) return;
     if (touched && !window.confirm("Replace what you have written with this template?")) return;
     const text = textFor(catalog, value);
+    const tpl = value.startsWith("saved:") ? catalog.savedTemplates.find((t) => t.id === Number(value.slice(6))) : null;
+    if (tpl) setSender(tpl.sender);
+    else if (value.startsWith("system:")) setSender(own);
     setSource(value);
     setSubject(text?.subject ?? "");
     setBody(text?.body ?? "<p></p>");
@@ -116,6 +136,7 @@ function OpenComposer({ entityType, entityId, start, recipients = [], onClose, o
     eventKey: !draft && source.startsWith("system:") ? source.slice("system:".length) : undefined,
     draftId: draft?.id,
     attachmentIds: files.map((f) => f.id),
+    sender: !draft && !source.startsWith("system:") ? sender ?? undefined : undefined,
   });
 
   const review = async () => {
@@ -186,7 +207,9 @@ function OpenComposer({ entityType, entityId, start, recipients = [], onClose, o
   };
 
   const draftLabel = draft && catalog?.systemEmails.find((e) => e.key === draft.eventKey)?.label;
-  const canReview = !busy && uploading === 0 && subject.trim() && catalog;
+  const canReview = !busy && uploading === 0 && subject.trim() && catalog && sender;
+  // A choice only for new hand-written emails; drafts and standard emails keep their mailbox.
+  const canPickSender = !draft && !source.startsWith("system:") && allowed.length > 1;
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open && !busy && (!touched || window.confirm("Discard this email?"))) onClose(); }}>
@@ -194,13 +217,20 @@ function OpenComposer({ entityType, entityId, start, recipients = [], onClose, o
         <DialogHeader className="px-6 pt-5 pb-4 border-b shrink-0">
           <DialogTitle>{draft ? `Edit before sending: ${draftLabel ?? "draft"}` : "New email"}</DialogTitle>
           <DialogDescription>
-            {catalog ? <>From <span className="font-medium text-foreground">{catalog.from}</span></> : "Loading…"}
+            {catalog ? <>From <span className="font-medium text-foreground">{fromOf(sender)}</span></> : "Loading…"}
             {recipients.length > 0 && <> to <span className="font-medium text-foreground">{recipients.join(", ")}</span></>}
           </DialogDescription>
         </DialogHeader>
 
         {stage === "write" ? (
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+            {canPickSender && (
+              <div className="grid gap-1.5 sm:grid-cols-[120px_1fr] sm:items-center">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">From</label>
+                <FormSelect name="mailSender" value={sender ?? ""} onValueChange={(v: string) => v && setSender(v)}
+                  options={allowed.map((s) => ({ label: s.from, value: s.key }))} placeholder="Choose a mailbox" />
+              </div>
+            )}
             {!draft && (
               <div className="grid gap-1.5 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Start from</label>
@@ -312,6 +342,18 @@ function OpenComposer({ entityType, entityId, start, recipients = [], onClose, o
       </DialogContent>
     </Dialog>
   );
+}
+
+/** The mailbox a composer opens with: the draft's or saved template's, else the first allowed (the record's own). */
+function startSender(catalog: MailTemplateCatalog, start: ComposerStart, senders?: { key: string }[]): string | null {
+  const own = catalog.senders[0]?.key ?? null;
+  if (start.kind === "draft") return start.eventKey.split("@")[1] ?? own;
+  if (start.kind === "system") return own;
+  if (start.kind === "saved") {
+    const tpl = catalog.savedTemplates.find((t) => t.id === start.id);
+    if (tpl) return tpl.sender;
+  }
+  return senders?.[0]?.key ?? own;
 }
 
 /** The starting subject/body for a source value ("blank", "saved:3", "system:key", "draft:7"). */

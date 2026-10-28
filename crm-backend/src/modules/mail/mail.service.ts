@@ -6,7 +6,7 @@ import type { MailOutboxStatus } from '../../database/entities/mail-outbox.entit
 import { MailSuppression } from '../../database/entities/mail-suppression.entity';
 import type { MailSuppressionReason } from '../../database/entities/mail-suppression.entity';
 import { PermissionsService } from '../permissions/permissions.service';
-import { MAIL_IDENTITIES } from './identities';
+import { MAIL_IDENTITIES, type MailIdentityKey } from './identities';
 import type { MailConfig } from './core/mail-config';
 import { type ComposedMail, MailComposer } from './core/mail-composer.service';
 import { type DomainEventPayload, type MailEventDefinition } from './core/mail-event';
@@ -32,6 +32,8 @@ export interface ComposeInput {
   /** Edit and send this draft. */
   draftId?: number;
   attachmentIds?: number[];
+  /** Mailbox for a hand-written email (default: the record's own, e.g. sales@ on leads). */
+  sender?: string;
 }
 
 /** Public face of the mail core: everything the API and the triggers use. */
@@ -55,9 +57,18 @@ export class MailService {
     const definitions = this.registry.forEntity(entityType);
     const allowed = new Map<string, boolean>();
     for (const module of new Set(definitions.map((d) => d.module))) allowed.set(module, await this.canSend(actor, module));
+    const senders = await Promise.all(
+      this.registry.senders(entityType).map(async ({ identity, module }) => ({
+        key: identity,
+        from: MAIL_IDENTITIES[identity].from,
+        name: MAIL_IDENTITIES[identity].name,
+        canSend: allowed.get(module) ?? (await this.canSend(actor, module)),
+      })),
+    );
     return {
       enabled: this.config.enabled,
       redirectTo: this.config.redirectTo,
+      senders,
       events: definitions.map((d) => ({
         key: d.key,
         label: d.label,
@@ -169,9 +180,12 @@ export class MailService {
     if (input.eventKey) {
       const definition = this.registry.get(input.eventKey);
       if (definition.entityType !== input.entityType) throw new BadRequestException('That email is for a different kind of record');
+      if (input.sender && input.sender !== definition.identity) {
+        throw new BadRequestException(`"${definition.label}" is always sent from ${MAIL_IDENTITIES[definition.identity].from}`);
+      }
       return { definition, draft: null };
     }
-    return { definition: this.registry.manual(input.entityType), draft: null };
+    return { definition: this.registry.manual(input.entityType, input.sender), draft: null };
   }
 
   private composeWith(input: ComposeInput, definition: MailEventDefinition, actor: MailActor) {
@@ -272,7 +286,7 @@ export class MailService {
 
   /** Same rule as sending: the addresses and bodies are the record's contact data. */
   async history(entityType: string, entityId: number, actor: MailActor) {
-    await this.assertCanSend(actor, this.registry.entity(entityType).module);
+    await this.assertCanSendAny(actor, this.registry.senders(entityType).map((s) => s.module));
     const rows = await this.outbox.find({
       where: { entity_type: entityType, entity_id: entityId },
       order: { id: 'DESC' },
@@ -389,7 +403,10 @@ export class MailService {
     return {
       id: row.id,
       event: row.event_key,
-      label: row.event_key.startsWith(MANUAL_PREFIX) ? 'Email' : (definition?.label ?? row.event_key),
+      // Composer emails: "Email", or "Email from finance@…" when another mailbox wrote it.
+      label: row.event_key.startsWith(MANUAL_PREFIX)
+        ? (row.event_key.includes('@') ? `Email from ${MAIL_IDENTITIES[row.identity as MailIdentityKey]?.from ?? row.identity}` : 'Email')
+        : (definition?.label ?? row.event_key),
       status: row.status,
       to: row.to_json,
       cc: row.cc_json ?? [],
@@ -424,6 +441,12 @@ export class MailService {
     if (!(await this.canSend(actor, module))) {
       throw new ForbiddenException(`You need the "${module}.mail.send" permission to send these emails`);
     }
+  }
+
+  /** History is readable by anyone who may write to the record from any of its mailboxes. */
+  private async assertCanSendAny(actor: MailActor, modules: string[]) {
+    for (const module of new Set(modules)) if (await this.canSend(actor, module)) return;
+    throw new ForbiddenException(`You need the "${modules[0]}.mail.send" permission to see these emails`);
   }
 
   private async assertAdmin(actor: MailActor) {

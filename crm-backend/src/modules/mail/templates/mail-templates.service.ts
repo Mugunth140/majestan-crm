@@ -15,6 +15,8 @@ export interface TemplateInput {
   subject: string;
   body: string;
   isActive?: boolean;
+  /** Saved templates: the mailbox it is written for (finance@ on leads, …). */
+  sender?: string;
 }
 
 /**
@@ -39,6 +41,7 @@ export class MailTemplatesService {
       label: entity.label,
       module: entity.module,
       from: MAIL_IDENTITIES[entity.identity].from,
+      senders: this.registry.senders(entityType).map(({ identity }) => ({ key: identity, from: MAIL_IDENTITIES[identity].from })),
       variables: [...entity.variableDocs, ...COMMON_VARIABLE_DOCS],
       systemEmails: this.registry.forEntity(entityType).map((event) => {
         const override = overrides.find((row) => row.event_key === event.key && row.is_active);
@@ -94,12 +97,12 @@ export class MailTemplatesService {
   }
 
   async createSaved(entityType: string, input: TemplateInput, actorId: number) {
-    const entity = this.registry.entity(entityType);
+    const sender = this.sender(entityType, input.sender);
     if (!input.name?.trim()) throw new BadRequestException('Template name is required');
     const clean = this.clean(input);
     const row = await this.templates.save(
       this.templates.create({
-        module: entity.module,
+        module: sender.module,
         entity_type: entityType,
         event_key: null,
         name: input.name.trim().slice(0, 150),
@@ -117,6 +120,7 @@ export class MailTemplatesService {
     const row = await this.findSaved(id);
     const clean = this.clean(input);
     Object.assign(row, {
+      module: input.sender ? this.sender(row.entity_type, input.sender).module : row.module,
       name: input.name?.trim() ? input.name.trim().slice(0, 150) : row.name,
       subject: clean.subject,
       body_html: clean.body,
@@ -140,12 +144,14 @@ export class MailTemplatesService {
   /** Renders a template with sample values, for the editor's live preview (no record needed). */
   previewWithSamples(entityType: string, input: TemplateInput) {
     const entity = this.registry.entity(entityType);
-    const vars = this.sampleVariables(entity);
+    const identity = this.sender(entityType, input.sender).identity;
+    const vars = { ...this.sampleVariables(entity), ...commonVariables(identity, null) };
+    for (const doc of COMMON_VARIABLE_DOCS) if (doc.key.startsWith('sender.')) vars[doc.key] = doc.sample;
     const clean = this.clean(input);
     const subject = fillText(clean.subject, vars);
     const body = fillHtml(clean.body, vars);
     const unknown = [...new Set([...subject.unknown, ...body.unknown])];
-    const team = MAIL_IDENTITIES[entity.identity];
+    const team = MAIL_IDENTITIES[identity];
     const rendered = renderLayout({ subject: subject.text, bodyHtml: body.html, signature: ['Priya Raman', `${team.signature}, Majestan Realty`, '+91 98765 43210'] });
     return {
       subject: rendered.subject,
@@ -173,6 +179,14 @@ export class MailTemplatesService {
     return { subject, body };
   }
 
+  /** A mailbox allowed to write to this record type; the record type's own by default. */
+  private sender(entityType: string, identity?: string) {
+    const senders = this.registry.senders(entityType);
+    const match = identity ? senders.find((s) => s.identity === identity) : senders[0];
+    if (!match) throw new BadRequestException("That mailbox can't write to these records");
+    return match;
+  }
+
   private async findSaved(id: number) {
     const row = await this.templates.findOne({ where: { id, event_key: IsNull() } });
     if (!row) throw new NotFoundException('Template not found');
@@ -180,8 +194,10 @@ export class MailTemplatesService {
   }
 
   private toSaved(row: MailTemplate) {
+    const senders = this.registry.senders(row.entity_type);
     return {
       id: row.id,
+      sender: (senders.find((s) => s.module === row.module) ?? senders[0]).identity,
       name: row.name,
       subject: row.subject,
       body: row.body_html,

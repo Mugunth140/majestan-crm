@@ -26,7 +26,11 @@ const welcome = defineMailEvent<Person>({
   template: { subject: 'Hi {{person.name}}', body: '<p>Hello {{person.name}}</p>' },
 });
 
-function setup(opts: { allowed?: boolean } = {}) {
+// A record type finance@ may also write to (COMPOSER_SENDERS lists 'lead').
+const leadEntity = defineMailEntity<Person>({ ...personEntity, entityType: 'lead', module: 'sales', identity: 'sales', label: 'Lead' });
+const leadHello = defineMailEvent<Person>({ ...welcome, key: 'test.lead_hello', entity: leadEntity, triggers: [] });
+
+function setup(opts: { allowed?: boolean; permit?: (permission: string) => boolean } = {}) {
   const rows: any[] = [];
   let nextId = 1;
   const matches = (row: any, where: any) => Object.entries(where).every(([k, v]) => row[k] === v);
@@ -48,6 +52,7 @@ function setup(opts: { allowed?: boolean } = {}) {
       rows.push({ id: nextId++, attempts: 0, ...x });
     },
     exists: async ({ where }: any) => rows.some((r) => matches(r, where)),
+    find: async ({ where }: any) => rows.filter((r) => matches(r, where)).reverse(),
     findOne: async ({ where }: any) => [...rows].reverse().find((r) => matches(r, where)) ?? null,
     findOneBy: async (where: any) => rows.find((r) => matches(r, where)) ?? null,
     update: async (where: any, set: any) => {
@@ -58,11 +63,13 @@ function setup(opts: { allowed?: boolean } = {}) {
   outbox.manager = { transaction: (fn: any) => fn({ getRepository: () => outbox }) };
   const suppressions: any = { find: async () => [] };
   const registry = new MailRegistry();
-  registry.register([welcome]);
+  registry.register([welcome, leadHello]);
   const staff: any = { getRepository: () => ({ findOne: async () => ({ id: 9, name: 'Staff Nine', email: null, phone: null }) }) };
   const templates: any = { findOne: async () => null };
   const composer = new MailComposer(staff, suppressions, templates);
-  const permissions: any = { hasPermission: jest.fn().mockResolvedValue(opts.allowed ?? true) };
+  const permissions: any = {
+    hasPermission: jest.fn(async (_id: number, permission: string) => (opts.permit ? opts.permit(permission) : opts.allowed ?? true)),
+  };
   const claimed: Record<number, number[]> = {};
   const attachments: any = {
     pendingFor: async (ids: number[]) => ids.map((id) => ({ id, filename: `f${id}.pdf`, contentType: 'application/pdf', size: 10 })),
@@ -176,6 +183,46 @@ describe('MailService', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ status: 'pending', subject: 'Edited Hari', confirmed_by: 9 });
     await expect(service.composeSend({ ...input, hash: pv.hash }, actor)).rejects.toThrow('This email is no longer a draft');
+  });
+
+  it('lets finance@ write to a lead with its own permission, mailbox and signature', async () => {
+    const { service, rows, registry } = setup({ permit: (p) => p === 'finance.mail.send' });
+    people.set(20, { email: 'buyer@x.com', name: 'Buyer', ready: true });
+    expect(registry.senders('lead').map((s) => s.identity)).toEqual(['sales', 'finance']);
+    expect(registry.senders('person').map((s) => s.identity)).toEqual(['hr']);
+
+    const catalog = await service.catalog('lead', actor);
+    expect(catalog.senders).toEqual([
+      expect.objectContaining({ key: 'sales', canSend: false }),
+      expect.objectContaining({ key: 'finance', from: 'finance@majestanrealty.com', canSend: true }),
+    ]);
+    const input = { entityType: 'lead', entityId: 20, subject: 'Receipt', body: '<p>Thanks {{person.name}}</p>' };
+    await expect(service.composePreview(input, actor)).rejects.toBeInstanceOf(ForbiddenException); // sales@ by default
+    const pv = await service.composePreview({ ...input, sender: 'finance' }, actor);
+    expect(pv.from).toBe('Majestan Realty Accounts <finance@majestanrealty.com>');
+    expect(pv.html).toContain('Accounts Team, Majestan Realty');
+    const sent = await service.composeSend({ ...input, sender: 'finance', hash: pv.hash }, actor);
+    expect(sent).toMatchObject({ event: 'manual.lead@finance', label: 'Email from finance@majestanrealty.com' });
+    expect(rows[0]).toMatchObject({ identity: 'finance', module: 'finance', entity_type: 'lead' });
+    expect(registry.resolve('manual.lead@finance')).toBe(registry.manual('lead', 'finance'));
+    await expect(service.history('lead', 20, actor)).resolves.toHaveLength(1); // finance can see the record's emails
+    await expect(service.history('person', 20, actor)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('refuses mailboxes that may not write to a record, and standard emails from another mailbox', async () => {
+    const { service, registry } = setup();
+    people.set(21, { email: 'p@x.com', name: 'P', ready: true });
+    expect(() => registry.manual('person', 'finance')).toThrow(BadRequestException);
+    expect(() => registry.manual('lead', 'hr')).toThrow(BadRequestException);
+    await expect(service.composePreview({ entityType: 'lead', entityId: 21, subject: 'x', body: '<p>x</p>', eventKey: 'test.lead_hello', sender: 'finance' }, actor))
+      .rejects.toThrow('always sent from sales@majestanrealty.com');
+  });
+
+  it('blocks sending while "[enter …]" blanks from a template are left in', async () => {
+    const { service } = setup();
+    people.set(22, { email: 'q@x.com', name: 'Q', ready: true });
+    const pv = await service.composePreview({ entityType: 'person', entityId: 22, subject: 'Due [enter date]', body: '<p>Pay <strong>[enter amount]</strong></p>' }, actor);
+    expect(pv.issues).toEqual(['Fill in: [enter date], [enter amount]']);
   });
 
   it('rejects a second registration of the same key', () => {

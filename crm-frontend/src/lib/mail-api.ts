@@ -14,9 +14,18 @@ export interface MailCatalogEvent {
   canSend: boolean;
 }
 
+/** A mailbox that can write to the record (its own first, then e.g. finance@). */
+export interface MailSender {
+  key: string;
+  from: string;
+  name: string;
+  canSend: boolean;
+}
+
 export interface MailCatalog {
   enabled: boolean;
   redirectTo: string | null;
+  senders: MailSender[];
   events: MailCatalogEvent[];
 }
 
@@ -73,6 +82,7 @@ export interface ComposeInput {
   eventKey?: string;
   draftId?: number;
   attachmentIds?: number[];
+  sender?: string;
 }
 
 export type ComposePreview = MailPreview & { attachments: MailAttachment[] };

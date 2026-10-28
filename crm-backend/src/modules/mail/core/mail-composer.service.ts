@@ -108,6 +108,9 @@ export class MailComposer {
     const body = fillHtml(template.body, vars);
     const unknown = [...new Set([...subject.unknown, ...body.unknown, ...preheader.unknown])];
     if (unknown.length) issues.push(`Unknown placeholder${unknown.length > 1 ? 's' : ''}: ${unknown.map((u) => `{{${u}}}`).join(', ')}`);
+    // Saved templates mark what staff must fill in, e.g. "[enter amount]".
+    const blanks = [...new Set(`${subject.text} ${body.html}`.match(/\[(?:enter|add) [^\]<>]{1,60}\]/gi) ?? [])];
+    if (blanks.length) issues.push(`Fill in: ${blanks.join(', ')}`);
     if (!subject.text) issues.push('Subject is empty');
     if (!body.html.replace(/<[^>]*>/g, '').trim()) issues.push('Message is empty');
 

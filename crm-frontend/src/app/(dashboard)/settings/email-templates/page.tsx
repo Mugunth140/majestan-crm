@@ -19,11 +19,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { FormSelect } from "@/components/shared/form-select";
 
 const noopSubscribe = () => () => {};
 
 type Selection = { kind: "system"; key: string } | { kind: "saved"; id: number } | { kind: "new" };
-type Draft = { name: string; subject: string; body: string; isActive: boolean };
+/** sender: the mailbox a saved template is written for (system emails keep the record's own). */
+type Draft = { name: string; subject: string; body: string; isActive: boolean; sender?: string };
 
 const EMPTY_BODY = "<p>Dear {{lead.name}},</p><p></p>";
 
@@ -78,10 +80,10 @@ export default function EmailTemplatesPage() {
       if (email) next = { name: email.label, subject: email.subject, body: email.body, isActive: true };
     } else if (target?.kind === "saved") {
       const tpl = source.savedTemplates.find((t) => t.id === target.id);
-      if (tpl) next = { name: tpl.name, subject: tpl.subject, body: tpl.body, isActive: tpl.isActive };
+      if (tpl) next = { name: tpl.name, subject: tpl.subject, body: tpl.body, isActive: tpl.isActive, sender: tpl.sender };
     } else if (target?.kind === "new") {
       const firstVar = source.variables.find((v) => !v.block && v.key.endsWith(".name"))?.key ?? "sender.name";
-      next = { name: "", subject: "", body: EMPTY_BODY.replace("lead.name", firstVar), isActive: true };
+      next = { name: "", subject: "", body: EMPTY_BODY.replace("lead.name", firstVar), isActive: true, sender: source.senders[0]?.key };
     }
     setSelection(next ? target : null);
     setDraft(next);
@@ -103,7 +105,7 @@ export default function EmailTemplatesPage() {
     let live = true;
     const timer = setTimeout(() => {
       mailTemplatesApi
-        .preview(entityType, draft.subject || "(no subject)", draft.body)
+        .preview(entityType, draft.subject || "(no subject)", draft.body, draft.sender)
         .then((result) => { if (live) setPreview(result); })
         .catch((reason) => { if (live) toast.error(reason instanceof Error ? reason.message : "Preview failed"); });
     }, 250);
@@ -258,7 +260,7 @@ export default function EmailTemplatesPage() {
                       active={selection?.kind === "saved" && selection.id === tpl.id}
                       title={tpl.name}
                       hint={tpl.subject}
-                      badge={tpl.isActive ? undefined : "Hidden"}
+                      badge={!tpl.isActive ? "Hidden" : tpl.sender !== catalog.senders[0]?.key ? `${tpl.sender}@` : undefined}
                       onClick={() => choose({ kind: "saved", id: tpl.id })}
                     />
                   ))}
@@ -280,7 +282,9 @@ export default function EmailTemplatesPage() {
                         {dirty && <span className="text-[11px] text-muted-foreground">· Unsaved changes</span>}
                       </div>
                       <p className="truncate text-xs text-muted-foreground">
-                        {system ? `${system.description} Sent from ${catalog.from}.` : `Staff can start from this when writing an email from ${catalog.from}.`}
+                        {system
+                          ? `${system.description} Sent from ${catalog.from}.`
+                          : `Staff can start from this when writing an email from ${catalog.senders.find((s) => s.key === draft.sender)?.from ?? catalog.from}.`}
                       </p>
                     </div>
                     <div className="flex items-center gap-1 rounded-lg border bg-muted/40 p-0.5">
@@ -301,6 +305,14 @@ export default function EmailTemplatesPage() {
                   <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
                     {mode === "edit" ? (
                       <>
+                        {selection?.kind !== "system" && catalog.senders.length > 1 && (
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Send from</label>
+                            <FormSelect name="templateSender" value={draft.sender ?? catalog.senders[0].key} disabled={readOnly}
+                              onValueChange={(v: string) => v && setDraft({ ...draft, sender: v })}
+                              options={catalog.senders.map((s) => ({ label: s.from, value: s.key }))} placeholder="Choose a mailbox" />
+                          </div>
+                        )}
                         {selection?.kind !== "system" && (
                           <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
                             <div className="space-y-1.5">

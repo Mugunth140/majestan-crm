@@ -62,6 +62,8 @@ export function MailPanel({ entityType, entityId, refreshKey = 0, recipients }: 
   if (!loading && !catalog) return null;
 
   const sendable = catalog?.events.filter((event) => event.canSend) ?? [];
+  // Mailboxes this user may write from here (e.g. sales@ and finance@ on a lead).
+  const writable = catalog?.senders?.filter((sender) => sender.canSend) ?? [];
   const drafts = rows.filter((row) => row.status === "draft");
   const history = rows.filter((row) => row.status !== "draft");
   const visible = expanded ? history : history.slice(0, COLLAPSED);
@@ -85,7 +87,7 @@ export function MailPanel({ entityType, entityId, refreshKey = 0, recipients }: 
         <h3 className="text-base font-bold text-foreground flex items-center gap-2">
           <Mail className="h-4 w-4 text-muted-foreground" /> Emails
         </h3>
-        {sendable.length > 0 && (
+        {writable.length > 0 && (
           <Button variant="outline" size="sm" onClick={() => setComposer({ kind: "blank" })} className="h-8 rounded-lg gap-1.5 text-[13px] font-semibold">
             <PenLine className="h-3.5 w-3.5" /> Write email
           </Button>
@@ -173,6 +175,7 @@ export function MailPanel({ entityType, entityId, refreshKey = 0, recipients }: 
         entityId={entityId}
         start={composer}
         recipients={recipients}
+        senders={writable}
         onClose={() => setComposer(null)}
         onSent={() => { setComposer(null); void load(); }}
       />

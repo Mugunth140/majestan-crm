@@ -32,6 +32,8 @@ export interface SystemEmailTemplate {
 
 export interface SavedEmailTemplate {
   id: number;
+  /** Mailbox it is written for, e.g. "finance". */
+  sender: string;
   name: string;
   subject: string;
   body: string;
@@ -40,6 +42,8 @@ export interface SavedEmailTemplate {
 }
 
 export interface MailTemplateCatalog extends MailTemplateEntity {
+  /** Mailboxes that can write to this record type, its own first. */
+  senders: { key: string; from: string }[];
   variables: MailVariableDoc[];
   systemEmails: SystemEmailTemplate[];
   savedTemplates: SavedEmailTemplate[];
@@ -62,14 +66,14 @@ export const mailTemplatesApi = {
   entities: () => apiJson<MailTemplateEntity[]>(`${API_URL}/mail/templates/entities`),
   catalog: (entityType: string) =>
     apiJson<MailTemplateCatalog>(`${API_URL}/mail/templates?entityType=${encodeURIComponent(entityType)}`),
-  preview: (entityType: string, subject: string, body: string) =>
-    send<TemplatePreview>("POST", "/preview", { entityType, subject, body }),
+  preview: (entityType: string, subject: string, body: string, sender?: string) =>
+    send<TemplatePreview>("POST", "/preview", { entityType, subject, body, sender }),
   saveSystem: (eventKey: string, subject: string, body: string) =>
     send<SystemEmailTemplate>("PUT", `/system/${encodeURIComponent(eventKey)}`, { subject, body }),
   resetSystem: (eventKey: string) => send<SystemEmailTemplate>("DELETE", `/system/${encodeURIComponent(eventKey)}`),
-  createSaved: (entityType: string, input: { name: string; subject: string; body: string; isActive?: boolean }) =>
+  createSaved: (entityType: string, input: { name: string; subject: string; body: string; isActive?: boolean; sender?: string }) =>
     send<SavedEmailTemplate>("POST", "/saved", { entityType, ...input }),
-  updateSaved: (id: number, entityType: string, input: { name: string; subject: string; body: string; isActive?: boolean }) =>
+  updateSaved: (id: number, entityType: string, input: { name: string; subject: string; body: string; isActive?: boolean; sender?: string }) =>
     send<SavedEmailTemplate>("PUT", `/saved/${id}`, { entityType, ...input }),
   deleteSaved: (id: number) => send<{ success: boolean }>("DELETE", `/saved/${id}`),
 };

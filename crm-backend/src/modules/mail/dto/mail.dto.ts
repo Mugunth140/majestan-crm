@@ -30,6 +30,8 @@ export class TemplateTextDto {
 
 export class TemplatePreviewDto extends TemplateTextDto {
   @IsString() @MaxLength(50) entityType: string;
+  /** Mailbox the template is written for (default: the record type's own). */
+  @IsOptional() @IsString() @MaxLength(50) sender?: string;
 }
 
 export class SavedTemplateDto extends TemplatePreviewDto {
@@ -47,6 +49,7 @@ export class ComposeDto {
   @IsOptional() @IsString() @MaxLength(100) eventKey?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) draftId?: number;
   @IsOptional() @IsArray() @ArrayMaxSize(10) @IsInt({ each: true }) attachmentIds?: number[];
+  @IsOptional() @IsString() @MaxLength(50) sender?: string;
 }
 
 export class ComposeSendDto extends ComposeDto {
