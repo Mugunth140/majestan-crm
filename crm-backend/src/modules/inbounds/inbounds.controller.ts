@@ -3,6 +3,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { InboundsService } from './inbounds.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateInboundDto } from './dto/create-inbound.dto';
+import { UpdateInboundLocationDto } from './dto/update-inbound-location.dto';
 import { UpdateInboundDto } from './dto/update-inbound.dto';
 import { CreateInboundFollowUpDto } from './dto/create-inbound-follow-up.dto';
 import { UpdateInboundFollowUpDto } from './dto/update-inbound-follow-up.dto';
@@ -51,6 +52,15 @@ export class InboundsController {
   @Get(':id')
   findOne(@Param('id') id: string, @Request() req: any) {
     return this.inboundsService.findOne(+id, req.user);
+  }
+
+  @Patch(':id/location')
+  saveLocation(
+    @Param('id') id: string,
+    @Body() coordinates: UpdateInboundLocationDto,
+    @Request() req: any,
+  ) {
+    return this.inboundsService.saveLocationIfMissing(+id, coordinates, req.user);
   }
 
   @Patch(':id')

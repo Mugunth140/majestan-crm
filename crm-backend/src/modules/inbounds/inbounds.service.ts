@@ -65,11 +65,6 @@ export class InboundsService {
 
     // Read the original buffer before imgproxy removes image metadata.
     const coordinates = await readInboundPhotoCoordinates(file.buffer);
-    if (coordinates) {
-      inbound.latitude = coordinates.latitude;
-      inbound.longitude = coordinates.longitude;
-      inbound.google_map_location = '';
-    }
     const fileExt = extname(file.originalname);
     const tempFileKey = `inbounds/${inbound.property_id}/temp_${Date.now()}${fileExt}`;
 
@@ -116,7 +111,20 @@ export class InboundsService {
       inbound.image_url = tempFileUrl;
     }
     
-    return this.inboundsRepository.save(inbound);
+    // Serialize the final image save with late GPS updates, including after an app reload.
+    return this.inboundsRepository.manager.transaction(async manager => {
+      const current = await manager.findOne(Inbound, {
+        where: { id }, lock: { mode: 'pessimistic_write' },
+      });
+      if (!current) throw new NotFoundException(`Inbound with ID ${id} not found`);
+      current.image_url = inbound.image_url;
+      if (coordinates) {
+        current.latitude = coordinates.latitude;
+        current.longitude = coordinates.longitude;
+        current.google_map_location = '';
+      }
+      return manager.save(Inbound, current);
+    });
   }
 
   /** Keep only rows with a floor label; coerce price to number-or-undefined. */
@@ -266,6 +274,22 @@ export class InboundsService {
     }
 
     return inbound;
+  }
+
+  async saveLocationIfMissing(id: number, coordinates: { latitude: number; longitude: number }, user?: any) {
+    await this.findOne(id, user);
+    // Atomic fallback: a delayed device fix must never replace photo GPS or staff edits.
+    const result = await this.inboundsRepository.createQueryBuilder()
+      .update(Inbound)
+      .set({
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+        quality_score: () => "LEAST(100, quality_score + IF(google_map_location IS NULL OR google_map_location = '', 10, 0))",
+      })
+      .where('id = :id', { id })
+      .andWhere('(latitude IS NULL OR longitude IS NULL)')
+      .execute();
+    return { saved: result.affected === 1 };
   }
 
   async update(id: number, updateInboundDto: Omit<Partial<Inbound>, 'units'> & { units?: any[] }): Promise<Inbound> {

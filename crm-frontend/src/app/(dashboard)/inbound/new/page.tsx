@@ -1,5 +1,6 @@
 "use client";
 
+import { inboundLocation } from "@/lib/inbound-location";
 import { apiFetch } from "@/lib/api-fetch";
 import { useIsMobile } from "@/hooks/use-device";
 import { readStoredCoordinates } from "@/lib/image-coordinates";
@@ -216,6 +217,7 @@ function InboundForm() {
   const editId = searchParams.get("edit");
   const isMobile = useIsMobile();
   const isQuickCapture = isMobile && !editId;
+  const locationCapture = useRef("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -509,7 +511,10 @@ function InboundForm() {
         throw new Error(inboundErrorMessage(result) || "Failed to save inbound");
       }
 
+      if (isQuickCapture) inboundLocation.enqueue(locationCapture.current, result.id, !!selectedFile);
+
       // Handle Image Upload
+      let photoHasLocation = false;
       if (selectedFile) {
         setIsUploadingImage(true);
         setUploadProgress("uploading");
@@ -525,6 +530,9 @@ function InboundForm() {
             setUploadProgress("error");
             toast.error("Property saved, but photo upload failed.");
           } else {
+            const uploaded = await uploadRes.json().catch(() => null);
+            const saved = uploaded?.data ?? uploaded;
+            photoHasLocation = saved?.latitude != null && saved?.longitude != null;
             setUploadProgress("done");
           }
         } catch {
@@ -535,6 +543,7 @@ function InboundForm() {
         }
       }
 
+      if (isQuickCapture) inboundLocation.photoFinished(result.id, photoHasLocation);
       toast.success(editId ? "Inbound updated successfully!" : "Inbound created successfully!");
       router.push("/inbound");
     } catch (err: any) {
@@ -578,6 +587,12 @@ function InboundForm() {
     );
   };
 
+  useEffect(() => {
+    if (!isQuickCapture) return;
+    locationCapture.current = inboundLocation.startCapture();
+    return () => inboundLocation.stopCapture(locationCapture.current);
+  }, [isQuickCapture]);
+
   const skeletonField = (
     <div className="h-12 rounded-xl bg-muted/50 animate-pulse flex items-center px-4">
       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -613,7 +628,7 @@ function InboundForm() {
             placeholder="e.g. 76.9558" className="h-12 rounded-xl bg-muted/30" />
         </div>
       </div>
-      <Button type="button" variant="outline" onClick={handleGetLocation} disabled={isGettingLocation}>
+      <Button type="button" variant="outline" onClick={() => handleGetLocation()} disabled={isGettingLocation}>
         {isGettingLocation ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
         {isGettingLocation ? "Getting location..." : "Use current location"}
       </Button>

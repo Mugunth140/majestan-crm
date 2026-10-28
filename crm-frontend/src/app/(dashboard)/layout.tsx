@@ -1,5 +1,6 @@
 "use client";
 
+import { InboundLocationSync } from "@/components/layout/inbound-location-sync";
 import { Suspense } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
@@ -23,6 +24,7 @@ export default function DashboardLayout({
   const isClient = useIsClient();
   return (
     <NotificationProvider>
+      <InboundLocationSync />
       <SidebarProvider>
         <MobileHeaderProvider>
           <div className="flex w-full min-h-[100dvh] md:h-[100dvh] md:overflow-hidden bg-card md:bg-muted/30 transition-colors duration-500 relative">
