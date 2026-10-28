@@ -27,7 +27,8 @@ export class AgentsController {
 
   @Post()
   async createAgent(@Body() body: any, @Request() req: any) {
-    if (req.user && req.user.role === 'Staff' && !body.assigned_staff_id) {
+    // Staff always own what they add; others may pick a staff member, else they own it.
+    if (req.user && req.user.role === 'Staff') {
       body.assigned_staff_id = req.user.id;
     }
     const result = await this.agentsService.createAgent(body, req.user?.id ?? null);

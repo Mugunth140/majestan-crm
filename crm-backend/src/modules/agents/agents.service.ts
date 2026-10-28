@@ -195,13 +195,13 @@ export class AgentsService {
   }
 
   async createAgent(body: any, actorId: number | null = null): Promise<CreateAgentResult> {
-    const result = await this.createAgentRecord(body);
+    const result = await this.createAgentRecord(body, actorId);
     // partners@ "thanks for connecting" draft, after commit (only reaches partners with an email).
     if (!result.isExistingAgent) await this.events?.emitAsync('partners.agent.created', { entityId: result.agent.id, actorId });
     return result;
   }
 
-  private async createAgentRecord(body: any): Promise<CreateAgentResult> {
+  private async createAgentRecord(body: any, actorId: number | null): Promise<CreateAgentResult> {
     return this.dataSource.transaction(async (manager: EntityManager) => {
       const existingAgent = await manager.getRepository(Agent).findOne({
         where: { mobile_number: body.mobile },
@@ -228,9 +228,11 @@ export class AgentsService {
         };
       }
 
+      // The signed-in user (actorId), not the browser's `userId`, decides the default owner.
       let assignedStaffId: number | undefined;
-      if (body.userId) {
-        const user = await manager.getRepository(User).findOne({ where: { id: body.userId } });
+      const requested = Number(body.assigned_staff_id ?? actorId ?? body.userId);
+      if (Number.isInteger(requested) && requested > 0) {
+        const user = await manager.getRepository(User).findOne({ where: { id: requested } });
         if (user) assignedStaffId = user.id;
       }
 
