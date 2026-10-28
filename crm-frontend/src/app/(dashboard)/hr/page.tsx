@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { Device } from "@/components/shared/device";
+import { matchesHrActionFilter, formatHrFollowUp } from "@/lib/hr-action-required";
 import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -90,7 +91,7 @@ export default function HrPage() {
   const fetchCandidates = () => {
     setIsLoading(true);
     apiFetch(`${API_URL}/hr`)
-      .then(res => res.json())
+      .then(res => { if (!res.ok) throw new Error("Failed to load candidates"); return res.json(); })
       .then(data => {
         const mapped = data.map((c: any, i: number) => ({
           ...c,
@@ -99,6 +100,7 @@ export default function HrPage() {
         }));
         setCandidates(mapped);
       })
+      .catch(() => toast.error("Failed to load candidates. Please refresh to try again."))
       .finally(() => setIsLoading(false));
   };
 
@@ -154,44 +156,10 @@ export default function HrPage() {
     if (filters.status) filtered = filtered.filter(c => c.status === filters.status);
 
     if (activeTab === "Action Required") {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      const actionStatuses = ["New Application", "Hold"];
-
-      return filtered.filter(l => {
-        const parseLocal = (dStr: string) => {
-          if (!dStr) return null;
-          const parts = dStr.split("T")[0].split("-");
-          if (parts.length !== 3) return null;
-          const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-          d.setHours(0, 0, 0, 0);
-          return d;
-        };
-        const fDate = parseLocal(l.nextFollowUpDate);
-        const lDate = parseLocal(l.lastFollowedUpDate);
-        let matchesTimeFilter = false;
-        if (actionFilter === "Overdue") {
-          matchesTimeFilter = !!(fDate && fDate < today);
-        } else if (actionFilter === "Yesterday") {
-          matchesTimeFilter = !!(lDate && lDate.getTime() === yesterday.getTime());
-        } else if (actionFilter === "Today") {
-          const isFollowedUpToday = !!(lDate && lDate.getTime() === today.getTime());
-          if (todayViewMode === "completed") {
-            matchesTimeFilter = !!(isFollowedUpToday && !(fDate && fDate.getTime() === today.getTime()));
-          } else {
-            matchesTimeFilter = !!(fDate && fDate.getTime() === today.getTime());
-          }
-        } else if (actionFilter === "Tomorrow") {
-          matchesTimeFilter = !!(fDate && fDate.getTime() === tomorrow.getTime());
-        } else if (actionFilter === "All Scheduled") {
-          matchesTimeFilter = !!(fDate && fDate > tomorrow);
-        }
-        return matchesTimeFilter || (actionStatuses.includes(l.status) && !fDate);
-      });
+      return filtered.filter(candidate =>
+        (filters.status || !["Joined", "Rejected"].includes(candidate.status)) &&
+        matchesHrActionFilter(candidate, actionFilter, todayViewMode)
+      );
     }
 
     if (activeTab === "Rejected") return filtered.filter(c => c.status === "Rejected");
@@ -240,6 +208,18 @@ export default function HrPage() {
         </Link>
       ),
     },
+    ...(activeTab === "Action Required" ? [{
+      id: "followUpDate",
+      header: actionFilter === "Yesterday" || (actionFilter === "Today" && todayViewMode === "completed")
+        ? "Followed Up" : "Next Follow Up",
+      cell: ({ row }: any) => {
+        const completed = actionFilter === "Yesterday" || (actionFilter === "Today" && todayViewMode === "completed");
+        return formatHrFollowUp(
+          completed ? row.original.lastFollowedUpDate : row.original.nextFollowUpDate,
+          completed ? row.original.lastFollowedUpTime : row.original.nextFollowUpTime,
+        );
+      },
+    }] : []),
     { accessorKey: "name", header: "Candidate Name" },
     { accessorKey: "mobile", header: "Mobile Number" },
     { id: "assignee", header: "Assigned staff", cell: ({ row }: any) => (
@@ -449,8 +429,8 @@ export default function HrPage() {
 
       {/* Action Required Row */}
       {activeTab === "Action Required" && (
-        <div className="flex items-center gap-4 px-6 py-3 bg-muted/5 border-b border-border/40 animate-in slide-in-from-top-2 fade-in duration-200">
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+        <div className="flex items-center gap-2 px-6 pb-0.5 min-h-[60px] animate-in slide-in-from-top-2 fade-in duration-200 flex-wrap">
+          <div className="flex h-10 items-center gap-2 overflow-x-auto scrollbar-hide">
             {actionFilters.map((filter) => {
               const isActive = actionFilter === filter;
               let activeClass = "bg-primary/10 text-primary border-primary/30";
@@ -460,7 +440,7 @@ export default function HrPage() {
               return (
                 <button
                   key={filter}
-                  className={"h-9 shrink-0 flex items-center justify-center cursor-pointer px-4 rounded-full text-[13px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
+                  className={"h-10 shrink-0 flex items-center justify-center cursor-pointer px-5 rounded-full text-[13.5px] font-medium leading-none transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
                   onClick={() => setActionFilter(filter)}
                 >
                   {getActionFilterLabel(filter)}
@@ -469,7 +449,7 @@ export default function HrPage() {
             })}
           </div>
 
-          <div className={`ml-auto flex items-center h-9 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "hidden opacity-0 pointer-events-none"}`}>
+          <div className={`ml-auto flex h-10 shrink-0 self-center items-center bg-muted/60 p-0.5 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "hidden opacity-0 pointer-events-none"}`}>
             {[
               { id: "pending", label: "Follow Up" },
               { id: "completed", label: "Followed Up" }
@@ -479,7 +459,7 @@ export default function HrPage() {
                 <button
                   key={mode.id}
                   onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
-                  className={`relative h-full flex items-center px-4 rounded-full text-[12px] font-bold transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
+                  className={`relative h-full flex items-center px-4 rounded-full text-[13px] font-bold leading-none transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
                 >
                   {isSelected && (
                     <motion.div

@@ -6,6 +6,7 @@ import { MasterService } from '../master/master.service';
 import { HrImportRowDto, normalizeCandidateMobile } from './dto/bulk-import-hr.dto';
 import { HrCandidate, HrCandidateStatus } from '../../database/entities/hr-candidate.entity';
 import { HrFollowUp } from '../../database/entities/hr-follow-up.entity';
+import { summarizeHrFollowUps } from './hr-follow-up-summary';
 import { HrContactLog } from '../../database/entities/hr-contact-log.entity';
 import { CreateHrCandidateDto } from './dto/create-hr-candidate.dto';
 import { UpdateHrCandidateDto } from './dto/update-hr-candidate.dto';
@@ -29,27 +30,20 @@ export class HrService {
 
     const names = await this.assigneeNames(candidates.map(candidate => candidate.assignedStaffId));
     const sources = new Map((await this.master.getHrSources()).map(source => [source.id, source.name]));
+    const followUpsByCandidate = new Map<number, HrFollowUp[]>();
+    for (const followUp of allFollowUps) {
+      const history = followUpsByCandidate.get(followUp.hr_candidate_id) || [];
+      history.push(followUp);
+      followUpsByCandidate.set(followUp.hr_candidate_id, history);
+    }
     return candidates.map(candidate => {
-      const followUps = allFollowUps.filter(f => f.hr_candidate_id === candidate.id);
-      let nextFollowUpDate = null;
-      let lastFollowedUpDate = null;
-
-      if (followUps.length > 0) {
-        nextFollowUpDate = followUps[0].next_follow_up_date || null;
-        
-        const actualFus = followUps
-          .filter(f => f.follow_up_date)
-          .sort((a, b) => new Date(b.follow_up_date!).getTime() - new Date(a.follow_up_date!).getTime());
-        
-        lastFollowedUpDate = actualFus.length > 0 ? actualFus[0].follow_up_date : null;
-      }
+      const summary = summarizeHrFollowUps(followUpsByCandidate.get(candidate.id) || []);
 
       return {
         ...candidate,
         recruitmentSource: sources.get(candidate.hrSourceId ?? 0) || candidate.recruitmentSource,
         assignedStaff: names.get(candidate.assignedStaffId ?? 0) || null,
-        nextFollowUpDate,
-        lastFollowedUpDate
+        ...summary
       };
     });
   }
