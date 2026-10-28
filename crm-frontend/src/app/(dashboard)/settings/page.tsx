@@ -1,6 +1,6 @@
 "use client";
 
-import { Settings, LogOut } from "lucide-react";
+import { ChevronRight, LogOut, Mail } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { MobileHeader } from "@/components/layout/mobile-header";
@@ -23,14 +23,25 @@ export default function SettingsPage() {
         <div className="hidden md:flex items-center justify-between">
           <h1 className="text-[28px] font-bold tracking-tight">System Settings</h1>
         </div>
-        <div className="bg-card border rounded-2xl p-10 shadow-sm flex flex-col items-center justify-center text-center h-[50vh]">
-          <div className="h-16 w-16 bg-blue-50 text-[#0052FF] rounded-full flex items-center justify-center mb-4 shadow-sm border border-blue-100">
-            <Settings className="h-8 w-8" />
-          </div>
-          <h3 className="text-xl font-bold text-foreground mb-2">Settings are coming soon</h3>
-          <p className="text-muted-foreground max-w-sm">
-            System configuration, user preferences, and platform integrations will be available in this module soon.
-          </p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <button
+            type="button"
+            onClick={() => router.push("/settings/email-templates")}
+            className="group flex items-start gap-4 rounded-2xl border bg-card p-5 text-left shadow-sm transition-colors hover:border-[#0052FF]/40"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-[#0052FF] dark:border-blue-900 dark:bg-blue-950/40">
+              <Mail className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center justify-between gap-2 text-[15px] font-bold text-foreground">
+                Email templates
+                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+              </span>
+              <span className="mt-1 block text-[13px] leading-snug text-muted-foreground">
+                Wording of the emails the CRM sends, and saved templates for writing your own.
+              </span>
+            </span>
+          </button>
         </div>
 
         <button

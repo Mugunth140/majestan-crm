@@ -32,6 +32,7 @@ export function nextRetryAt(attempts: number, now: Date): Date | null {
 }
 
 /** Stable fingerprint of rendered content; the client sends it back to prove what it previewed. */
-export function contentHash(mail: { subject: string; html: string; to: string[]; cc: string[] }): string {
-  return createHash('sha256').update(JSON.stringify([mail.subject, mail.html, mail.to, mail.cc])).digest('hex').slice(0, 32);
+export function contentHash(mail: { subject: string; html: string; to: string[]; cc: string[]; attachments?: number[] }): string {
+  const attachments = [...(mail.attachments ?? [])].sort((a, b) => a - b);
+  return createHash('sha256').update(JSON.stringify([mail.subject, mail.html, mail.to, mail.cc, attachments])).digest('hex').slice(0, 32);
 }

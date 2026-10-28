@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, Loader2, Mail, RotateCcw, Send } from "lucide-react";
+import { Loader2, Mail, PenLine, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { mailApi, MailCatalog, MailSummary, MailTarget, MAIL_STATUS, newDraftIds } from "@/lib/mail-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { MailComposer, type ComposerStart } from "./mail-composer";
 import { MailPreviewDialog } from "./mail-preview-dialog";
 
 type Props = {
@@ -16,16 +16,19 @@ type Props = {
   entityId: number;
   /** Change it after a save that may have created a draft (e.g. a status change). */
   refreshKey?: number;
+  /** The record's own email address(es), shown in the composer. */
+  recipients?: string[];
 };
 
 const COLLAPSED = 4;
 
 /** Drop-in email section for any CRM record: send menu, drafts waiting, and history. */
-export function MailPanel({ entityType, entityId, refreshKey = 0 }: Props) {
+export function MailPanel({ entityType, entityId, refreshKey = 0, recipients }: Props) {
   const [catalog, setCatalog] = useState<MailCatalog | null>(null);
   const [rows, setRows] = useState<MailSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [target, setTarget] = useState<MailTarget | null>(null);
+  const [composer, setComposer] = useState<ComposerStart | null>(null);
   const [retrying, setRetrying] = useState<number | null>(null);
   const [expanded, setExpanded] = useState(false);
   const seen = useRef<Set<number> | null>(null);
@@ -83,21 +86,9 @@ export function MailPanel({ entityType, entityId, refreshKey = 0 }: Props) {
           <Mail className="h-4 w-4 text-muted-foreground" /> Emails
         </h3>
         {sendable.length > 0 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={<Button variant="outline" size="sm" className="h-8 rounded-lg gap-1.5 text-[13px] font-semibold" />}
-            >
-              <Send className="h-3.5 w-3.5" /> Send email <ChevronDown className="h-3.5 w-3.5" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-72">
-              {sendable.map((event) => (
-                <DropdownMenuItem key={event.key} onClick={() => setTarget({ kind: "new", event: event.key })} className="flex-col items-start gap-0.5 py-2">
-                  <span className="font-medium">{event.label}</span>
-                  <span className="text-xs text-muted-foreground leading-snug">{event.description}</span>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button variant="outline" size="sm" onClick={() => setComposer({ kind: "blank" })} className="h-8 rounded-lg gap-1.5 text-[13px] font-semibold">
+            <PenLine className="h-3.5 w-3.5" /> Write email
+          </Button>
         )}
       </div>
 
@@ -116,9 +107,14 @@ export function MailPanel({ entityType, entityId, refreshKey = 0 }: Props) {
               <p className="text-[13px] font-semibold text-amber-900 dark:text-amber-300">Ready to send: {draft.label}</p>
               <p className="mt-0.5 text-xs text-amber-900/70 dark:text-amber-300/70 truncate">To {draft.to.join(", ")}</p>
               {sendable.length > 0 && (
-                <Button size="sm" onClick={() => setTarget({ kind: "draft", id: draft.id })} className="mt-3 h-8 w-full rounded-lg bg-[#0052FF] text-white hover:bg-[#0040CC]">
-                  Preview &amp; send
-                </Button>
+                <div className="mt-3 grid grid-cols-[auto_1fr] gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setComposer({ kind: "draft", id: draft.id, eventKey: draft.event })} className="h-8 rounded-lg bg-background">
+                    Edit
+                  </Button>
+                  <Button size="sm" onClick={() => setTarget({ kind: "draft", id: draft.id })} className="h-8 rounded-lg bg-[#0052FF] text-white hover:bg-[#0040CC]">
+                    Preview &amp; send
+                  </Button>
+                </div>
               )}
             </div>
           ))}
@@ -171,6 +167,14 @@ export function MailPanel({ entityType, entityId, refreshKey = 0 }: Props) {
         entityId={entityId}
         onClose={() => setTarget(null)}
         onDone={() => { setTarget(null); void load(); }}
+      />
+      <MailComposer
+        entityType={entityType}
+        entityId={entityId}
+        start={composer}
+        recipients={recipients}
+        onClose={() => setComposer(null)}
+        onSent={() => { setComposer(null); void load(); }}
       />
     </div>
   );

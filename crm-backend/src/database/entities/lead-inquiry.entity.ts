@@ -50,6 +50,10 @@ export class LeadInquiry {
   @Column({ name: 'visit_slot', type: 'time', nullable: true })
   visit_slot: string | null;
 
+  /** Where to meet for the site visit (shown in the confirmation email). */
+  @Column({ name: 'visit_location', type: 'varchar', length: 500, nullable: true })
+  visit_location: string | null;
+
   // Website-enquiry provenance + queue state. Mirrors migration
   // infra/migrations/025_add_inquiry_source_and_ack.sql — synchronize is
   // false, so the migration is the authority and these must agree with it

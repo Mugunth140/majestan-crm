@@ -8,6 +8,7 @@ import type { MailConfig } from './mail-config';
 import { applyRedirect, isPermanentFailure, nextRetryAt } from './mail-policy';
 import { MAIL_CONFIG, MailTransports } from './mail-transports.service';
 import { MailRegistry } from './mail-registry.service';
+import { MailAttachmentsService } from '../attachments/mail-attachments.service';
 
 const BATCH_SIZE = 10;
 const STUCK_AFTER_MS = 10 * 60_000;
@@ -34,6 +35,7 @@ export class MailDispatcher implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly transports: MailTransports,
     private readonly registry: MailRegistry,
     private readonly dataSource: DataSource,
+    private readonly attachments: MailAttachmentsService,
   ) {}
 
   onApplicationBootstrap() {
@@ -74,6 +76,13 @@ export class MailDispatcher implements OnApplicationBootstrap, OnModuleDestroy {
       .set({ status: 'cancelled', last_error: 'Draft expired without being sent' })
       .where("status = 'draft' AND expires_at IS NOT NULL AND expires_at < :now", { now })
       .execute();
+    // Scheduled emails (e.g. reminders) that couldn't go out in time would arrive too late.
+    await this.outbox
+      .createQueryBuilder()
+      .update(MailOutbox)
+      .set({ status: 'cancelled', last_error: 'Not sent in time; no longer relevant' })
+      .where("status = 'pending' AND expires_at IS NOT NULL AND expires_at < :now", { now })
+      .execute();
   }
 
   /** A crash mid-send leaves a row in "sending"; put it back in the queue. */
@@ -98,6 +107,7 @@ export class MailDispatcher implements OnApplicationBootstrap, OnModuleDestroy {
         cutoff: new Date(now.getTime() - this.config.retentionDays * DAY_MS),
       })
       .execute();
+    await this.attachments.purge(now, this.config.retentionDays);
   }
 
   private async processBatch(now: Date) {
@@ -128,7 +138,12 @@ export class MailDispatcher implements OnApplicationBootstrap, OnModuleDestroy {
     const cc = row.cc_json ?? [];
 
     // The record may have been deleted after the email was queued: never write about it then.
-    const definition = this.registry.all().find((d) => d.key === row.event_key);
+    let definition: ReturnType<MailRegistry['resolve']> | null = null;
+    try {
+      definition = this.registry.resolve(row.event_key);
+    } catch {
+      definition = null; // an email type that was removed from the code: still deliver what was queued
+    }
     if (definition && !(await definition.load(row.entity_id, { dataSource: this.dataSource, actorId: null }))) {
       await this.outbox.update(row.id, { status: 'cancelled', last_error: 'The record was deleted before sending' });
       return;
@@ -167,6 +182,7 @@ export class MailDispatcher implements OnApplicationBootstrap, OnModuleDestroy {
         html: row.html ?? '',
         text: row.text ?? '',
         headers,
+        attachments: await this.attachments.filesFor(row.id),
       });
       await this.outbox.update(row.id, { status: 'sent', sent_at: new Date(), message_id: messageId, last_error: null, next_attempt_at: null });
     } catch (error) {

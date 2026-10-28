@@ -10,7 +10,8 @@ import { MAIL_IDENTITIES } from './identities';
 import type { MailConfig } from './core/mail-config';
 import { type ComposedMail, MailComposer } from './core/mail-composer.service';
 import { type DomainEventPayload, type MailEventDefinition } from './core/mail-event';
-import { MailRegistry } from './core/mail-registry.service';
+import { MANUAL_PREFIX, MailRegistry } from './core/mail-registry.service';
+import { MailAttachmentsService } from './attachments/mail-attachments.service';
 import { MAIL_CONFIG } from './core/mail-transports.service';
 
 export const MAIL_ADMIN = 'mail.admin';
@@ -18,6 +19,19 @@ const DAY_MS = 24 * 3600_000;
 
 export interface MailActor {
   id: number;
+}
+
+export interface ComposeInput {
+  entityType: string;
+  entityId: number;
+  subject: string;
+  body: string;
+  cc?: string[];
+  /** Start from / send as this system email (its checks apply). */
+  eventKey?: string;
+  /** Edit and send this draft. */
+  draftId?: number;
+  attachmentIds?: number[];
 }
 
 /** Public face of the mail core: everything the API and the triggers use. */
@@ -32,6 +46,7 @@ export class MailService {
     @InjectRepository(MailSuppression) private readonly suppressions: Repository<MailSuppression>,
     private readonly permissions: PermissionsService,
     @Inject(MAIL_CONFIG) private readonly config: MailConfig,
+    private readonly attachments: MailAttachmentsService,
   ) {}
 
   // ── Catalog and preview ────────────────────────────────────────────────
@@ -63,7 +78,7 @@ export class MailService {
   async previewDraft(outboxId: number, note: string | null, actor: MailActor) {
     const row = await this.findRow(outboxId);
     if (row.status !== 'draft') throw new BadRequestException('Only drafts can be previewed for sending');
-    const definition = this.registry.get(row.event_key);
+    const definition = this.registry.resolve(row.event_key);
     await this.assertCanSend(actor, definition.module);
     return this.toPreview(await this.composer.compose(definition, row.entity_id, { actorId: actor.id, note }), row.id);
   }
@@ -103,7 +118,7 @@ export class MailService {
   async confirm(outboxId: number, note: string | null, hash: string | null, actor: MailActor) {
     const row = await this.findRow(outboxId);
     if (row.status !== 'draft') throw new BadRequestException('This email is no longer a draft');
-    const definition = this.registry.get(row.event_key);
+    const definition = this.registry.resolve(row.event_key);
     await this.assertCanSend(actor, definition.module);
     const composed = await this.composer.compose(definition, row.entity_id, { actorId: actor.id, note });
     this.assertSendable(composed, hash);
@@ -135,6 +150,89 @@ export class MailService {
     return this.summary(await this.findRow(row.id));
   }
 
+  // ── Composer ───────────────────────────────────────────────────────────
+
+  /**
+   * Which email type a composed message is: an existing draft being edited, a
+   * system email started from the menu (its checks still apply), or a plain
+   * staff-written email.
+   */
+  private async composeTarget(input: ComposeInput) {
+    if (input.draftId) {
+      const draft = await this.findRow(input.draftId);
+      if (draft.status !== 'draft') throw new BadRequestException('This email is no longer a draft');
+      if (draft.entity_type !== input.entityType || draft.entity_id !== input.entityId) {
+        throw new BadRequestException('Draft does not belong to this record');
+      }
+      return { definition: this.registry.resolve(draft.event_key), draft };
+    }
+    if (input.eventKey) {
+      const definition = this.registry.get(input.eventKey);
+      if (definition.entityType !== input.entityType) throw new BadRequestException('That email is for a different kind of record');
+      return { definition, draft: null };
+    }
+    return { definition: this.registry.manual(input.entityType), draft: null };
+  }
+
+  private composeWith(input: ComposeInput, definition: MailEventDefinition, actor: MailActor) {
+    return this.composer.compose(definition, input.entityId, {
+      actorId: actor.id,
+      override: { subject: input.subject, body: input.body },
+      cc: input.cc ?? [],
+      attachmentIds: input.attachmentIds ?? [],
+    });
+  }
+
+  async composePreview(input: ComposeInput, actor: MailActor) {
+    const { definition, draft } = await this.composeTarget(input);
+    await this.assertCanSend(actor, definition.module);
+    const attachments = await this.attachments.pendingFor(input.attachmentIds ?? [], actor.id);
+    const composed = await this.composeWith(input, definition, actor);
+    return { ...this.toPreview(composed, draft?.id ?? null), attachments };
+  }
+
+  async composeSend(input: ComposeInput & { hash: string }, actor: MailActor) {
+    const { definition, draft } = await this.composeTarget(input);
+    await this.assertCanSend(actor, definition.module);
+    const ids = input.attachmentIds ?? [];
+    await this.attachments.pendingFor(ids, actor.id);
+    const composed = await this.composeWith(input, definition, actor);
+    this.assertSendable(composed, input.hash);
+
+    // Row and attachments in one transaction: the dispatcher can't see the
+    // pending email before its files are linked.
+    const id = await this.outbox.manager.transaction(async (manager) => {
+      const repo = manager.getRepository(MailOutbox);
+      if (draft) {
+        const result = await repo
+          .createQueryBuilder()
+          .update(MailOutbox)
+          .set({ ...this.snapshot(composed, null), status: 'pending', confirmed_by: actor.id, confirmed_at: new Date(), expires_at: null, last_error: null })
+          .where("id = :id AND status = 'draft'", { id: draft.id })
+          .execute();
+        if (!result.affected) throw new ConflictException('This draft was already sent or cancelled');
+        await this.attachments.claim(manager, ids, actor.id, draft.id);
+        return draft.id;
+      }
+      let key = composed.idempotencyKey;
+      if (await repo.exists({ where: { idempotency_key: key } })) key = `${key}#resend-${Date.now()}`;
+      const row = await repo.save(
+        repo.create({
+          ...this.snapshot(composed, null),
+          idempotency_key: key,
+          status: 'pending',
+          trigger_source: 'composer',
+          created_by: actor.id,
+          confirmed_by: actor.id,
+          confirmed_at: new Date(),
+        }),
+      );
+      await this.attachments.claim(manager, ids, actor.id, row.id);
+      return row.id;
+    });
+    return this.summary(await this.findRow(id));
+  }
+
   // ── Domain-event triggers ──────────────────────────────────────────────
 
   /**
@@ -142,7 +240,7 @@ export class MailService {
    * queued email (auto mode). Never throws: a mail problem must not break the save
    * that caused it.
    */
-  async createFromTrigger(definition: MailEventDefinition, payload: DomainEventPayload, source: string) {
+  async createFromTrigger(definition: MailEventDefinition, payload: DomainEventPayload, source: string, opts: { expiresAt?: Date } = {}) {
     try {
       const composed = await this.composer.compose(definition, payload.entityId, { actorId: payload.actorId ?? null });
       if (!composed.to.length) return; // nobody to write to: nothing to suggest
@@ -162,7 +260,7 @@ export class MailService {
         last_error: blocked ? composed.issues.join('; ').slice(0, 1000) : null,
         trigger_source: source,
         created_by: payload.actorId ?? null,
-        expires_at: auto ? null : new Date(Date.now() + this.config.draftTtlDays * DAY_MS),
+        expires_at: auto ? (opts.expiresAt ?? null) : new Date(Date.now() + this.config.draftTtlDays * DAY_MS),
       });
     } catch (error) {
       if ((error as { code?: string }).code === 'ER_DUP_ENTRY') return; // raced with an identical trigger
@@ -183,7 +281,7 @@ export class MailService {
 
   async findOne(outboxId: number) {
     const row = await this.findRow(outboxId);
-    return { ...this.summary(row), html: row.html, text: row.text };
+    return { ...this.summary(row), html: row.html, text: row.text, attachments: await this.attachments.forOutbox(row.id) };
   }
 
   async list(filters: { status?: MailOutboxStatus; module?: string; page?: number }, actor: MailActor) {
@@ -288,7 +386,7 @@ export class MailService {
     return {
       id: row.id,
       event: row.event_key,
-      label: definition?.label ?? row.event_key,
+      label: row.event_key.startsWith(MANUAL_PREFIX) ? 'Email' : (definition?.label ?? row.event_key),
       status: row.status,
       to: row.to_json,
       cc: row.cc_json ?? [],

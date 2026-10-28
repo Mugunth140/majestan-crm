@@ -8,6 +8,7 @@ import { UpdateLeadDto } from './dto/update-lead.dto';
 import { BulkCreateLeadsDto } from './dto/bulk-create-leads.dto';
 import { BulkCheckMobilesDto } from './dto/bulk-check-mobiles.dto';
 import { UpdateLeadStatusDto } from './dto/update-lead-status.dto';
+import { ScheduleVisitDto } from './dto/schedule-visit.dto';
 import { UpdateLeadInquiryDto } from './dto/update-lead-inquiry.dto';
 import { CreateLeadContactLogDto } from './dto/create-lead-contact-log.dto';
 import { CreateLeadFollowUpDto } from './dto/create-lead-follow-up.dto';
@@ -72,6 +73,12 @@ export class LeadsController {
       existingStaff: result.existingStaff,
       data: result.lead,
     };
+  }
+
+  @Put(':id/visit')
+  async scheduleVisit(@Param('id') id: string, @Body() body: ScheduleVisitDto, @Request() req: any) {
+    const inquiry = await this.leadsService.scheduleVisit(Number(id), body, req.user?.id ?? null);
+    return { success: true, data: inquiry };
   }
 
   @Put(':id/status')

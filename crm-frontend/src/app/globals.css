@@ -337,3 +337,19 @@
     100% { background-color: rgba(255, 255, 255, 0.06); }
   }
 }
+
+/* Email editor (components/mail/email-editor.tsx): close to how the email will look. */
+.email-prose { font-size: 15px; line-height: 1.65; color: var(--foreground); }
+.email-prose p { margin: 0 0 0.75em; }
+.email-prose h2 { font-size: 1.2em; font-weight: 700; margin: 0.9em 0 0.4em; }
+.email-prose h3 { font-size: 1.05em; font-weight: 700; margin: 0.8em 0 0.35em; }
+.email-prose ul { list-style: disc; padding-left: 1.4em; margin: 0 0 0.75em; }
+.email-prose ol { list-style: decimal; padding-left: 1.4em; margin: 0 0 0.75em; }
+.email-prose blockquote { border-left: 3px solid #ffc900; padding-left: 0.9em; color: var(--muted-foreground); margin: 0 0 0.75em; }
+.email-prose a { color: #0052ff; text-decoration: underline; }
+.email-prose hr { border: 0; border-top: 1px solid var(--border); margin: 1em 0; }
+.email-prose .email-var { background: rgba(0, 82, 255, 0.1); color: #0040cc; border-radius: 5px; padding: 1px 4px; font-weight: 600; font-size: 0.92em; }
+.dark .email-prose .email-var { background: rgba(80, 140, 255, 0.18); color: #9dbbff; }
+.email-prose .email-var-block { display: inline-block; width: 100%; padding: 8px 10px; border: 1px dashed rgba(0, 82, 255, 0.45); background: rgba(0, 82, 255, 0.05); }
+.email-prose .email-var-unknown { background: rgba(220, 38, 38, 0.12); color: #b91c1c; }
+.dark .email-prose .email-var-unknown { color: #fca5a5; }

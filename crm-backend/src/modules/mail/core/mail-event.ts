@@ -1,7 +1,6 @@
 import type { DataSource } from 'typeorm';
-import type { LayoutInput, RenderedMail } from '../render/layout';
-import type { html, safeUrl } from '../render/html';
 import type { MailIdentityKey } from '../identities';
+import type { MailVariables } from '../render/template';
 
 export type MailMode = 'confirm' | 'auto';
 
@@ -20,10 +19,51 @@ export interface MailContext {
   actorId: number | null;
 }
 
-export interface RenderContext {
-  layout: (input: LayoutInput) => RenderedMail;
-  html: typeof html;
-  safeUrl: typeof safeUrl;
+/** Documents one {{variable}} for the template editor's picker. */
+export interface MailVariableDoc {
+  key: string;
+  label: string;
+  /** Shown in previews when no real record is used. */
+  sample: string;
+  /** Pre-built HTML (cards, buttons): insert on its own line. */
+  block?: boolean;
+}
+
+/**
+ * A kind of CRM record emails can be about (candidate, lead, inbound…).
+ * Defined once per module; every email type and hand-written email for that
+ * record reuses it.
+ */
+export interface MailEntity<TData = any> {
+  entityType: string;
+  module: string;
+  identity: MailIdentityKey;
+  /** e.g. "Candidate", used in the UI. */
+  label: string;
+  load(entityId: number, ctx: MailContext): Promise<TData | null>;
+  recipients(data: TData): { to: string[]; cc?: string[] };
+  /** Values for {{variables}}: plain text is escaped, SafeHtml blocks are inserted as-is. */
+  variables(data: TData): MailVariables;
+  variableDocs: MailVariableDoc[];
+}
+
+export const defineMailEntity = <TData>(entity: MailEntity<TData>) => entity;
+
+/** A subject/body pair with {{variables}}. The body is email-safe HTML. */
+export interface MailTemplateSource {
+  subject: string;
+  body: string;
+  preheader?: string;
+}
+
+/** For automatic emails sent on a timetable (e.g. a reminder the day before a visit). */
+export interface MailSchedule {
+  /** How often to look for records that are due. */
+  everyMinutes: number;
+  /** Ids of records that should get this email now; idempotency keys stop repeats. */
+  due(ctx: { dataSource: DataSource; now: Date }): Promise<number[]>;
+  /** Cancel instead of sending if it couldn't go out within this many hours. */
+  expiresAfterHours: number;
 }
 
 export interface MailTrigger {
@@ -31,25 +71,44 @@ export interface MailTrigger {
   when?: (payload: DomainEventPayload) => boolean;
 }
 
-/** One kind of email. A module adds an email by writing one of these. */
-export interface MailEventDefinition<TData = any> {
+/** What a module writes to add an email type. */
+export interface MailEventSpec<TData = any> {
   key: string;
-  module: string;
-  entityType: string;
-  identity: MailIdentityKey;
+  entity: MailEntity<TData>;
   label: string;
   description: string;
   mode: MailMode;
   version: number;
   triggers?: MailTrigger[];
-  load(entityId: number, ctx: MailContext): Promise<TData | null>;
-  recipients(data: TData): { to: string[]; cc?: string[] };
+  /** Only for mode 'auto': run on a timetable instead of (or as well as) triggers. */
+  schedule?: MailSchedule;
+  /** Blocking problems shown in the preview ("Interview time is not set"). */
   check?(data: TData): string[];
+  /** Same key = same mail. Prevents duplicates when a status is saved twice. */
   idempotencyKey(data: TData, entityId: number): string;
-  render(data: TData, ctx: RenderContext): RenderedMail;
+  /** Default wording; admins can override it in Settings → Email templates. */
+  template: MailTemplateSource;
 }
 
-export const defineMailEvent = <TData>(definition: MailEventDefinition<TData>) => definition;
+/** A registered email type: the spec plus the entity fields the core needs directly. */
+export interface MailEventDefinition<TData = any> extends MailEventSpec<TData> {
+  module: string;
+  entityType: string;
+  identity: MailIdentityKey;
+  load: MailEntity<TData>['load'];
+  recipients: MailEntity<TData>['recipients'];
+}
+
+export function defineMailEvent<TData>(spec: MailEventSpec<TData>): MailEventDefinition<TData> {
+  return {
+    ...spec,
+    module: spec.entity.module,
+    entityType: spec.entity.entityType,
+    identity: spec.entity.identity,
+    load: spec.entity.load,
+    recipients: spec.entity.recipients,
+  };
+}
 
 /** Removes empty/duplicate addresses and lowercases them. */
 export function cleanAddresses(values: (string | null | undefined)[]): string[] {

@@ -1,4 +1,5 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException, ForbiddenException, Optional } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { isQueuedWebsiteSource } from './website-sources';
@@ -48,6 +49,8 @@ export class LeadsService {
     @InjectDataSource('site') private siteDataSource: DataSource,
     private readonly notificationsService: NotificationsService,
     private readonly tasksService: TasksService,
+    // Domain events for the central mail service (docs/mail-composer-plan.md).
+    @Optional() private readonly events?: EventEmitter2,
   ) {}
 
   private get s3Client(): S3Client {
@@ -277,6 +280,7 @@ export class LeadsService {
     const leadRepo = this.dataSource.getRepository(Lead);
     const existingLead = await leadRepo.findOne({ where: { id } });
     if (!existingLead) throw new NotFoundException('Lead not found');
+    const previousStatus = existingLead.status;
 
     if (body.status_name) {
       existingLead.status = body.status_name;
@@ -318,7 +322,49 @@ export class LeadsService {
       });
     }
 
+    if (body.status_name && body.status_name !== previousStatus) {
+      await this.events?.emitAsync('leads.lead.status_changed', {
+        entityId: id, actorId: actionedById, from: previousStatus, to: body.status_name,
+      });
+    }
+
     return { lead: saved, transferredToSales: entersSales };
+  }
+
+  /**
+   * Staff schedule (or move) a site visit: the date, time, project and meeting
+   * point go on the latest enquiry, like website bookings, plus a "Site Visit"
+   * follow-up on the visit date. Drafts the visit confirmation email.
+   */
+  async scheduleVisit(
+    leadId: number,
+    body: { date: string; time: string; project?: string | null; location?: string | null },
+    actorId: number | null,
+  ) {
+    const lead = await this.dataSource.getRepository(Lead).findOne({ where: { id: leadId } });
+    if (!lead) throw new NotFoundException('Lead not found');
+    const saved = await this.dataSource.transaction(async (manager) => {
+      const inquiries = manager.getRepository(LeadInquiry);
+      const inquiry = (await inquiries.findOne({ where: { lead_id: leadId }, order: { id: 'DESC' } })) ?? inquiries.create({ lead_id: leadId });
+      inquiry.visit_date = body.date;
+      inquiry.visit_slot = body.time;
+      inquiry.visit_location = body.location?.trim() || null;
+      if (body.project?.trim()) inquiry.project_list = body.project.trim();
+      await manager.save(LeadInquiry, inquiry);
+
+      const followUp = new LeadFollowUp();
+      followUp.lead_id = leadId;
+      followUp.purpose = 'Site Visit';
+      followUp.next_follow_up_date = body.date as any;
+      followUp.next_follow_up_time = body.time as any;
+      followUp.notes = ['Site visit', inquiry.project_list, inquiry.visit_location && `at ${inquiry.visit_location}`].filter(Boolean).join(' – ');
+      followUp.is_completed = false;
+      followUp.created_by_id = actorId as any;
+      await manager.save(LeadFollowUp, followUp);
+      return inquiry;
+    });
+    await this.events?.emitAsync('leads.site_visit.scheduled', { entityId: leadId, actorId });
+    return saved;
   }
 
   async updateLead(id: number, body: any) {
@@ -647,7 +693,20 @@ export class LeadsService {
     return { existing };
   }
 
-  async createLead(body: any): Promise<CreateLeadResult> {    // Normalise: frontend sends 'mobile', legacy DTO used 'mobile_number'
+  /** Creates or merges a lead, then announces it (after commit) for emails. */
+  async createLead(body: any): Promise<CreateLeadResult> {
+    const result = await this.createLeadRecord(body);
+    if (result.lead && this.events) {
+      const withVisit = body.intent === 'site_visit' && Boolean(body.visitDate ?? body.visit_date);
+      if (!result.isExistingCustomer) {
+        await this.events.emitAsync('leads.lead.created', { entityId: result.lead.id, actorId: body.createdById ?? null, withVisit });
+      }
+      if (withVisit) await this.events.emitAsync('leads.site_visit.scheduled', { entityId: result.lead.id, actorId: null });
+    }
+    return result;
+  }
+
+  private async createLeadRecord(body: any): Promise<CreateLeadResult> {    // Normalise: frontend sends 'mobile', legacy DTO used 'mobile_number'
     const mobile = this.normalizeMobileForCheck(body.mobile ?? body.mobile_number ?? '');
     if (!mobile) {
       throw new BadRequestException('mobile is required');

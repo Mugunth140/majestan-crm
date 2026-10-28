@@ -19,17 +19,23 @@ describe('mail html escaping', () => {
     expect(safeUrl('not a url')).toBeNull();
     expect(safeUrl(null)).toBeNull();
   });
+});
 
-  it('wraps the body, escapes the sender note and adds the footer', () => {
-    const mail = renderLayout(
-      { subject: 'Hello\r\nBcc: evil@x.com', body: html`<p>Body</p>`, text: 'Body' },
-      { note: 'Bring <b>certificates</b>', signature: 'HR Team' },
-    );
+describe('branded layout', () => {
+  it('frames the body with the logo, signature, escaped note and footer', () => {
+    const mail = renderLayout({
+      subject: 'Hello\r\nBcc: evil@x.com',
+      bodyHtml: '<p>Body</p>',
+      note: 'Bring <b>certificates</b>',
+      signature: ['Priya', 'HR Team, Majestan Realty', ''],
+    });
     expect(mail.subject).toBe('Hello Bcc: evil@x.com');
+    expect(mail.html).toContain('assets/images/logo/logo.png');
     expect(mail.html).toContain('<p>Body</p>');
     expect(mail.html).toContain('Bring &lt;b&gt;certificates&lt;/b&gt;');
+    expect(mail.html).toContain('<strong>Priya</strong>');
     expect(mail.html).toContain('47/1 Aandal Street');
-    expect(mail.text).toContain('Bring <b>certificates</b>');
-    expect(mail.text).toContain('Regards,\nHR Team');
+    expect(mail.text).toContain('Body');
+    expect(mail.text).toContain('Regards,\nPriya\nHR Team, Majestan Realty');
   });
 });

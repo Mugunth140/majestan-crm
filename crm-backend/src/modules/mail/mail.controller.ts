@@ -1,14 +1,20 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Post, Query, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Post, Query, Request, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { MailOutboxStatus } from '../../database/entities/mail-outbox.entity';
-import { DraftActionDto, PreviewMailDto, SendMailDto, SuppressionDto } from './dto/mail.dto';
+import { ComposeDto, ComposeSendDto, DraftActionDto, PreviewMailDto, SendMailDto, SuppressionDto } from './dto/mail.dto';
+import { MAX_ATTACHMENT_BYTES, MailAttachmentsService } from './attachments/mail-attachments.service';
 import { MailService } from './mail.service';
 
 /** One API for every module's email. Permissions are checked per email type in MailService. */
 @Controller('api/v1/mail')
 @UseGuards(JwtAuthGuard)
 export class MailController {
-  constructor(private readonly mail: MailService) {}
+  constructor(
+    private readonly mail: MailService,
+    private readonly attachments: MailAttachmentsService,
+  ) {}
 
   @Get('events')
   catalog(@Query('entityType') entityType: string, @Request() req: any) {
@@ -29,6 +35,28 @@ export class MailController {
   @Post('send')
   send(@Body() body: SendMailDto, @Request() req: any) {
     return this.mail.send(body.event, body.entityId, body.note ?? null, body.hash ?? null, req.user);
+  }
+
+  @Post('compose/preview')
+  @HttpCode(200) // renders, stores nothing
+  composePreview(@Body() body: ComposeDto, @Request() req: any) {
+    return this.mail.composePreview(body, req.user);
+  }
+
+  @Post('compose/send')
+  composeSend(@Body() body: ComposeSendDto, @Request() req: any) {
+    return this.mail.composeSend(body, req.user);
+  }
+
+  @Post('attachments')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: MAX_ATTACHMENT_BYTES, files: 1 } }))
+  uploadAttachment(@UploadedFile() file: Express.Multer.File, @Request() req: any) {
+    return this.attachments.upload(file, req.user.id);
+  }
+
+  @Delete('attachments/:id')
+  removeAttachment(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.attachments.remove(id, req.user.id);
   }
 
   @Get('outbox')

@@ -1,0 +1,13 @@
+{
+  // Tests only: compile to CommonJS and allow transpiling the few ESM-only
+  // packages listed in jest.transformIgnorePatterns (htmlparser2 family,
+  // used by sanitize-html). The app build uses tsconfig.build.json.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "allowJs": true,
+    "resolvePackageJsonExports": false,
+    "resolvePackageJsonImports": false
+  }
+}

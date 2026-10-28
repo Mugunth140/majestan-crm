@@ -1,12 +1,20 @@
 import { HrCandidateStatus } from '../../../database/entities/hr-candidate.entity';
-import { html, safeUrl } from '../../mail/render/html';
-import { renderLayout } from '../../mail/render/layout';
-import { CandidateMailData, formatLongDate, formatTime, toDateOnly } from './candidate-mail-data';
+import { commonVariables } from '../../mail/core/mail-composer.service';
+import type { MailEventDefinition } from '../../mail/core/mail-event';
+import { fillHtml, fillText } from '../../mail/render/template';
+import { type CandidateMailData, formatLongDate, formatTime, toDateOnly } from './candidate-mail-data';
 import { HR_MAIL_EVENTS } from '.';
 import { interviewScheduledMail } from './interview-scheduled.mail';
 import { offerSentMail } from './offer-sent.mail';
 
-const ctx = { layout: (input: any) => renderLayout(input, { signature: 'HR Team' }), html, safeUrl };
+/** Fills an event's default template the way the composer does. */
+function render(event: MailEventDefinition<CandidateMailData>, d: CandidateMailData) {
+  const vars = { ...commonVariables(event.identity, null), ...event.entity.variables(d) };
+  const subject = fillText(event.template.subject, vars);
+  const body = fillHtml(event.template.body, vars);
+  return { subject: subject.text, html: body.html, unknown: [...subject.unknown, ...body.unknown] };
+}
+
 const candidate = (over: Partial<CandidateMailData> = {}): CandidateMailData => ({
   id: 12, name: 'Priya <b>S</b>', email: 'priya@example.com', position: 'Sales Executive',
   status: HrCandidateStatus.INTERVIEW_SCHEDULED, interviewDate: '2099-11-03', interviewTime: '11:30',
@@ -20,6 +28,19 @@ describe('HR mail events', () => {
     expect(HR_MAIL_EVENTS.every((e) => e.identity === 'hr' && e.mode === 'confirm' && e.entityType === 'hr_candidate')).toBe(true);
   });
 
+  it('only uses variables the candidate entity provides', () => {
+    for (const event of HR_MAIL_EVENTS) {
+      const status = { 'hr.offer_sent': HrCandidateStatus.OFFER_SENT, 'hr.rejected': HrCandidateStatus.REJECTED } as Record<string, HrCandidateStatus>;
+      expect(render(event, candidate({ status: status[event.key] ?? HrCandidateStatus.INTERVIEW_SCHEDULED })).unknown).toEqual([]);
+    }
+  });
+
+  it('documents every variable it provides', () => {
+    const provided = Object.keys(interviewScheduledMail.entity.variables(candidate()));
+    const documented = interviewScheduledMail.entity.variableDocs.map((d) => d.key);
+    expect(provided.filter((k) => !documented.includes(k))).toEqual(['candidate.email']);
+  });
+
   it('blocks an interview invitation until it has what the candidate needs', () => {
     expect(interviewScheduledMail.check!(candidate())).toEqual([]);
     expect(interviewScheduledMail.check!(candidate({ interviewTime: null, interviewMode: null }))).toEqual([
@@ -30,29 +51,28 @@ describe('HR mail events', () => {
     expect(interviewScheduledMail.check!(candidate({ interviewMode: 'in_person', interviewLink: null }))).toContain(
       'In-person interview needs a location');
     expect(interviewScheduledMail.check!(candidate({ interviewDate: '2001-01-01' }))).toContain('Interview date is in the past');
-    expect(interviewScheduledMail.check!(candidate({ status: HrCandidateStatus.REJECTED }))).toContain(
-      'Candidate status is not "Interview Scheduled"');
   });
 
-  it('renders the invitation with escaped candidate data and the meeting link', () => {
-    const mail = interviewScheduledMail.render(candidate(), ctx);
+  it('renders the invitation with escaped data, details card and join button', () => {
+    const mail = render(interviewScheduledMail, candidate());
     expect(mail.subject).toBe('Interview invitation – Sales Executive at Majestan Realty');
-    expect(mail.html).toContain('Priya &lt;b&gt;S&lt;/b&gt;');
-    expect(mail.html).toContain('href="https://meet.google.com/abc-defg-hij"');
+    expect(mail.html).toContain('Dear Priya,');
     expect(mail.html).toContain('11:30 AM (IST)');
-    expect(mail.text).toContain('Meeting link: https://meet.google.com/abc-defg-hij');
+    expect(mail.html).toContain('Join the interview');
+    expect(mail.html).toContain('href="https://meet.google.com/abc-defg-hij"');
+    expect(render(interviewScheduledMail, candidate({ name: '<b>X</b> Y' })).html).toContain('&lt;b&gt;X&lt;/b&gt;');
   });
 
-  it('makes a new invitation key when the interview changes', () => {
-    const a = interviewScheduledMail.idempotencyKey(candidate(), 12);
-    expect(interviewScheduledMail.idempotencyKey(candidate({ interviewTime: '15:00' }), 12)).not.toBe(a);
-    expect(interviewScheduledMail.idempotencyKey(candidate(), 12)).toBe(a);
+  it('gives in-person interviews a Maps button instead of a meeting link', () => {
+    const mail = render(interviewScheduledMail, candidate({ interviewMode: 'in_person', interviewLink: null, interviewLocation: 'Majestan Realty, Coimbatore' }));
+    expect(mail.html).toContain('Open in Google Maps');
+    expect(mail.html).toContain('google.com/maps/search');
+    expect(mail.html).not.toContain('meet.google.com');
   });
 
   it('never puts salary in the offer email', () => {
-    const mail = offerSentMail.render(candidate({ status: HrCandidateStatus.OFFER_SENT }), ctx);
+    const mail = render(offerSentMail, candidate({ status: HrCandidateStatus.OFFER_SENT }));
     expect(mail.html).not.toMatch(/salary|ctc|₹|lakh/i);
-    expect(offerSentMail.check!(candidate({ status: HrCandidateStatus.OFFER_SENT }))).toEqual([]);
   });
 
   it('formats dates and times without timezone drift', () => {

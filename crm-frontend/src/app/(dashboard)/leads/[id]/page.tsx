@@ -4,6 +4,12 @@ import { apiFetch } from "@/lib/api-fetch";
 import { normalizeDepartment, pipelineOf } from "@/lib/department";
 import { recordNotInterested } from "@/lib/not-interested";
 import { NotInterestedDialog } from "./not-interested-dialog";
+import { MailPanel } from "@/components/mail/mail-panel";
+import { ScheduleVisitDialog, type VisitDetails } from "@/components/leads/schedule-visit-dialog";
+
+const VISIT_STATUSES = ["Site Visit Scheduled", "Re Visit Scheduled"];
+
+type VisitInquiry = { id: number; visit_date?: string | null; visit_slot?: string | null; project_list?: string | null; visit_location?: string | null };
 
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -199,6 +205,10 @@ function LeadDetail() {
   const id = params.id as string;
 
   const [lead, setLead] = useState<any>(null);
+  // Bumped after saves that may create an email draft (status changes, visits).
+  const [mailRefresh, setMailRefresh] = useState(0);
+  const [visitDialog, setVisitDialog] = useState<{ status: string | null; initial: Partial<VisitDetails> } | null>(null);
+  const [savingVisit, setSavingVisit] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -358,6 +368,70 @@ function LeadDetail() {
   }, [id, router]);
 
   useEffect(() => { fetchLead(); }, [fetchLead]);
+
+  const putStatus = async (status: string) => {
+    const res = await apiFetch(`${API_URL}/leads/${id}/status`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status_name: status }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error("Failed to update status");
+    return data as { transferredToSales?: boolean };
+  };
+
+  /** Pre-fills the visit dialog from the latest enquiry that has a visit, else the latest one. */
+  const openVisitDialog = (status: string | null) => {
+    const inquiries: VisitInquiry[] = [...(lead?.inquiries ?? [])].sort((a: VisitInquiry, b: VisitInquiry) => b.id - a.id);
+    const source = inquiries.find((i) => i.visit_date) ?? inquiries[0];
+    setVisitDialog({
+      status,
+      initial: {
+        date: source?.visit_date ? String(source.visit_date).slice(0, 10) : "",
+        time: source?.visit_slot ? String(source.visit_slot).slice(0, 5) : "",
+        project: source?.project_list ?? "",
+        location: source?.visit_location ?? "",
+      },
+    });
+  };
+
+  const saveVisit = async (visit: VisitDetails) => {
+    if (!visitDialog) return;
+    setSavingVisit(true);
+    try {
+      if (visitDialog.status && visitDialog.status !== lead.status) await putStatus(visitDialog.status);
+      const res = await apiFetch(`${API_URL}/leads/${id}/visit`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: visit.date, time: visit.time, project: visit.project || undefined, location: visit.location || undefined }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || "Failed to save the visit");
+      toast.success("Site visit saved.");
+      setVisitDialog(null);
+      fetchLead(true);
+      setMailRefresh((n) => n + 1);
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : "Failed to save the visit");
+    } finally {
+      setSavingVisit(false);
+    }
+  };
+
+  const skipVisit = async () => {
+    if (!visitDialog?.status) return setVisitDialog(null);
+    setSavingVisit(true);
+    try {
+      const data = await putStatus(visitDialog.status);
+      toast.success(data.transferredToSales ? "Lead moved to the Sales pipeline." : "Lead status updated.");
+      setVisitDialog(null);
+      fetchLead(true);
+      setMailRefresh((n) => n + 1);
+    } catch {
+      toast.error("Failed to update status");
+    } finally {
+      setSavingVisit(false);
+    }
+  };
 
   // Acknowledge open website enquiries: opening the lead IS seeing them
   // (the Interested In card is on this page). The server only honours this
@@ -716,22 +790,25 @@ function LeadDetail() {
                           setIsNotInterestedOpen(true);
                           return;
                         }
+                        if (VISIT_STATUSES.includes(v)) {
+                          openVisitDialog(v);
+                          return;
+                        }
                         try {
-                          const res = await apiFetch(`${API_URL}/leads/${id}/status`, {
-                            method: "PUT",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ status_name: v }),
-                          });
-                          const data = await res.json();
-                          if (data.success) {
-                            toast.success(data.transferredToSales ? "Lead moved to the Sales pipeline." : "Lead status updated.");
-                            fetchLead(true);
-                          } else toast.error("Failed to update status");
+                          const data = await putStatus(v);
+                          toast.success(data.transferredToSales ? "Lead moved to the Sales pipeline." : "Lead status updated.");
+                          fetchLead(true);
+                          setMailRefresh((n) => n + 1);
                         } catch {
                           toast.error("Failed to update status");
                         }
                       }}
                     />
+                    {VISIT_STATUSES.includes(lead.status) && (
+                      <button type="button" onClick={() => openVisitDialog(null)} className="mt-2 text-[12px] font-semibold text-[#0052FF] hover:underline">
+                        Reschedule site visit
+                      </button>
+                    )}
                   </div>
                   <div>
                     <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Lead Qualification</p>
@@ -927,6 +1004,7 @@ function LeadDetail() {
                 <p className="text-[15px] font-semibold">{lead.assigned_staff?.name || "Unassigned"}</p>
               </div>
             </div>
+            <MailPanel entityType="lead" entityId={lead.id} refreshKey={mailRefresh} recipients={lead.email ? [lead.email] : []} />
           </div>
         </div>
 
@@ -1277,6 +1355,13 @@ function LeadDetail() {
       </Dialog>
 
       {/* ── Not Interested Reason Dialog ── */}
+      <ScheduleVisitDialog
+        open={visitDialog}
+        busy={savingVisit}
+        onClose={() => setVisitDialog(null)}
+        onSave={saveVisit}
+        onSkip={visitDialog?.status ? skipVisit : undefined}
+      />
       <NotInterestedDialog
         open={isNotInterestedOpen}
         onClose={() => setIsNotInterestedOpen(false)}

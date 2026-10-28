@@ -13,6 +13,7 @@ export interface OutgoingMail {
   html: string;
   text: string;
   headers: Record<string, string>;
+  attachments?: { filename: string; contentType: string; content: Buffer }[];
 }
 
 /**
@@ -41,6 +42,7 @@ export class MailTransports implements OnModuleDestroy {
       html: mail.html,
       text: mail.text,
       headers: mail.headers,
+      attachments: mail.attachments?.length ? mail.attachments : undefined,
     });
     return info.messageId;
   }

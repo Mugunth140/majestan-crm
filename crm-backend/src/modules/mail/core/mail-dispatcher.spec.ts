@@ -11,8 +11,9 @@ function setup(opts: { send?: jest.Mock; suppressed?: string[]; sentToday?: numb
   const config = { ...readMailConfig({ MAIL_ENABLED: 'true' }), minSendIntervalMs: 0, redirectTo: opts.redirect ?? null };
   const send = opts.send ?? jest.fn().mockResolvedValue('<id@majestanrealty.com>');
   const transports: any = { hasCredentials: () => opts.creds ?? true, send };
-  const registry: any = { all: () => [{ key: 'hr.rejected', load: async () => (opts.deleted ? null : { id: 1 }) }] };
-  const dispatcher = new MailDispatcher(outbox, suppressions, config, transports, registry, {} as any);
+  const registry: any = { resolve: () => ({ key: 'hr.rejected', load: async () => (opts.deleted ? null : { id: 1 }) }) };
+  const attachments: any = { filesFor: async () => [], purge: async () => {} };
+  const dispatcher = new MailDispatcher(outbox, suppressions, config, transports, registry, {} as any, attachments);
   const row: any = {
     id: 7, identity: 'hr', event_key: 'hr.rejected', to_json: ['cand@x.com'], cc_json: null, reply_to: 'hr@majestanrealty.com',
     subject: 'Subj', html: '<p>h</p>', text: 't', attempts: 1, confirmed_by: 3,

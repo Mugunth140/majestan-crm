@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, ForbiddenException, NotFoundException, Optional } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+
+/** A website enquiry that booked a dated site visit. */
+const bookedVisit = (event: { intent?: string | null; visit_date?: unknown }) => event.intent === 'site_visit' && Boolean(event.visit_date);
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import { Lead } from '../../database/entities/lead.entity';
@@ -18,6 +22,7 @@ export class LeadRoutingService {
     @InjectDataSource() private readonly dataSource: DataSource,
     @InjectDataSource('site') private readonly siteDataSource: DataSource,
     private readonly notificationsService: NotificationsService,
+    @Optional() private readonly events?: EventEmitter2,
   ) {}
 
   // ── Queue ──────────────────────────────────────────────────────────────────
@@ -642,6 +647,14 @@ export class LeadRoutingService {
   // ── Convert ── fresh mobile → unassigned lead, meanwhile-created mobile →
   // attach (kills the duplicate instead of creating a second lead).
   async convertEvent(eventId: number, requestingUserId: number, requestingRole?: string) {
+    const { isNew, withVisit, ...result } = await this.convertEventRecord(eventId, requestingUserId, requestingRole);
+    // After commit, so the email drafts see the new lead and its enquiry.
+    if (isNew) await this.events?.emitAsync('leads.lead.created', { entityId: result.leadId, actorId: requestingUserId, withVisit });
+    if (withVisit) await this.events?.emitAsync('leads.site_visit.scheduled', { entityId: result.leadId, actorId: requestingUserId });
+    return result;
+  }
+
+  private async convertEventRecord(eventId: number, requestingUserId: number, requestingRole?: string) {
     this.assertConvertRole(requestingRole);
     return this.dataSource.transaction(async (manager) => {
       const event = await this.lockOpenEvent(manager, eventId);
@@ -663,7 +676,7 @@ export class LeadRoutingService {
           decided_at: new Date(),
         });
         await this.writeEventHistory(manager, meanwhile, 'Enquiry Attached', requestingUserId, true);
-        return { leadId: meanwhile.id, converted: 1 };
+        return { leadId: meanwhile.id, converted: 1, isNew: false, withVisit: bookedVisit(event) };
       }
 
       // Status rule copied from createLead's new-lead branch.
@@ -701,12 +714,18 @@ export class LeadRoutingService {
         converted += 1;
       }
       await this.writeEventHistory(manager, lead, 'Queued', requestingUserId, false);
-      return { leadId: lead.id, converted };
+      return { leadId: lead.id, converted, isNew: true, withVisit: siblings.some(bookedVisit) };
     });
   }
 
   // ── Accept (attach) ── matched enquiries only; lead status untouched.
   async acceptEvent(eventId: number, requestingUserId: number, requestingRole?: string) {
+    const { withVisit, ...result } = await this.acceptEventRecord(eventId, requestingUserId, requestingRole);
+    if (withVisit) await this.events?.emitAsync('leads.site_visit.scheduled', { entityId: result.leadId, actorId: requestingUserId });
+    return result;
+  }
+
+  private async acceptEventRecord(eventId: number, requestingUserId: number, requestingRole?: string) {
     this.assertDeciderRole(requestingRole);
     return this.dataSource.transaction(async (manager) => {
       const event = await this.lockOpenEvent(manager, eventId);
@@ -738,7 +757,7 @@ export class LeadRoutingService {
         `Website enquiry ${this.enquiryLabel(event)} attached to Lead #${lead.id}`,
         'lead_enquiry_attached',
       );
-      return { leadId: lead.id, inquiryId: inquiry.id };
+      return { leadId: lead.id, inquiryId: inquiry.id, withVisit: bookedVisit(event) };
     });
   }
 

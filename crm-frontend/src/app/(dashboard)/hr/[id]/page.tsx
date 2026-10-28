@@ -485,7 +485,7 @@ export default function HrDetail() {
               </div>
             </div>
 
-            <MailPanel entityType="hr_candidate" entityId={candidate.id} refreshKey={mailRefresh} />
+            <MailPanel entityType="hr_candidate" entityId={candidate.id} refreshKey={mailRefresh} recipients={candidate.email ? [candidate.email] : []} />
 
             {/* Contact activity (device-synced call history, same as leads) */}
             <div className="bg-card border rounded-2xl p-6 shadow-sm">
