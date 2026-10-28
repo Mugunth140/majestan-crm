@@ -99,6 +99,9 @@ export class Inbound {
   @Column({ type: 'varchar', default: 'New Inbound' })
   status: string;
 
+  @Column({ type: 'varchar', length: 32, nullable: true })
+  inbound_status: string | null;
+
   // Owner Info
   @Column({ type: 'varchar', nullable: true })
   owner_name: string;

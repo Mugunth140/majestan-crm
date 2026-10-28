@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsInt, IsBoolean, IsNumber, IsArray, ValidateNested, MaxLength, IsNotEmpty, Matches, IsLatitude, IsLongitude } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsBoolean, IsNumber, IsArray, ValidateNested, MaxLength, IsIn, IsNotEmpty, Matches, IsLatitude, IsLongitude } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 export class InboundUnitDto {
@@ -120,6 +120,10 @@ export class CreateInboundDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  @IsOptional()
+  @IsIn(['available', 'not_available', 'fixed_verification'])
+  inbound_status?: string;
 
   // ── Owner ─────────────────────────────────────────────────────────
   @IsOptional()

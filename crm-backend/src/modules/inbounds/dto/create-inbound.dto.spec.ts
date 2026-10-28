@@ -59,6 +59,17 @@ function staffRentPayload(assignedStaffId: any) {
 }
 
 describe('CreateInboundDto (inbound form contract)', () => {
+  it.each(['available', 'not_available', 'fixed_verification'])('accepts inbound status %s and an alternate contact', async (inbound_status) => {
+    const dto = plainToInstance(CreateInboundDto, { property_category: 'commercial', mobile_number: '9876543210', inbound_status, alternate_contact: '8765432109' });
+    expect(await validate(dto, { whitelist: true })).toEqual([]);
+    expect(dto.inbound_status).toBe(inbound_status);
+    expect(dto.alternate_contact).toBe('8765432109');
+  });
+  it('rejects an unknown inbound status', async () => {
+    const errors = await pipeValidate(CreateInboundDto, { property_category: 'commercial', mobile_number: '9876543210', inbound_status: 'invalid' });
+    expect(errors.some(error => error.property === 'inbound_status')).toBe(true);
+  });
+
   it.each([undefined, null, '', '   '])('requires a category on new submissions: %s', async (property_category) => {
     const errors = await pipeValidate(CreateInboundDto, { property_category, mobile_number: '9876543210' });
     expect(errors.some(e => e.property === 'property_category')).toBe(true);

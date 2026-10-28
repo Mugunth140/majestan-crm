@@ -1,5 +1,6 @@
 "use client";
 
+import { inboundStatusLabel } from "@/lib/inbound-status";
 import { apiFetch } from "@/lib/api-fetch";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -331,6 +332,17 @@ export default function InboundPage() {
             </Tooltip>
           </TooltipProvider>
         );
+      },
+    },
+    {
+      accessorKey: "inbound_status",
+      header: "Inbound status",
+      cell: ({ row }) => {
+        const value = row.original.inbound_status;
+        if (!value) return <span>—</span>;
+        const style = value === "available" ? STATUS_STYLES["Approved"]
+          : value === "not_available" ? STATUS_STYLES["Rejected"] : STATUS_STYLES["Pending Verification"];
+        return <Badge variant="outline" className={style}>{inboundStatusLabel(value)}</Badge>;
       },
     },
     {

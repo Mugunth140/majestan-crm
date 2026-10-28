@@ -1,5 +1,6 @@
 "use client";
 
+import { INBOUND_STATUS_OPTIONS } from "@/lib/inbound-status";
 import { inboundLocation } from "@/lib/inbound-location";
 import { apiFetch } from "@/lib/api-fetch";
 import { useIsMobile } from "@/hooks/use-device";
@@ -229,6 +230,7 @@ function InboundForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form states for conditional logic
+  const [selectedInboundStatus, setSelectedInboundStatus] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedPurpose, setSelectedPurpose] = useState<string | null>(null);
@@ -311,6 +313,7 @@ function InboundForm() {
             // sections (BHK, floors, commercial extras) work on edit.
             const normalized = normalizeCategoryAndType(data.property_category || null, data.property_type || null);
             setSelectedCategory(normalized.category);
+            setSelectedInboundStatus(data.inbound_status || null);
             setSelectedType(normalized.type);
             setSelectedPurpose(data.purpose || null);
             
@@ -423,6 +426,7 @@ function InboundForm() {
       payload.mobile_number = mobile;
 
       // Override with controlled values
+      payload.inbound_status = selectedInboundStatus;
       payload.property_category = selectedCategory;
       payload.property_type = selectedType;
       payload.purpose = selectedPurpose;
@@ -494,6 +498,8 @@ function InboundForm() {
       const requestPayload = isQuickCapture ? {
         property_category: selectedCategory,
         mobile_number: mobile,
+        inbound_status: selectedInboundStatus,
+        alternate_contact: String(formData.get("alternate_contact") || "").trim() || null,
       } : payload;
 
       const method = editId ? "PATCH" : "POST";
@@ -665,6 +671,17 @@ function InboundForm() {
                 autoComplete="tel" required minLength={10} maxLength={25}
                 placeholder="e.g. +91 98765 43210" className="h-12 rounded-xl bg-muted/30" />
             </div>
+            <div className="space-y-2">
+              <label htmlFor="inbound-alternate-contact" className="text-sm font-semibold">Alternate contact</label>
+              <Input id="inbound-alternate-contact" name="alternate_contact" type="tel" inputMode="tel"
+                autoComplete="tel" placeholder="Alternate number" className="h-12 rounded-xl bg-muted/30" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">Inbound status</label>
+              <FormSelect name="_inbound_status" value={selectedInboundStatus}
+                onValueChange={setSelectedInboundStatus} placeholder="Select inbound status"
+                options={INBOUND_STATUS_OPTIONS} />
+            </div>
           </div>
         )}
         {!isQuickCapture && (<>
@@ -822,6 +839,12 @@ function InboundForm() {
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Status</label>
               <FormSelect name="status" defaultValue={inboundData?.status || "New Inbound"} placeholder="Select Status" options={STATUSES} required />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Inbound status</label>
+              <FormSelect name="_inbound_status" value={selectedInboundStatus}
+                onValueChange={setSelectedInboundStatus} placeholder="Select inbound status"
+                options={INBOUND_STATUS_OPTIONS} />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">State</label>

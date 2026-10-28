@@ -22,6 +22,13 @@ describe("inbound form variants", () => {
     device.mobile = true;
     device.edit = null;
     const html = renderToStaticMarkup(<NewInboundPage />);
+    expect(html).toContain('name="_inbound_status"');
+    expect(html).toContain("Available");
+    expect(html).toContain("Not available");
+    expect(html).toContain("Fixed verification");
+    expect(html).toContain('name="alternate_contact"');
+    expect(html.indexOf('name="alternate_contact"')).toBeLessThan(html.indexOf('name="_inbound_status"'));
+    expect(html.indexOf('name="mobile_number"')).toBeLessThan(html.indexOf('name="alternate_contact"'));
     expect(html).toContain("Commercial");
     expect(html).toContain("Industrial");
     expect(html).toContain("Residential");
