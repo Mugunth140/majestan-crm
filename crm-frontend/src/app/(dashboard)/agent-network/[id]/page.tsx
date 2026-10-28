@@ -25,7 +25,7 @@ import {
   Briefcase, Mail, MessageSquare, Plus, ArrowUpRight,
   Clock, RefreshCw, History, Percent, Edit, ChevronLeft
 } from "lucide-react";
-import { contactLogIcon } from "@/lib/contact-log-utils";
+import { contactLogIcon, contactLogAuthor } from "@/lib/contact-log-utils";
 import { MailPanel } from "@/components/mail/mail-panel";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -501,7 +501,7 @@ export default function AgentViewPage() {
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         <p className="text-[13.5px] font-semibold text-foreground">
                           <span className="capitalize">{log.contact_type}</span> by{" "}
-                          <span className="text-[#0052FF]">{log.sent_by?.name || "Staff"}</span>
+                          <span className="text-[#0052FF]">{contactLogAuthor(log)}</span>
                         </p>
                         <span className="text-xs text-muted-foreground">{formatTimestamp(log.created_at)}</span>
                       </div>

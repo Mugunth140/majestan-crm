@@ -39,6 +39,7 @@ import {
   countByType,
   countCallDirections,
   contactLogIcon,
+  contactLogAuthor,
 } from "@/lib/contact-log-utils";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -978,7 +979,7 @@ export default function InboundViewPage() {
                     <div className="min-w-0 flex-1 rounded-xl border bg-card px-3.5 py-3 shadow-sm">
                       <div className="flex items-start justify-between gap-3">
                         <p className="text-[13px] font-semibold text-foreground">
-                          <span className="text-[#0052FF]">{log.sent_by?.name || "Staff"}</span>
+                          <span className="text-[#0052FF]">{contactLogAuthor(log)}</span>
                           <span className="mx-1.5 text-muted-foreground/60">•</span>
                           {log.contact_type === "call" ? (
                             <>{log.call_direction || "Voice"} call <span className="font-normal text-muted-foreground whitespace-nowrap">({formatDuration(log.call_duration)})</span></>

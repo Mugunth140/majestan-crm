@@ -97,6 +97,7 @@ const projectTitle = (d: LeadMailData) => d.project?.name ?? d.projectText ?? nu
 export const leadMailEntity = defineMailEntity<LeadMailData>({
   entityType: 'lead',
   module: 'sales',
+  contactLog: { table: 'contact_logs', column: 'lead_id' },
   identity: 'sales',
   label: 'Lead',
   load: loadLeadMailData,

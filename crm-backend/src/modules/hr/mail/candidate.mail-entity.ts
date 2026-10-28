@@ -14,6 +14,7 @@ import {
 export const candidateMailEntity = defineMailEntity<CandidateMailData>({
   entityType: 'hr_candidate',
   module: 'hr',
+  contactLog: { table: 'hr_contact_logs', column: 'hr_candidate_id' },
   identity: 'hr',
   label: 'Candidate',
   load: loadCandidateMailData,

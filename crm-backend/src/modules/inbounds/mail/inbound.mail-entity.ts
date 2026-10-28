@@ -83,6 +83,7 @@ export async function loadInboundMailData(id: number, ctx: MailContext): Promise
 export const inboundMailEntity = defineMailEntity<InboundMailData>({
   entityType: 'inbound',
   module: 'listings',
+  contactLog: { table: 'inbound_contact_logs', column: 'inbound_id' },
   identity: 'listings',
   label: 'Inbound',
   load: loadInboundMailData,

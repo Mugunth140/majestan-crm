@@ -7,7 +7,8 @@ import { MAIL_IDENTITIES, type MailIdentityKey } from '../identities';
 import type { MailConfig } from './mail-config';
 import { applyRedirect, isPermanentFailure, nextRetryAt } from './mail-policy';
 import { MAIL_CONFIG, MailTransports } from './mail-transports.service';
-import { MailRegistry } from './mail-registry.service';
+import { MANUAL_PREFIX, MailRegistry } from './mail-registry.service';
+import type { MailEventDefinition } from './mail-event';
 import { MailAttachmentsService } from '../attachments/mail-attachments.service';
 
 const BATCH_SIZE = 10;
@@ -184,7 +185,9 @@ export class MailDispatcher implements OnApplicationBootstrap, OnModuleDestroy {
         headers,
         attachments: await this.attachments.filesFor(row.id),
       });
-      await this.outbox.update(row.id, { status: 'sent', sent_at: new Date(), message_id: messageId, last_error: null, next_attempt_at: null });
+      const sentAt = new Date();
+      await this.outbox.update(row.id, { status: 'sent', sent_at: sentAt, message_id: messageId, last_error: null, next_attempt_at: null });
+      await this.logContact(row, definition, sentAt);
     } catch (error) {
       const err = error as { message?: string; responseCode?: number; code?: string };
       const retryAt = isPermanentFailure(err) ? null : nextRetryAt(row.attempts, now);
@@ -195,6 +198,27 @@ export class MailDispatcher implements OnApplicationBootstrap, OnModuleDestroy {
         await this.outbox.update(row.id, { status: 'failed', next_attempt_at: null, last_error: message });
         this.logger.error(`Mail #${row.id} (${row.event_key}) failed permanently: ${message}`);
       }
+    }
+  }
+
+  /**
+   * Adds the sent email to the record's contact activity. Keyed "mail:<id>" so it
+   * is written once. No addresses: some roles must not see a record's contacts.
+   * A failure here never affects the email, which has already gone.
+   */
+  private async logContact(row: MailOutbox, definition: MailEventDefinition | null, sentAt: Date) {
+    try {
+      const target = this.registry.entity(row.entity_type).contactLog;
+      if (!target) return;
+      const from = MAIL_IDENTITIES[row.identity as MailIdentityKey]?.from ?? row.identity;
+      const label = row.event_key.startsWith(MANUAL_PREFIX) ? 'Email' : (definition?.label ?? 'Email');
+      await this.dataSource.query(
+        `INSERT INTO \`${target.table}\` (\`${target.column}\`, contact_type, subject, message, sent_by_id, source_call_id, created_at)
+         VALUES (?, 'email', ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE id = id`,
+        [row.entity_id, row.subject.slice(0, 255), `${label} · sent from ${from}`, row.confirmed_by ?? row.created_by ?? null, `mail:${row.id}`, sentAt],
+      );
+    } catch (error) {
+      this.logger.warn(`Mail #${row.id} was sent but not added to contact activity: ${(error as Error).message}`);
     }
   }
 

@@ -54,6 +54,7 @@ export async function loadPartnerMailData(id: number, ctx: MailContext): Promise
 export const partnerMailEntity = defineMailEntity<PartnerMailData>({
   entityType: 'agent',
   module: 'partners',
+  contactLog: { table: 'agent_contact_logs', column: 'agent_id' },
   identity: 'partners',
   label: 'Partner',
   load: loadPartnerMailData,

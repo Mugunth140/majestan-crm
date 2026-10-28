@@ -19,6 +19,13 @@ export class HrContactLog {
   @Column({ default: 'call' })
   contact_type: string;
 
+  // Set for emails (migration 052); calls leave them empty.
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  subject: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  message: string | null;
+
   @Column({ name: 'sent_by_id', nullable: true })
   sent_by_id: number;
 

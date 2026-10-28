@@ -45,6 +45,12 @@ export interface MailEntity<TData = any> {
   /** Values for {{variables}}: plain text is escaped, SafeHtml blocks are inserted as-is. */
   variables(data: TData): MailVariables;
   variableDocs: MailVariableDoc[];
+  /**
+   * Where sent emails appear in the record's contact activity: the module's
+   * contact-log table and its record-id column. Every table has contact_type,
+   * subject, message, sent_by_id and a unique source_call_id.
+   */
+  contactLog?: { table: string; column: string };
 }
 
 export const defineMailEntity = <TData>(entity: MailEntity<TData>) => entity;

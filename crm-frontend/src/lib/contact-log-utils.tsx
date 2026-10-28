@@ -33,6 +33,13 @@ export function contactLogIcon(log: { contact_type: string; call_direction?: str
   return CONTACT_TYPE_ICONS[log.contact_type] || <MessageSquare className="h-3.5 w-3.5" />;
 }
 
+// Who the log is from. Emails the CRM sent by itself (reminders, checks) have
+// no staff member; the mail service keys its entries "mail:<id>".
+export function contactLogAuthor(log: { sent_by?: { name?: string } | null; source_call_id?: string | null }): string {
+  if (log.sent_by?.name) return log.sent_by.name;
+  return String(log.source_call_id ?? "").startsWith("mail:") ? "Automatic email" : "Staff";
+}
+
 export function formatTimestamp(ts: string) {
   const d = new Date(ts);
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) +
