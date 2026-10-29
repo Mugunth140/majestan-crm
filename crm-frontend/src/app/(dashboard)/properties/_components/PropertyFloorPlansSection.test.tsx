@@ -20,6 +20,20 @@ const plans: PropertyFloorPlan[] = Array.from({ length: 5 }, (_, index) => ({
 }));
 
 describe("PropertyFloorPlansSection", () => {
+  it("uses ground plan labels throughout the land uploader while keeping document identifiers stable", () => {
+    const markup = renderToStaticMarkup(createElement(PropertyFloorPlansSection, {
+      planKind: "ground", plans: [{ ...plans[0], title: "Site layout" }], onChange: () => undefined,
+    }));
+    expect(markup).toContain("Ground plans");
+    expect(markup).toContain("Ground plan name");
+    expect(markup).toContain("Add ground plans");
+    expect(markup).toContain("Choose ground plan files");
+    expect(markup).toContain('name="floorPlanName-0"');
+    expect(markup).toContain('value="Site layout"');
+    expect(markup).not.toContain("Floor name");
+    expect(markup).not.toContain("floor plans");
+  });
+
   it("provides a separate floor-name field for each uploaded file", () => {
     const markup = renderToStaticMarkup(createElement(PropertyFloorPlansSection, {
       plans: [{ ...plans[0], title: "Ground floor" }, { ...plans[1], title: "First floor" }],

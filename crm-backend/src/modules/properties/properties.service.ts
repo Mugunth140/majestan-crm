@@ -117,7 +117,7 @@ const CRM_TOP_LEVEL_KEYS = new Set([
   'hypothecation', 'deviation', 'attachment1', 'attachment2', 'attachment3',
   'attachment4', 'attachment5', 'attachment6',
   // ── Pricing / CRM finance (decimal) ──
-  'expectedSalePrice', 'monthlyRent',
+  'expectedSalePrice', 'pricePerSqft', 'monthlyRent',
 ]);
 
 const ARRAY_DETAILS_KEYS = new Set([
@@ -609,7 +609,7 @@ export class PropertiesService {
     for (const key of CRM_TOP_LEVEL_KEYS) {
       if (dto[key] === undefined) continue;
       payload[key] =
-        key === 'expectedSalePrice' || key === 'monthlyRent'
+        key === 'expectedSalePrice' || key === 'pricePerSqft' || key === 'monthlyRent'
           ? (dto[key] != null && dto[key] !== '' ? String(dto[key]) : undefined)
           : (str(dto[key]) ?? null);
     }
@@ -685,6 +685,12 @@ export class PropertiesService {
   // ── create ─────────────────────────────────────────────────────────────────
   async create(dto: CreatePropertyDto, reqUser?: any) {
     const body = { ...(dto as unknown as Record<string, any>) };
+    if (body.propertyType === 'pg_service_apartment' && body.listingType !== 'Rent') {
+      throw new BadRequestException('PG / Service Apartment is available for Rent only.');
+    }
+    if (body.propertyType === 'investment_property' && body.listingType === 'Rent') {
+      throw new BadRequestException('Investment Property is available for Buy only.');
+    }
     if (!(await this.canSeeContacts(reqUser))) {
       for (const k of PropertiesService.CONTACT_KEYS) delete body[k];
     }
@@ -705,7 +711,27 @@ export class PropertiesService {
     if (!(await this.canSeeContacts(reqUser))) {
       for (const k of PropertiesService.CONTACT_KEYS) delete body[k];
     }
+    // Type is immutable in the site API. Use the stored type for mappings too.
+    body.propertyType = existing.propertyType;
+    if (body.listingType === undefined && existing.listingType) body.listingType = existing.listingType;
+    if (body.propertyType === 'pg_service_apartment' && body.listingType !== undefined && body.listingType !== 'Rent') {
+      throw new BadRequestException('PG / Service Apartment is available for Rent only.');
+    }
+    if (body.propertyType === 'investment_property' && body.listingType === 'Rent') {
+      throw new BadRequestException('Investment Property is available for Buy only.');
+    }
     const payload = await this.buildSitePayload(body);
+    // The site API replaces the details row on PATCH. Preserve omitted details
+    // so curating a form never erases fields imported from the old CRM.
+    if (payload.details && existing.propertyDetails) {
+      payload.details = {
+        ...this.buildDetails(existing.propertyDetails, existing.propertyType),
+        ...(existing.propertyDetails.floorPlanImages
+          ? { floorPlanImages: existing.propertyDetails.floorPlanImages }
+          : {}),
+        ...payload.details,
+      };
+    }
     delete (payload as any).propertyType;
     if (body.expectedUpdatedAt) payload.expectedUpdatedAt = body.expectedUpdatedAt;
     await this.siteApi.patch(`/admin/properties/${existing.propertyType}/${id}`, payload);
@@ -766,7 +792,7 @@ export class PropertiesService {
 
     const VALID_PROPERTY_TYPES = new Set([
       'apartment', 'villa', 'plot', 'commercial', 'coworking',
-      'farmland', 'industrial', 'individual_portion', 'other',
+      'farmland', 'industrial', 'individual_portion', 'investment_property', 'pg_service_apartment', 'other',
     ]);
 
     for (let idx = 0; idx < (dto.properties as any[]).length; idx++) {

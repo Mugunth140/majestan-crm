@@ -24,7 +24,7 @@ describe("FAQ_SECTIONS", () => {
 
 describe("hasFaqSections", () => {
   it("is true only for the multi-page property types", () => {
-    for (const t of ["apartment", "villa", "individual_portion"]) {
+    for (const t of ["apartment", "villa", "individual_portion", "investment_property", "pg_service_apartment"]) {
       expect(hasFaqSections(t)).toBe(true);
     }
   });

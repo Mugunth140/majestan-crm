@@ -81,6 +81,10 @@ function normalizePropertyType(raw: string): string {
     "independent house": "individual_portion",
     "individual portion": "individual_portion",
     individual_portion: "individual_portion",
+    "investment property": "investment_property",
+    investment_property: "investment_property",
+    "pg / service apartment": "pg_service_apartment",
+    pg_service_apartment: "pg_service_apartment",
   };
   return map[lower] ?? lower;
 }
@@ -277,7 +281,7 @@ function mapRowToPayload(row: Record<string, unknown>): Record<string, any> {
   // Apartment / Villa / Individual House specific
   // ------------------------------------------------------------------
   const pt = normalizePropertyType(rawPropertyType);
-  if (["apartment", "villa", "individual_portion"].includes(pt)) {
+  if (["apartment", "villa", "individual_portion", "investment_property", "pg_service_apartment"].includes(pt)) {
     Object.assign(payload, {
       unitType: str("unit type"),
       unitNumber: str("unit number"),

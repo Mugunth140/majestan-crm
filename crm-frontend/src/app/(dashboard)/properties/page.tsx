@@ -38,6 +38,8 @@ const PROPERTY_TYPE_OPTIONS = [
   { value: "farmland", label: "Farmland" },
   { value: "industrial", label: "Industrial" },
   { value: "individual_portion", label: "Independent House" },
+  { value: "investment_property", label: "Investment Property" },
+  { value: "pg_service_apartment", label: "PG / Service Apartment" },
 ];
 
 const STATUS_STYLES: Record<string, string> = {

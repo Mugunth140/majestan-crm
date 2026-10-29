@@ -18,7 +18,7 @@ export class CreatePropertyDto {
   listingType!: 'Sell' | 'Rent';
 
   @IsString()
-  propertyType!: 'apartment' | 'villa' | 'plot' | 'commercial' | 'coworking' | 'farmland' | 'industrial' | 'individual_portion';
+  propertyType!: 'apartment' | 'villa' | 'plot' | 'commercial' | 'coworking' | 'farmland' | 'industrial' | 'individual_portion' | 'investment_property' | 'pg_service_apartment';
 
   @IsOptional() @Type(() => Number) @IsNumber()
   price!: number;
@@ -181,6 +181,9 @@ export class CreatePropertyDto {
   // ── Property table: pricing ────────────────────────────────────────────────
   @IsOptional() @IsNumber() @Type(() => Number)
   expectedSalePrice?: number;
+
+  @IsOptional() @IsNumber() @Min(0) @Type(() => Number)
+  pricePerSqft?: number;
 
   @IsOptional() @IsNumber() @Type(() => Number)
   monthlyRent?: number;

@@ -38,7 +38,7 @@ export type FaqRow = {
   section?: string | null;
 };
 
-const MULTI_PAGE_PROPERTY_TYPES = ["apartment", "villa", "individual_portion"];
+const MULTI_PAGE_PROPERTY_TYPES = ["apartment", "villa", "individual_portion", "investment_property", "pg_service_apartment"];
 
 /**
  * Only multi-page types curate FAQs per sub-page. Every other type —

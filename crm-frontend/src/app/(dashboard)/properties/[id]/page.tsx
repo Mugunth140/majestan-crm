@@ -1,5 +1,7 @@
 "use client";
 
+import { isPropertyFieldVisible } from "../_components/property-form-fields";
+
 import { propertyStatusLabel } from "@/lib/property-status";
 
 import { useEffect, useState, useCallback } from "react";
@@ -206,7 +208,8 @@ export default function PropertyViewPage() {
 
   const bool = (v: any) => (v === true || v === 1 || v === "1" ? "Yes" : v === false || v === 0 || v === "0" ? "No" : v);
   const type = property.propertyType;
-  const isApartmentLike = ["apartment", "villa", "individual_portion"].includes(type);
+  const isFieldVisible = (field: string) => isPropertyFieldVisible(field, type, property.listingType === "Rent" ? "Rent" : "Buy", property.tenantOccupied);
+  const isApartmentLike = ["apartment", "villa", "individual_portion", "investment_property", "pg_service_apartment"].includes(type);
   const isPlotLike = ["plot", "farmland"].includes(type);
 
   return (
@@ -332,16 +335,19 @@ export default function PropertyViewPage() {
         {/* Pricing + Owner */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Section title="Pricing & Commercials" icon={<IndianRupee className="h-4 w-4 text-emerald-600" />}>
-            <SectionField label="Expected Sale Price" value={property.expectedSalePrice ? formatPrice(Number(property.expectedSalePrice)) : undefined} />
+            {isFieldVisible("pricePerSqft") && (
+              <SectionField label="Sqft Price" value={property.pricePerSqft != null ? `${formatPrice(Number(property.pricePerSqft))} / sq ft` : undefined} />
+            )}
+            {isFieldVisible("expectedSalePrice") && (<SectionField label="Expected Sale Price" value={property.expectedSalePrice ? formatPrice(Number(property.expectedSalePrice)) : undefined} />)}
             {!isPlotLike && (<>
             <SectionField label="Monthly Rent" value={property.monthlyRent ? formatPrice(Number(property.monthlyRent)) : undefined} />
             <SectionField label="Maintenance Charges" value={property.maintenanceCharges} />
-            <SectionField label="Security Deposit" value={property.securityDeposit} />
+            {isFieldVisible("securityDeposit") && (<SectionField label="Security Deposit" value={property.securityDeposit} />)}
             </>)}
             <SectionField label="Booking Amount" value={property.bookingAmount} />
             <SectionField label="Brokerage Type" value={property.brokerageType} />
             <SectionField label="Brokerage Value" value={property.brokerageValue} />
-            {!isPlotLike && (
+            {isFieldVisible("lockInPeriod") && (
             <SectionField label="Lock-in Period" value={property.lockInPeriod} />
             )}
             <SectionField label="Taxes" value={property.taxes} />
@@ -376,13 +382,13 @@ export default function PropertyViewPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Section title="Specifications" icon={<Ruler className="h-4 w-4 text-purple-500" />}>
             {!isPlotLike && (<>
-            <SectionField label="Bedrooms" value={det.bedrooms} />
-            <SectionField label="Bathrooms" value={det.bathrooms} />
+            {isFieldVisible("bedrooms") && (<SectionField label="Bedrooms" value={det.bedrooms} />)}
+            {isFieldVisible("bathrooms") && (<SectionField label="Bathrooms" value={det.bathrooms} />)}
             </>)}
             <SectionField label="Area" value={det.areaSqft ? `${det.areaSqft} ${det.areaUnit || "Sq Ft"}` : undefined} />
             {!isPlotLike && (<>
-            <SectionField label="Furnished" value={bool(det.furnished)} />
-            <SectionField label="Furnishing Status" value={det.furnishingStatus} />
+            {isFieldVisible("furnished") && (<SectionField label="Furnished" value={bool(det.furnished)} />)}
+            {isFieldVisible("furnishingStatus") && (<SectionField label="Furnishing Status" value={det.furnishingStatus} />)}
             </>)}
             <SectionField label="Facing" value={det.propertyFacing} />
             {!isPlotLike && (<>

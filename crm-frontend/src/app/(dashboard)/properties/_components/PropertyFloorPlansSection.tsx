@@ -18,6 +18,7 @@ export interface PropertyFloorPlan {
 }
 
 export interface PropertyFloorPlansSectionProps {
+  planKind?: "floor" | "ground";
   plans: PropertyFloorPlan[];
   onChange: (plans: PropertyFloorPlan[]) => void;
   disabled?: boolean;
@@ -64,17 +65,20 @@ export function isCrossOriginLocalPdf(url: string, currentOrigin: string): boole
 }
 
 function formatFileSize(size?: number) {
-  if (size == null || !Number.isFinite(size)) return "Floor plan";
+  if (size == null || !Number.isFinite(size)) return "Plan";
   if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export default function PropertyFloorPlansSection({
   plans,
+  planKind = "floor",
   onChange,
   disabled = false,
   onUploadingChange,
 }: PropertyFloorPlansSectionProps) {
+  const planLabel = `${planKind} plan`;
+  const planHeading = planKind === "ground" ? "Ground plans" : "Floor plans";
   const inputRef = useRef<HTMLInputElement>(null);
   const uploadingRef = useRef(false);
   const [uploading, setUploading] = useState(false);
@@ -107,7 +111,7 @@ export default function PropertyFloorPlansSection({
     const selected = Array.from(fileList);
     const remaining = MAX_FLOOR_PLANS - plans.length;
     if (remaining <= 0) {
-      toast.error("You can add up to five floor plans.");
+      toast.error(`You can add up to five ${planLabel}s.`);
       return;
     }
 
@@ -117,7 +121,7 @@ export default function PropertyFloorPlansSection({
       const validationError = validateFloorPlanFile(file);
       if (validationError) errors.push(validationError);
       else if (accepted.length < remaining) accepted.push(file);
-      else errors.push(`${file.name} was not added. You can add up to five floor plans.`);
+      else errors.push(`${file.name} was not added. You can add up to five ${planLabel}s.`);
     }
     errors.forEach((error) => toast.error(error));
     if (!accepted.length) return;
@@ -129,7 +133,7 @@ export default function PropertyFloorPlansSection({
       const result = (await propertiesApi.uploadDocs(accepted)) as UploadDocumentsResponse;
       const uploadedItems = Array.isArray(result?.data) ? result.data : [];
       if (!result?.success || uploadedItems.length !== accepted.length || uploadedItems.some((item) => !item?.fileKey)) {
-        throw new Error("The floor plans could not be uploaded. Please try again.");
+        throw new Error(`The ${planLabel}s could not be uploaded. Please try again.`);
       }
 
       const mapped = accepted.map((file, index) => {
@@ -147,9 +151,9 @@ export default function PropertyFloorPlansSection({
       });
       setLocalPreviewUrls({ ...localPreviewUrlsRef.current });
       onChange([...plans, ...mapped]);
-      toast.success(`${mapped.length} floor plan${mapped.length === 1 ? "" : "s"} uploaded.`);
+      toast.success(`${mapped.length} ${planLabel}${mapped.length === 1 ? "" : "s"} uploaded.`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "The floor plans could not be uploaded. Please try again.");
+      toast.error(error instanceof Error ? error.message : `The ${planLabel}s could not be uploaded. Please try again.`);
     } finally {
       uploadingRef.current = false;
       setUploading(false);
@@ -219,8 +223,8 @@ export default function PropertyFloorPlansSection({
     <section className="rounded-2xl border border-border bg-card p-8" aria-labelledby="property-floor-plans-title">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 id="property-floor-plans-title" className="text-lg font-semibold text-foreground">Floor plans</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Add up to five plans and name each floor. PDF, JPG, PNG, or WebP, up to 15 MB each.</p>
+          <h2 id="property-floor-plans-title" className="text-lg font-semibold text-foreground">{planHeading}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Add up to five plans and name each {planKind === "ground" ? "ground plan" : "floor"}. PDF, JPG, PNG, or WebP, up to 15 MB each.</p>
         </div>
         <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground" aria-live="polite">
           {plans.length} of {MAX_FLOOR_PLANS}
@@ -228,20 +232,20 @@ export default function PropertyFloorPlansSection({
       </div>
 
       {plans.length > 0 ? (
-        <ul className="mt-6 divide-y divide-border rounded-xl border border-border" aria-label="Uploaded floor plans">
+        <ul className="mt-6 divide-y divide-border rounded-xl border border-border" aria-label={`Uploaded ${planLabel}s`}>
           {plans.map((plan, index) => (
             <li key={`${plan.fileKey}-${index}`} className="flex items-center gap-3 p-4">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                 <FileText className="h-5 w-5" aria-hidden="true" />
               </span>
               <div className="min-w-0 flex-1">
-                <label htmlFor={`pf-floorPlanName-${index}`} className="block text-xs font-medium text-muted-foreground">Floor name</label>
+                <label htmlFor={`pf-floorPlanName-${index}`} className="block text-xs font-medium text-muted-foreground">{planKind === "ground" ? "Ground plan name" : "Floor name"}</label>
                 <input
                   id={`pf-floorPlanName-${index}`}
                   name={`floorPlanName-${index}`}
                   value={plan.title ?? getFloorPlanTitle(plan)}
                   onChange={(event) => onChange(plans.map((other, otherIndex) => otherIndex === index ? { ...other, title: event.target.value } : other))}
-                  placeholder="e.g. Ground floor"
+                  placeholder={planKind === "ground" ? "e.g. Site layout" : "e.g. Ground floor"}
                   maxLength={255}
                   required
                   disabled={disabled || uploading}
@@ -272,8 +276,8 @@ export default function PropertyFloorPlansSection({
           <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-muted text-muted-foreground">
             <UploadCloud className="h-5 w-5" aria-hidden="true" />
           </span>
-          <p className="mt-3 text-sm font-medium text-foreground">No floor plans added</p>
-          <p className="mt-1 text-sm text-muted-foreground">Upload a plan to help buyers understand the layout.</p>
+          <p className="mt-3 text-sm font-medium text-foreground">No {planLabel}s added</p>
+          <p className="mt-1 text-sm text-muted-foreground">Upload a plan to help people understand the layout.</p>
         </div>
       )}
 
@@ -285,7 +289,7 @@ export default function PropertyFloorPlansSection({
         className="sr-only"
         disabled={disabled || uploading || plans.length >= MAX_FLOOR_PLANS}
         onChange={(event) => void handleFiles(event.currentTarget.files)}
-        aria-label="Choose floor plan files"
+        aria-label={`Choose ${planLabel} files`}
       />
       <button
         type="button"
@@ -294,7 +298,7 @@ export default function PropertyFloorPlansSection({
         className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
       >
         {uploading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Plus className="h-4 w-4" aria-hidden="true" />}
-        {uploading ? "Uploading floor plans…" : "Add floor plans"}
+        {uploading ? `Uploading ${planLabel}s…` : `Add ${planLabel}s`}
       </button>
 
       <Dialog open={Boolean(previewPlan)} onOpenChange={(open) => { if (!open) closePreview(); }}>
@@ -307,8 +311,8 @@ export default function PropertyFloorPlansSection({
             }}
           >
             <DialogHeader className="shrink-0 pr-9">
-              <DialogTitle className="truncate">{getFloorPlanTitle(previewPlan) || "Floor plan"}</DialogTitle>
-              <DialogDescription className="sr-only">Floor plan preview. Use the previous and next buttons or left and right arrow keys to browse plans.</DialogDescription>
+              <DialogTitle className="truncate">{getFloorPlanTitle(previewPlan) || planLabel}</DialogTitle>
+              <DialogDescription className="sr-only"> {planHeading} preview. Use the previous and next buttons or left and right arrow keys to browse plans.</DialogDescription>
             </DialogHeader>
             <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-lg bg-muted/40">
               {previewUrl ? (isPdf ? (
@@ -320,25 +324,25 @@ export default function PropertyFloorPlansSection({
                   <iframe title={`Preview of ${previewPlan.fileName}`} src={renderedPdfUrl} className="h-full w-full border-0" />
                 )
               ) : imageFailed ? (
-                <p role="alert" className="px-6 text-center text-sm text-muted-foreground">This image could not be loaded. Try another floor plan or check the file.</p>
+                <p role="alert" className="px-6 text-center text-sm text-muted-foreground">This image could not be loaded. Try another {planLabel} or check the file.</p>
               ) : (
-                <Image key={previewPlan.fileKey} unoptimized width={1600} height={1200} src={previewUrl} alt={`Floor plan: ${previewPlan.fileName}`} onError={() => setImageFailed(true)} className="max-h-full max-w-full object-contain" />
+                <Image key={previewPlan.fileKey} unoptimized width={1600} height={1200} src={previewUrl} alt={`${planHeading}: ${previewPlan.fileName}`} onError={() => setImageFailed(true)} className="max-h-full max-w-full object-contain" />
               )) : (
-                <p role="alert" className="px-6 text-center text-sm text-muted-foreground">A preview is not available for this floor plan.</p>
+                <p role="alert" className="px-6 text-center text-sm text-muted-foreground">A preview is not available for this {planLabel}.</p>
               )}
             </div>
-            <div className="flex shrink-0 gap-2 overflow-x-auto py-1" role="group" aria-label="Choose a floor plan">
+            <div className="flex shrink-0 gap-2 overflow-x-auto py-1" role="group" aria-label={`Choose a ${planLabel}`}>
               {plans.map((plan) => (
                 <button key={plan.fileKey} type="button" onClick={() => openPreview(plan)} aria-pressed={plan.fileKey === previewPlan.fileKey}
                   className={`shrink-0 rounded-lg border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${plan.fileKey === previewPlan.fileKey ? "border-primary/30 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-muted"}`}>
-                  {getFloorPlanTitle(plan) || "Floor plan"}
+                  {getFloorPlanTitle(plan) || planLabel}
                 </button>
               ))}
             </div>
             <div className="flex shrink-0 items-center justify-between gap-3">
-              <button type="button" onClick={() => movePreview(-1)} disabled={plans.length < 2} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50" aria-label="Previous floor plan"><ArrowLeft className="h-4 w-4" aria-hidden="true" />Previous</button>
+              <button type="button" onClick={() => movePreview(-1)} disabled={plans.length < 2} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50" aria-label={`Previous ${planLabel}`}><ArrowLeft className="h-4 w-4" aria-hidden="true" />Previous</button>
               <span className="min-w-0 truncate text-center text-xs text-muted-foreground" aria-live="polite">{previewIndex + 1} of {plans.length} · {getFloorPlanTitle(previewPlan)}</span>
-              <button type="button" onClick={() => movePreview(1)} disabled={plans.length < 2} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50" aria-label="Next floor plan">Next<ArrowRight className="h-4 w-4" aria-hidden="true" /></button>
+              <button type="button" onClick={() => movePreview(1)} disabled={plans.length < 2} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50" aria-label={`Next ${planLabel}`}>Next<ArrowRight className="h-4 w-4" aria-hidden="true" /></button>
             </div>
           </DialogContent>
         )}
