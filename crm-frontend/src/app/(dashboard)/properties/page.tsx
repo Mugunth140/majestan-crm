@@ -1,5 +1,6 @@
 "use client";
 
+import { EMPTY_PROPERTY_FILTERS } from "@/lib/property-list-filters";
 import { propertyStatusLabel } from "@/lib/property-status";
 
 import { useState, useEffect } from "react";
@@ -67,11 +68,11 @@ export default function PropertiesPage() {
 
   const [searchQuery, setSearchQuery] = usePersistedState("properties:search", "");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
-  const [filters, setFilters] = usePersistedState("properties:filters", { propertyType: "", listingType: "", cityId: "" });
+  const [filters, setFilters] = usePersistedState("properties:filters", EMPTY_PROPERTY_FILTERS);
   const [pagination, setPagination] = usePersistedState("properties:page", { pageIndex: 0, pageSize: 10 });
   const [role, setRole] = useState("");
 
-  const { properties, totalCount, isLoading, cities, fetchProperties, toggleVisibility, deleteBulk } = usePropertiesList();
+  const { properties, totalCount, isLoading, cities, sublocations, roadNames, propertyTypes, fetchProperties, toggleVisibility, deleteBulk } = usePropertiesList();
   useClampedPage(pagination, setPagination, totalCount, isLoading);
 
   useEffect(() => {
@@ -160,7 +161,7 @@ export default function PropertiesPage() {
       header: "Id",
       cell: ({ row }) => (
         <Link href={`/properties/${row.original.id}`} className="text-[#0052FF] hover:underline font-medium">
-          #{row.original.id}
+          {row.original.propertyCode || row.original.id}
         </Link>
       ),
     },
@@ -180,13 +181,6 @@ export default function PropertiesPage() {
           </div>
         );
       },
-    },
-    {
-      accessorKey: "propertyCode",
-      header: "Code",
-      cell: ({ row }) => (
-        <span className="font-mono text-xs text-muted-foreground">{row.original.propertyCode || "-"}</span>
-      ),
     },
     {
       accessorKey: "propertyType",
@@ -319,7 +313,7 @@ export default function PropertiesPage() {
 
   const activeFiltersCount = Object.values(filters).filter((v) => v !== "").length;
   const clearFilters = () => {
-    setFilters({ propertyType: "", listingType: "", cityId: "" });
+    setFilters(EMPTY_PROPERTY_FILTERS);
     resetPage();
   };
 
@@ -327,7 +321,7 @@ export default function PropertiesPage() {
     <Popover>
       <PopoverTrigger render={
         isMobile ? (
-          <Button variant="outline" size="icon" className="h-12 w-12 rounded-2xl bg-black/5 dark:bg-white/10 border-transparent relative shrink-0">
+          <Button aria-label="Filters" variant="outline" size="icon" className="h-12 w-12 rounded-2xl bg-black/5 dark:bg-white/10 border-transparent relative shrink-0">
             <Filter className="h-5 w-5 text-foreground" />
             {activeFiltersCount > 0 && (
               <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#0052FF] border-2 border-background text-white text-[10px] font-bold flex items-center justify-center">
@@ -356,8 +350,42 @@ export default function PropertiesPage() {
         </div>
         <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
           <div className="space-y-1.5">
+            <label className="text-xs font-bold text-muted-foreground">Location</label>
+            <FormSelect name="sublocationId" options={sublocations.filter(item => !filters.cityId || String(item.cityId) === filters.cityId).map(item => ({label: item.name, value: String(item.id)}))}
+              value={filters.sublocationId} onValueChange={value => { setFilters(f => ({...f, sublocationId: value || ""})); resetPage(); }} placeholder="All locations" />
+          </div>
+          {[
+            { label: "Sq.ft", min: "minSqft", max: "maxSqft" },
+            { label: "Budget (₹)", min: "minBudget", max: "maxBudget" },
+          ].map(range => <div key={range.min} className="space-y-1.5">
+            <label className="text-xs font-bold text-muted-foreground">{range.label}</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[range.min, range.max].map((key, index) => <Input key={key} type="number" min="0" step="any" aria-label={`${range.label} ${index ? "maximum" : "minimum"}`}
+                placeholder={index ? "Maximum" : "Minimum"} value={filters[key as keyof typeof filters]}
+                onChange={event => { setFilters(f => ({...f, [key]: event.target.value})); resetPage(); }} />)}
+            </div>
+          </div>)}
+          {[
+            { key: "floor", label: "Floor", placeholder: "e.g. Ground, 1, 2" },
+            { key: "specialPurpose", label: "Special purpose", placeholder: "e.g. Office, showroom" },
+          ].map(field => <div key={field.key} className="space-y-1.5">
+            <label htmlFor={`filter-${field.key}`} className="text-xs font-bold text-muted-foreground">{field.label}</label>
+            <Input id={`filter-${field.key}`} value={filters[field.key as keyof typeof filters]} placeholder={field.placeholder}
+              onChange={event => { setFilters(f => ({...f, [field.key]: event.target.value})); resetPage(); }} />
+          </div>)}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-muted-foreground">Furnishing status</label>
+            <FormSelect name="furnishingStatus" options={[{label:"Bareshell",value:"BARESHELL"},{label:"Fully furnished",value:"FULLY FURNISHED"},{label:"Semi furnished",value:"SEMI FURNISHED"},{label:"Unfurnished",value:"UNFURNISHED"}]}
+              value={filters.furnishingStatus} onValueChange={value => { setFilters(f => ({...f, furnishingStatus:value || ""})); resetPage(); }} placeholder="Any furnishing" />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-muted-foreground">Road Name</label>
+            <FormSelect name="roadName" options={roadNames} value={filters.roadName}
+              onValueChange={value => { setFilters(f => ({...f, roadName:value || ""})); resetPage(); }} placeholder="All roads" />
+          </div>
+          <div className="space-y-1.5">
             <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Property Type</label>
-            <FormSelect name="propertyType" options={PROPERTY_TYPE_OPTIONS} value={filters.propertyType} onValueChange={(v) => { setFilters((f) => ({ ...f, propertyType: v || "" })); resetPage(); }} placeholder="All Types" />
+            <FormSelect name="propertyType" options={propertyTypes.length ? propertyTypes : PROPERTY_TYPE_OPTIONS} value={filters.propertyType} onValueChange={(v) => { setFilters((f) => ({ ...f, propertyType: v || "" })); resetPage(); }} placeholder="All Types" />
           </div>
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Listing Type</label>
@@ -365,7 +393,7 @@ export default function PropertiesPage() {
           </div>
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">City</label>
-            <FormSelect name="cityId" options={cities.map((c) => ({ label: c.cityName, value: String(c.id) }))} value={filters.cityId} onValueChange={(v) => { setFilters((f) => ({ ...f, cityId: v || "" })); resetPage(); }} placeholder="All Cities" />
+            <FormSelect name="cityId" options={cities.map((c) => ({ label: c.cityName, value: String(c.id) }))} value={filters.cityId} onValueChange={(v) => { setFilters((f) => ({ ...f, cityId: v || "", sublocationId: "" })); resetPage(); }} placeholder="All Cities" />
           </div>
         </div>
       </PopoverContent>

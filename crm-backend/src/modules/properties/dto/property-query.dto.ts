@@ -40,4 +40,44 @@ export class PropertyQueryDto {
   @Type(() => Number)
   @IsNumber()
   sublocationId?: number;
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  minSqft?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  maxSqft?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  minBudget?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  maxBudget?: number;
+
+  @IsOptional()
+  @IsString()
+  floor?: string;
+
+  @IsOptional()
+  @IsString()
+  specialPurpose?: string;
+
+  @IsOptional()
+  @IsString()
+  furnishingStatus?: string;
+
+  @IsOptional()
+  @IsString()
+  roadName?: string;
+
 }

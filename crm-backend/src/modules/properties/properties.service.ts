@@ -212,6 +212,9 @@ export class PropertiesService {
     if (query.status === 'archived') params.append('statusFilter', 'archived');
     else if (query.status) params.append('statusFilter', query.status);
     if (query.cityId) params.append('cityId', String(query.cityId));
+    for (const key of ['sublocationId', 'minSqft', 'maxSqft', 'minBudget', 'maxBudget', 'floor', 'specialPurpose', 'furnishingStatus', 'roadName'] as const) {
+      if (query[key] !== undefined && query[key] !== '') params.append(key, String(query[key]));
+    }
 
     const res = await this.siteApi.get(`/admin/properties/all?${params.toString()}`);
     const items = res?.items ?? [];

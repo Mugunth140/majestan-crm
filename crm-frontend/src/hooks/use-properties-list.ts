@@ -1,3 +1,4 @@
+import { EMPTY_PROPERTY_FILTERS, type PropertyFilters } from "@/lib/property-list-filters";
 import { useState, useCallback, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { propertyTabStatus } from "@/lib/property-tabs";
@@ -7,7 +8,7 @@ interface UsePropertiesListArgs {
   pagination: { pageIndex: number; pageSize: number };
   debouncedSearchQuery: string;
   activeTab: string;
-  filters: { propertyType: string; listingType: string; cityId: string };
+  filters: PropertyFilters;
 }
 
 export function usePropertiesList() {
@@ -15,6 +16,9 @@ export function usePropertiesList() {
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [cities, setCities] = useState<{ id: number; cityName: string }[]>([]);
+  const [sublocations, setSublocations] = useState<{id: number; cityId: number; name: string}[]>([]);
+  const [roadNames, setRoadNames] = useState<{label: string; value: string}[]>([]);
+  const [propertyTypes, setPropertyTypes] = useState<{label: string; value: string}[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Load cities robustly
@@ -25,6 +29,10 @@ export function usePropertiesList() {
         if (!isMounted) return;
         const list = res?.data?.cities ?? res?.cities ?? [];
         setCities(list.map((c: any) => ({ id: c.id, cityName: c.cityName ?? c.city_name ?? "" })));
+        const data = res?.data ?? res;
+        setSublocations((data.sublocations || []).map((item: any) => ({ id: item.id, cityId: Number(item.cityId ?? item.city_id), name: item.localityName ?? item.locality_name ?? "" })));
+        setRoadNames(data.roadNames || []);
+        setPropertyTypes(data.propertyTypes || []);
       })
       .catch((err) => {
         console.error("Failed to load cities", err);
@@ -53,6 +61,9 @@ export function usePropertiesList() {
       if (filters.propertyType) params.propertyType = filters.propertyType;
       if (filters.listingType) params.listingType = filters.listingType;
       if (filters.cityId) params.cityId = filters.cityId;
+      for (const key of Object.keys(EMPTY_PROPERTY_FILTERS) as (keyof PropertyFilters)[]) {
+        if (filters[key] !== '') params[key] = filters[key];
+      }
 
       const data = await propertiesApi.list(params);
       
@@ -110,5 +121,5 @@ export function usePropertiesList() {
     }
   };
 
-  return { properties, totalCount, isLoading, cities, fetchProperties, toggleVisibility, deleteBulk };
+  return { properties, totalCount, isLoading, cities, sublocations, roadNames, propertyTypes, fetchProperties, toggleVisibility, deleteBulk };
 }
