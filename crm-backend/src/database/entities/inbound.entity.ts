@@ -18,6 +18,12 @@ import { InboundUnit } from './inbound-unit.entity';
 
 @Entity('inbounds')
 export class Inbound {
+  @Column({ type: 'int', nullable: true, update: false })
+  uploaded_by_id: number | null;
+
+  @Column({ type: 'boolean', default: false })
+  is_queued: boolean;
+
   @PrimaryGeneratedColumn()
   id: number;
 

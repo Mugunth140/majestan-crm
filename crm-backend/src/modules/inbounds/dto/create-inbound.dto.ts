@@ -29,6 +29,10 @@ export class InboundUnitDto {
  * fields would reject legitimate quick captures.
  */
 export class CreateInboundDto {
+  @IsOptional()
+  @IsBoolean()
+  quick_capture?: boolean;
+
   // ── Basic / property ──────────────────────────────────────────────
   @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsString()

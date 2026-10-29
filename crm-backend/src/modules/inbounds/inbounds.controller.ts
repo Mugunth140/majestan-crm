@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, Upl
 import { FileInterceptor } from '@nestjs/platform-express';
 import { InboundsService } from './inbounds.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AssignInboundsDto } from './dto/assign-inbounds.dto';
 import { CreateInboundDto } from './dto/create-inbound.dto';
 import { UpdateInboundLocationDto } from './dto/update-inbound-location.dto';
 import { UpdateInboundDto } from './dto/update-inbound.dto';
@@ -38,7 +39,7 @@ export class InboundsController {
 
   @Post()
   create(@Body() createInboundDto: CreateInboundDto, @Request() req: any) {
-    if (req.user && req.user.role === 'Staff') {
+    if (!createInboundDto.quick_capture && req.user && req.user.role === 'Staff') {
       createInboundDto.assigned_staff_id = req.user.id;
     }
     return this.inboundsService.create(createInboundDto, req.user?.id ?? null);
@@ -47,6 +48,16 @@ export class InboundsController {
   @Get()
   findAll(@Request() req: any) {
     return this.inboundsService.findAll(req.user);
+  }
+
+  @Get('staff-list')
+  async staffList(@Request() req: any) {
+    return { success: true, data: await this.inboundsService.assignableStaff(), canAssign: await this.inboundsService.canManageQueue(req.user) };
+  }
+
+  @Post('assign')
+  assign(@Body() body: AssignInboundsDto, @Request() req: any) {
+    return this.inboundsService.assign(body.inboundIds, body.staffId, req.user);
   }
 
   @Get(':id')
@@ -65,7 +76,7 @@ export class InboundsController {
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateInboundDto: UpdateInboundDto, @Request() req: any) {
-    return this.inboundsService.update(+id, updateInboundDto, req.user?.id ?? null);
+    return this.inboundsService.updateAuthorized(+id, updateInboundDto, req.user);
   }
 
   @Post(':id/follow-ups')

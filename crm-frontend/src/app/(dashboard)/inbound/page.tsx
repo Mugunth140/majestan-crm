@@ -1,7 +1,10 @@
 "use client";
 
+import { matchesInboundActionFilter } from "@/lib/inbound-action-required";
 import { inboundStatusLabel } from "@/lib/inbound-status";
-import { apiFetch } from "@/lib/api-fetch";
+import { InboundAssignmentDialog } from "@/components/inbound/inbound-assignment-dialog";
+import { formatInboundCreated, matchesInboundSearch } from "@/lib/inbound-queue";
+import { apiFetch, apiJson } from "@/lib/api-fetch";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { DataTable } from "@/components/tables/data-table";
@@ -43,7 +46,7 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default function InboundPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = usePersistedState<string>("inbound:tab", "All Inbound", { allowed: ["All Inbound", "Action Required", "Closed"] });
+  const [activeTab, setActiveTab] = usePersistedState<string>("inbound:tab", "All Inbound", { allowed: ["All Inbound", "Queue", "Action Required", "Closed"] });
   const [actionFilter, setActionFilter] = usePersistedState<string>("inbound:actionFilter", "Today", { allowed: ACTION_FILTERS });
   const [inbounds, setInbounds] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,6 +54,27 @@ export default function InboundPage() {
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
   const [role, setRole] = useState<string>("");
+
+  const [canAssign, setCanAssign] = useState(false);
+  const [staffDirectory, setStaffDirectory] = useState<{id: number; name: string}[]>([]);
+  const [assignmentIds, setAssignmentIds] = useState<number[] | null>(null);
+  const [assigning, setAssigning] = useState(false);
+  const [queueFilters, setQueueFilters] = usePersistedState("inbound:queueFilters", { uploader: "", staff: "" });
+  useEffect(() => {
+    apiJson(`${API_URL}/inbounds/staff-list`).then(result => { setCanAssign(!!result.canAssign); setStaffDirectory(result.data || []); })
+      .catch(() => toast.error("Could not load inbound staff directory."));
+  }, []);
+  const assignInbounds = async (staffId: number | null) => {
+    if (!assignmentIds?.length) return;
+    setAssigning(true);
+    try {
+      await apiJson(`${API_URL}/inbounds/assign`, { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inboundIds: assignmentIds, staffId }) });
+      setAssignmentIds(null); await fetchInbounds();
+      toast.success(staffId === null ? "Inbounds returned to Queue." : "Inbounds assigned and moved to All Inbound.");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Assignment failed"); }
+    finally { setAssigning(false); }
+  };
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -73,13 +97,14 @@ export default function InboundPage() {
 
   const [todayViewMode, setTodayViewMode] = usePersistedState<"pending" | "completed">("inbound:todayViewMode", "pending", { allowed: ["pending", "completed"] });
 
-  const tabs = ["All Inbound", "Action Required", "Closed"];
+  const tabs = ["All Inbound", "Queue", "Action Required", "Closed"];
   const actionFilters = [...ACTION_FILTERS];
 
   const fetchInbounds = useCallback(async () => {
     try {
       setIsLoading(true);
       const res = await apiFetch(API_URL + "/inbounds");
+      if (!res.ok) throw new Error("Failed to load inbounds");
       const data = await res.json();
       if (Array.isArray(data)) {
         setInbounds(data);
@@ -106,13 +131,7 @@ export default function InboundPage() {
     // 1. Search Query
     if (debouncedSearchQuery.trim()) {
       const q = debouncedSearchQuery.toLowerCase();
-      filtered = filtered.filter(l => {
-        const propId = l.property_id || l.propertyId || "";
-        const idStr = l.id ? l.id.toString() : "";
-        const pType = l.property_type || l.propertyType || "";
-        const title = l.property_title || l.propertyTitle || "";
-        return propId.toLowerCase().includes(q) || idStr.includes(q) || pType.toLowerCase().includes(q) || title.toLowerCase().includes(q);
-      });
+      filtered = filtered.filter(record => matchesInboundSearch(record, q));
     }
 
     // 2. Filters
@@ -130,57 +149,16 @@ export default function InboundPage() {
     if (filters.type) filtered = filtered.filter(l => (l.property_type || l.propertyType) === filters.type);
     if (filters.status) filtered = filtered.filter(l => l.status === filters.status);
 
+    if (activeTab === "Queue" && queueFilters.uploader) filtered = filtered.filter(record => String(record.uploaded_by_id) === queueFilters.uploader);
+    if (queueFilters.staff) filtered = filtered.filter(record => queueFilters.staff === "unassigned" ? !record.assigned_staff_id : String(record.assigned_staff_id) === queueFilters.staff);
+    if (activeTab === "Queue") return filtered.filter(record => record.is_queued);
+    filtered = filtered.filter(record => !record.is_queued);
+
     const closedStatuses = ["Closed"];
 
     if (activeTab === "Action Required") {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-
-      const actionStatuses = ["New Inbound", "Contacting Owner", "Pending Verification"];
-
-      return filtered.filter(l => {
-        const parseLocal = (dStr: string) => {
-          if (!dStr) return null;
-          const parts = dStr.split("T")[0].split("-");
-          if (parts.length !== 3) return null;
-          const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-          d.setHours(0, 0, 0, 0);
-          return d;
-        };
-
-        const fDate = parseLocal(l.nextFollowUpDate);
-        const lDate = parseLocal(l.lastFollowedUpDate);
-
-        let matchesTimeFilter = false;
-
-        if (actionFilter === "Overdue") {
-          matchesTimeFilter = !!(fDate && fDate < today);
-        } else if (actionFilter === "Yesterday") {
-          matchesTimeFilter = !!(lDate && lDate.getTime() === yesterday.getTime());
-        } else if (actionFilter === "Today") {
-          const isFollowedUpToday = !!(lDate && lDate.getTime() === today.getTime());
-          
-          if (todayViewMode === "completed") {
-            matchesTimeFilter = !!(isFollowedUpToday && !(fDate && fDate.getTime() === today.getTime()));
-          } else {
-            // pending
-            matchesTimeFilter = !!(fDate && fDate.getTime() === today.getTime());
-          }
-        } else if (actionFilter === "Tomorrow") {
-          matchesTimeFilter = !!(fDate && fDate.getTime() === tomorrow.getTime());
-        } else if (actionFilter === "All Scheduled") {
-          matchesTimeFilter = !!(fDate && fDate > tomorrow);
-        }
-
-        // Action required if it matches the time filter, OR if it's in a critical status and has NO future follow-ups scheduled
-        return matchesTimeFilter || (actionStatuses.includes(l.status) && !fDate);
-      });
+      const now = new Date();
+      return filtered.filter(record => matchesInboundActionFilter(record, actionFilter, todayViewMode, now, filters.status));
     }
 
     if (activeTab === "Closed") {
@@ -189,7 +167,7 @@ export default function InboundPage() {
 
     // Default: All Inbound (Active Pipeline)
     return filtered.filter(l => !closedStatuses.includes(l.status));
-  }, [inbounds, debouncedSearchQuery, filters, activeTab]);
+  }, [inbounds, debouncedSearchQuery, filters, activeTab, queueFilters, actionFilter, todayViewMode]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -224,7 +202,7 @@ export default function InboundPage() {
     }
   };
 
-  const columns: ColumnDef<any>[] = [
+  const allColumns: ColumnDef<any>[] = [
     {
       id: "select",
       header: ({ table }) => (
@@ -267,11 +245,11 @@ export default function InboundPage() {
     },
     { 
       accessorKey: "date", 
-      header: "Date",
+      header: activeTab === "Queue" ? "Created at" : "Date",
       
       cell: ({ row }) => {
         const d = row.original.createdAt || row.original.created_at || row.original.date;
-        return <span>{d ? new Date(d).toLocaleDateString() : "-"}</span>;
+        return <span>{activeTab === "Queue" ? formatInboundCreated(d) : d ? new Date(d).toLocaleDateString() : "-"}</span>;
       }
     },
     { 
@@ -299,7 +277,7 @@ export default function InboundPage() {
         return <span>{row.original.mobile_number || row.original.owner_mobile || "-"}</span>;
       },
     },
-    {
+    ...(activeTab === "Queue" ? [{
       accessorKey: "submission_status",
       header: "Submission",
       cell: ({ row }) => {
@@ -310,6 +288,14 @@ export default function InboundPage() {
         </Badge>;
       },
     },
+    ] as ColumnDef<any>[] : []),
+    { id: "uploaded_by", header: "Uploaded by", cell: ({ row }) => row.original.uploaded_by?.name || "Unknown" },
+    { id: "assigned", header: "Assigned", cell: ({ row }) => (
+      <button type="button" disabled={!canAssign} onClick={() => setAssignmentIds([row.original.id])}
+        className="enabled:text-[#0052FF] enabled:hover:underline disabled:cursor-default">
+        {row.original.assigned?.name || "Unassigned"}
+      </button>
+    ) },
     {
       id: "address",
       header: "Address",
@@ -356,13 +342,23 @@ export default function InboundPage() {
     },
   ];
 
+  const columnKey = (column: ColumnDef<any>) => column.id || ("accessorKey" in column ? String(column.accessorKey) : "");
+  const columns = activeTab === "Queue"
+    ? [
+        ...allColumns.filter(column => !["sno", "assigned", "address", "status", "date"].includes(columnKey(column))),
+        ...allColumns.filter(column => columnKey(column) === "date"),
+      ]
+    : activeTab === "All Inbound"
+      ? allColumns.filter(column => !["sno", "date"].includes(columnKey(column)))
+      : allColumns;
+
   const uniqueCategories = Array.from(new Set(inbounds.map(l => l.property_category || l.propertyCategory).filter(c => c && c !== "—")));
   const uniqueTypes = Array.from(new Set(inbounds.map(l => l.property_type || l.propertyType).filter(t => t && t !== "—")));
   const uniqueStatuses = Array.from(new Set(inbounds.map(l => l.status).filter(Boolean)));
 
-  const activeFiltersCount = Object.values(filters).filter(v => v !== "").length;
+  const activeFiltersCount = Object.values(filters).filter(v => v !== "").length + (queueFilters.staff ? 1 : 0) + (activeTab === "Queue" && queueFilters.uploader ? 1 : 0);
 
-  const clearFilters = () => setFilters({ dateFrom: "", dateTo: "", category: "", type: "", status: "" });
+  const clearFilters = () => { setFilters({ dateFrom: "", dateTo: "", category: "", type: "", status: "" }); setQueueFilters({ uploader: "", staff: "" }); };
 
   
   const tableProps = {
@@ -373,17 +369,18 @@ export default function InboundPage() {
     showDeleteAction: role === "Admin",
     onDeleteSelected: (rows: any[]) => setBulkDeleteIds(rows.map(r => r.rawId || r.id)),
     renderToolbarActions: (selectedRows: any[]) => {
-      if (selectedRows.length !== 1) return null;
+      if (!selectedRows.length) return null;
       const row = selectedRows[0];
       const id = row.rawId || row.id;
       return (
         <>
-          <Button variant="outline" size="sm" onClick={() => router.push("/inbound/" + id)}>
+          {canAssign && <Button variant="outline" size="sm" onClick={() => setAssignmentIds(selectedRows.map(row => row.id))}>Assign Selected</Button>}
+          {selectedRows.length === 1 && <><Button variant="outline" size="sm" onClick={() => router.push("/inbound/" + id)}>
             <Eye size={15} className="mr-1.5" /> View
           </Button>
           <Button variant="outline" size="sm" onClick={() => router.push("/inbound/new?edit=" + id)}>
             <Edit size={15} className="mr-1.5" /> Edit
-          </Button>
+          </Button></>}
         </>
       );
     }
@@ -421,6 +418,16 @@ export default function InboundPage() {
           )}
         </div>
         <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+          {activeTab === "Queue" && <div className="space-y-1.5">
+            <label className="text-xs font-bold text-muted-foreground">Uploaded by</label>
+            <FormSelect name="uploader" value={queueFilters.uploader} onValueChange={value => setQueueFilters(f => ({ ...f, uploader: value || "" }))}
+              placeholder="All uploaders" options={[{ label: "All uploaders", value: "" }, ...Array.from(new Map(inbounds.filter(row => row.uploaded_by).map(row => [row.uploaded_by.id, row.uploaded_by])).values()).map(person => ({ label: person.name, value: String(person.id) }))]} />
+          </div>}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-muted-foreground">Staff (assigned)</label>
+            <FormSelect name="assignedStaff" value={queueFilters.staff} onValueChange={value => setQueueFilters(f => ({ ...f, staff: value || "" }))}
+              placeholder="All staff" options={[{ label: "All staff", value: "" }, { label: "Unassigned", value: "unassigned" }, ...staffDirectory.map(person => ({ label: person.name, value: String(person.id) }))]} />
+          </div>
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Created From</label>
             <Input type="date" value={filters.dateFrom} onChange={e => setFilters(f => ({...f, dateFrom: e.target.value}))} className="h-9 rounded-lg text-sm" />
@@ -453,7 +460,7 @@ export default function InboundPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input 
-            placeholder="Search Inbound..." 
+            placeholder="Search ID, Type, Phone..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="pl-11 h-12 bg-black/5 dark:bg-white/10 border-transparent rounded-2xl text-[16px] focus-visible:ring-1 focus-visible:ring-primary shadow-none"
@@ -550,7 +557,7 @@ export default function InboundPage() {
           <div className="relative w-64 xl:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search Property ID, Type..."
+              placeholder="Search ID, Type, Phone..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="pl-9 h-10 bg-background rounded-xl border-border/60 shadow-sm text-[13.5px] focus-visible:ring-1 focus-visible:ring-primary"
@@ -680,6 +687,8 @@ export default function InboundPage() {
         />
       </div>
 
+      <InboundAssignmentDialog open={assignmentIds !== null} count={assignmentIds?.length || 0} busy={assigning}
+        onClose={() => setAssignmentIds(null)} onConfirm={assignInbounds} />
       <Dialog open={deleteId !== null || bulkDeleteIds !== null} onOpenChange={(open) => {
         if (!open) {
           setDeleteId(null);

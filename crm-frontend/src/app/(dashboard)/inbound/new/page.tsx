@@ -3,6 +3,7 @@
 import { INBOUND_STATUS_OPTIONS } from "@/lib/inbound-status";
 import { inboundLocation } from "@/lib/inbound-location";
 import { apiFetch } from "@/lib/api-fetch";
+import { persistedStateKey } from "@/hooks/use-persisted-state";
 import { useIsMobile } from "@/hooks/use-device";
 import { readStoredCoordinates } from "@/lib/image-coordinates";
 
@@ -419,6 +420,7 @@ function InboundForm() {
       });
 
       if (!selectedCategory) throw new Error("Select a property category.");
+      if (isQuickCapture && !selectedType) throw new Error("Select a property type.");
       const mobile = String(formData.get("mobile_number") || "").trim();
       if (!/^\+?(?:[ ()-]*\d){10,15}[ ()-]*$/.test(mobile)) {
         throw new Error("Enter a valid mobile number with 10 to 15 digits.");
@@ -497,7 +499,9 @@ function InboundForm() {
         }
       }
       const requestPayload = isQuickCapture ? {
+        quick_capture: true,
         property_category: selectedCategory,
+        property_type: selectedType,
         mobile_number: mobile,
         inbound_status: selectedInboundStatus,
         alternate_contact: String(formData.get("alternate_contact") || "").trim() || null,
@@ -553,6 +557,12 @@ function InboundForm() {
 
       if (isQuickCapture) inboundLocation.photoFinished(result.id, photoHasLocation);
       toast.success(editId ? "Inbound updated successfully!" : "Inbound created successfully!");
+      if (isQuickCapture) {
+        try {
+          sessionStorage.setItem(persistedStateKey("inbound:tab"), JSON.stringify("Queue"));
+          for (const key of ["inbound:search", "inbound:filters", "inbound:queueFilters"]) sessionStorage.removeItem(persistedStateKey(key));
+        } catch { /* Submission still succeeds when browser storage is unavailable. */ }
+      }
       router.push("/inbound");
     } catch (err: any) {
       toast.error(err.message || "Failed to save inbound.");
@@ -664,8 +674,14 @@ function InboundForm() {
             <div className="space-y-2">
               <label className="text-sm font-semibold">Property category *</label>
               <FormSelect name="_property_category" value={selectedCategory}
-                onValueChange={setSelectedCategory} placeholder="Select category"
+                onValueChange={value => { setSelectedCategory(value); setSelectedType(null); }} placeholder="Select category"
                 options={PROPERTY_CATEGORIES} required />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">Property type *</label>
+              <FormSelect name="_property_type" value={selectedType} onValueChange={setSelectedType}
+                placeholder="Select property type" options={PROPERTY_TYPES_MAP[selectedCategory || ""] || []}
+                disabled={!selectedCategory} required />
             </div>
             <div className="space-y-2">
               <label htmlFor="inbound-mobile" className="text-sm font-semibold">Mobile number *</label>

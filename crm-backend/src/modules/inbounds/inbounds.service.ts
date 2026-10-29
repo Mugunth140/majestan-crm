@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException, Optional } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { User } from '../../database/entities/user.entity';
+import { In, Repository } from 'typeorm';
 import { Inbound } from '../../database/entities/inbound.entity';
 import { InboundFollowUp } from '../../database/entities/inbound-follow-up.entity';
 import { InboundContactLog } from '../../database/entities/inbound-contact-log.entity';
@@ -147,8 +148,12 @@ export class InboundsService {
   }
 
   async create(createInboundDto: Omit<Partial<Inbound>, 'units'> & { units?: any[] }, actorId: number | null = null): Promise<Inbound> {
-    const { units, ...rest } = createInboundDto;
-    const newInbound = this.inboundsRepository.create(rest);
+    const { units, quick_capture, uploaded_by_id: _uploader, is_queued: _queued, ...rest } = createInboundDto as typeof createInboundDto & { quick_capture?: boolean };
+    if (quick_capture) {
+      rest.assigned_staff_id = null as any;
+      if (!rest.property_type) throw new BadRequestException('Select a property type');
+    }
+    const newInbound = this.inboundsRepository.create({ ...rest, uploaded_by_id: actorId, is_queued: !!quick_capture });
     
     // Save to get the auto-incremented ID
     let savedInbound = await this.inboundsRepository.save(newInbound);
@@ -192,23 +197,68 @@ export class InboundsService {
     return this.permissionsService.hasInboundTrackingAccess(userId);
   }
 
+  private userRepository() { return this.inboundsRepository.manager.getRepository(User); }
+
+  async canManageQueue(user?: any): Promise<boolean> {
+    if (['Admin', 'Super Admin', 'Manager'].includes(user?.role?.name || user?.role)) return true;
+    if (!user?.id) return false;
+    const person = await this.userRepository().findOne({ where: { id: Number(user.id), is_active: true }, relations: { department: true } });
+    return !!person?.department?.name?.toLowerCase().replace(/[^a-z]/g, '').startsWith('inbound');
+  }
+
+  async assignableStaff() {
+    const people = await this.userRepository().find({ where: { is_active: true }, relations: { department: true },
+      select: { id: true, name: true, department: { id: true, name: true } }, order: { name: 'ASC' } });
+    return people.filter(person => person.department?.name?.toLowerCase().replace(/[^a-z]/g, '').startsWith('inbound'))
+      .map(person => ({ id: person.id, name: person.name }));
+  }
+
+  async assign(ids: number[], staffId: number | null, actor: any) {
+    if (!(await this.canManageQueue(actor))) throw new ForbiddenException('Only inbound staff and managers can assign inbounds');
+    if (staffId !== null && !(await this.assignableStaff()).some(person => person.id === staffId)) {
+      throw new BadRequestException('Choose an active inbound staff member');
+    }
+    const records = await this.inboundsRepository.find({ where: { id: In(ids) }, select: { id: true } });
+    if (records.length !== ids.length) throw new NotFoundException('One or more inbounds were not found');
+    await this.inboundsRepository.update({ id: In(ids) }, { assigned_staff_id: staffId as any, is_queued: staffId === null });
+    return { success: true, assigned: ids.length };
+  }
+
+  async updateAuthorized(id: number, data: any, actor: any) {
+    if (data.assigned_staff_id !== undefined) {
+      const current = await this.mustFindOne(id);
+      if (current.assigned_staff_id !== data.assigned_staff_id) {
+        throw new BadRequestException('Use Assign to change the assigned staff member');
+      }
+    }
+    return this.update(id, data, actor?.id ?? null);
+  }
+
   async findAll(user?: any): Promise<any[]> {
-    const whereClause: any = {};
+    let whereClause: any = {};
     if (user && user.role === 'Staff') {
       whereClause.assigned_staff_id = user.id;
     } else if (user && user.role === 'Team Lead') {
       whereClause.assigned_staff = { department_id: user.department_id };
     }
 
+    if (user && ['Staff', 'Team Lead'].includes(user.role)) {
+      whereClause = [whereClause, { uploaded_by_id: user.id },
+        ...((await this.canManageQueue(user)) ? [{ is_queued: true }] : [])];
+    }
+
     const inbounds = await this.inboundsRepository.find({
       where: whereClause,
       relations: { follow_ups: true },
-      order: { created_at: 'DESC' }
+      order: { created_at: 'DESC', id: 'DESC' }
     });
 
     const contactHistory = await this.inboundsRepository.find({
       select: { id: true, mobile_number: true },
     });
+    const personIds = [...new Set(inbounds.flatMap(record => [record.uploaded_by_id, record.assigned_staff_id]).filter((id): id is number => !!id))];
+    const people = personIds.length ? await this.userRepository().find({ where: { id: In(personIds) }, select: { id: true, name: true } }) : [];
+    const names = new Map(people.map(person => [person.id, { id: person.id, name: person.name }]));
     const statuses = submissionStatuses(contactHistory);
     const canSee = await this.canSeeContacts(user);
     return inbounds.map(inbound => {
@@ -232,6 +282,8 @@ export class InboundsService {
 
       return {
         ...(canSee ? inbound : this.stripContacts(inbound)),
+        uploaded_by: names.get(inbound.uploaded_by_id!) || null,
+        assigned: names.get(inbound.assigned_staff_id) || null,
         submission_status: statuses.get(inbound.id) || 'New',
         nextFollowUpDate,
         lastFollowedUpDate
@@ -242,7 +294,7 @@ export class InboundsService {
   async findOne(id: number, user?: any): Promise<Inbound> {
     const inbound = await this.mustFindOne(id);
 
-    if (user && user.role === 'Staff' && inbound.assigned_staff_id !== user.id) {
+    if (user && user.role === 'Staff' && inbound.assigned_staff_id !== user.id && inbound.uploaded_by_id !== user.id && !(inbound.is_queued && await this.canManageQueue(user))) {
       throw new NotFoundException(`Inbound with ID ${id} not found`);
     }
 
@@ -301,7 +353,7 @@ export class InboundsService {
     const inbound = await this.mustFindOne(id);
     const previousStatus = inbound.status;
 
-    const { units, ...rest } = updateInboundDto;
+    const { units, uploaded_by_id: _uploader, is_queued: _queued, quick_capture: _quick, ...rest } = updateInboundDto as typeof updateInboundDto & { quick_capture?: boolean };
     // update properties (TypeORM hooks will trigger on save)
     Object.assign(inbound, rest);
 

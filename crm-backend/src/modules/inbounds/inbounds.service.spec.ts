@@ -17,7 +17,7 @@ describe('inbound capture and repeat review', () => {
       findOne: jest.fn(async () => repository.findOne()),
       save: jest.fn(async (_target, value) => repository.save(value)),
     };
-    repository.manager = { transaction: async (run: (value: typeof manager) => unknown) => run(manager) };
+    repository.manager = { getRepository: () => ({ findOne: async () => null, find: async () => [] }), transaction: async (run: (value: typeof manager) => unknown) => run(manager) };
     service = new InboundsService(repository, {} as any, {} as any, {} as any, { hasInboundTrackingAccess: async () => false } as any);
     storage = { write: jest.fn().mockResolvedValue(undefined), delete: jest.fn().mockResolvedValue(undefined) };
     (service as any)._s3Client = storage;
@@ -88,7 +88,7 @@ describe('inbound capture and repeat review', () => {
     repository.find.mockResolvedValueOnce([{ id: 7, mobile_number: '+91 9876543210', alternative_contact: 'Kavya 8765432109', follow_ups: [] }])
       .mockResolvedValueOnce([{ id: 1, mobile_number: '9876543210' }, { id: 7, mobile_number: '+91 9876543210' }]);
     const rows = await service.findAll({ id: 12, role: 'Staff' });
-    expect(repository.find.mock.calls[0][0].where).toEqual({ assigned_staff_id: 12 });
+    expect(repository.find.mock.calls[0][0].where).toEqual([{ assigned_staff_id: 12 }, { uploaded_by_id: 12 }]);
     expect(repository.find.mock.calls[1][0]).toEqual({ select: { id: true, mobile_number: true } });
     expect(rows[0].submission_status).toBe('Repeat');
     expect(rows[0].mobile_number).toBeUndefined();
