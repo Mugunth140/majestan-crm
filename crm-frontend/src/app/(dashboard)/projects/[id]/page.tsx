@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { Edit, Loader2, ChevronDown, Download, Play } from "lucide-react";
+import { formatProjectArea } from "@/lib/project-area";
 import { projectsApi } from "@/lib/projects-api";
 import {
   PROJECT_FAQ_SECTIONS,
@@ -215,11 +216,7 @@ export default function ProjectDetailPage({
             <Field label="Total Floors" value={project.totalFloors} />
             <Field
               label="Project Area"
-              value={
-                project.projectAreaSqft
-                  ? `${Number(project.projectAreaSqft).toLocaleString("en-IN")} sqft`
-                  : undefined
-              }
+              value={formatProjectArea(project.projectAreaSqft)}
             />
             <Field label="Total Units" value={project.totalUnits} />
             <Field label="Pincode" value={project.pincode} />
