@@ -1,5 +1,6 @@
 "use client";
 
+import { toHrFollowUpPayload } from "@/lib/hr-follow-up";
 import { apiFetch } from "@/lib/api-fetch";
 
 import React, { useState, useEffect } from "react";
@@ -144,7 +145,7 @@ export function FollowUpPanel({ entityId, entityType, followUps, onRefresh }: Fo
       const res = await apiFetch(`${API_URL}/${entityType}/${entityId}/follow-ups/${editFu.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editFuForm),
+        body: JSON.stringify(entityType === "hr" ? toHrFollowUpPayload(editFuForm) : editFuForm),
       });
       const data = await res.json();
       if (data.success) {

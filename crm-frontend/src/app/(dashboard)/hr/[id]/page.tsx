@@ -3,6 +3,7 @@
 import { HrAssignmentDialog } from "@/components/hr/hr-assignment-dialog";
 import { MailPanel } from "@/components/mail/mail-panel";
 import { INTERVIEW_MODE_LABELS, formatInterviewTime } from "@/lib/hr-interview";
+import { toHrFollowUpPayload } from "@/lib/hr-follow-up";
 import { apiFetch, apiJson } from "@/lib/api-fetch";
 
 import { useState, useEffect } from "react";
@@ -208,15 +209,16 @@ export default function HrDetail() {
   };
 
   const handleSaveFollowUp = async () => {
+    if (isSavingFu || !newFollowUp.notes?.trim()) return;
     setIsSavingFu(true);
     try {
       const res = await apiFetch(`${API_URL}/hr/${id}/follow-ups`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newFollowUp),
+        body: JSON.stringify(toHrFollowUpPayload(newFollowUp, new Date())),
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         toast.success("Follow-up logged successfully");
         setNewFollowUp({});
         fetchCandidate();
@@ -350,7 +352,7 @@ export default function HrDetail() {
                 </div>
                 <div className="space-y-2 lg:col-span-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Priority Level</label>
-                  <FormSelect name="priority" placeholder="Select Priority" options={[{label: "Low", value: "low"}, {label: "Medium", value: "medium"}, {label: "High", value: "high"}]} value={newFollowUp.priority} onValueChange={(v) => setNewFollowUp((p: any) => ({...p, priority: v}))} />
+                  <FormSelect name="priority" placeholder="Select Priority" options={[{label: "Low", value: "low"}, {label: "Medium", value: "medium"}, {label: "High", value: "high"}]} value={newFollowUp.priority ?? ""} onValueChange={(v) => setNewFollowUp((p: any) => ({...p, priority: v}))} />
                 </div>
                 <div className="space-y-2 md:col-span-2 lg:col-span-4">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow Up Notes</label>
@@ -358,7 +360,7 @@ export default function HrDetail() {
                 </div>
               </div>
               <div className="flex justify-end mt-4">
-                <Button disabled={isSavingFu || !newFollowUp.notes} onClick={handleSaveFollowUp} className="rounded-xl px-6 bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md">
+                <Button disabled={isSavingFu || !newFollowUp.notes?.trim()} onClick={handleSaveFollowUp} className="rounded-xl px-6 bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md">
                   {isSavingFu ? "Saving..." : "Save Follow Up"}
                 </Button>
               </div>
