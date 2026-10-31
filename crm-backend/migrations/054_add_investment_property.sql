@@ -4,7 +4,7 @@ SET @current_property_types = (SELECT COLUMN_TYPE FROM information_schema.COLUMN
 SET @property_type_ddl = IF(LOCATE("'investment_property'", @current_property_types) > 0,
   'SELECT 1', CONCAT('ALTER TABLE majestan.properties MODIFY property_type ',
     LEFT(@current_property_types, CHAR_LENGTH(@current_property_types) - 1),
-    ",''investment_property') NOT NULL DEFAULT 'other'"));
+    ",'investment_property') NOT NULL DEFAULT 'other'"));
 PREPARE property_type_stmt FROM @property_type_ddl;
 EXECUTE property_type_stmt;
 DEALLOCATE PREPARE property_type_stmt;
