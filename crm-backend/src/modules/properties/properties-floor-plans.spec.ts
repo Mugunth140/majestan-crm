@@ -72,7 +72,6 @@ describe('Named property floor plans through CRM updates', () => {
         documents: documents.map((document) => ({
           ...document,
           title: document.title,
-          isPublic: true,
         })),
       }),
     );

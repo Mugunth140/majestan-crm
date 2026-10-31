@@ -1,3 +1,4 @@
+import { PropertyTypeRegistryService } from './property-type-registry.service';
 import { Module } from '@nestjs/common';
 import { PropertiesService } from './properties.service';
 import { SiteApiService } from './site-api.service';
@@ -8,7 +9,7 @@ import { PermissionsModule } from '../permissions/permissions.module';
 @Module({
   imports: [AuthModule, PermissionsModule],
   controllers: [PropertiesController],
-  providers: [PropertiesService, SiteApiService],
+  providers: [PropertiesService, SiteApiService, PropertyTypeRegistryService],
   exports: [SiteApiService],
 })
 export class PropertiesModule {}

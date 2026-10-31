@@ -24,6 +24,7 @@ export enum PropertyType {
   INDIVIDUAL_PORTION = 'individual_portion',
   INVESTMENT_PROPERTY = 'investment_property',
   PG_SERVICE_APARTMENT = 'pg_service_apartment',
+  FARM_HOUSE = 'farm_house',
 }
 
 export enum PropertyStatus {
@@ -180,7 +181,7 @@ export class Property {
   @Column({ name: 'expected_sale_price', type: 'decimal', precision: 12, scale: 2, nullable: true })
   expectedSalePrice!: string | null;
 
-  @Column({ name: 'price_per_sqft', type: 'decimal', precision: 15, scale: 2, nullable: true })
+  @Column({ name: 'price_per_sqft', type: 'decimal', precision: 24, scale: 10, nullable: true })
   pricePerSqft!: string | null;
 
   @Column({ name: 'monthly_rent', type: 'decimal', precision: 12, scale: 2, nullable: true })

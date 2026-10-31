@@ -1,0 +1,131 @@
+export const INDUSTRIAL_BUILDING_TYPES = [
+  "RC Frame",
+  "PEB / Steel Shed",
+  "Masonry / Brick Construction",
+  "Semi-Permanent / Temporary Shed",
+  "Precast Concrete",
+];
+export const INDUSTRIAL_USES = [
+  "General Warehousing",
+  "Logistics & Distribution",
+  "Cold Storage / Food Processing",
+  "Heavy Manufacturing",
+  "Light Assembly & Packaging",
+  "Flex Space / R&D Labs",
+  "Showroom & Commercial Retail",
+  "Hazardous / Chemical Storage",
+];
+export const INDUSTRIAL_FLOOR_TYPES = [
+  "VDF (Vacuum Dewatered Concrete)",
+  "Epoxy / Polyurethane Coated",
+  "Standard Reinforced Concrete (RCC)",
+  "IPS Flooring (Indian Patent Stone)",
+  "Kota Stone / Granite / Tiles",
+  "Paver Blocks / Interlocking Blocks",
+  "Unpaved / Earthen Floor",
+];
+export const CONTAINER_ACCESS_OPTIONS = [
+  "20 ft",
+  "30 ft",
+  "40 ft",
+  "50 ft",
+  "60 ft",
+];
+export const POLLUTION_CATEGORIES = ["Red", "Orange", "Yellow", "Green"];
+export const INDUSTRIAL_CERTIFICATES = [
+  "DTCP / Local Planning Approved Plan",
+  "CMDA / LPA Approved Plan",
+  "Panchayat / Municipal Building License",
+  "Completion Certificate (CC)",
+  "Occupancy Certificate (OC)",
+  "Industrial Land Conversion (CLU)",
+  "Patta / Chitta / FMB Sketch",
+  "Fire NOC",
+  "TNPCB CTE (Consent to Establish)",
+  "TNPCB CTO (Consent to Operate)",
+  "EIA Clearance",
+  "CEIG Approval / HT Power Sanction",
+  "TANGEDCO / Electricity Board Permit",
+  "PESO License (Chemicals & Explosives)",
+  "Applied / In-Progress",
+  "No Certificates Available",
+];
+export const PLOT_ZONING = [
+  "Industrial Plot",
+  "Commercial Plot",
+  "Residential Plot",
+];
+export const CROP_SUITABILITY = [
+  "Paddy / Rice",
+  "Coconut",
+  "Arecanut",
+  "Sugarcane",
+  "Coffee",
+  "Tea",
+  "Rubber",
+  "Banana",
+  "Mango",
+  "Cotton",
+  "Millets / Ragi / Jowar",
+  "Turmeric & Spices",
+  "Groundnut & Oilseeds",
+  "Pulses / Legumes",
+  "Exotic Fruits (Avocado, Dragon Fruit)",
+  "Commercial Timber (Teak, Mahogany, Malabar Neem)",
+  "Mixed Short-term Cultivation",
+  "Fallow / Not Cultivated",
+];
+export const EXISTING_PLANTATIONS = [
+  "Coconut Plantation",
+  "Coffee Plantation (Robusta / Arabica)",
+  "Tea Plantation",
+  "Arecanut / Betel Nut Plantation",
+  "Rubber Plantation",
+  "Mango Orchard",
+  "Commercial Timber (Teak / Mahogany / Malabar Neem)",
+  "Mixed Plantation (Coconut + Arecanut)",
+  "Integrated Spices (Coffee/Arecanut with Pepper & Cardamom)",
+  "Exotic Fruit Plantation (Avocado / Rambutan / Mangosteen)",
+  "Cocoa / Cacao Plantation",
+  "Oil Palm Plantation",
+  "Fallow / Re-plantation Required",
+];
+export const asOptions = (values: readonly string[]) =>
+  values.map((value) => ({ value, label: value }));
+
+export const COMMERCIAL_RENT_USES = [
+  "Corporate Office",
+  "Back Office / IT-BPO Center",
+  "Retail Showroom",
+  "Automobile Showroom & Service",
+  "General Warehousing",
+  "E-commerce Fulfillment Center",
+  "Cold Storage / Pharma Storage",
+  "Heavy Manufacturing / Factory",
+  "Light Assembly & Packaging",
+  "Hazardous / Chemical Storage",
+  "Data Center",
+  "R&D Lab / Clean Room",
+  "Cloud Kitchen / Commercial Kitchen",
+  "Supermarket / Hypermarket",
+  "Educational Institute / Training Center",
+  "Clinic / Diagnostic Center",
+];
+export const COMMERCIAL_SPECIAL_PURPOSES = [
+  "Gym / Fitness Center",
+  "Restaurant / Fine Dining",
+  "Cafe / Coffee Shop",
+  "Spa & Wellness Center",
+  "Salon / Grooming Center",
+  "Banquet Hall / Event Space",
+  "Boutique / Design Studio",
+  "Entertainment Zone / Gaming Arcade",
+  "Indoor Sports Arena / Turf",
+  "Daycare / Creche",
+  "Hotel / Guest House / Lodging",
+  "Microbrewery / Pub",
+  "Art Gallery / Photo Studio",
+  "Veterinary Clinic / Pet Care",
+  "Bank Branch / ATM Hub",
+];
+export const PROPERTY_ACCESSIBILITY = ["On Road", "Cut Road", "Inside Colony"];

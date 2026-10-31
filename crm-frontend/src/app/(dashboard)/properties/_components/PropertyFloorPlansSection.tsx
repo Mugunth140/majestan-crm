@@ -18,6 +18,7 @@ export interface PropertyFloorPlan {
 }
 
 export interface PropertyFloorPlansSectionProps {
+  children?: React.ReactNode;
   planKind?: "floor" | "ground";
   plans: PropertyFloorPlan[];
   onChange: (plans: PropertyFloorPlan[]) => void;
@@ -72,6 +73,7 @@ function formatFileSize(size?: number) {
 
 export default function PropertyFloorPlansSection({
   plans,
+  children,
   planKind = "floor",
   onChange,
   disabled = false,
@@ -223,7 +225,7 @@ export default function PropertyFloorPlansSection({
     <section className="rounded-2xl border border-border bg-card p-8" aria-labelledby="property-floor-plans-title">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 id="property-floor-plans-title" className="text-lg font-semibold text-foreground">{planHeading}</h2>
+          <h2 id="property-floor-plans-title" className="text-lg font-semibold text-foreground">{children ? "Floor plans & room dimensions" : planHeading}</h2>
           <p className="mt-1 text-sm text-muted-foreground">Add up to five plans and name each {planKind === "ground" ? "ground plan" : "floor"}. PDF, JPG, PNG, or WebP, up to 15 MB each.</p>
         </div>
         <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground" aria-live="polite">
@@ -301,6 +303,7 @@ export default function PropertyFloorPlansSection({
         {uploading ? `Uploading ${planLabel}s…` : `Add ${planLabel}s`}
       </button>
 
+      {children}
       <Dialog open={Boolean(previewPlan)} onOpenChange={(open) => { if (!open) closePreview(); }}>
         {previewPlan && (
           <DialogContent

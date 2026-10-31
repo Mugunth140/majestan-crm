@@ -4,8 +4,8 @@ import type { ComponentProps } from "react";
 import { FormSelect } from "@/components/shared/form-select";
 
 const ABBREVIATIONS = new Set([
-  "AC", "BHK", "CMDA", "DTCP", "EB", "FMB", "GST", "HP", "HT", "INR",
-  "LT", "PG", "NA", "N/A", "RCC", "RERA", "TSLR", "UDS", "VLT", "CCTV", "IT",
+  "BPO", "ATM", "RC", "PEB", "VDF", "IPS", "TNPCB", "EIA", "CEIG", "PESO", "CTE", "CTO", "CC", "OC", "CLU", "NOC", "R", "D", "AC", "BHK", "CMDA", "DTCP", "EB", "FMB", "GST", "HP", "HT", "INR",
+  "LT", "PG", "LPA", "NDFC", "NA", "N/A", "RCC", "RERA", "TSLR", "UDS", "VLT", "CCTV", "IT",
 ]);
 
 /** Presentation only: keep API/master values and meaningful abbreviations. */

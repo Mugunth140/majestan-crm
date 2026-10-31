@@ -15,6 +15,7 @@ interface PriceInputProps {
   min?: number;
   step?: string;
   name?: string;
+  readOnly?: boolean;
 }
 
 export function PriceInput({
@@ -27,6 +28,7 @@ export function PriceInput({
   min,
   step,
   name,
+  readOnly,
 }: PriceInputProps) {
   const [internal, setInternal] = useState(
     defaultValue !== undefined && defaultValue !== null ? String(defaultValue) : ""
@@ -38,6 +40,7 @@ export function PriceInput({
     <div className="space-y-1">
       <Input
         type={type}
+        readOnly={readOnly}
         min={min}
         step={step}
         name={name}
