@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 
 interface FormSelectProps {
+  id?: string;
   name: string;
   placeholder: string;
   options: { label: string; value: string }[];
@@ -17,6 +18,7 @@ interface FormSelectProps {
 }
 
 export function FormSelect({
+  id,
   name,
   placeholder,
   options,
@@ -42,6 +44,7 @@ export function FormSelect({
   return (
     <Select name={name} required={required} onValueChange={onValueChange} disabled={disabled} {...selectProps}>
       <SelectTrigger
+        id={id}
         className={cn(
           "w-full h-12! rounded-xl bg-muted/30 border-border/60 focus:ring-2 focus:ring-[#0052FF]/20 focus:border-[#0052FF] transition-all text-[15px]",
           className

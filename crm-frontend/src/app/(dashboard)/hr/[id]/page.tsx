@@ -3,10 +3,11 @@
 import { HrAssignmentDialog } from "@/components/hr/hr-assignment-dialog";
 import { MailPanel } from "@/components/mail/mail-panel";
 import { INTERVIEW_MODE_LABELS, formatInterviewTime } from "@/lib/hr-interview";
+import { downloadHrDocument, isHrDocumentAvailable, HR_DOCUMENT_ACCEPT } from "@/lib/hr-documents";
 import { toHrFollowUpPayload } from "@/lib/hr-follow-up";
 import { apiFetch, apiJson } from "@/lib/api-fetch";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -138,6 +139,9 @@ export default function HrDetail() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   // Bumped after saves that may create an email draft (status changes).
   const [mailRefresh, setMailRefresh] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
+  const candidateRequest = useRef(0);
 
   // Keyboard shortcut for history slider
   useEffect(() => {
@@ -157,13 +161,16 @@ export default function HrDetail() {
 
   const fetchCandidate = async () => {
     if (!id) return;
+    const request = ++candidateRequest.current;
+    setLoadError(null);
     try {
-      const res = await apiFetch(`${API_URL}/hr/${id}`);
-      const data = await res.json();
+      const data = await apiJson(`${API_URL}/hr/${id}`);
+      if (request !== candidateRequest.current) return;
+      if (!data?.id) throw new Error("Candidate not found.");
       setCandidate(data);
       setSelectedStatus(data.status || "New Application");
-    } catch (e) {
-      toast.error("Failed to load candidate");
+    } catch (error) {
+      if (request === candidateRequest.current) setLoadError(error instanceof Error ? error.message : "Could not load candidate.");
     }
   };
 
@@ -191,21 +198,35 @@ export default function HrDetail() {
   };
 
   useEffect(() => {
-    fetchCandidate();
+    setCandidate(null);
+    void fetchCandidate();
+    return () => { candidateRequest.current++; };
   }, [id]);
 
-  const handleUpload = async (docType: string, e: any) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const formData = new FormData(); 
+  const handleUpload = async (docType: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || uploadingDoc) return;
+    if (file.size > 10 * 1024 * 1024) return void toast.error("Document must be 10 MB or smaller.");
+    const formData = new FormData();
     formData.append("file", file);
+    const request = candidateRequest.current;
+    setUploadingDoc(docType);
     try {
-      await apiFetch(`${API_URL}/hr/${id}/upload/${docType}`, { method: "POST", body: formData });
-      toast.success("Document uploaded successfully");
-      fetchCandidate();
-    } catch (err) {
-      toast.error("Failed to upload document");
-    }
+      const result = await apiJson(`${API_URL}/hr/${id}/upload/${docType}`, { method: "POST", body: formData });
+      if (result?.success === false) throw new Error(result.message || "Upload failed.");
+      if (request !== candidateRequest.current) return;
+      toast.success("Document uploaded.");
+      await fetchCandidate();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not upload document.");
+    } finally { setUploadingDoc(null); }
+  };
+  const handleDownload = async (type: string, reference: string) => {
+    try {
+      if (reference.startsWith("hr-private://")) await downloadHrDocument(API_URL, id, type);
+      else if (isHrDocumentAvailable(reference)) window.open(reference, "_blank", "noopener,noreferrer");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not download document."); }
   };
 
   const handleSaveFollowUp = async () => {
@@ -232,6 +253,7 @@ export default function HrDetail() {
     }
   };
 
+  if (!candidate && loadError) return <div role="alert" className="space-y-4 rounded-xl border p-6"><h1 className="text-xl font-semibold">Could not load candidate</h1><p>{loadError}</p><Button variant="outline" onClick={() => fetchCandidate()}>Try again</Button></div>;
   if (!candidate) return <PageSkeleton />;
 
   const badgeCls = STATUS_STYLES[selectedStatus || candidate.status] ?? "bg-gray-100 text-gray-800 border-gray-200";
@@ -245,6 +267,7 @@ export default function HrDetail() {
 
   return (
     <div className="flex flex-col md:h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {loadError && <div role="alert" className="space-y-2 rounded-xl border p-4"><p>{loadError}</p><Button variant="outline" onClick={() => fetchCandidate()}>Try again</Button></div>}
       
       <HrAssignmentDialog open={assignmentOpen} count={1} busy={isAssigning} onClose={() => setAssignmentOpen(false)} onConfirm={assignCandidate} />
       {/* ── Mobile Header ── */}
@@ -372,13 +395,15 @@ export default function HrDetail() {
           <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
             <FileText className="h-4 w-4 text-muted-foreground" /> Documents
           </h3>
+          <p className="mb-4 text-sm text-muted-foreground">PDF, JPEG, PNG or WebP, up to 10 MB. Passport photos must be images.</p>
+          {uploadingDoc && <p role="status" className="mb-4 text-sm">Uploading document…</p>}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="p-4 border rounded-xl bg-muted/10 space-y-3">
               <p className="text-sm font-semibold flex items-center gap-2"><FileText className="h-4 w-4 text-blue-500" /> Resume / CV</p>
-              {candidate.resumeUrl ? (
-                 <div className="flex gap-2"><Button variant="outline" size="sm" className="w-full text-xs" onClick={() => window.open(candidate.resumeUrl, "_blank")}>View File</Button></div>
+              {isHrDocumentAvailable(candidate.resumeUrl) ? (
+                 <div className="flex gap-2"><Button variant="outline" size="sm" className="w-full text-xs" onClick={() => handleDownload("resume", candidate.resumeUrl)}>Download file</Button></div>
               ) : (
-                <Input type="file" onChange={(e) => handleUpload('resume', e)} className="text-xs cursor-pointer" />
+                <Input type="file" accept={HR_DOCUMENT_ACCEPT} disabled={uploadingDoc !== null} onChange={(e) => handleUpload('resume', e)} className="text-xs cursor-pointer" />
               )}
             </div>
             
@@ -386,42 +411,42 @@ export default function HrDetail() {
               <>
                 <div className="p-4 border rounded-xl bg-muted/10 space-y-3">
                   <p className="text-sm font-semibold flex items-center gap-2"><FileText className="h-4 w-4 text-blue-500" /> Aadhaar Card</p>
-                  {candidate.aadhaarUrl ? (
-                     <div className="flex gap-2"><Button variant="outline" size="sm" className="w-full text-xs" onClick={() => window.open(candidate.aadhaarUrl, "_blank")}>View File</Button></div>
+                  {isHrDocumentAvailable(candidate.aadhaarUrl) ? (
+                     <div className="flex gap-2"><Button variant="outline" size="sm" className="w-full text-xs" onClick={() => handleDownload("aadhaar", candidate.aadhaarUrl)}>Download file</Button></div>
                   ) : (
-                    <Input type="file" onChange={(e) => handleUpload('aadhaar', e)} className="text-xs cursor-pointer" />
+                    <Input type="file" accept={HR_DOCUMENT_ACCEPT} disabled={uploadingDoc !== null} onChange={(e) => handleUpload('aadhaar', e)} className="text-xs cursor-pointer" />
                   )}
                 </div>
                 <div className="p-4 border rounded-xl bg-muted/10 space-y-3">
                   <p className="text-sm font-semibold flex items-center gap-2"><FileText className="h-4 w-4 text-blue-500" /> PAN Card</p>
-                  {candidate.panUrl ? (
-                     <div className="flex gap-2"><Button variant="outline" size="sm" className="w-full text-xs" onClick={() => window.open(candidate.panUrl, "_blank")}>View File</Button></div>
+                  {isHrDocumentAvailable(candidate.panUrl) ? (
+                     <div className="flex gap-2"><Button variant="outline" size="sm" className="w-full text-xs" onClick={() => handleDownload("pan", candidate.panUrl)}>Download file</Button></div>
                   ) : (
-                    <Input type="file" onChange={(e) => handleUpload('pan', e)} className="text-xs cursor-pointer" />
+                    <Input type="file" accept={HR_DOCUMENT_ACCEPT} disabled={uploadingDoc !== null} onChange={(e) => handleUpload('pan', e)} className="text-xs cursor-pointer" />
                   )}
                 </div>
                 <div className="p-4 border rounded-xl bg-muted/10 space-y-3">
                   <p className="text-sm font-semibold flex items-center gap-2"><FileText className="h-4 w-4 text-blue-500" /> Educational Certs</p>
-                  {candidate.educationCertUrl ? (
-                     <div className="flex gap-2"><Button variant="outline" size="sm" className="w-full text-xs" onClick={() => window.open(candidate.educationCertUrl, "_blank")}>View File</Button></div>
+                  {isHrDocumentAvailable(candidate.educationCertUrl) ? (
+                     <div className="flex gap-2"><Button variant="outline" size="sm" className="w-full text-xs" onClick={() => handleDownload("educationCert", candidate.educationCertUrl)}>Download file</Button></div>
                   ) : (
-                    <Input type="file" onChange={(e) => handleUpload('educationCert', e)} className="text-xs cursor-pointer" />
+                    <Input type="file" accept={HR_DOCUMENT_ACCEPT} disabled={uploadingDoc !== null} onChange={(e) => handleUpload('educationCert', e)} className="text-xs cursor-pointer" />
                   )}
                 </div>
                 <div className="p-4 border rounded-xl bg-muted/10 space-y-3">
                   <p className="text-sm font-semibold flex items-center gap-2"><FileText className="h-4 w-4 text-blue-500" /> Experience Cert</p>
-                  {candidate.experienceCertUrl ? (
-                     <div className="flex gap-2"><Button variant="outline" size="sm" className="w-full text-xs" onClick={() => window.open(candidate.experienceCertUrl, "_blank")}>View File</Button></div>
+                  {isHrDocumentAvailable(candidate.experienceCertUrl) ? (
+                     <div className="flex gap-2"><Button variant="outline" size="sm" className="w-full text-xs" onClick={() => handleDownload("experienceCert", candidate.experienceCertUrl)}>Download file</Button></div>
                   ) : (
-                    <Input type="file" onChange={(e) => handleUpload('experienceCert', e)} className="text-xs cursor-pointer" />
+                    <Input type="file" accept={HR_DOCUMENT_ACCEPT} disabled={uploadingDoc !== null} onChange={(e) => handleUpload('experienceCert', e)} className="text-xs cursor-pointer" />
                   )}
                 </div>
                 <div className="p-4 border rounded-xl bg-muted/10 space-y-3">
                   <p className="text-sm font-semibold flex items-center gap-2"><FileText className="h-4 w-4 text-blue-500" /> Passport Photo</p>
-                  {candidate.photoUrl ? (
-                     <div className="flex gap-2"><Button variant="outline" size="sm" className="w-full text-xs" onClick={() => window.open(candidate.photoUrl, "_blank")}>View File</Button></div>
+                  {isHrDocumentAvailable(candidate.photoUrl) ? (
+                     <div className="flex gap-2"><Button variant="outline" size="sm" className="w-full text-xs" onClick={() => handleDownload("photo", candidate.photoUrl)}>Download file</Button></div>
                   ) : (
-                    <Input type="file" onChange={(e) => handleUpload('photo', e)} className="text-xs cursor-pointer" />
+                    <Input type="file" accept={"image/jpeg,image/png,image/webp"} disabled={uploadingDoc !== null} onChange={(e) => handleUpload('photo', e)} className="text-xs cursor-pointer" />
                   )}
                 </div>
               </>

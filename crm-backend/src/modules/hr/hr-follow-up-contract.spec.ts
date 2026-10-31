@@ -15,12 +15,16 @@ describe('HR follow-up form to Action Required contract', () => {
   let history: HrFollowUp[];
   beforeEach(() => {
     history = [];
-    const candidates = { find: async () => [{ id: 7, status: 'New Application' }] };
+    const candidates = { existsBy: async () => true, find: async () => [{ id: 7, status: 'New Application' }] };
     const followUps = {
       create: (data: Partial<HrFollowUp>) => ({ id: 1, created_at: now, ...data }),
       save: async (data: HrFollowUp) => { history.push(data); return data; },
       find: async () => history,
-      update: async (id: number, data: Partial<HrFollowUp>) => { Object.assign(history.find(item => item.id === id)!, data); },
+      update: async (where: { id: number; hr_candidate_id: number }, data: Partial<HrFollowUp>) => {
+        const row = history.find(item => item.id === where.id && item.hr_candidate_id === where.hr_candidate_id);
+        if (!row) return { affected: 0 };
+        Object.assign(row, data); return { affected: 1 };
+      },
     };
     service = new HrService(candidates as never, followUps as never, {} as never,
       { getHrSources: async () => [] } as never, {} as never);

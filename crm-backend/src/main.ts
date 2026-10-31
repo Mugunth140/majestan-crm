@@ -28,6 +28,7 @@ async function bootstrap() {
     origin: allowedOrigins.length > 0 ? allowedOrigins : false,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
+    exposedHeaders: ['Content-Disposition'],
   });
 
   app.useGlobalFilters(new AllExceptionsFilter());

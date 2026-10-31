@@ -1,3 +1,4 @@
+import { HrDocumentsService } from './hr-documents.service';
 import { User } from '../../database/entities/user.entity';
 import { MasterModule } from '../master/master.module';
 import { Module } from '@nestjs/common';
@@ -14,6 +15,6 @@ import { HR_MAIL_EVENTS } from './mail';
 @Module({
   imports: [TypeOrmModule.forFeature([HrCandidate, HrFollowUp, HrContactLog, User]), AuthModule, MasterModule, MailModule.forFeature(HR_MAIL_EVENTS)],
   controllers: [HrController],
-  providers: [HrService],
+  providers: [HrService, HrDocumentsService],
 })
 export class HrModule {}

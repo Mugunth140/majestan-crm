@@ -42,3 +42,10 @@ describe('adsApi', () => {
     );
   });
 });
+
+describe('failed advertisement responses', () => {
+ it.each(['status', 'order', 'delete'] as const)('rejects an unsuccessful %s response', async op => {
+  vi.mocked(apiJson).mockResolvedValueOnce({ success: false, message: 'Operation rejected' });
+  await expect(op === 'status' ? adsApi.setStatus(7, false) : op === 'order' ? adsApi.reorder([7, 8]) : adsApi.remove(7)).rejects.toThrow('Operation rejected');
+ });
+});

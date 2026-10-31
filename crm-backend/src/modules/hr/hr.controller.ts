@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException, Put, UseGuards, ParseEnumPipe, Request } from '@nestjs/common';
+import { HrDocumentsService, MAX_HR_DOCUMENT_BYTES } from './hr-documents.service';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException, Put, UseGuards, ParseEnumPipe, Request, StreamableFile, Header, ParseIntPipe } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AssignHrCandidatesDto } from './dto/assign-hr-candidates.dto';
 import { RolesGuard } from '../auth/roles.guard';
@@ -24,22 +25,22 @@ export enum HrDocumentType {
 @UseGuards(JwtAuthGuard)
 export class HrController {
   @Post(':id/follow-ups')
-  async addFollowUp(@Param('id') id: string, @Body() data: CreateHrFollowUpDto) {
+  async addFollowUp(@Param('id', ParseIntPipe) id: number, @Body() data: CreateHrFollowUpDto) {
     await this.hrService.addFollowUp(+id, data);
     return { success: true };
   }
 
   @Put(':id/follow-ups/:fuId')
-  async updateFollowUp(@Param('id') id: string, @Param('fuId') fuId: string, @Body() data: UpdateHrFollowUpDto) {
+  async updateFollowUp(@Param('id', ParseIntPipe) id: number, @Param('fuId', ParseIntPipe) fuId: number, @Body() data: UpdateHrFollowUpDto) {
     return this.hrService.updateFollowUp(+id, +fuId, data);
   }
 
   @Delete(':id/follow-ups/:fuId')
-  async deleteFollowUp(@Param('id') id: string, @Param('fuId') fuId: string) {
+  async deleteFollowUp(@Param('id', ParseIntPipe) id: number, @Param('fuId', ParseIntPipe) fuId: number) {
     return this.hrService.deleteFollowUp(+id, +fuId);
   }
 
-  constructor(private readonly hrService: HrService) {}
+  constructor(private readonly hrService: HrService, private readonly documents: HrDocumentsService) {}
 
   @Get() findAll() { return this.hrService.findAll(); }
 
@@ -54,29 +55,46 @@ export class HrController {
   @Post('bulk')
   bulkImport(@Body() body: BulkImportHrDto, @Request() req: any) { return this.hrService.bulkImport(body.candidates, req.user); }
 
-  @Get(':id') findOne(@Param('id') id: string) { return this.hrService.findOne(+id); }
+  @Get(':id') findOne(@Param('id', ParseIntPipe) id: number) { return this.hrService.findOne(+id); }
   
   @Post() create(@Body() createDto: CreateHrCandidateDto, @Request() req: any) { return this.hrService.create(createDto, req.user); }
   
-  @Patch(':id') update(@Param('id') id: string, @Body() updateDto: UpdateHrCandidateDto, @Request() req: any) {
+  @Patch(':id') update(@Param('id', ParseIntPipe) id: number, @Body() updateDto: UpdateHrCandidateDto, @Request() req: any) {
     return this.hrService.update(+id, updateDto, req.user);
   }
   
-  @Delete(':id') remove(@Param('id') id: string) { return this.hrService.remove(+id); }
+  @Delete(':id') remove(@Param('id', ParseIntPipe) id: number) { return this.hrService.remove(+id); }
 
   @Post(':id/upload/:docType')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_HR_DOCUMENT_BYTES } }))
   async uploadDocument(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Param('docType', new ParseEnumPipe(HrDocumentType)) docType: HrDocumentType,
     @UploadedFile() file: Express.Multer.File
   ) {
     if (!file) throw new BadRequestException('No file provided');
-    // NOTE: In reality, upload this to S3/Cloudflare R2 here.
-    // For this step, we will mock the URL and just update the DB record.
-    const fileUrl = `https://r2.cloudflare.com/hr-documents/${id}/${docType}-${file.originalname}`;
-    
-    const updateData = { [`${docType}Url`]: fileUrl };
-    return this.hrService.update(+id, updateData);
+    await this.hrService.findOne(+id);
+    const reference = await this.documents.upload(+id, docType, file);
+    try {
+      return await this.hrService.saveDocument(+id, docType, reference);
+    } catch (error) {
+      // A lost database acknowledgement can still mean the write committed.
+      // Keep the object when its persisted reference cannot be ruled out.
+      const current = await this.hrService.findOne(+id).catch(() => null);
+      if (current && current[`${docType}Url`] !== reference) await this.documents.discard(reference).catch(() => {});
+      throw error;
+    }
   }
+  @Header('Cache-Control', 'private, no-store')
+  @Header('X-Content-Type-Options', 'nosniff')
+  @Get(':id/documents/:docType')
+  async downloadDocument(@Param('id', ParseIntPipe) id: number, @Param('docType', new ParseEnumPipe(HrDocumentType)) docType: HrDocumentType) {
+    const candidate = await this.hrService.findOne(+id);
+    const document = await this.documents.read(+id, docType, candidate[`${docType}Url`]);
+    return new StreamableFile(document.buffer, {
+      type: document.contentType, length: document.buffer.length,
+      disposition: `attachment; filename*=UTF-8''${encodeURIComponent(document.filename)}`,
+    });
+  }
+
 }

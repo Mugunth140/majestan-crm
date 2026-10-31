@@ -216,16 +216,24 @@ export class HrService {
     await this.repo.delete(id);
   }
 
+  async saveDocument(id: number, type: string, reference: string) {
+    const result = await this.repo.update(id, { [`${type}Url`]: reference });
+    if (!result.affected) throw new NotFoundException('Candidate not found');
+    return { success: true };
+  }
   async addFollowUp(id: number, data: Partial<HrFollowUp>) {
+    if (!(await this.repo.existsBy({ id }))) throw new NotFoundException('Candidate not found');
     const fu = this.fuRepo.create({ ...data, hr_candidate_id: id });
     return this.fuRepo.save(fu);
   }
   async updateFollowUp(id: number, fuId: number, data: Partial<HrFollowUp>) {
-    await this.fuRepo.update(fuId, data);
+    const result = await this.fuRepo.update({ id: fuId, hr_candidate_id: id }, data);
+    if (!result.affected) throw new NotFoundException('Follow-up not found for this candidate');
     return { success: true };
   }
   async deleteFollowUp(id: number, fuId: number) {
-    await this.fuRepo.delete(fuId);
+    const result = await this.fuRepo.delete({ id: fuId, hr_candidate_id: id });
+    if (!result.affected) throw new NotFoundException('Follow-up not found for this candidate');
     return { success: true };
   }
 }
