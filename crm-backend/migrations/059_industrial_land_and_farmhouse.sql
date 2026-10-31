@@ -37,4 +37,4 @@ PREPARE spec_stmt FROM @spec_ddl;
 EXECUTE spec_stmt;
 DEALLOCATE PREPARE spec_stmt;
 
-INSERT INTO `property_types` (`name`, `value`, `is_active`) VALUES ('Farm House', 'farm_house', 1) ON DUPLICATE KEY UPDATE `name` = 'Farm House', `is_active` = 1;
+INSERT IGNORE INTO `property_types` (`name`, `value`, `is_active`) VALUES ('Farm House', 'farm_house', 1);
