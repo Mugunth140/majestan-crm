@@ -1,9 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { curatePropertyPayload, isPropertyFieldVisible as visible, isPropertyTypeAllowed, propertyTypesForListing, PROPERTY_FIELD_RULES } from "./property-form-fields";
+import { curatePropertyPayload, isPropertyFieldVisible as visible, isPropertyTypeAllowed, isRentalOnlyPropertyType, isRemovedPropertyType, propertyTypesForListing, PROPERTY_FIELD_RULES } from "./property-form-fields";
 
 const types = ["apartment", "villa", "individual_portion", "plot", "farmland", "commercial", "coworking", "industrial"];
 
 describe("Property form curation", () => {
+  it.each([null, undefined, ""])("handles an empty dropdown selection (%s) without crashing", (value) => {
+    for (const listing of ["Buy", "Rent"]) {
+      for (const field of Object.keys(PROPERTY_FIELD_RULES)) {
+        expect(visible(field, value, listing, "", null)).toBe(visible(field, "", listing));
+      }
+    }
+    expect(isRentalOnlyPropertyType(value)).toBe(false);
+    expect(isRemovedPropertyType(value)).toBe(false);
+    expect(isPropertyTypeAllowed(value, "Buy")).toBe(false);
+    expect(isPropertyTypeAllowed(value, "Rent")).toBe(false);
+  });
+
+  it("treats a cleared furnishing status as unfurnished", () => {
+    expect(visible("furnishingItemIds", "apartment", "Buy", "", null)).toBe(false);
+    expect(visible("conferenceRoom", "commercial", "Rent", "", null)).toBe(false);
+    expect(visible("privateCabins", "commercial", "Rent", "", null)).toBe(false);
+    expect(isPropertyTypeAllowed("apartment", "Buy", null)).toBe(true);
+  });
+
   it.each(types)("shows home fields only on residential types: %s", (type) => {
     const home = ["apartment", "villa", "individual_portion"].includes(type);
     for (const field of ["bedrooms", "bathrooms", "roomDimensions"]) {

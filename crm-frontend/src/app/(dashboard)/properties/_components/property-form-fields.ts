@@ -81,11 +81,15 @@ export const PROPERTY_FIELD_RULES: Record<string, FieldRule> = {
 
 export function isPropertyFieldVisible(
   field: string,
-  propertyType: string,
+  propertyType: string | null | undefined,
   listingType: string,
   tenantOccupied = "",
-  furnishingStatus = "",
+  furnishingStatus: string | null | undefined = "",
 ): boolean {
+  // Single-select controls can emit null when cleared or reset. Treat these
+  // values like an empty selection, including older drafts and API records.
+  propertyType ??= "";
+  furnishingStatus ??= "";
   if (propertyType === "coworking" && ["documentsVerification", "documentUploads", "verificationStatus", "ownershipTitleVerified", "encumbranceCertificate", "rentalAgreementDraft", "tslrFmb", "taxReceipt", "ebReceipt", "pattaChitta", "approvals", "hypothecation", "financeFacing", "fundedBy", "deviation", "areaSqft", "openSides", "availableFrom", "handoverDate", "possessionStatus"].includes(field)) return false;
   if (field === "accessibility" && propertyType === "commercial") return listingType === "Rent";
   if (field === "specialPurpose") return propertyType === "commercial" && listingType === "Rent";
@@ -159,20 +163,25 @@ export const PROPERTY_TYPE_LABELS: Record<string, string> = {
 };
 
 /** The master registry can contain old labels/aliases. PG/co-living is excluded. */
-export function isRemovedPropertyType(value: string): boolean {
+function propertyTypeKey(value: string | null | undefined): string {
+  return (value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+export function isRemovedPropertyType(value: string | null | undefined): boolean {
   return ["pg", "coliving", "pgcoliving", "payingguest", "payingguests"].includes(
-    value.toLowerCase().replace(/[^a-z0-9]/g, ""),
+    propertyTypeKey(value),
   );
 }
 
-export function isRentalOnlyPropertyType(value: string): boolean {
-  return ["coworking", "pgserviceapartment"].includes(value.toLowerCase().replace(/[^a-z0-9]/g, ""));
+export function isRentalOnlyPropertyType(value: string | null | undefined): boolean {
+  return ["coworking", "pgserviceapartment"].includes(propertyTypeKey(value));
 }
 
-export function isPropertyTypeAllowed(value: string, listingType: string, label = ""): boolean {
+export function isPropertyTypeAllowed(value: string | null | undefined, listingType: string, label: string | null | undefined = ""): boolean {
+  const normalized = propertyTypeKey(value);
+  if (!normalized) return false;
   if (isRemovedPropertyType(value) || isRemovedPropertyType(label)) return false;
-  if (listingType === "Rent" && label.toLowerCase().replace(/[^a-z0-9]/g, "") === "farmhouse") return false;
-  const normalized = value.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (listingType === "Rent" && propertyTypeKey(label) === "farmhouse") return false;
   return listingType === "Rent" ? !["farmland", "farmhouse", "investmentproperty"].includes(normalized) : !isRentalOnlyPropertyType(value);
 }
 

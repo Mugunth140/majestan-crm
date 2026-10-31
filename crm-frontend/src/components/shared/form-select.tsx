@@ -42,7 +42,7 @@ export function FormSelect({
     : { defaultValue: defaultValue === null ? undefined : defaultValue };
 
   return (
-    <Select name={name} required={required} onValueChange={onValueChange} disabled={disabled} {...selectProps}>
+    <Select name={name} required={required} onValueChange={(nextValue) => onValueChange?.(nextValue ?? "")} disabled={disabled} {...selectProps}>
       <SelectTrigger
         id={id}
         className={cn(
