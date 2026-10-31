@@ -95,4 +95,3 @@ SET @asset_column_ddl = IF(
 PREPARE asset_column_stmt FROM @asset_column_ddl;
 EXECUTE asset_column_stmt;
 DEALLOCATE PREPARE asset_column_stmt;
-
