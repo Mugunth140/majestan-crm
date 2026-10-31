@@ -1240,7 +1240,7 @@ export class LeadsService {
     // property_type enum: 'apartment','villa','plot','commercial','coworking','farmland','industrial','other','individual_portion'
     if (inquiry.property_type) {
       let mappedType = inquiry.property_type.toLowerCase();
-      const validTypes = ['apartment', 'villa', 'plot', 'commercial', 'coworking', 'farmland', 'industrial', 'other', 'individual_portion', 'investment_property', 'pg_service_apartment'];
+      const validTypes = ['apartment', 'villa', 'plot', 'commercial', 'coworking', 'farmland', 'industrial', 'other', 'individual_portion', 'investment_property', 'pg_service_apartment', 'farm_house'];
       if (validTypes.includes(mappedType)) {
         query += ` AND p.property_type = ?`;
         params.push(mappedType);

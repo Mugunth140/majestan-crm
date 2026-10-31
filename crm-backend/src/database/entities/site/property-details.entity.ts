@@ -239,7 +239,7 @@ export class PropertyDetails {
   @Column({ name: 'sf_number', type: 'varchar', length: 255, nullable: true })
   sfNumber!: string | null;
 
-  @Column({ name: 'property_use', type: 'varchar', length: 255, nullable: true })
+  @Column({ name: 'property_use', type: 'text', nullable: true })
   propertyUse!: string | null;
 
   @Column({ name: 'no_of_lifts', type: 'int', nullable: true })
@@ -366,7 +366,7 @@ export class PropertyDetails {
   @Column({ name: 'ownership_proof_verified', type: 'varchar', length: 50, nullable: true })
   ownershipProofVerified!: string | null;
 
-  @Column({ name: 'building_approval_cert', type: 'varchar', length: 50, nullable: true })
+  @Column({ name: 'building_approval_cert', type: 'text', nullable: true })
   buildingApprovalCert!: string | null;
 
   @Column({ name: 'pollution_clearance', type: 'varchar', length: 50, nullable: true })
@@ -399,6 +399,41 @@ export class PropertyDetails {
 
   @Column({ name: 'document_require', type: 'varchar', length: 255, nullable: true })
   documentRequire!: string | null;
+
+
+  @Column({ name: 'measurement_units', type: 'simple-json', nullable: true })
+  measurementUnits!: Record<string, string> | null;
+
+  @Column({ name: 'plot_facing', type: 'varchar', length: 100, nullable: true })
+  plotFacing!: string | null;
+
+  @Column({ name: 'has_ground_floor', type: 'boolean', nullable: true })
+  hasGroundFloor!: boolean | null;
+
+  @Column({ name: 'number_of_portions', type: 'int', nullable: true })
+  numberOfPortions!: number | null;
+
+  @Column({ name: 'funded_by', type: 'varchar', length: 100, nullable: true })
+  fundedBy!: string | null;
+
+
+  @Column({ name: 'container_access', type: 'varchar', length: 30, nullable: true })
+  containerAccess!: string | null;
+
+  @Column({ name: 'labor_rooms', type: 'int', nullable: true })
+  laborRooms!: number | null;
+
+  @Column({ name: 'toilets', type: 'int', nullable: true })
+  toilets!: number | null;
+
+  @Column({ name: 'borewell_count', type: 'int', nullable: true })
+  boreWellCount!: number | null;
+
+  @Column({ name: 'plot_boundaries', type: 'simple-json', nullable: true })
+  plotBoundaries!: { direction: string; length: number | null; unit: string }[] | null;
+
+  @Column({ name: 'special_purpose', type: 'varchar', length: 255, nullable: true })
+  specialPurpose!: string | null;
 
   @OneToOne(() => Property, (property) => property.propertyDetails, {
     lazy: true,

@@ -30,7 +30,7 @@ const RENAMED_DETAILS_KEYS: Record<string, string> = {
 
 // Details keys passed through unchanged (numbers coerced, see below)
 const NUMERIC_DETAILS_KEYS = new Set([
-  'bedrooms', 'bathrooms', 'areaSqft', 'parking', 'balconies', 'totalFloors',
+  'boreWellCount', 'numberOfPortions', 'bedrooms', 'bathrooms', 'areaSqft', 'parking', 'balconies', 'totalFloors',
   'carpetArea', 'superBuiltUpArea', 'builtUpArea', 'buildUpArea', 'openSides',
   'plotLength', 'plotWidth', 'plotSizeCents', 'ceilingHeightFt', 'udsArea',
   'numberOfFlats', 'towerNos', 'plotNos', 'noOfLifts', 'conferenceRoom', 'seater',
@@ -41,7 +41,7 @@ const NUMERIC_DETAILS_KEYS = new Set([
 ]);
 
 const PASSTHROUGH_DETAILS_KEYS = new Set([
-  'floorNumber', 'propertyAge', 'possessionStatus', 'waterSupply', 'areaUnit',
+  'specialPurpose', 'plotFacing', 'fundedBy', 'floorNumber', 'propertyAge', 'possessionStatus', 'waterSupply', 'areaUnit',
   'roadWidth', 'suitableFor', 'floorType', 'furnishingStatus',
   'unitNumber', 'unitType', 'architecturalStyle', 'availablePortion', 'amenities',
   'zoning', 'plotType', 'landType', 'topography', 'soilType', 'irrigation', 'fencing',
@@ -55,7 +55,7 @@ const PASSTHROUGH_DETAILS_KEYS = new Set([
 ]);
 
 const BOOLEAN_DETAILS_KEYS = new Set([
-  'furnished', 'powerBackup', 'boundaryWall', 'hasPantry', 'hasCentralAc',
+  'hasGroundFloor', 'furnished', 'powerBackup', 'boundaryWall', 'hasPantry', 'hasCentralAc',
   'heavyVehicleAccess', 'hasRestroom', 'guestParking', 'poojaRoom', 'studyRoom',
   'boreWell', 'storageTank', 'outsideParking', 'fireSafety', 'truckTrailerAccess',
   'craneAvailable', 'highSpeedWifi', 'airConditioning', 'cctvSurveillance',
@@ -66,13 +66,13 @@ const BOOLEAN_DETAILS_KEYS = new Set([
 // these names to the shared NUMERIC/PASSTHROUGH/BOOLEAN sets above — that
 // would leak industrial-only columns onto other property types.
 const INDUSTRIAL_ONLY_STR_DETAILS_KEYS = new Set([
-  'powerSupply2', 'powerSupply3', 'ownershipProofVerified',
+  'containerAccess', 'powerSupply2', 'powerSupply3', 'ownershipProofVerified',
   'buildingApprovalCert', 'pollutionClearance', 'blueprintLayout',
   'otherLegalClearance', 'otherLegalDetails', 'publicTransportAccess',
 ]);
 
 const INDUSTRIAL_ONLY_NUM_DETAILS_KEYS = new Set([
-  'truckTrailerCount',
+  'laborRooms', 'toilets', 'truckTrailerCount',
 ]);
 
 // Details keys forwarded ONLY when propertyType === 'commercial'.
@@ -121,7 +121,7 @@ const CRM_TOP_LEVEL_KEYS = new Set([
 ]);
 
 const ARRAY_DETAILS_KEYS = new Set([
-  'floorsOccupied', 'roomDimensions'
+  'plotBoundaries', 'floorsOccupied', 'roomDimensions'
 ]);
 
 function num(v: any): number | undefined {
@@ -363,6 +363,8 @@ export class PropertiesService {
         fileUrl: pf.file?.fileUrl ?? null,
         fileName: pf.file?.fileName ?? pf.title ?? null,
         mimeType: pf.file?.mimeType ?? null,
+        fileSize: pf.file?.fileSizeBytes != null ? Number(pf.file.fileSizeBytes) : null,
+        isPublic: pf.isPublic,
         documentType: pf.documentType ?? 'other',
         title: pf.title ?? null,
       })),
@@ -489,6 +491,10 @@ export class PropertiesService {
 
   private buildDetails(dto: Record<string, any>, propertyType?: unknown): Record<string, any> {
     const details: Record<string, any> = {};
+    if (dto.measurementUnits && typeof dto.measurementUnits === 'object' && !Array.isArray(dto.measurementUnits)) {
+      const keys = ['builtUpArea', 'carpetArea', 'superBuiltUpArea', 'udsArea', 'plotArea', 'coveredArea', 'openArea', 'plotSizeCents', 'pricePerSqft'];
+      details.measurementUnits = Object.fromEntries(Object.entries(dto.measurementUnits).filter(([key, unit]) => keys.includes(key) && ['Sq Ft', 'Sq M', 'Cents', 'Acres', 'Grounds'].includes(String(unit))));
+    }
     const renamedSources = new Set(Object.keys(RENAMED_DETAILS_KEYS));
     for (const [from, to] of Object.entries(RENAMED_DETAILS_KEYS)) {
       if (dto[from] === undefined) continue;
@@ -527,7 +533,7 @@ export class PropertiesService {
     }
     for (const key of PASSTHROUGH_DETAILS_KEYS) {
       if (dto[key] === undefined || renamedSources.has(key)) continue;
-      const v = str(dto[key]);
+      const v = dto[key] === '' ? '' : str(dto[key]);
       if (v !== undefined) details[key] = v;
     }
     for (const key of BOOLEAN_DETAILS_KEYS) {
@@ -545,7 +551,7 @@ export class PropertiesService {
     if (isIndustrial(propertyType ?? dto.propertyType)) {
       for (const key of INDUSTRIAL_ONLY_STR_DETAILS_KEYS) {
         if (dto[key] === undefined || key in details) continue;
-        const v = str(dto[key]);
+        const v = dto[key] === '' ? '' : str(dto[key]);
         if (v !== undefined) details[key] = v;
       }
       for (const key of INDUSTRIAL_ONLY_NUM_DETAILS_KEYS) {
@@ -558,7 +564,7 @@ export class PropertiesService {
     if (isCommercial(propertyType ?? dto.propertyType)) {
       for (const key of COMMERCIAL_ONLY_STR_DETAILS_KEYS) {
         if (dto[key] === undefined || key in details) continue;
-        const v = str(dto[key]);
+        const v = dto[key] === '' ? '' : str(dto[key]);
         if (v !== undefined) details[key] = v;
       }
       for (const key of COMMERCIAL_ONLY_NUM_DETAILS_KEYS) {
@@ -655,7 +661,7 @@ export class PropertiesService {
         fileSizeBytes: doc.fileSize,
         documentType: doc.documentType || 'other',
         title: doc.title || doc.fileName,
-        isPublic: true,
+        ...(typeof doc.isPublic === 'boolean' ? { isPublic: doc.isPublic } : {}),
       }));
     }
 
@@ -688,8 +694,8 @@ export class PropertiesService {
     if (body.propertyType === 'pg_service_apartment' && body.listingType !== 'Rent') {
       throw new BadRequestException('PG / Service Apartment is available for Rent only.');
     }
-    if (body.propertyType === 'investment_property' && body.listingType === 'Rent') {
-      throw new BadRequestException('Investment Property is available for Buy only.');
+    if (['investment_property', 'farm_house'].includes(body.propertyType) && body.listingType === 'Rent') {
+      throw new BadRequestException('This property type is available for Buy only.');
     }
     if (!(await this.canSeeContacts(reqUser))) {
       for (const k of PropertiesService.CONTACT_KEYS) delete body[k];
@@ -717,8 +723,8 @@ export class PropertiesService {
     if (body.propertyType === 'pg_service_apartment' && body.listingType !== undefined && body.listingType !== 'Rent') {
       throw new BadRequestException('PG / Service Apartment is available for Rent only.');
     }
-    if (body.propertyType === 'investment_property' && body.listingType === 'Rent') {
-      throw new BadRequestException('Investment Property is available for Buy only.');
+    if (['investment_property', 'farm_house'].includes(body.propertyType) && body.listingType === 'Rent') {
+      throw new BadRequestException('This property type is available for Buy only.');
     }
     const payload = await this.buildSitePayload(body);
     // The site API replaces the details row on PATCH. Preserve omitted details
@@ -731,6 +737,11 @@ export class PropertiesService {
           : {}),
         ...payload.details,
       };
+    }
+    // A hidden RERA field must not overwrite the existing registration value.
+    if (body.reraNumber === undefined) delete payload.reraNumber;
+    if (payload.details?.measurementUnits) {
+      payload.details.measurementUnits = { ...existing.propertyDetails?.measurementUnits, ...payload.details.measurementUnits };
     }
     delete (payload as any).propertyType;
     if (body.expectedUpdatedAt) payload.expectedUpdatedAt = body.expectedUpdatedAt;
@@ -792,7 +803,7 @@ export class PropertiesService {
 
     const VALID_PROPERTY_TYPES = new Set([
       'apartment', 'villa', 'plot', 'commercial', 'coworking',
-      'farmland', 'industrial', 'individual_portion', 'investment_property', 'pg_service_apartment', 'other',
+      'farmland', 'industrial', 'individual_portion', 'investment_property', 'pg_service_apartment', 'farm_house', 'other',
     ]);
 
     for (let idx = 0; idx < (dto.properties as any[]).length; idx++) {

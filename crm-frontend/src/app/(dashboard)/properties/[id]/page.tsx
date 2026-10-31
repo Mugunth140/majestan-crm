@@ -1,5 +1,9 @@
 "use client";
 
+import { PropertyPlotBoundaries, restorePlotBoundaries } from "../_components/PropertyPlotBoundaries";
+import { parseMultiValue } from "../_components/PropertyMultiSelect";
+import { convertRate, rateLabel, initialArea, areaInSqft, restorePlotArea } from "../_components/property-measurements";
+import { calculateRentPerSqft } from "@/lib/rental-pricing";
 import { isPropertyFieldVisible } from "../_components/property-form-fields";
 
 import { propertyStatusLabel } from "@/lib/property-status";
@@ -208,8 +212,23 @@ export default function PropertyViewPage() {
 
   const bool = (v: any) => (v === true || v === 1 || v === "1" ? "Yes" : v === false || v === 0 || v === "0" ? "No" : v);
   const type = property.propertyType;
-  const isFieldVisible = (field: string) => isPropertyFieldVisible(field, type, property.listingType === "Rent" ? "Rent" : "Buy", property.tenantOccupied);
-  const isApartmentLike = ["apartment", "villa", "individual_portion", "investment_property", "pg_service_apartment"].includes(type);
+  const isFieldVisible = (field: string) => isPropertyFieldVisible(field, type, property.listingType === "Rent" ? "Rent" : "Buy", property.tenantOccupied, det.furnishingStatus);
+  const rentArea = isFieldVisible("areaSqft") ? areaInSqft(det.areaSqft ?? "", det.areaUnit || "Sq Ft") : Number(det.builtUpArea || areaInSqft(det.areaSqft ?? "", det.areaUnit || "Sq Ft") || 0);
+  const rentPerSqft = calculateRentPerSqft(Number(property.price), rentArea ?? 0);
+  const salePricePerSqft = type === "villa" ? calculateRentPerSqft(Number(property.price), Number(det.builtUpArea || 0)) : property.pricePerSqft;
+  const displayedPriceUnit = type === "plot" ? det.measurementUnits?.pricePerSqft || "Sq Ft" : "Sq Ft";
+  const displayedPriceRate = convertRate(salePricePerSqft ?? "", "Sq Ft", displayedPriceUnit);
+  const boundarySides = restorePlotBoundaries(det.plotBoundaries, det.plotLength, det.plotWidth);
+  const hypothecated = !["", "no", "nil", "n/a", "na", "none", "-"].includes(String(property.hypothecation ?? "").trim().toLowerCase());
+  const measurement = (field: string, base = "Sq Ft") => {
+    if (det[field] == null) return undefined;
+    if (field === "plotArea") {
+      const restored = restorePlotArea(det.plotArea, det.areaUnit || "Sq Ft", det.measurementUnits ?? {});
+      return `${restored.value} ${restored.unit}`;
+    }
+    return `${initialArea(det[field], field, det.measurementUnits ?? {}, base)} ${det.measurementUnits?.[field] || base}`;
+  };
+  const isApartmentLike = ["apartment", "villa", "individual_portion", "investment_property", "pg_service_apartment", "farm_house"].includes(type);
   const isPlotLike = ["plot", "farmland"].includes(type);
 
   return (
@@ -297,15 +316,15 @@ export default function PropertyViewPage() {
             <SectionField label="Property Condition" value={property.propertyCondition} />
             </>)}
             <SectionField label="Ownership Type" value={property.ownershipType} />
-            <SectionField label="RERA Number" value={property.reraNumber} />
+            {isFieldVisible("reraNumber") && <SectionField label="RERA Number" value={property.reraNumber} />}
             {!isPlotLike && (<>
-            <SectionField label="Project Name" value={property.projectName} />
-            <SectionField label="Builder Name" value={property.builderName} />
+            {isFieldVisible("projectName") && <SectionField label="Project Name" value={property.projectName} />}
+            {isFieldVisible("builderName") && <SectionField label="Builder Name" value={property.builderName} />}
             <SectionField label="Transaction Type" value={property.transactionType} />
-            <SectionField label="Handover Date" value={property.handoverDate} />
+            {isFieldVisible("handoverDate") && (<SectionField label="Handover Date" value={property.handoverDate} />)}
             </>)}
             <SectionField label="Sale Type" value={property.saleType} />
-            <SectionField label="Available From" value={formatDate(property.availableFrom)} />
+            {isFieldVisible("availableFrom") && (<SectionField label="Available From" value={formatDate(property.availableFrom)} />)}
             <SectionField label="Available Until" value={formatDate(property.availableUntil)} />
           </Section>
 
@@ -335,16 +354,19 @@ export default function PropertyViewPage() {
         {/* Pricing + Owner */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Section title="Pricing & Commercials" icon={<IndianRupee className="h-4 w-4 text-emerald-600" />}>
+            {isFieldVisible("rentPerSqft") && (
+              <SectionField label="Rent per sqft" value={rentPerSqft === null ? undefined : `₹${rentPerSqft.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / sqft / month`} />
+            )}
             {isFieldVisible("pricePerSqft") && (
-              <SectionField label="Sqft Price" value={property.pricePerSqft != null ? `${formatPrice(Number(property.pricePerSqft))} / sq ft` : undefined} />
+              <SectionField label={type === "plot" ? `Price per ${rateLabel(displayedPriceUnit)}` : "Sqft Price"} value={displayedPriceRate != null ? `${formatPrice(displayedPriceRate)} / ${rateLabel(displayedPriceUnit)}` : undefined} />
             )}
             {isFieldVisible("expectedSalePrice") && (<SectionField label="Expected Sale Price" value={property.expectedSalePrice ? formatPrice(Number(property.expectedSalePrice)) : undefined} />)}
             {!isPlotLike && (<>
-            <SectionField label="Monthly Rent" value={property.monthlyRent ? formatPrice(Number(property.monthlyRent)) : undefined} />
+            {isFieldVisible("monthlyRent") && (<SectionField label={type === "commercial" && property.listingType !== "Rent" ? "Expected Monthly Rent" : "Monthly Rent"} value={property.monthlyRent ? formatPrice(Number(property.monthlyRent)) : undefined} />)}
             <SectionField label="Maintenance Charges" value={property.maintenanceCharges} />
             {isFieldVisible("securityDeposit") && (<SectionField label="Security Deposit" value={property.securityDeposit} />)}
             </>)}
-            <SectionField label="Booking Amount" value={property.bookingAmount} />
+            {isFieldVisible("bookingAmount") && (<SectionField label="Booking Amount" value={property.bookingAmount} />)}
             <SectionField label="Brokerage Type" value={property.brokerageType} />
             <SectionField label="Brokerage Value" value={property.brokerageValue} />
             {isFieldVisible("lockInPeriod") && (
@@ -364,15 +386,14 @@ export default function PropertyViewPage() {
                 <SectionField label="Owner Name" value={property.ownerName} />
                 <SectionField label="Owner Phone" value={property.ownerPhone} />
                 <SectionField label="Owner Email" value={property.ownerEmail} />
-                {!isPlotLike && (
-                <SectionField label="Tenant Occupied" value={property.tenantOccupied} />
-                )}
+                {isFieldVisible("tenantOccupied") && <SectionField label="Tenant Occupied" value={property.tenantOccupied} />}
+                <SectionField label="Alternative Name" value={property.alternateName} />
+                <SectionField label="Alternative Phone" value={property.alternatePhone} />
+                <SectionField label="Alternative Email" value={property.alternateEmail} />
                 <SectionField label="Agent Name" value={property.agentName} />
                 <SectionField label="Agency" value={property.agencyName} />
                 <SectionField label="Commission Terms" value={property.commissionTerms} />
-                <SectionField label="Alternate Name" value={property.alternateName} />
-                <SectionField label="Alternate Phone" value={property.alternatePhone} />
-                <SectionField label="Alternate Email" value={property.alternateEmail} />
+
               </>
             )}
           </Section>
@@ -385,7 +406,7 @@ export default function PropertyViewPage() {
             {isFieldVisible("bedrooms") && (<SectionField label="Bedrooms" value={det.bedrooms} />)}
             {isFieldVisible("bathrooms") && (<SectionField label="Bathrooms" value={det.bathrooms} />)}
             </>)}
-            <SectionField label="Area" value={det.areaSqft ? `${det.areaSqft} ${det.areaUnit || "Sq Ft"}` : undefined} />
+            {isFieldVisible("areaSqft") && (<SectionField label={type === "plot" ? "Total Project Area" : "Area"} value={det.areaSqft ? `${det.areaSqft} ${det.areaUnit || "Sq Ft"}` : undefined} />)}
             {!isPlotLike && (<>
             {isFieldVisible("furnished") && (<SectionField label="Furnished" value={bool(det.furnished)} />)}
             {isFieldVisible("furnishingStatus") && (<SectionField label="Furnishing Status" value={det.furnishingStatus} />)}
@@ -393,17 +414,23 @@ export default function PropertyViewPage() {
             <SectionField label="Facing" value={det.propertyFacing} />
             {!isPlotLike && (<>
             <SectionField label="Property Age" value={det.propertyAge} />
-            <SectionField label="Possession Status" value={det.possessionStatus} />
+            {isFieldVisible("possessionStatus") && (<SectionField label="Possession Status" value={det.possessionStatus} />)}
             </>)}
-            <SectionField label="Open Sides" value={det.openSides} />
+            {isFieldVisible("openSides") && (<SectionField label="Open Sides" value={det.openSides} />)}
             {!isPlotLike && (<>
             <SectionField label="Suitable For" value={det.suitableFor} />
-            <SectionField label="Floor No" value={det.floorNumber} />
+            <SectionField label={type === "commercial" ? "Available Floor Number" : "Floor No"} value={det.floorNumber} />
+            {["villa", "individual_portion", "investment_property", "farm_house"].includes(type) && <SectionField label="Plot Area" value={measurement("plotArea")} />}
             <SectionField label="Total Floors" value={det.totalFloors} />
-            <SectionField label="Built-up Area" value={det.builtUpArea} />
-            <SectionField label="Carpet Area" value={det.carpetArea} />
-            <SectionField label="Super Built-up" value={det.superBuiltUpArea} />
-            <SectionField label="UDS Area" value={det.udsArea} />
+            {isFieldVisible("hasGroundFloor") && <SectionField label="Includes Ground Floor" value={bool(det.hasGroundFloor)} />}
+            {isFieldVisible("plotFacing") && <SectionField label="Plot Facing" value={det.plotFacing} />}
+            {isFieldVisible("numberOfPortions") && <SectionField label="No of Portions" value={det.numberOfPortions} />}
+            {isFieldVisible("parking") && <SectionField label="No of Parking" value={det.parking} />}
+            {isFieldVisible("noOfLifts") && type !== "commercial" && <SectionField label="No of Lifts" value={det.noOfLifts} />}
+            <SectionField label="Built-up Area" value={measurement("builtUpArea")} />
+            <SectionField label="Carpet Area" value={measurement("carpetArea")} />
+            {isFieldVisible("superBuiltUpArea") && (<SectionField label="Super Built-up" value={measurement("superBuiltUpArea")} />)}
+            <SectionField label="UDS Area" value={measurement("udsArea")} />
             <SectionField label="Balconies" value={det.balconies} />
             <SectionField label="Parking" value={det.parking} />
             <SectionField label="Car Parking" value={det.carParking} />
@@ -432,32 +459,36 @@ export default function PropertyViewPage() {
                 <SectionField label="Community Facilities" value={det.communityFacilities} />
                 <SectionField label="Amenity Notes" value={det.amenities} />
               </>)}
-              {isPlotLike && (<>
-                <SectionField label="Plot Size (Cents)" value={det.plotSizeCents} />
-                <SectionField label="Plot Nos" value={det.plotNos} />
-                <SectionField label="Zoning" value={det.zoning} />
+              {(isPlotLike || type === "farm_house") && (<>
+                {isFieldVisible("plotSizeCents") && (<SectionField label="Plot Size (Cents)" value={det.plotSizeCents} />)}
+                <SectionField label="No of Plots" value={det.plotNos} />
+                {isFieldVisible("zoning") && (<SectionField label="Zoning" value={det.zoning} />)}
                 <SectionField label="Plot Type" value={det.plotType} />
                 <SectionField label="SF Number" value={det.sfNumber} />
                 <SectionField label="Land Type" value={det.landType} />
-                <SectionField label="Topography" value={det.topography} />
+                {isFieldVisible("topography") && (<SectionField label="Topography" value={det.topography} />)}
                 <SectionField label="Soil Type" value={det.soilType} />
                 <SectionField label="Irrigation" value={det.irrigation} />
-                <SectionField label="Fencing" value={det.fencing} />
+                {isFieldVisible("fencing") && (<SectionField label="Fencing" value={det.fencing} />)}
                 <SectionField label="Boundary Wall" value={bool(det.boundaryWall)} />
-                <SectionField label="Plot Length" value={det.plotLength} />
-                <SectionField label="Plot Width" value={det.plotWidth} />
+                {isFieldVisible("plotLength") && (<SectionField label="Plot Length" value={det.plotLength} />)}
+                {isFieldVisible("plotWidth") && (<SectionField label="Plot Width" value={det.plotWidth} />)}
                 <SectionField label="Water Sources" value={det.waterSources} />
                 <SectionField label="Crop Suitability" value={det.cropSuitability} />
                 <SectionField label="Existing Plantation" value={det.existingPlantation} />
                 <SectionField label="Bore Well" value={bool(det.boreWell)} />
+                {det.boreWell && <SectionField label="No of Borewells" value={det.boreWellCount} />}
                 <SectionField label="Storage Tank" value={bool(det.storageTank)} />
               </>)}
+              {type === "plot" && boundarySides.some((side) => side.length) && <div className="sm:col-span-2"><PropertyPlotBoundaries value={boundarySides} readOnly /></div>}
               {type === "commercial" && (<>
-                <SectionField label="Property Use" value={det.propertyUse} />
+                {isFieldVisible("specialPurpose") && <SectionField label="Special Purpose" value={det.specialPurpose} />}
+                {property.listingType === "Rent" && <SectionField label="Property Accessibility" value={det.accessibility} />}
+                <SectionField label="Property Use" value={det.propertyUse ? parseMultiValue(det.propertyUse).join(", ") : undefined} />
                 <SectionField label="No. of Lifts" value={det.noOfLifts} />
                 <SectionField label="Dimension" value={det.dimension} />
                 <SectionField label="Frontage" value={det.frontage} />
-                <SectionField label="Floors Occupied" value={Array.isArray(det.floorsOccupied) ? det.floorsOccupied.join(", ") : det.floorsOccupied} />
+
                 <SectionField label="Visitors Parking" value={det.visitorsParking} />
                 <SectionField label="Outside Parking" value={bool(det.outsideParking)} />
                 <SectionField label="Fire Safety" value={bool(det.fireSafety)} />
@@ -465,23 +496,23 @@ export default function PropertyViewPage() {
                 <SectionField label="Electricity" value={det.electricityConnection} />
                 <SectionField label="Central AC" value={bool(det.hasCentralAc)} />
                 <SectionField label="Pantry" value={bool(det.hasPantry)} />
-                <SectionField label="Conference Rooms" value={det.conferenceRoom} />
-                <SectionField label="Seater" value={det.seater} />
+                {isFieldVisible("conferenceRoom") && (<SectionField label={type === "commercial" && property.listingType === "Rent" ? "No of Conference Hall" : "Conference Rooms"} value={det.conferenceRoom} />)}
+                {isFieldVisible("seater") && (<SectionField label={type === "commercial" && property.listingType === "Rent" ? "No of Seaters" : "Seater"} value={det.seater} />)}
                 <SectionField label="Tenant Mix" value={det.tenantMix} />
                 <SectionField label="No. of Towers" value={det.towerNos} />
-                <SectionField label="Plot Area" value={det.plotArea} />
+                <SectionField label="Plot Area" value={measurement("plotArea")} />
                 <SectionField label="Water Supply" value={det.waterSupply} />
                 <SectionField label="Lift Facility" value={bool(det.elevatorAccess)} />
-                <SectionField label="Private Cabins" value={det.privateCabins} />
+                {isFieldVisible("privateCabins") && (<SectionField label={type === "commercial" && property.listingType === "Rent" ? "No of Cabins" : "Private Cabins"} value={det.privateCabins} />)}
                 <SectionField label="Fully Furnished" value={bool(det.furnished)} />
                 <SectionField label="Shared Washrooms" value={det.sharedWashrooms} />
                 <SectionField label="Individual Washrooms" value={det.individualWashrooms} />
-                <SectionField label="Construction Date" value={det.constructionDate} />
-                <SectionField label="Documents Required" value={det.documentRequire} />
+                {isFieldVisible("constructionDate") && (<SectionField label="Construction Date" value={det.constructionDate} />)}
+                {isFieldVisible("documentRequire") && (<SectionField label="Documents Required" value={det.documentRequire} />)}
               </>)}
               {type === "coworking" && (<>
                 <SectionField label="Workstations" value={det.availableWorkstations} />
-                <SectionField label="Private Cabins" value={det.privateCabins} />
+                {isFieldVisible("privateCabins") && (<SectionField label="Private Cabins" value={det.privateCabins} />)}
                 <SectionField label="Meeting Rooms" value={det.meetingRooms} />
                 <SectionField label="Min Seats" value={det.minSeats} />
                 <SectionField label="Rent / Seat" value={det.rentPerSeat} />
@@ -499,10 +530,14 @@ export default function PropertyViewPage() {
                 <SectionField label="Accessibility" value={det.accessibility} />
               </>)}
               {type === "industrial" && (<>
+                <SectionField label="Plot Area" value={measurement("plotArea")} />
+                <SectionField label="Container Access" value={det.containerAccess} />
+                <SectionField label="No of Labor Rooms" value={det.laborRooms} />
+                <SectionField label="No of Toilets" value={det.toilets} />
                 <SectionField label="Building Type" value={det.buildingType} />
-                <SectionField label="Property Use" value={det.propertyUse} />
-                <SectionField label="Covered Area" value={det.coveredArea} />
-                <SectionField label="Open Area" value={det.openArea} />
+                <SectionField label="Property Use" value={det.propertyUse ? parseMultiValue(det.propertyUse).join(", ") : undefined} />
+                <SectionField label="Covered Area" value={measurement("coveredArea")} />
+                <SectionField label="Open Area" value={measurement("openArea")} />
                 <SectionField label="Ceiling Height" value={det.ceilingHeightFt} />
                 <SectionField label="Floor Type" value={det.floorType} />
                 <SectionField label="No. of Bays" value={det.numberOfBays} />
@@ -526,12 +561,12 @@ export default function PropertyViewPage() {
                 <SectionField label="Truck/Trailer Count" value={det.truckTrailerCount} />
                 <SectionField label="Public Transport Access" value={det.publicTransportAccess} />
                 <SectionField label="Ownership Proof Verified" value={det.ownershipProofVerified} />
-                <SectionField label="Building Approval Certification" value={det.buildingApprovalCert} />
+                <SectionField label="Building Approval Certification" value={det.buildingApprovalCert ? parseMultiValue(det.buildingApprovalCert).join(", ") : undefined} />
                 <SectionField label="Pollution Clearance" value={det.pollutionClearance} />
-                <SectionField label="Blueprint / Layout" value={det.blueprintLayout} />
+
                 <SectionField label="Other Legal Clearance" value={det.otherLegalClearance} />
                 <SectionField label="Other Legal Details" value={det.otherLegalDetails} />
-                <SectionField label="Available Visit Time" value={property.availableVisitTime} />
+
               </>)}
             </Section>
           )}
@@ -591,24 +626,25 @@ export default function PropertyViewPage() {
         )}
 
         {/* Verification + Market */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Section title="Documents & Verification" icon={<ShieldCheck className="h-4 w-4 text-green-600" />}>
+        <div className={`grid grid-cols-1 ${isFieldVisible("documentsVerification") ? "md:grid-cols-2" : ""} gap-6`}>
+          {isFieldVisible("documentsVerification") && (<Section title="Documents & Verification" icon={<ShieldCheck className="h-4 w-4 text-green-600" />}>
             <SectionField label="Ownership Title" value={property.ownershipTitleVerified} />
             <SectionField label="Encumbrance Cert." value={property.encumbranceCertificate} />
-            {!isPlotLike && (
-            <SectionField label="Rental Agreement" value={property.rentalAgreementDraft} />
+            {!isPlotLike && isFieldVisible("rentalAgreementDraft") && (
+              <SectionField label="Rental Agreement" value={property.rentalAgreementDraft} />
             )}
-            <SectionField label="TSLR / FMB" value={property.tslrFmb} />
+            {isFieldVisible("tslrFmb") && (<SectionField label="TSLR / FMB" value={property.tslrFmb} />)}
             <SectionField label="Tax Receipt" value={property.taxReceipt} />
             {!isPlotLike && (
             <SectionField label="EB Receipt" value={property.ebReceipt} />
             )}
-            <SectionField label="Patta / Chitta" value={property.pattaChitta} />
+            {isFieldVisible("pattaChitta") && (<SectionField label="Patta / Chitta" value={property.pattaChitta} />)}
             <SectionField label="Approvals" value={property.approvals} />
-            <SectionField label="Finance Facing" value={property.financeFacing} />
-            <SectionField label="Hypothecation" value={property.hypothecation} />
-            <SectionField label="Deviation" value={property.deviation} />
-          </Section>
+            {isFieldVisible("financeFacing") && hypothecated && <SectionField label="Finance" value={property.financeFacing} />}
+            {isFieldVisible("fundedBy") && hypothecated && <SectionField label="Funded By" value={det.fundedBy} />}
+            {isFieldVisible("hypothecation") && (<SectionField label="Hypothecation" value={property.hypothecation} />)}
+            {isFieldVisible("deviation") && (<SectionField label="Deviation" value={property.deviation} />)}
+          </Section>)}
 
           <Section title="Market Analysis" icon={<TrendingUp className="h-4 w-4 text-rose-500" />}>
             <SectionField label="Comparative Price" value={property.comparativePrice} />
@@ -731,7 +767,7 @@ export default function PropertyViewPage() {
         </Dialog>
 
         {/* Documents */}
-        {documents.length > 0 && (
+        {isFieldVisible("documentUploads") && documents.length > 0 && (
           <div className="bg-card border rounded-2xl p-6 shadow-sm">
             <h3 className="text-base font-bold text-foreground border-b pb-3 mb-4 flex items-center gap-2">
               <FileText className="h-4 w-4 text-emerald-500" /> Documents
@@ -767,7 +803,7 @@ export default function PropertyViewPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
             <SectionField label="ID" value={property.id} />
             <SectionField label="Slug" value={property.slug} />
-            <SectionField label="Verification" value={property.verificationStatus} />
+            {isFieldVisible("verificationStatus") && (<SectionField label="Verification" value={property.verificationStatus} />)}
             <SectionField label="Approval" value={property.approvalStatus} />
             <SectionField label="Created At" value={formatDate(property.createdAt)} />
             <SectionField label="Updated At" value={formatDate(property.updatedAt)} />

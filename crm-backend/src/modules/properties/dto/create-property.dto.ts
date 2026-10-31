@@ -1,5 +1,9 @@
 import {
   IsArray,
+  IsIn,
+  ValidateNested,
+  ArrayMinSize,
+  ArrayMaxSize,
   IsBoolean,
   IsInt,
   IsNumber,
@@ -7,10 +11,53 @@ import {
   IsOptional,
   IsString,
   Min,
+  Max,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
+export class PlotBoundaryDto {
+  @IsIn(['North', 'North East', 'East', 'South East', 'South', 'South West', 'West', 'North West']) direction!: string;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0) length?: number | null;
+  @IsIn(['ft', 'm']) unit!: string;
+}
+
+export class PropertyLocationDataDto {
+  @IsOptional() @IsString() address?: string;
+  @IsOptional() @IsString() pincode?: string;
+  @IsOptional() @IsObject() localityData?: Record<string, unknown>;
+  @IsOptional() @IsNumber()
+  @Min(-90, { message: 'Latitude must be between -90 and 90 degrees.' })
+  @Max(90, { message: 'Latitude must be between -90 and 90 degrees.' })
+  latitude?: number;
+  @IsOptional() @IsNumber()
+  @Min(-180, { message: 'Longitude must be between -180 and 180 degrees.' })
+  @Max(180, { message: 'Longitude must be between -180 and 180 degrees.' })
+  longitude?: number;
+}
+
 export class CreatePropertyDto {
+  @IsOptional() @IsString() specialPurpose?: string;
+  @IsOptional() @IsString() containerAccess?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) laborRooms?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) toilets?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) boreWellCount?: number;
+  @IsOptional() @IsArray() @ArrayMinSize(4) @ArrayMaxSize(4) @ValidateNested({ each: true }) @Type(() => PlotBoundaryDto) plotBoundaries?: PlotBoundaryDto[];
+
+  @IsOptional() @IsObject()
+  measurementUnits?: Record<string, string>;
+
+  @IsOptional() @IsString()
+  plotFacing?: string;
+
+  @IsOptional() @IsBoolean()
+  hasGroundFloor?: boolean;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0)
+  numberOfPortions?: number;
+
+  @IsOptional() @IsString()
+  fundedBy?: string;
+
   @IsString()
   title!: string;
 
@@ -18,7 +65,7 @@ export class CreatePropertyDto {
   listingType!: 'Sell' | 'Rent';
 
   @IsString()
-  propertyType!: 'apartment' | 'villa' | 'plot' | 'commercial' | 'coworking' | 'farmland' | 'industrial' | 'individual_portion' | 'investment_property' | 'pg_service_apartment';
+  propertyType!: 'apartment' | 'villa' | 'plot' | 'commercial' | 'coworking' | 'farmland' | 'industrial' | 'individual_portion' | 'investment_property' | 'pg_service_apartment' | 'farm_house';
 
   @IsOptional() @Type(() => Number) @IsNumber()
   price!: number;
@@ -100,8 +147,8 @@ export class CreatePropertyDto {
   @IsOptional() @IsArray()
   faqs?: { question: string; answer: string; section?: string }[];
 
-  @IsOptional() @IsObject()
-  locationData?: { address?: string; latitude?: number; longitude?: number };
+  @IsOptional() @IsObject() @ValidateNested() @Type(() => PropertyLocationDataDto)
+  locationData?: PropertyLocationDataDto;
 
   @IsOptional() @IsString()
   maintenanceCharges?: string;

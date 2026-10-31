@@ -105,3 +105,86 @@ describe('Sqft Price', () => {
     expect(payload.expectedSalePrice).toBeUndefined();
   });
 });
+
+describe('Hidden rental registration fields', () => {
+  it('does not reset omitted RERA while editing a rental', async () => {
+    const { service, siteApi } = setup('commercial', {});
+    await service.update(7, { listingType: 'Rent', price: 30000 });
+    expect(siteApi.patch.mock.calls[0][1]).not.toHaveProperty('reraNumber');
+    expect(siteApi.patch.mock.calls[0][1].builderName).toBeUndefined();
+    expect(siteApi.patch.mock.calls[0][1].projectName).toBeUndefined();
+  });
+  it('still applies explicitly submitted RERA changes', async () => {
+    const { service, siteApi } = setup('apartment', {});
+    await service.update(7, { reraNumber: 'Registered' });
+    expect(siteApi.patch.mock.calls[0][1].reraNumber).toBe('Registered');
+  });
+});
+
+describe('Fine-grained property specifications', () => {
+  it('saves new counts, ground-floor flag, plot facing, units and funding source', async () => {
+    const { service, siteApi } = setup('villa', { measurementUnits: { carpetArea: 'Sq M' } });
+    await service.update(7, { builtUpArea: 4356, measurementUnits: { builtUpArea: 'Cents' }, plotFacing: 'East', hasGroundFloor: false, numberOfPortions: 3, fundedBy: 'Bank', parking: 2, noOfLifts: 1 });
+    expect(siteApi.patch).toHaveBeenCalledWith('/admin/properties/villa/7', expect.objectContaining({
+      details: expect.objectContaining({ buildUpArea: 4356, measurementUnits: { carpetArea: 'Sq M', builtUpArea: 'Cents' }, plotFacing: 'East', hasGroundFloor: false, numberOfPortions: 3, fundedBy: 'Bank', parking: 2, noOfLifts: 1 }),
+    }));
+  });
+  it('retains saved specification additions on unrelated partial edits', async () => {
+    const { service, siteApi } = setup('individual_portion', { numberOfPortions: 4, hasGroundFloor: true, plotFacing: 'West', fundedBy: 'NDFC', measurementUnits: { plotArea: 'Acres' } });
+    await service.update(7, { bedrooms: 3 });
+    expect(siteApi.patch.mock.calls[0][1].details).toMatchObject({ numberOfPortions: 4, hasGroundFloor: true, plotFacing: 'West', fundedBy: 'NDFC', measurementUnits: { plotArea: 'Acres' } });
+  });
+});
+
+describe('Industrial and land field persistence', () => {
+  it('preserves long multi-select values, industrial counts and rate units', async () => {
+    const { service, siteApi } = setup('industrial', {});
+    const certificates = 'DTCP / Local Planning Approved Plan, TNPCB CTO (Consent to Operate), PESO License (Chemicals & Explosives)';
+    await service.update(7, { propertyUse: 'General Warehousing, Logistics & Distribution', buildingApprovalCert: certificates, containerAccess: '40 ft', laborRooms: 3, toilets: 4, plotArea: '4800', builtUpArea: 2400, carpetArea: 2100, measurementUnits: { openArea: 'Grounds', pricePerSqft: 'Acres' } });
+    expect(siteApi.patch.mock.calls[0][1].details).toMatchObject({ propertyUse: 'General Warehousing, Logistics & Distribution', buildingApprovalCert: certificates, containerAccess: '40 ft', laborRooms: 3, toilets: 4, plotArea: 4800, buildUpArea: 2400, carpetArea: 2100, measurementUnits: { openArea: 'Grounds', pricePerSqft: 'Acres' } });
+  });
+  it('keeps four boundary directions and nullable lengths through mapping', async () => {
+    const { service, siteApi } = setup('plot', {});
+    const boundaries = ['North East', 'East', 'South', 'West'].map((direction, index) => ({ direction, length: index === 0 ? 42.5 : null, unit: 'ft' }));
+    await service.update(7, { plotBoundaries: boundaries, pricePerSqft: 100, measurementUnits: { pricePerSqft: 'Grounds' } });
+    expect(siteApi.patch.mock.calls[0][1].details).toMatchObject({ plotBoundaries: boundaries, measurementUnits: { pricePerSqft: 'Grounds' } });
+    expect(siteApi.patch.mock.calls[0][1].pricePerSqft).toBe('100');
+  });
+  it('saves combined Farm House fields and rejects rental creates and edits', async () => {
+    const { service, siteApi } = setup('farm_house', {});
+    await service.create({ title: 'Farm home', listingType: 'Sell', propertyType: 'farm_house', cityId: 1, price: 9000000, bedrooms: 3, cropSuitability: 'Coconut', boreWell: true, boreWellCount: 2 });
+    expect(siteApi.post).toHaveBeenCalledWith('/admin/properties/farm_house', expect.objectContaining({ details: expect.objectContaining({ bedrooms: 3, cropSuitability: 'Coconut', boreWell: true, boreWellCount: 2 }) }));
+    await expect(service.update(7, { listingType: 'Rent' })).rejects.toThrow('Buy only');
+    await expect(service.create({ title: 'Farm rent', listingType: 'Rent', propertyType: 'farm_house', cityId: 1, price: 10000 })).rejects.toThrow('Buy only');
+  });
+});
+
+describe('Commercial rental classification', () => {
+  it('saves separate use, special purpose and accessibility values', async () => {
+    const { service, siteApi } = setup('commercial', {});
+    await service.update(7, { listingType: 'Rent', propertyUse: 'Corporate Office', specialPurpose: 'Gym / Fitness Center', accessibility: 'On Road', furnishingStatus: 'SEMI FURNISHED', conferenceRoom: 2, privateCabins: 3, seater: 20 });
+    expect(siteApi.patch.mock.calls[0][1].details).toMatchObject({ propertyUse: 'Corporate Office', specialPurpose: 'Gym / Fitness Center', accessibility: 'On Road', conferenceRoom: 2, privateCabins: 3, seater: 20 });
+  });
+  it('preserves classification values on a partial update', async () => {
+    const { service, siteApi } = setup('commercial', { specialPurpose: 'Cafe / Coffee Shop', accessibility: 'Inside Colony' });
+    const result = await service.update(7, { price: 30000 });
+    expect(siteApi.patch.mock.calls[0][1]).not.toHaveProperty('details');
+    expect(result.propertyDetails).toMatchObject({ specialPurpose: 'Cafe / Coffee Shop', accessibility: 'Inside Colony' });
+  });
+});
+
+describe('Explicit curation removals', () => {
+  it('clears visible multi selections without clearing omitted legacy details', async () => {
+    const { service, siteApi } = setup('industrial', { propertyUse: 'Warehousing', buildingApprovalCert: 'Fire NOC', soilType: 'Imported' });
+    await service.update(7, { propertyUse: '', buildingApprovalCert: '', approvals: '', hypothecation: 'No' });
+    expect(siteApi.patch.mock.calls[0][1]).toMatchObject({
+      approvals: null, hypothecation: 'No',
+      details: { propertyUse: '', buildingApprovalCert: '', soilType: 'Imported' },
+    });
+  });
+  it('does not default document visibility to public', async () => {
+    const { service, siteApi } = setup('apartment', {});
+    await service.update(7, { documents: [{ fileKey: 'private.pdf', fileName: 'Private' }] });
+    expect(siteApi.patch.mock.calls[0][1].documents[0]).not.toHaveProperty('isPublic');
+  });
+});

@@ -34,18 +34,18 @@ describe("Property form curation", () => {
 
   it.each(types)("separates sale and rental financial fields: %s", (type) => {
     for (const field of ["bookingAmount", "expectedSalePrice", "registrationCharge", "timeForRegistration", "saleType", "ownershipType", "modeOfPayment", "hypothecation", "financeFacing", "tslrFmb"]) {
-      expect(visible(field, type, "Buy")).toBe(type !== "coworking" && (field !== "expectedSalePrice" || !["commercial", "industrial"].includes(type)));
+      expect(visible(field, type, "Buy")).toBe(type !== "coworking" && (field !== "expectedSalePrice" || !["commercial", "industrial", "villa"].includes(type)));
       expect(visible(field, type, "Rent")).toBe(false);
     }
     for (const field of ["securityDeposit", "lockInPeriod", "rentalAgreementDraft"]) {
       expect(visible(field, type, "Buy")).toBe(false);
-      expect(visible(field, type, "Rent")).toBe(true);
+      expect(visible(field, type, "Rent")).toBe(field !== "rentalAgreementDraft" || type !== "coworking");
     }
   });
 
   it("shows one monthly rent input for rentals and current rent for occupied sales", () => {
     expect(visible("monthlyRent", "commercial", "Rent")).toBe(false);
-    expect(visible("monthlyRent", "commercial", "Buy", "No")).toBe(false);
+    expect(visible("monthlyRent", "commercial", "Buy", "No")).toBe(true);
     expect(visible("monthlyRent", "commercial", "Buy", "Yes")).toBe(true);
     expect(visible("monthlyRent", "plot", "Buy", "Yes")).toBe(false);
   });
@@ -54,7 +54,7 @@ describe("Property form curation", () => {
     expect(visible("furnishingItemIds", "industrial", "Rent")).toBe(false);
     expect(visible("furnishingStatus", "industrial", "Rent")).toBe(false);
     expect(visible("amenityIds", "industrial", "Rent")).toBe(true);
-    expect(visible("furnishingItemIds", "coworking", "Rent")).toBe(true);
+    expect(visible("furnishingItemIds", "coworking", "Rent", "", "FULLY FURNISHED")).toBe(true);
   });
 
   it("keeps hidden values in state while omitting them from requests", () => {
@@ -116,7 +116,57 @@ describe("PG / Service Apartment", () => {
   });
   it("uses exactly the Apartment rental field profile", () => {
     for (const field of Object.keys(PROPERTY_FIELD_RULES)) {
-      expect(visible(field, "pg_service_apartment", "Rent"), field).toBe(visible(field, "apartment", "Rent"));
+      expect(visible(field, "pg_service_apartment", "Rent"), field).toBe(["builderName", "projectName"].includes(field) ? false : visible(field, "apartment", "Rent"));
     }
+  });
+});
+
+
+describe("Rental listing requirements", () => {
+  it.each(["farm_house", "farmhouse", "Farm House", "farm-house"])("excludes Farm House aliases from rentals: %s", (value) => {
+    expect(isPropertyTypeAllowed(value, "Rent")).toBe(false);
+    expect(isPropertyTypeAllowed(value, "Buy")).toBe(true);
+  });
+  it("also filters Farm House when a master option uses a custom value", () => {
+    expect(isPropertyTypeAllowed("custom", "Rent", "Farm House")).toBe(false);
+    expect(isPropertyTypeAllowed("custom", "Buy", "Farm House")).toBe(true);
+    expect(propertyTypesForListing([{ value: "custom", label: "Farm House" }], "Rent")).toEqual([]);
+  });
+  it.each([...types, "pg_service_apartment"])("curates rental project and RERA fields for %s", (type) => {
+    const hasProject = ["apartment", "villa"].includes(type);
+    expect(visible("reraNumber", type, "Rent")).toBe(false);
+    expect(visible("builderName", type, "Rent")).toBe(hasProject);
+    expect(visible("projectName", type, "Rent")).toBe(hasProject);
+    const payload = curatePropertyPayload({ reraNumber: "Legacy RERA", builderName: "Builder", projectName: "Project", price: 24000 }, type, "Rent");
+    expect(payload).toEqual(hasProject ? { builderName: "Builder", projectName: "Project", price: 24000 } : { price: 24000 });
+    expect(visible("rentPerSqft", type, "Rent")).toBe(type !== "coworking");
+  });
+});
+
+describe("Farm House and revised land rules", () => {
+  it("allows Farm House only on Buy and gives it both home and farm fields", () => {
+    expect(isPropertyTypeAllowed("farm_house", "Buy")).toBe(true);
+    expect(isPropertyTypeAllowed("farm_house", "Rent")).toBe(false);
+    for (const field of ["bedrooms", "bathrooms", "cropSuitability", "existingPlantation", "irrigation", "boreWellCount", "numberOfPortions"]) expect(visible(field, "farm_house", "Buy"), field).toBe(true);
+    for (const field of ["plotSizeCents", "zoning", "plotNos", "numberOfFlats"]) expect(visible(field, "farm_house", "Buy"), field).toBe(false);
+  });
+  it("preserves hidden furnishing selections in memory but excludes them from requests", () => {
+    const payload = { furnishingItemIds: [3, 8], bedrooms: 2 };
+    expect(curatePropertyPayload(payload, "apartment", "Buy", "", "UNFURNISHED")).toEqual({ bedrooms: 2 });
+    expect(curatePropertyPayload(payload, "apartment", "Buy", "", "SEMI FURNISHED")).toEqual(payload);
+    expect(payload.furnishingItemIds).toEqual([3, 8]);
+  });
+});
+
+describe("Commercial rental and coworking save rules", () => {
+  it("omits hidden office counts and sale-only fields from unfurnished rental requests", () => {
+    const payload = { conferenceRoom: 2, privateCabins: 3, seater: 10, constructionDate: "2022", documentRequire: "Old note", specialPurpose: "Gym / Fitness Center", accessibility: "On Road" };
+    expect(curatePropertyPayload(payload, "commercial", "Rent", "", "UNFURNISHED")).toEqual({ specialPurpose: "Gym / Fitness Center", accessibility: "On Road" });
+    expect(curatePropertyPayload(payload, "commercial", "Rent", "", "SEMI FURNISHED")).toMatchObject({ conferenceRoom: 2, privateCabins: 3, seater: 10 });
+  });
+  it("omits coworking verification metadata while retaining floor plans", () => {
+    const payload = { ownershipTitleVerified: "Yes", approvals: "CMDA", availableFrom: "2026-12-01", possessionStatus: "Ready", openSides: 2, areaSqft: 1200, price: 30000 };
+    expect(curatePropertyPayload(payload, "coworking", "Rent")).toEqual({ price: 30000 });
+    expect(visible("floorPlans", "coworking", "Rent")).toBe(true);
   });
 });

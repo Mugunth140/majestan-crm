@@ -108,3 +108,109 @@ infra-managed deployment, copy them to `infra/migrations/` and run
 check for existing enum values/columns so either migration channel can run first.
 The SQL migrations also seed the CRM master registry; apply them before using
 the new categories in CRM. They have already been applied locally.
+
+## Rental refinements
+
+Rent options exclude Farm House (including aliases and master labels) as well as
+Farmland and Investment Property. Rentals hide RERA; Builder Name and Project
+Name appear only for Apartment and Villa rentals. Hidden saved values remain
+stored, including RERA when a partial rental save omits it.
+
+All rental types except Coworking show a read-only Rent per sqft value derived
+from the current monthly rent and Area. Square metres, acres and cents are
+converted to square feet before division. Missing/invalid rent, area or unknown
+legacy units leave the rate empty. The rate is recalculated from saved inputs
+on the details page rather than persisted as a second potentially stale amount.
+Coworking retains its existing Rent per Seat field.
+
+## Specification and verification refinement
+
+- Common specifications are embedded in each type's details card. Room
+  dimensions and floor plans share a single section. Alternate contact name,
+  phone and email appear under Owner with existing contact permissions.
+- All area inputs offer sqft, sqm, cents and acres. Named measurements are saved
+  as canonical sqft (plot size remains canonical cents) with their chosen units
+  in `measurement_units`; changing units converts the value. The searchable
+  base area is derived from built-up area where its standalone input is hidden.
+- Tenant Occupied appears only on rentals. Commercial and industrial omit the
+  furnishing items section; their existing selections are preserved on edits.
+- Apartment rentals omit possession status, super built-up area and general
+  Area; they add numeric lift and parking counts. PG / Service Apartment
+  inherits that Apartment rental specification profile.
+- Villa omits general Area and Expected Sale Price. Its automatic rate uses
+  sale price divided by built-up area, as confirmed, while plot area has a
+  separate unit selector and facing. Includes ground floor is stored separately
+  from Total Floors.
+- Independent House (and its Investment Property profile) adds No of Portions.
+- Commercial adds plot, built-up, carpet and UDS measurements, omits Floors
+  Occupied, labels floor number Available Floor Number, and labels sale income
+  Expected Monthly Rent.
+- Approvals is a multiselect with CMDA, LPA, DTCP, Corporation Approved and
+  Village Panchayat; legacy approvals remain selectable. Ownership verification
+  uses N/A, Yes and No; availability fields use Available and Not Available.
+  Finance uses the existing price-in-words input; Funded By is visible alongside
+  Finance with Bank, NDFC and Local finance options.
+
+Migration `058_property_specification_refinements.sql` adds nullable detail
+columns for measurement units, plot facing, ground floor, portions and funding
+source. It is tracked in CRM, applied locally through infra and registered in
+site startup migrations for deployment. No existing records are deleted.
+
+## Industrial, Plot, Farmland and Farm House refinements
+
+- Industrial includes Plot Area, Built Up Area and Carpet Area. Building Type,
+  Floor Type, Container Access and pollution category use the specified option
+  lists. Property Use and Building Approval Certificates allow multiple choices.
+  Their existing string columns are widened to TEXT; old selections remain
+  available. Labor room and toilet counts are numeric. Available Visit Time and
+  Blueprint / Layout are omitted from both forms and details.
+- Plot hides open sides, topography and fencing, labels Plot Nos as No of Plots,
+  and labels its main area Total Project Area. Zoning offers Industrial Plot,
+  Commercial Plot and Residential Plot. Amenities are enabled for Plot.
+- Plot replaces length/width controls with four direction/length/unit rows.
+  Direction choices include all eight compass directions; lengths use feet or
+  metres. The live SVG sketch is explicitly not to scale. Saved old rectangular
+  dimensions restore into four sides; no area is inferred from side lengths.
+- Plot sale rates can be entered and displayed per sqft, sqm, cent, acre or
+  ground. The chosen unit is retained in measurement metadata; the rate is
+  stored canonically per sqft with increased decimal precision to preserve
+  conversion accuracy. The total asking price is independent.
+- Grounds use 2,400 sqft, consistent with the [Greater Chennai Corporation's
+  tax assessment conversion](https://chennaicorporation.gov.in/gcc/online-services/property-tax/tax-assessment/).
+- Farmland omits Plot Size and Zoning. Crop Suitability and Existing Plantation
+  use the requested lists. No of Borewells appears only while Bore Well is
+  checked.
+- Farm House is a separate Buy-only category combining the current Farmland
+  agricultural controls with the Independent House profile. Independent House
+  and its Investment Property profile also expose the sale rate per sqft.
+- Furnishing Items is shown and submitted only when Furnishing Status is Fully
+  Furnished or Semi Furnished, for applicable residential/coworking types.
+  Commercial and Industrial never expose this section. Hidden saved selections
+  are retained rather than deleted.
+
+Migration 059 seeds Farm House, adds boundary/container/count fields, widens the
+multiselect storage, and increases rate precision. Its tracked CRM SQL copy and
+registered site startup migration support deployment; it is applied locally.
+
+## Commercial Rent and Co-Working refinement
+
+Commercial rental Property Use is a single select with the specified sixteen
+uses. Special Purpose is a separate fifteen-choice select stored in
+`property_details.special_purpose`, and Property Accessibility uses the existing
+accessibility field with On Road, Cut Road and Inside Colony choices. The CRM
+Special Purpose search checks the new field and the legacy Property Use field.
+
+For Commercial rentals, conference hall, cabin and seater counts appear and are
+submitted only with Fully Furnished or Semi Furnished status. Construction Date
+and Documents Required are hidden and omitted. These restrictions do not alter
+the Commercial Buy form.
+
+Co-Working hides Documents & Verification and general document uploads. It also
+omits general Area, Open Sides, possession status, handover and Available From
+(the possession/move-in date). Named built-up/carpet measurements, floor plans,
+listing status and rent per seat remain available. Ordinary edits omit document
+updates entirely; when plans change, existing non-plan attachments are retained.
+Hidden verification fields and office counts are preserved in stored records.
+
+Migration 060 adds the nullable Special Purpose field. Its CRM SQL copy is
+tracked, it is registered in site startup migrations, and it is applied locally.
