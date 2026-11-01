@@ -106,6 +106,7 @@ it.each([
 ])("submits existing %s with version protection", async (type) => {
   const p = await save({
     propertyType: type,
+    propertyDetails: type === "coworking" ? { rentPerSeat: 8000 } : {},
     listingType: ["coworking", "pg_service_apartment"].includes(type)
       ? "Rent"
       : "Sell",
@@ -134,6 +135,7 @@ it("keeps every coworking attachment untouched on an ordinary edit", async () =>
   const p = await save({
     propertyType: "coworking",
     listingType: "Rent",
+    propertyDetails: { rentPerSeat: 8000 },
     documents: [
       { fileKey: "audit/other.pdf", fileName: "Other", documentType: "other" },
     ],
@@ -200,4 +202,35 @@ it("preserves the physical size of legacy Plot Area stored in the general unit",
   });
   expect(Number(p.plotArea)).toBe(43560);
   expect(p.measurementUnits.plotArea).toBe("Acres");
+});
+
+it("saves split bathrooms as a total, and calculates apartment rates from built-up area", async () => {
+ const p = await save({ price: 5000000, propertyDetails: { builtUpArea: 1000, bathrooms: 9, curationDetails: { individualBathrooms: 2, attachedBathrooms: 1 } } });
+ expect(p.bathrooms).toBe(3); expect(p.pricePerSqft).toBe(5000); expect(p.curationDetails).toMatchObject({ individualBathrooms: 2, attachedBathrooms: 1 });
+});
+it("retains land display units separately from searchable sqft and computes the canonical rate", async () => {
+ const p = await save({ propertyType: "farmland", price: 4356000, propertyDetails: { areaSqft: 43560, areaUnit: "Sq Ft", measurementUnits: { landArea: "Acres", pricePerSqft: "Acres" } } });
+ expect(p.areaSqft).toBe(43560); expect(p.areaUnit).toBe("Sq Ft"); expect(p.measurementUnits).toMatchObject({ landArea: "Acres", pricePerSqft: "Acres" }); expect(p.pricePerSqft).toBe(100);
+});
+it("stores coworking price per seat and its fully furnished default without a monthly total", async () => {
+ const p = await save({ propertyType: "coworking", listingType: "Rent", price: 80000, propertyDetails: { rentPerSeat: 8000, minSeats: 10, furnishingStatus: "FULLY FURNISHED" } });
+ expect(p.price).toBe(8000); expect(p.rentPerSeat).toBe(8000); expect(p).not.toHaveProperty("monthlyRent"); expect(p.furnished).toBe(true); expect(p.furnishingStatus).toBe("FULLY FURNISHED");
+});
+it("saves two owner alternatives and the agent contacts without flattening the second contact", async () => {
+ const contactDetails = { ownerAlternatives: [{ role: "Care Taker", name: "Synthetic one", phone: "synthetic-1", email: "one@example.invalid" }, { role: "Security", name: "Synthetic two", phone: "synthetic-2", email: "two@example.invalid" }], agentPhone: "synthetic-agent", agentEmail: "agent@example.invalid", agentAlternative: { name: "Synthetic alternate", phone: "synthetic-3", email: "alt@example.invalid", role: "" } };
+ const p = await save({ contactDetails }); expect(p.contactDetails).toEqual(contactDetails); expect(p.alternateName).toBe("Synthetic one");
+});
+
+it.each([['SEMI FURNISHED', true], ['FULLY FURNISHED', true], ['BARESHELL', false], ['UNFURNISHED', false]])('saves commercial rental furnishing status %s without depending on the removed checkbox', async (furnishingStatus, furnished) => {
+ const p = await save({ propertyType: 'commercial', listingType: 'Rent', propertyDetails: { furnishingStatus, furnished: !furnished } });
+ expect(p.furnished).toBe(furnished);
+});
+it('preserves unparseable legacy room measurements on an unrelated edit', async () => {
+ const p = await save({ propertyDetails: { roomDimensions: [{ name: 'Living', dimensions: '12 × 10 m' }] } });
+ expect(p.roomDimensions).toEqual([{ name: 'Living', dimensions: '12 × 10 m' }]);
+});
+
+it('does not overwrite an existing coworking furnishing choice with the new-form default', async () => {
+ const p = await save({ propertyType: 'coworking', listingType: 'Rent', propertyDetails: { rentPerSeat: 8000, furnishingStatus: 'UNFURNISHED', furnished: false } });
+ expect(p.furnishingStatus).toBe('UNFURNISHED'); expect(p.furnished).toBe(false);
 });

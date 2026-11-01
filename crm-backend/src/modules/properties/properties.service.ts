@@ -156,7 +156,7 @@ export class PropertiesService {
 
   // Owner/agent contact keys — omitted entirely for callers without the grant.
   private static readonly CONTACT_KEYS = [
-    'ownerName', 'ownerPhone', 'ownerEmail',
+    'ownerName', 'ownerPhone', 'ownerEmail', 'contactDetails',
     'agentName', 'agencyName', 'commissionTerms',
     'alternateName', 'alternatePhone', 'alternateEmail',
   ];
@@ -491,8 +491,9 @@ export class PropertiesService {
 
   private buildDetails(dto: Record<string, any>, propertyType?: unknown): Record<string, any> {
     const details: Record<string, any> = {};
+    if (dto.curationDetails !== undefined) details.curationDetails = dto.curationDetails;
     if (dto.measurementUnits && typeof dto.measurementUnits === 'object' && !Array.isArray(dto.measurementUnits)) {
-      const keys = ['builtUpArea', 'carpetArea', 'superBuiltUpArea', 'udsArea', 'plotArea', 'coveredArea', 'openArea', 'plotSizeCents', 'pricePerSqft'];
+      const keys = ['landArea', 'builtUpArea', 'carpetArea', 'superBuiltUpArea', 'udsArea', 'plotArea', 'coveredArea', 'openArea', 'plotSizeCents', 'pricePerSqft'];
       details.measurementUnits = Object.fromEntries(Object.entries(dto.measurementUnits).filter(([key, unit]) => keys.includes(key) && ['Sq Ft', 'Sq M', 'Cents', 'Acres', 'Grounds'].includes(String(unit))));
     }
     const renamedSources = new Set(Object.keys(RENAMED_DETAILS_KEYS));
@@ -604,6 +605,7 @@ export class PropertiesService {
       country: city ? (city.country_name ?? city.countryName ?? 'India') : (dto.country ?? 'India'),
       cityId: (() => { const n = dto.cityId !== undefined ? Number(dto.cityId) : undefined; return Number.isNaN(n as any) ? undefined : n; })(),
       sublocationId: (() => { const n = dto.sublocationId !== undefined ? Number(dto.sublocationId) : undefined; return Number.isNaN(n as any) ? undefined : n; })(),
+      contactDetails: dto.contactDetails,
       ownerName: dto.ownerName || undefined,
       ownerEmail: dto.ownerEmail || undefined,
       ownerPhone: dto.ownerPhone || undefined,
@@ -743,6 +745,9 @@ export class PropertiesService {
     if (payload.details?.measurementUnits) {
       payload.details.measurementUnits = { ...existing.propertyDetails?.measurementUnits, ...payload.details.measurementUnits };
     }
+    // Let the site API merge JSON refinements. Re-inserting hidden keys here
+    // would make old aggregates look explicitly supplied during recalculation.
+    if (payload.details && body.curationDetails === undefined) delete payload.details.curationDetails;
     delete (payload as any).propertyType;
     if (body.expectedUpdatedAt) payload.expectedUpdatedAt = body.expectedUpdatedAt;
     await this.siteApi.patch(`/admin/properties/${existing.propertyType}/${id}`, payload);

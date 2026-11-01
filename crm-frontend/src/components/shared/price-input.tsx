@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { formatIndianCurrencyWords, parseIndianCurrency } from "@/lib/indian-currency";
 
 interface PriceInputProps {
+  id?: string;
   value?: string;
   defaultValue?: string | number;
   onChange?: (value: string) => void;
@@ -19,6 +20,7 @@ interface PriceInputProps {
 }
 
 export function PriceInput({
+  id,
   value,
   defaultValue,
   onChange,
@@ -39,6 +41,7 @@ export function PriceInput({
   return (
     <div className="space-y-1">
       <Input
+        id={id}
         type={type}
         readOnly={readOnly}
         min={min}

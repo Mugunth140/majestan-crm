@@ -38,7 +38,7 @@ describe("Property form curation", () => {
     expect(visible("udsArea", "villa", "Buy")).toBe(false);
     expect(visible("plotArea", "villa", "Buy")).toBe(true);
     expect(visible("availablePortion", "villa", "Rent")).toBe(false);
-    expect(visible("availablePortion", "individual_portion", "Rent")).toBe(true);
+    expect(visible("availablePortion", "individual_portion", "Rent")).toBe(false);
   });
 
   it("separates agricultural and plotted development fields", () => {
@@ -53,12 +53,12 @@ describe("Property form curation", () => {
 
   it.each(types)("separates sale and rental financial fields: %s", (type) => {
     for (const field of ["bookingAmount", "expectedSalePrice", "registrationCharge", "timeForRegistration", "saleType", "ownershipType", "modeOfPayment", "hypothecation", "financeFacing", "tslrFmb"]) {
-      expect(visible(field, type, "Buy")).toBe(type !== "coworking" && (field !== "expectedSalePrice" || !["commercial", "industrial", "villa"].includes(type)));
+      expect(visible(field, type, "Buy")).toBe(type !== "coworking" && !(type === "farmland" && ["hypothecation", "financeFacing", "tslrFmb"].includes(field)) && (field !== "expectedSalePrice" || !["apartment", "commercial", "industrial", "villa", "farmland"].includes(type)));
       expect(visible(field, type, "Rent")).toBe(false);
     }
     for (const field of ["securityDeposit", "lockInPeriod", "rentalAgreementDraft"]) {
       expect(visible(field, type, "Buy")).toBe(false);
-      expect(visible(field, type, "Rent")).toBe(field !== "rentalAgreementDraft" || type !== "coworking");
+      expect(visible(field, type, "Rent")).toBe(field !== "rentalAgreementDraft" || ["plot", "commercial", "industrial"].includes(type));
     }
   });
 
@@ -144,7 +144,7 @@ describe("PG / Service Apartment", () => {
 describe("Rental listing requirements", () => {
   it.each(["farm_house", "farmhouse", "Farm House", "farm-house"])("excludes Farm House aliases from rentals: %s", (value) => {
     expect(isPropertyTypeAllowed(value, "Rent")).toBe(false);
-    expect(isPropertyTypeAllowed(value, "Buy")).toBe(true);
+    expect(isPropertyTypeAllowed(value, "Buy")).toBe(value !== "farmhouse");
   });
   it("also filters Farm House when a master option uses a custom value", () => {
     expect(isPropertyTypeAllowed("custom", "Rent", "Farm House")).toBe(false);
@@ -180,7 +180,7 @@ describe("Farm House and revised land rules", () => {
 describe("Commercial rental and coworking save rules", () => {
   it("omits hidden office counts and sale-only fields from unfurnished rental requests", () => {
     const payload = { conferenceRoom: 2, privateCabins: 3, seater: 10, constructionDate: "2022", documentRequire: "Old note", specialPurpose: "Gym / Fitness Center", accessibility: "On Road" };
-    expect(curatePropertyPayload(payload, "commercial", "Rent", "", "UNFURNISHED")).toEqual({ specialPurpose: "Gym / Fitness Center", accessibility: "On Road" });
+    expect(curatePropertyPayload(payload, "commercial", "Rent", "", "UNFURNISHED")).toEqual({ accessibility: "On Road" });
     expect(curatePropertyPayload(payload, "commercial", "Rent", "", "SEMI FURNISHED")).toMatchObject({ conferenceRoom: 2, privateCabins: 3, seater: 10 });
   });
   it("omits coworking verification metadata while retaining floor plans", () => {

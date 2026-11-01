@@ -1,5 +1,7 @@
 "use client";
 
+import { restoreRoomDimensions } from "../_components/PropertyRoomDimensions";
+import { curationReadFields, restoreContactDetails } from "../_components/property-curation-two";
 import { PropertyPlotBoundaries, restorePlotBoundaries } from "../_components/PropertyPlotBoundaries";
 import { parseMultiValue } from "../_components/PropertyMultiSelect";
 import { convertRate, rateLabel, initialArea, areaInSqft, restorePlotArea } from "../_components/property-measurements";
@@ -202,7 +204,7 @@ export default function PropertyViewPage() {
   const faqs: any[] = property.faqs ?? [];
   const amenitiesList: any[] = property.amenitiesList ?? [];
   const units: any[] = property.propertyUnits ?? [];
-  const roomDimensions: any[] = det.roomDimensions ?? [];
+  const roomDimensions = restoreRoomDimensions(det.roomDimensions);
   const loc = (property.propertyLocations ?? [])[0] ?? {};
   const localityData = loc.localityData ?? {};
   const connectivity: any[] = localityData.connectivity ?? [];
@@ -216,8 +218,10 @@ export default function PropertyViewPage() {
   const rentArea = isFieldVisible("areaSqft") ? areaInSqft(det.areaSqft ?? "", det.areaUnit || "Sq Ft") : Number(det.builtUpArea || areaInSqft(det.areaSqft ?? "", det.areaUnit || "Sq Ft") || 0);
   const rentPerSqft = calculateRentPerSqft(Number(property.price), rentArea ?? 0);
   const salePricePerSqft = type === "villa" ? calculateRentPerSqft(Number(property.price), Number(det.builtUpArea || 0)) : property.pricePerSqft;
-  const displayedPriceUnit = type === "plot" ? det.measurementUnits?.pricePerSqft || "Sq Ft" : "Sq Ft";
+  const displayedPriceUnit = ["plot", "farmland"].includes(type) ? det.measurementUnits?.pricePerSqft || "Sq Ft" : "Sq Ft";
   const displayedPriceRate = convertRate(salePricePerSqft ?? "", "Sq Ft", displayedPriceUnit);
+  const curationRows = curationReadFields(det.curationDetails, field => isFieldVisible(field) && (field !== "restroomCount" || det.hasRestroom === true));
+  const contacts = restoreContactDetails(property.contactDetails);
   const boundarySides = restorePlotBoundaries(det.plotBoundaries, det.plotLength, det.plotWidth);
   const hypothecated = !["", "no", "nil", "n/a", "na", "none", "-"].includes(String(property.hypothecation ?? "").trim().toLowerCase());
   const measurement = (field: string, base = "Sq Ft") => {
@@ -310,7 +314,7 @@ export default function PropertyViewPage() {
             <SectionField label="Property Type" value={formatPropertyType(property.propertyType)} />
             <SectionField label="Listing Type" value={property.listingType === "Sell" ? "Buy" : property.listingType} />
             <SectionField label="Status" value={propertyStatusLabel(property.status, property.approvalStatus)} />
-            <SectionField label="Price" value={formatPrice(Number(property.price))} />
+            <SectionField label={type === "coworking" ? "Rent per Seat" : "Price"} value={formatPrice(Number(type === "coworking" ? det.rentPerSeat ?? property.price : property.price))} />
             <SectionField label="Negotiable" value={bool(property.negotiable)} />
             {!isPlotLike && (<>
             <SectionField label="Property Condition" value={property.propertyCondition} />
@@ -358,7 +362,7 @@ export default function PropertyViewPage() {
               <SectionField label="Rent per sqft" value={rentPerSqft === null ? undefined : `₹${rentPerSqft.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / sqft / month`} />
             )}
             {isFieldVisible("pricePerSqft") && (
-              <SectionField label={type === "plot" ? `Price per ${rateLabel(displayedPriceUnit)}` : "Sqft Price"} value={displayedPriceRate != null ? `${formatPrice(displayedPriceRate)} / ${rateLabel(displayedPriceUnit)}` : undefined} />
+              <SectionField label={["plot", "farmland"].includes(type) ? `Price per ${rateLabel(displayedPriceUnit)}` : "Sqft Price"} value={displayedPriceRate != null ? `${formatPrice(displayedPriceRate)} / ${rateLabel(displayedPriceUnit)}` : undefined} />
             )}
             {isFieldVisible("expectedSalePrice") && (<SectionField label="Expected Sale Price" value={property.expectedSalePrice ? formatPrice(Number(property.expectedSalePrice)) : undefined} />)}
             {!isPlotLike && (<>
@@ -387,10 +391,10 @@ export default function PropertyViewPage() {
                 <SectionField label="Owner Phone" value={property.ownerPhone} />
                 <SectionField label="Owner Email" value={property.ownerEmail} />
                 {isFieldVisible("tenantOccupied") && <SectionField label="Tenant Occupied" value={property.tenantOccupied} />}
-                <SectionField label="Alternative Name" value={property.alternateName} />
-                <SectionField label="Alternative Phone" value={property.alternatePhone} />
-                <SectionField label="Alternative Email" value={property.alternateEmail} />
+                {(property.contactDetails?.ownerAlternatives ?? [{ name: property.alternateName, phone: property.alternatePhone, email: property.alternateEmail }]).map((contact: any, index: number) => <div className="contents" key={index}><SectionField label={`Alternative ${index + 1} Role`} value={contact.role} /><SectionField label={`Alternative ${index + 1} Name`} value={contact.name} /><SectionField label={`Alternative ${index + 1} Phone`} value={contact.phone} /><SectionField label={`Alternative ${index + 1} Email`} value={contact.email} /></div>)}
                 <SectionField label="Agent Name" value={property.agentName} />
+                <SectionField label="Agent Phone" value={contacts.agentPhone} /><SectionField label="Agent Email" value={contacts.agentEmail} />
+                <SectionField label="Alternative Agent Name" value={contacts.agentAlternative.name} /><SectionField label="Alternative Agent Phone" value={contacts.agentAlternative.phone} /><SectionField label="Alternative Agent Email" value={contacts.agentAlternative.email} />
                 <SectionField label="Agency" value={property.agencyName} />
                 <SectionField label="Commission Terms" value={property.commissionTerms} />
 
@@ -402,6 +406,9 @@ export default function PropertyViewPage() {
         {/* Common Specs + Type Specs */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Section title="Specifications" icon={<Ruler className="h-4 w-4 text-purple-500" />}>
+            {curationRows.map(row => <SectionField key={row.label} label={row.label} value={row.value} />)}
+            {isFieldVisible("landArea") && <SectionField label={type === "plot" && property.listingType !== "Rent" ? "Total Project Area" : "Land Area"} value={det.areaSqft ? `${initialArea(areaInSqft(det.areaSqft, det.areaUnit || "Sq Ft"), "landArea", det.measurementUnits ?? {})} ${det.measurementUnits?.landArea || "Sq Ft"}` : undefined} />}
+            {isFieldVisible("plotBoundaries") && boundarySides.some(side => side.length) && <div className="sm:col-span-2"><PropertyPlotBoundaries value={boundarySides} facing={det.plotFacing} readOnly /></div>}
             {!isPlotLike && (<>
             {isFieldVisible("bedrooms") && (<SectionField label="Bedrooms" value={det.bedrooms} />)}
             {isFieldVisible("bathrooms") && (<SectionField label="Bathrooms" value={det.bathrooms} />)}
@@ -454,7 +461,7 @@ export default function PropertyViewPage() {
                 <SectionField label="Architectural Style" value={det.architecturalStyle} />
                 <SectionField label="Available Portion" value={det.availablePortion} />
                 <SectionField label="Outdoor Spaces" value={det.outdoorSpaces} />
-                <SectionField label="Utilities Provided" value={det.utilitiesProvided} />
+                {!Array.isArray(det.curationDetails?.utilities) && <SectionField label="Utilities Provided" value={det.utilitiesProvided} />}
                 <SectionField label="Neighborhood" value={det.neighborhoodHighlights} />
                 <SectionField label="Community Facilities" value={det.communityFacilities} />
                 <SectionField label="Amenity Notes" value={det.amenities} />
@@ -480,9 +487,9 @@ export default function PropertyViewPage() {
                 {det.boreWell && <SectionField label="No of Borewells" value={det.boreWellCount} />}
                 <SectionField label="Storage Tank" value={bool(det.storageTank)} />
               </>)}
-              {type === "plot" && boundarySides.some((side) => side.length) && <div className="sm:col-span-2"><PropertyPlotBoundaries value={boundarySides} readOnly /></div>}
+
               {type === "commercial" && (<>
-                {isFieldVisible("specialPurpose") && <SectionField label="Special Purpose" value={det.specialPurpose} />}
+                {type === "commercial" && property.listingType === "Rent" && !Array.isArray(det.curationDetails?.specialPurposes) && <SectionField label="Special Purpose" value={det.specialPurpose} />}
                 {property.listingType === "Rent" && <SectionField label="Property Accessibility" value={det.accessibility} />}
                 <SectionField label="Property Use" value={det.propertyUse ? parseMultiValue(det.propertyUse).join(", ") : undefined} />
                 <SectionField label="No. of Lifts" value={det.noOfLifts} />
@@ -542,7 +549,7 @@ export default function PropertyViewPage() {
                 <SectionField label="Floor Type" value={det.floorType} />
                 <SectionField label="No. of Bays" value={det.numberOfBays} />
                 <SectionField label="No. of Cabins" value={det.numberOfCabins} />
-                <SectionField label="Power Supply (HP)" value={det.powerSupplyHp} />
+                {!Object.hasOwn(det.curationDetails ?? {}, "powerSupplyCapacity") && <SectionField label="Power Supply (HP)" value={det.powerSupplyHp} />}
                 <SectionField label="Water Supply" value={det.waterSupply} />
                 <SectionField label="Truck Parking" value={det.truckParking} />
                 <SectionField label="Loading Bays" value={det.loadingBays} />

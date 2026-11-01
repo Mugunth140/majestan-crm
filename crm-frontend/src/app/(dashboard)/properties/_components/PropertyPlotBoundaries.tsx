@@ -59,10 +59,12 @@ export function PropertyPlotBoundaries({
   value,
   onChange,
   readOnly = false,
+  facing,
 }: {
   value: PlotBoundary[];
   onChange?: (value: PlotBoundary[]) => void;
   readOnly?: boolean;
+  facing?: string;
 }) {
   const sides = value.length === 4 ? value : emptyPlotBoundaries();
   const change = (index: number, key: keyof PlotBoundary, next: string) =>
@@ -130,6 +132,7 @@ export function PropertyPlotBoundaries({
           </div>
         )}
         <figure className="rounded-xl border bg-muted/20 p-4">
+          {facing && <p className="mb-3 text-right text-sm font-semibold">Plot facing: {facing}</p>}
           <svg
             viewBox="0 0 400 300"
             className="w-full"

@@ -201,3 +201,5 @@ waterSources,Accepted,details.waterSources
 waterSupply,Accepted,details.waterSupply
 workerFacilities,Accepted,details.workerFacilities
 zoning,Accepted,details.zoning
+contactDetails,Accepted,contactDetails (private admin/contact permission)
+curationDetails,Accepted,details.curationDetails

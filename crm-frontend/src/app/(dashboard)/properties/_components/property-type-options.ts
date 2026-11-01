@@ -6,6 +6,7 @@ export const INDUSTRIAL_BUILDING_TYPES = [
   "Precast Concrete",
 ];
 export const INDUSTRIAL_USES = [
+  "General Storage",
   "General Warehousing",
   "Logistics & Distribution",
   "Cold Storage / Food Processing",

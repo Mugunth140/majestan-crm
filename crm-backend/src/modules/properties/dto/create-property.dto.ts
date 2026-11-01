@@ -1,3 +1,4 @@
+import { PropertyCurationDto, PropertyContactDetailsDto } from './property-curation.dto';
 import {
   IsArray,
   IsIn,
@@ -36,6 +37,9 @@ export class PropertyLocationDataDto {
 }
 
 export class CreatePropertyDto {
+  @IsOptional() @IsObject() @ValidateNested() @Type(() => PropertyContactDetailsDto) contactDetails?: PropertyContactDetailsDto;
+  @IsOptional() @IsObject() @ValidateNested() @Type(() => PropertyCurationDto) curationDetails?: PropertyCurationDto;
+
   @IsOptional() @IsString() specialPurpose?: string;
   @IsOptional() @IsString() containerAccess?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) laborRooms?: number;

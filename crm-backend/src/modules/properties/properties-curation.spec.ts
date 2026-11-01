@@ -188,3 +188,24 @@ describe('Explicit curation removals', () => {
     expect(siteApi.patch.mock.calls[0][1].documents[0]).not.toHaveProperty('isPublic');
   });
 });
+
+describe('Property curation 2 payloads', () => {
+ it('forwards a partial JSON refinement patch and preserves land units', async () => {
+  const { service, siteApi } = setup('farmland', { curationDetails: { agricultureEb: 2, storageTankCapacity: '1 Lakh Litres' } });
+  await service.update(7, { curationDetails: { roadApproach: 'Mud Road' }, measurementUnits: { landArea: 'Acres', pricePerSqft: 'Acres' } });
+  expect(siteApi.patch.mock.calls[0][1].details).toMatchObject({ curationDetails: { roadApproach: 'Mud Road' }, measurementUnits: { landArea: 'Acres', pricePerSqft: 'Acres' } });
+ });
+ it('does not forward private structured contacts without the contacts grant', async () => {
+  const { service, siteApi } = setup('apartment', {});
+  await service.update(7, { contactDetails: { agentPhone: 'synthetic-private', ownerAlternatives: [{ name: 'Synthetic private' }] } });
+  expect(siteApi.patch.mock.calls[0][1]).not.toHaveProperty('contactDetails');
+ });
+ it('forwards permitted structured contacts without converting them to a string', async () => {
+  const { siteApi } = setup('apartment', {});
+  const permission = { hasPermission: jest.fn(async () => true) };
+  const service = new PropertiesService(siteApi as unknown as SiteApiService, permission as unknown as PermissionsService, {} as DataSource);
+  const contactDetails = { agentPhone: 'synthetic-private', ownerAlternatives: [{ role: 'Manager', name: 'Synthetic private' }] };
+  await service.update(7, { contactDetails }, { id: 1 });
+  expect(siteApi.patch.mock.calls[0][1].contactDetails).toEqual(contactDetails);
+ });
+});

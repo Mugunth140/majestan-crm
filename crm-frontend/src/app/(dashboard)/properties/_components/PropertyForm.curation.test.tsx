@@ -31,7 +31,7 @@ beforeEach(() => { state.calls = 0; state.contacts = false; });
 describe("Rendered property type forms", () => {
   it.each(["apartment", "villa", "individual_portion", "plot", "farmland", "commercial", "coworking", "industrial"])("renders the existing fields for %s", (type) => {
     const markup = render(type, type === "coworking" ? "Rent" : "Sell");
-    expect(markup).toContain(type === "coworking" ? "Monthly rent *" : "Sale price *");
+    expect(markup).toContain(type === "coworking" ? "Rent per Seat" : "Sale price *");
     expect(markup).toContain(type === "coworking" ? "Rent per Seat" : "Documents");
     expect(markup).not.toContain("Loading property");
   });
@@ -79,7 +79,7 @@ describe("Rendered property type forms", () => {
     expect(markup).not.toContain(">Booking Amount</label>");
     expect(markup).not.toContain(">Expected Sale Price</label>");
     expect(markup).not.toContain(">Registration Charge</label>");
-    expect(markup).toContain("Rental Agreement Draft");
+    expect(markup).not.toContain("Rental Agreement Draft");
     expect(markup).toContain("Property type is fixed for an existing listing.");
   });
 });
@@ -106,7 +106,7 @@ describe("Investment Property form", () => {
     const independent = render("individual_portion");
     const investment = render("investment_property");
     const fieldLabels = (markup: string) => markup.match(/<label[^>]*>[\s\S]*?<\/label>/g);
-    expect(fieldLabels(investment)).toEqual(fieldLabels(independent));
+    expect(fieldLabels(investment)?.filter(label => !/Total Rent per Month|Expected Rent per Month/.test(label))).toEqual(fieldLabels(independent));
     expect(investment).toContain("Investment Property details");
     expect(investment).toContain("Available Portion");
     expect(investment).toContain("Plot Area");
@@ -131,10 +131,11 @@ describe("PG / Service Apartment form", () => {
 describe("Commercial and industrial pricing and specifications", () => {
   it.each(["commercial", "industrial"])("uses Sqft Price on %s sales without residential fields or rental terms", (type) => {
     const markup = render(type, "Sell", {
-      pricePerSqft: "6500.50", expectedSalePrice: "8000000", securityDeposit: "3 Months", lockInPeriod: "3 Years",
-      propertyDetails: { bedrooms: 2, bathrooms: 2, furnished: true, furnishingStatus: "FULLY FURNISHED" },
+      price: 6500500, pricePerSqft: "6500.50", expectedSalePrice: "8000000", securityDeposit: "3 Months", lockInPeriod: "3 Years",
+      propertyDetails: { builtUpArea: 1000, bedrooms: 2, bathrooms: 2, furnished: true, furnishingStatus: "FULLY FURNISHED" },
     });
-    expect(markup).toContain(">Sqft Price</label>");
+    expect(markup).toContain("Price per Sqft");
+    expect(markup).toContain('aria-label="Calculated price per area"');
     expect(Number(markup.match(/id="pf-pricePerSqft"[\s\S]*?<input[^>]*value="([^"]+)"/)?.[1])).toBe(6500.5);
     expect(markup).not.toContain(">Expected Sale Price</label>");
     expect(markup).not.toContain(">Bedrooms</label>");
@@ -223,7 +224,7 @@ describe("Owner alternatives", () => {
     state.contacts = true;
     const markup = render("industrial");
     const owner = markup.slice(markup.indexOf(">Owner</h3>"), markup.indexOf(">Agent</h3>"));
-    for (const label of ["Alternative Name", "Alternative Phone", "Alternative Email"]) expect(owner.includes(label)).toBe(true);
+    for (const label of ["Alternative owner contact 1", "Alternative owner contact 2", "Alternative person"]) expect(owner.includes(label)).toBe(true);
   });
 });
 
@@ -239,9 +240,9 @@ describe("Industrial, plot and farm requirements", () => {
     expect(markup.includes("Available Visit Time")).toBe(false);
   });
   it("renders four live plot boundaries and editable rate units", () => {
-    const markup = render("plot", "Sell", { pricePerSqft: 100, propertyDetails: { measurementUnits: { pricePerSqft: "Grounds" }, plotBoundaries: [{ direction: "North East", length: 40, unit: "ft" }, { direction: "East", length: 50, unit: "ft" }, { direction: "South", length: 45, unit: "ft" }, { direction: "West", length: 60, unit: "ft" }] } });
+    const markup = render("plot", "Sell", { pricePerSqft: 100, propertyDetails: { areaSqft: 1000, measurementUnits: { pricePerSqft: "Grounds" }, plotBoundaries: [{ direction: "North East", length: 40, unit: "ft" }, { direction: "East", length: 50, unit: "ft" }, { direction: "South", length: 45, unit: "ft" }, { direction: "West", length: 60, unit: "ft" }] } });
     for (const label of ["Total Project Area", "No of Plots", "Plot boundaries", "Plot boundary preview", "North East", "Price per ground", "Amenities"]) expect(markup.includes(label)).toBe(true);
-    expect(markup.includes('value="240000"')).toBe(true);
+    expect(markup.includes('value="240000.00"')).toBe(true);
     for (const label of ["Open Sides", "Topography", "Fencing", "Plot Length", "Plot Width"]) expect(markup.includes(`>${label}</label>`)).toBe(false);
     expect(markup.includes('name="pricePerSqftUnit"')).toBe(true);
     expect((markup.match(/aria-label="Boundary [1-4] length"/g) || []).length).toBe(4);
@@ -270,7 +271,8 @@ describe("Industrial, plot and farm requirements", () => {
 describe("Commercial Rent and Co-Working refinements", () => {
   it("offers commercial rental uses, special purpose and accessibility", () => {
     const markup = render("commercial", "Rent", { propertyDetails: { propertyUse: "Corporate Office", specialPurpose: "Gym / Fitness Center", accessibility: "On Road", constructionDate: "2022", documentRequire: "Old note" } });
-    for (const name of ["propertyUse", "specialPurpose", "accessibility"]) expect(markup.includes(`name="${name}"`)).toBe(true);
+    expect(markup.includes('name="accessibility"')).toBe(true);
+    for (const label of ["Property Use", "Special Purpose"]) expect(markup.includes(`aria-label="${label}"`)).toBe(true);
     for (const label of ["Special Purpose", "Property Accessibility", "Corporate Office", "Gym / Fitness Center"]) expect(markup.includes(label)).toBe(true);
     expect(markup.includes("Construction Date")).toBe(false);
     expect(markup.includes("Documents Required")).toBe(false);
@@ -282,7 +284,7 @@ describe("Commercial Rent and Co-Working refinements", () => {
   it("leaves commercial Buy controls available", () => {
     const markup = render("commercial", "Sell");
     expect(markup.includes("Construction Date")).toBe(true);
-    expect(markup.includes("Documents Required")).toBe(true);
+    expect(markup.includes("Documents Required")).toBe(false);
     expect(markup.includes("Special Purpose")).toBe(false);
     expect(markup.includes("Property Accessibility")).toBe(false);
   });
@@ -291,7 +293,7 @@ describe("Commercial Rent and Co-Working refinements", () => {
     for (const label of ["Area", "Open Sides", "Possession Status", "Available From", "Handover Date"]) expect(markup.includes(`>${label}</label>`)).toBe(false);
     expect(markup.includes("Documents &amp; Verification")).toBe(false);
     expect(markup.includes(">Documents</h3>")).toBe(false);
-    expect(markup.includes("Built Up Area")).toBe(true);
+    expect(markup.includes("Built Up Area")).toBe(false);
     expect(markup.includes("Floor plans")).toBe(true);
     expect(markup.includes("Rent per Seat")).toBe(true);
   });

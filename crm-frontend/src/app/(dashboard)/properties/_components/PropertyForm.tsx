@@ -1,5 +1,8 @@
 "use client";
 
+import { AdditionalCurationFields, PortionFields, ParkingFields, OwnerAlternativeContacts, AgentContactFields } from "./PropertyCurationFields";
+import { PropertyRoomDimensions, roomSides, restoreRoomDimensions } from "./PropertyRoomDimensions";
+import { WATER_SUPPLY_OPTIONS, ELECTRICITY_OPTIONS, OWNERSHIP_OPTIONS, IRRIGATION_OPTIONS, PLOT_RENT_USES, restoreContactDetails, restoreCurationDetails, curationPayload, curationErrors, bathroomTotal } from "./property-curation-two";
 import { PropertyAreaInput } from "./PropertyAreaInput";
 import { PropertyApprovalsSelect } from "./PropertyApprovalsSelect";
 import { PropertyMultiSelect } from "./PropertyMultiSelect";
@@ -439,7 +442,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   const [numberOfPortions, setNumberOfPortions] = useState(det?.numberOfPortions != null ? String(det.numberOfPortions) : "");
   const [hasGroundFloor, setHasGroundFloor] = useState<boolean>(det?.hasGroundFloor ?? false);
   const [plotFacing, setPlotFacing] = useState(det?.plotFacing ?? "");
-  const [fundedBy, setFundedBy] = useState(det?.fundedBy ?? "");
+  const [fundedBy, setFundedBy] = useState(det?.fundedBy === "NDFC" ? "NBFC" : det?.fundedBy ?? "");
   const [parking, setParking] = useState(det?.parking != null ? String(det.parking) : "");
 
   const [containerAccess, setContainerAccess] = useState(det?.containerAccess ?? "");
@@ -451,8 +454,8 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   // ---- Specs / Details ----
   const [bedrooms, setBedrooms] = useState(det?.bedrooms ? String(det.bedrooms) : "");
   const [bathrooms, setBathrooms] = useState(det?.bathrooms ? String(det.bathrooms) : "");
-  const [areaSqft, setAreaSqft] = useState(det?.areaSqft ? String(det.areaSqft) : "");
-  const [areaUnit, setAreaUnit] = useState(det?.areaUnit ?? "Sq Ft");
+  const [areaSqft, setAreaSqft] = useState(initialArea(det?.areaSqft, "landArea", { landArea: det?.measurementUnits?.landArea || det?.areaUnit || "Sq Ft" }, det?.areaUnit || "Sq Ft"));
+  const [areaUnit, setAreaUnit] = useState(det?.measurementUnits?.landArea || det?.areaUnit || "Sq Ft");
   const [furnishingStatus, setFurnishingStatus] = useState(det?.furnishingStatus ?? "");
   const [propertyFacing, setPropertyFacing] = useState(det?.propertyFacing ?? "");
   const [floorFacing, setFloorFacing] = useState(det?.floorFacing ?? "");
@@ -477,7 +480,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   const [connectivity, setConnectivity] = useState<{ icon: string; label: string; detail: string }[]>(loc0?.localityData?.connectivity ?? []);
   const [categories, setCategories] = useState<LocalityCategory[]>(loc0?.localityData?.categories ?? []);
   const [isFetchingPlaces, setIsFetchingPlaces] = useState(false);
-  const [roomDimensions, setRoomDimensions] = useState<{ name: string; dimensions: string }[]>(det?.roomDimensions ?? []);
+  const [roomDimensions, setRoomDimensions] = useState<{ name: string; dimensions: string }[]>(restoreRoomDimensions(det?.roomDimensions));
   // ---- Apartment / Villa / Individual House ----
   const [unitType, setUnitType] = useState(det?.unitType ?? "");
   const [unitNumber, setUnitNumber] = useState(det?.unitNumber ?? "");
@@ -615,9 +618,9 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   const [agentName, setAgentName] = useState(d?.agentName ?? "");
   const [agencyName, setAgencyName] = useState(d?.agencyName ?? "");
   const [commissionTerms, setCommissionTerms] = useState(d?.commissionTerms ?? "");
-  const [alternateName, setAlternateName] = useState(d?.alternateName ?? "");
-  const [alternatePhone, setAlternatePhone] = useState(d?.alternatePhone ?? "");
-  const [alternateEmail, setAlternateEmail] = useState(d?.alternateEmail ?? "");
+  const [alternateName, setAlternateName] = useState(d?.contactDetails?.ownerAlternatives?.[0]?.name ?? d?.alternateName ?? "");
+  const [alternatePhone, setAlternatePhone] = useState(d?.contactDetails?.ownerAlternatives?.[0]?.phone ?? d?.alternatePhone ?? "");
+  const [alternateEmail, setAlternateEmail] = useState(d?.contactDetails?.ownerAlternatives?.[0]?.email ?? d?.alternateEmail ?? "");
 
   // ---- Documents & Verification ----
   const [ownershipTitleVerified, setOwnershipTitleVerified] = useState(d?.ownershipTitleVerified ?? "");
@@ -697,6 +700,13 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   const [uploadTotalCount, setUploadTotalCount] = useState(0);
   const imgInputRef = useRef<HTMLInputElement>(null);
 
+  const [curation, setCuration] = useState(() => restoreCurationDetails({ propertyUses: det?.propertyUse, specialPurposes: det?.specialPurpose, utilities: det?.utilitiesProvided, powerSupplyCapacity: det?.powerSupplyHp ? `${det.powerSupplyHp} HP` : "", ...det?.curationDetails }));
+  const [contactDetails, setContactDetails] = useState(() => restoreContactDetails(d?.contactDetails));
+  const ownerContacts = { ...contactDetails, ownerAlternatives: contactDetails.ownerAlternatives.map((row, index) => index === 0 ? { ...row, name: alternateName, phone: alternatePhone, email: alternateEmail } : row) };
+  const changeOwnerContacts = (next: typeof contactDetails) => {
+    setContactDetails(next); setAlternateName(next.ownerAlternatives[0].name); setAlternatePhone(next.ownerAlternatives[0].phone); setAlternateEmail(next.ownerAlternatives[0].email);
+  };
+
   // ---- Draft persistence (localStorage) — form survives refresh ----
   // Snapshots the whole form (debounced) so a refresh/PWA restart keeps
   // unsaved edits. Uploads in flight can't persist (blob URLs and File
@@ -733,11 +743,13 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
   type DraftKind = "s" | "b" | "a" | "listing" | "amenityIds" | "furnishingItemIds" | "images" | "docs" | "uploads" | "plans" | "object";
   const draftFields: Array<{ key: string; kind: DraftKind; get: () => unknown; set: (v: any) => void }> = [
+    { key: "curationDetails", kind: "object", get: () => curation, set: (v) => setCuration(restoreCurationDetails(v)) },
+    { key: "contactDetails", kind: "object", get: () => ownerContacts, set: (v) => changeOwnerContacts(restoreContactDetails(v)) },
     { key: "measurementUnits", kind: "object", get: () => measurementUnits, set: setMeasurementUnits },
     { key: "numberOfPortions", kind: "s", get: () => numberOfPortions, set: setNumberOfPortions },
     { key: "hasGroundFloor", kind: "b", get: () => hasGroundFloor, set: setHasGroundFloor },
     { key: "plotFacing", kind: "s", get: () => plotFacing, set: setPlotFacing },
-    { key: "fundedBy", kind: "s", get: () => fundedBy, set: setFundedBy },
+    { key: "fundedBy", kind: "s", get: () => fundedBy, set: value => setFundedBy(value === "NDFC" ? "NBFC" : value) },
     { key: "parking", kind: "s", get: () => parking, set: setParking },
     { key: "containerAccess", kind: "s", get: () => containerAccess, set: setContainerAccess },
     { key: "laborRooms", kind: "s", get: () => laborRooms, set: setLaborRooms },
@@ -805,7 +817,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
     { key: "faqs", kind: "a", get: () => faqs, set: setFaqs },
     { key: "connectivity", kind: "a", get: () => connectivity, set: setConnectivity },
     { key: "categories", kind: "a", get: () => categories, set: setCategories },
-    { key: "roomDimensions", kind: "a", get: () => roomDimensions, set: setRoomDimensions },
+    { key: "roomDimensions", kind: "a", get: () => roomDimensions, set: (v) => setRoomDimensions(restoreRoomDimensions(v)) },
     { key: "unitType", kind: "s", get: () => unitType, set: setUnitType },
     { key: "unitNumber", kind: "s", get: () => unitNumber, set: setUnitNumber },
     { key: "numberOfFlats", kind: "s", get: () => numberOfFlats, set: setNumberOfFlats },
@@ -1233,8 +1245,9 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
   // ---- Property types filtered by listing type ----
   // Coworking is rental only; new farmland listings are sale only. PG/co-living is excluded.
+  const effectiveFurnishingStatus = propertyType === "coworking" && mode === "create" && !furnishingStatus ? "FULLY FURNISHED" : furnishingStatus;
   const isFieldVisible = (field: string) =>
-    isPropertyFieldVisible(field, propertyType, listingType, tenantOccupied, furnishingStatus);
+    isPropertyFieldVisible(field, propertyType, listingType, tenantOccupied, effectiveFurnishingStatus);
 
   // Multi-page types curate FAQs per sub-page tab; every other type edits
   // the one flat list. Rows keep their real indices so tabbed edits and
@@ -1243,21 +1256,24 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   const visibleFaqs = faqs
     .map((faq, idx) => ({ faq, idx }))
     .filter(({ faq }) => !showFaqTabs || displaySectionOf(faq) === faqTab);
-  const measuredAreaSqft = isFieldVisible("areaSqft")
+  const measuredAreaSqft = ["plot", "farmland"].includes(propertyType)
     ? areaInSqft(areaSqft, areaUnit || "Sq Ft")
     : areaInSqft(builtUpArea, measurementUnits.builtUpArea || "Sq Ft");
   const rentPerSqft = calculateRentPerSqft(parseIndianCurrency(price), measuredAreaSqft ?? 0);
-  const villaPricePerSqft = calculateRentPerSqft(parseIndianCurrency(price), areaInSqft(builtUpArea, measurementUnits.builtUpArea || "Sq Ft") ?? 0);
+  const automaticPricePerSqft = calculateRentPerSqft(parseIndianCurrency(price), measuredAreaSqft ?? 0);
+  const expectedMonthlyRentPerSqft = calculateRentPerSqft(parseIndianCurrency(monthlyRent), measuredAreaSqft ?? 0);
+  const isResidential = ["apartment", "villa", "individual_portion", "investment_property", "pg_service_apartment", "farm_house"].includes(propertyType);
+  const generalFinance = propertyType === "apartment" && listingType === "Buy";
   // Only Plot exposes a selectable rate basis. Normalize it when changing type.
   useEffect(() => {
     const unit = measurementUnits.pricePerSqft || "Sq Ft";
-    if (propertyType !== "plot" && unit !== "Sq Ft") {
+    if (!["plot", "farmland"].includes(propertyType) && unit !== "Sq Ft") {
       setPricePerSqft((current) => current.trim() ? String(convertRate(parseIndianCurrency(current), unit, "Sq Ft") ?? current) : current);
       setMeasurementUnits((current) => ({ ...current, pricePerSqft: "Sq Ft" }));
     }
   }, [propertyType, measurementUnits.pricePerSqft]);
   const filteredPropertyTypes = propertyTypesForListing(formData.propertyTypes || [], listingType);
-  const selectedPropertyTypeLabel = formData.propertyTypes.find((type) => type.value === propertyType)?.label ?? "";
+  const selectedPropertyTypeLabel = (filteredPropertyTypes.find((type) => type.value === propertyType) ?? formData.propertyTypes.find((type) => type.value === propertyType))?.label ?? "";
 
   // A listing switch or draft restore must not leave an invisible selection.
   useEffect(() => {
@@ -1527,14 +1543,14 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
     if (propertyType && !isPropertyTypeAllowed(propertyType, listingType, selectedPropertyTypeLabel)
       && !(mode === "edit" && propertyType === "farmland" && d?.listingType === "Rent" && listingType === "Rent"))
       errs.push({ field: "listingType", message: "This property type is not available for the selected listing type. Choose a compatible listing type." });
-    if (parseIndianCurrency(price) <= 0)
+    if (parseIndianCurrency(propertyType === "coworking" ? rentPerSeat : price) <= 0)
       errs.push({ field: "price", message: "Enter a valid price (e.g. 1.2 Cr, 50 L, 8000000)." });
     if (!cityId) errs.push({ field: "city", message: "City is required." });
     if (!sublocationId) errs.push({ field: "locality", message: "Locality is required." });
     const moneyFields: [string, unknown, string][] = [
       ["bookingAmount", bookingAmount, "Booking Amount"],
       ["expectedSalePrice", expectedSalePrice, "Expected Sale Price"],
-      ["pricePerSqft", propertyType === "villa" ? (villaPricePerSqft?.toString() ?? "") : pricePerSqft, "Sqft Price"],
+      ["pricePerSqft", automaticPricePerSqft?.toString() ?? "", "Sqft Price"],
       ["monthlyRent", monthlyRent, "Monthly Rent"],
     ];
     for (const [field, val, label] of moneyFields) {
@@ -1545,6 +1561,9 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
     }
     if (isFieldVisible("areaSqft") && areaSqft.trim() && (!Number.isFinite(Number(areaSqft)) || Number(areaSqft) < 0)) {
       errs.push({ field: "areaSqft", message: "Enter a valid nonnegative area." });
+    }
+    if (isFieldVisible("landArea") && areaSqft.trim() && (!Number.isFinite(Number(areaSqft)) || Number(areaSqft) < 0)) {
+      errs.push({ field: "landArea", message: "Enter a valid nonnegative land area." });
     }
     const activeMeasurements: [string, string][] =
       ["apartment", "villa", "individual_portion", "investment_property", "pg_service_apartment", "farm_house"].includes(propertyType)
@@ -1563,7 +1582,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         errs.push({ field, message: "Enter a nonnegative whole number." });
       }
     }
-    if (propertyType === "plot") {
+    if (isFieldVisible("plotBoundaries")) {
       const directions = new Set<string>();
       for (const side of plotBoundaries) {
         if (!side.length.trim()) continue;
@@ -1571,6 +1590,10 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         if (directions.has(side.direction)) errs.push({ field: "plotBoundaries", message: "Choose a different direction for each measured boundary." });
         directions.add(side.direction);
       }
+    }
+    for (const message of curationErrors(curation, field => isFieldVisible(field) && (field !== "restroomCount" || hasRestroom), numberOfPortions)) errs.push({ field: "curationDetails", message });
+    if (isFieldVisible("roomDimensions")) for (const room of roomDimensions) {
+      if (!restoreRoomDimensions(det?.roomDimensions).some(original => original.dimensions === room.dimensions) && room.dimensions.includes("×") && (!roomSides(room.dimensions) || roomSides(room.dimensions)!.some(side => Number(side) <= 0))) errs.push({ field: "roomDimensions", message: "Enter a positive length and width for each room in feet." });
     }
     if (isFieldVisible("floorPlans")) floorPlans.forEach((plan, index) => {
       if (!getFloorPlanTitle(plan)) errs.push({ field: `floorPlanName-${index}`, message: `Enter a ${["plot", "farmland"].includes(propertyType) ? "ground plan" : "floor"} name for plan ${index + 1}.` });
@@ -1609,7 +1632,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         title: title.trim(),
         listingType: listingType === "Buy" ? "Sell" : "Rent",
         propertyType,
-        price: parseIndianCurrency(price),
+        price: parseIndianCurrency(propertyType === "coworking" ? rentPerSeat : price),
         negotiable,
         status,
         availableFrom: availableFrom || undefined,
@@ -1637,7 +1660,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         brokerageType: brokerageType.trim() || undefined,
         brokerageValue: brokerageValue.trim() || undefined,
         expectedSalePrice: expectedSalePrice ? parseIndianCurrency(expectedSalePrice) : undefined,
-        pricePerSqft: propertyType === "villa" ? villaPricePerSqft ?? undefined : pricePerSqft.trim() ? convertRate(parseIndianCurrency(pricePerSqft), measurementUnits.pricePerSqft || "Sq Ft", "Sq Ft") : undefined,
+        pricePerSqft: automaticPricePerSqft ?? undefined,
         monthlyRent: monthlyRent ? parseIndianCurrency(monthlyRent) : undefined,
         maintenanceCharges: maintenanceCharges.trim() || undefined,
         securityDeposit: securityDeposit.trim() || undefined,
@@ -1666,6 +1689,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         plotBoundaries: plotBoundaries.some((side) => side.length.trim()) ? plotBoundaries.map((side) => ({ ...side, length: side.length.trim() ? Number(side.length) : null })) : undefined,
         measurementUnits: {
           ...measurementUnits,
+          ...(["plot", "farmland"].includes(propertyType) ? { landArea: areaUnit, pricePerSqft: measurementUnits.pricePerSqft || "Sq Ft" } : {}),
           ...Object.fromEntries([
             ["builtUpArea", builtUpArea], ["carpetArea", carpetArea],
             ["superBuiltUpArea", superBuiltUpArea], ["udsArea", udsArea],
@@ -1675,6 +1699,8 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             [field, measurementUnits[field] || (field === "plotSizeCents" ? "Cents" : "Sq Ft")],
           )),
         },
+        contactDetails: canViewPropertyContacts() ? ownerContacts : undefined,
+        curationDetails: { ...curationPayload(curation, isFieldVisible), ...(propertyType === "commercial" && listingType === "Buy" ? { expectedMonthlyRentPerSqft } : {}) },
         numberOfPortions: numberOfPortions !== "" ? Number(numberOfPortions) : undefined,
         hasGroundFloor,
         plotFacing: plotFacing.trim() || undefined,
@@ -1683,10 +1709,10 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         noOfLifts: noOfLifts !== "" ? Number(noOfLifts) : undefined,
         // Specifications — curated by property type before submission.
         bedrooms: bedrooms ? Number(bedrooms) : undefined,
-        bathrooms: bathrooms ? Number(bathrooms) : undefined,
+        bathrooms: bathroomTotal(curation, bathrooms),
         areaSqft: areaSqft ? Number(areaSqft) : undefined,
         areaUnit,
-        furnishingStatus: furnishingStatus.trim() || undefined,
+        furnishingStatus: effectiveFurnishingStatus.trim() || undefined,
         propertyFacing: propertyFacing.trim() || undefined,
         floorFacing: floorFacing.trim() || undefined,
         propertyAge: propertyAge.trim() || undefined,
@@ -1823,7 +1849,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             cropSuitability: cropSuitability.trim() || undefined,
             existingPlantation: existingPlantation.trim() || undefined,
             boreWell,
-            storageTank,
+            storageTank: curation.storageTankCapacity ? true : storageTank,
           });
         }
       }
@@ -1860,7 +1886,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           waterSupply: waterSupply.trim() || undefined,
           elevatorAccess,
           privateCabins: privateCabins ? Number(privateCabins) : undefined,
-          furnished: fullyFurnished,
+          furnished: propertyType === "coworking" ? true : fullyFurnished,
           sharedWashrooms: sharedWashrooms ? Number(sharedWashrooms) : undefined,
           individualWashrooms: individualWashrooms ? Number(individualWashrooms) : undefined,
           constructionDate: constructionDate.trim() || undefined,
@@ -1945,13 +1971,19 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         d?.documents ?? [], initialDocs, documents, initialFloorPlans, floorPlans,
         isFieldVisible("documentUploads"),
       );
-      const curatedPayload = curatePropertyPayload(payload, propertyType, listingType, tenantOccupied, furnishingStatus);
+      if (!hasRestroom && payload.curationDetails) delete payload.curationDetails.restroomCount;
+      const curatedPayload = curatePropertyPayload(payload, propertyType, listingType, tenantOccupied, effectiveFurnishingStatus);
 
       // Keep the searchable base area derived from built-up area when its
       // standalone input is intentionally hidden for Villa / Apartment rentals.
       if (!isFieldVisible("areaSqft") && measuredAreaSqft !== undefined) {
         curatedPayload.areaSqft = measuredAreaSqft;
         curatedPayload.areaUnit = "Sq Ft";
+      }
+
+      if (propertyType === "coworking" || (propertyType === "commercial" && listingType === "Rent")) {
+        const selected = effectiveFurnishingStatus.toLowerCase().replace(/[^a-z]/g, "");
+        if (["fullyfurnished", "semifurnished", "unfurnished", "bareshell"].includes(selected)) curatedPayload.furnished = ["fullyfurnished", "semifurnished"].includes(selected);
       }
 
       // Remove undefined fields
@@ -2067,11 +2099,6 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 </div>
               )}
 
-              {isFieldVisible("zoning") && (<div className="space-y-2">
-                <label className={labelClass}>Zoning / Usage</label>
-                <FormSelect name="zoning" placeholder="Select option" options={asOptions(PLOT_ZONING)} value={zoning || null} onValueChange={setZoning} />
-              </div>)}
-
               {isFieldVisible("plotType") && (
                 <div className="space-y-2">
                   <label className={labelClass}>Plot Type</label>
@@ -2084,7 +2111,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 </div>
               )}
 
-              <div className="space-y-2">
+              {isFieldVisible("sfNumber") && (<div className="space-y-2">
                 <label className={labelClass}>SF Number</label>
                 <Input
                   value={sfNumber}
@@ -2092,7 +2119,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   placeholder="Survey / SF Number"
                   className={inputClass}
                 />
-              </div>
+              </div>)}
 
               <div className="space-y-2">
                 <label className={labelClass}>Land Type</label>
@@ -2140,7 +2167,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 />
               </div>)}
 
-              <div className="space-y-2">
+              {isFieldVisible("boundaryWall") && (<div className="space-y-2">
                 <label className={labelClass}>Boundary Wall</label>
                 <div className={checkboxRowClass}>
                   <Checkbox
@@ -2152,7 +2179,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                     Has Boundary Wall
                   </label>
                 </div>
-              </div>
+              </div>)}
 
               {/* Land characteristics; soil and irrigation are farmland only. */}
               {["plot", "farmland", "farm_house"].includes(propertyType) && (
@@ -2184,12 +2211,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   {isFieldVisible("irrigation") && (
                     <div className="space-y-2">
                       <label className={labelClass}>Irrigation Facilities</label>
-                      <Input
-                        value={irrigation}
-                        onChange={(e) => setIrrigation(e.target.value)}
-                        placeholder="e.g. Canal"
-                        className={inputClass}
-                      />
+                      <FormSelect name="irrigation" placeholder="Select option" options={asOptions(IRRIGATION_OPTIONS)} value={irrigation} onValueChange={setIrrigation} />
                     </div>
                   )}
 
@@ -2238,22 +2260,10 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className={labelClass}>Storage Tank</label>
-                    <div className={checkboxRowClass}>
-                      <Checkbox
-                        id="storageTank"
-                        checked={storageTank}
-                        onCheckedChange={(checked) => setStorageTank(!!checked)}
-                      />
-                      <label htmlFor="storageTank" className="text-sm font-semibold cursor-pointer flex-1">
-                        Has Storage Tank
-                      </label>
-                    </div>
-                  </div>
+
                 </>
               )}
-{isFieldVisible("plotBoundaries") && <div className="space-y-4 lg:col-span-3" id="pf-plotBoundaries"><h3 className="text-lg font-semibold">Plot boundaries</h3><PropertyPlotBoundaries value={plotBoundaries} onChange={setPlotBoundaries} /><FormErr field="plotBoundaries" /></div>}{isFieldVisible("boreWellCount") && boreWell && <div className="space-y-2"><label className={labelClass}>No of Borewells</label><Input type="number" min={1} step="1" value={boreWellCount} onChange={(event) => setBoreWellCount(event.target.value)} className={inputClass} /></div>}</>);
+{isFieldVisible("plotBoundaries") && <div className="space-y-4 lg:col-span-3" id="pf-plotBoundaries"><h3 className="text-lg font-semibold">Plot boundaries</h3><PropertyPlotBoundaries value={plotBoundaries} onChange={setPlotBoundaries} facing={plotFacing} /><FormErr field="plotBoundaries" /></div>}{isFieldVisible("boreWellCount") && boreWell && <div className="space-y-2"><label className={labelClass}>No of Borewells</label><Input type="number" min={1} step="1" value={boreWellCount} onChange={(event) => setBoreWellCount(event.target.value)} className={inputClass} /></div>}</>);
 
   const commonSpecifications = (<>
 
@@ -2274,48 +2284,10 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
             {/* Bathrooms — residential only */}
             {isFieldVisible("bathrooms") && (
-              <div className="space-y-2">
-                <label className={labelClass}>Bathrooms</label>
-                <Input
-                  type="number"
-                  value={bathrooms}
-                  onChange={(e) => setBathrooms(e.target.value)}
-                  placeholder="e.g. 2"
-                  min={0}
-                  className={inputClass}
-                />
-              </div>
+              <div className="space-y-3"><label className={labelClass}>Bathrooms</label><div className="grid grid-cols-2 gap-3"><div className="space-y-2"><label htmlFor="individualBathrooms" className="text-sm">Individual bathrooms</label><Input className={inputClass} id="individualBathrooms" type="number" min={0} step={1} value={curation.individualBathrooms} onChange={e => setCuration(current => ({ ...current, individualBathrooms: e.target.value }))} /></div><div className="space-y-2"><label htmlFor="attachedBathrooms" className="text-sm">Attached bathrooms</label><Input className={inputClass} id="attachedBathrooms" type="number" min={0} step={1} value={curation.attachedBathrooms} onChange={e => setCuration(current => ({ ...current, attachedBathrooms: e.target.value }))} /></div></div><p className="text-sm text-muted-foreground">Total bathrooms: {bathroomTotal(curation, bathrooms) ?? 0}{!curation.individualBathrooms && !curation.attachedBathrooms && bathrooms ? " (saved total; split not yet recorded)" : ""}</p></div>
             )}
 
-            {/* Area */}
-            {isFieldVisible("areaSqft") && (<div className="space-y-2">
-              <label className={labelClass}>{propertyType === "plot" ? "Total Project Area" : "Area"}</label>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  step="any"
-                  value={areaSqft}
-                  onChange={(e) => setAreaSqft(e.target.value)}
-                  placeholder="e.g. 1500"
-                  min={0}
-                  className={`${inputClass} flex-1 min-w-0`}
-                />
-                <FormSelect
-                  name="areaUnit"
-                  className="w-32 shrink-0"
-                  placeholder="Unit"
-                  options={[
-                    { label: "Sq Ft", value: "Sq Ft" },
-                    { label: "Sq M", value: "Sq M" },
-                    { label: "Acres", value: "Acres" },
-                    { label: "Cents", value: "Cents" },
-                    { label: "Grounds", value: "Grounds" }
-                  ]}
-                  value={areaUnit || null}
-                  onValueChange={setAreaUnit}
-                />
-              </div>
-            </div>)}
+            {isFieldVisible("landArea") && <div className="space-y-2"><label className={labelClass}>{propertyType === "plot" && listingType === "Buy" ? "Total Project Area" : "Land Area"}</label><PropertyAreaInput name="landArea" value={areaSqft} unit={areaUnit} onChange={setAreaSqft} onUnitChange={setAreaUnit} /></div>}
 
             {/* Furnishing Status — hidden for plot / farmland */}
             {isFieldVisible("furnishingStatus") && (
@@ -2325,7 +2297,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   name="furnishingStatus"
                   placeholder="Select Furnishing"
                   options={FURNISHING_STATUS_OPTIONS}
-                  value={furnishingStatus || null}
+                  value={effectiveFurnishingStatus || null}
                   onValueChange={setFurnishingStatus}
                 />
               </div>
@@ -2399,7 +2371,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 <FormSelect
                   name="suitableFor"
                   placeholder="Select Segment"
-                  options={withLegacyOption(SUITABLE_FOR_OPTIONS, suitableFor)}
+                  options={withLegacyOption(propertyType === "plot" ? asOptions(PLOT_RENT_USES) : SUITABLE_FOR_OPTIONS, suitableFor)}
                   value={suitableFor || null}
                   onValueChange={setSuitableFor}
                 />
@@ -2448,6 +2420,13 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 />
               </div>
             )}
+  <AdditionalCurationFields value={curation} onChange={setCuration} visible={isFieldVisible} hasRestroom={hasRestroom} utilities={formData.utilities.map((u: any) => u.name)} />
+  {isFieldVisible("numberOfPortions") && <PortionFields count={numberOfPortions} onCountChange={setNumberOfPortions} value={curation} onChange={setCuration} />}
+  {isFieldVisible("parkingSpaces") && <ParkingFields value={curation} onChange={setCuration} />}
+  {isFieldVisible("plotFacing") && <div className="space-y-2"><label className={labelClass}>Plot Facing</label><FormSelect name="plotFacing" placeholder="Select direction" options={FACING_DIRECTION_OPTIONS} value={plotFacing} onValueChange={setPlotFacing} /></div>}
+  {isFieldVisible("plotBoundaries") && !["plot", "farmland", "farm_house"].includes(propertyType) && <div className="space-y-4 lg:col-span-3"><h3 className="text-lg font-semibold">Plot boundaries</h3><PropertyPlotBoundaries value={plotBoundaries} onChange={setPlotBoundaries} facing={plotFacing} /><FormErr field="plotBoundaries" /></div>}
+  {isResidential && <div className="space-y-2"><label className={labelClass}>Approvals</label><PropertyApprovalsSelect value={approvals} onChange={setApprovals} /></div>}
+  {generalFinance && <><label className="flex items-center gap-3 text-sm font-semibold"><Checkbox checked={isHypothecated(hypothecation)} onCheckedChange={checked => setHypothecation(checked === true ? "Yes" : "No")} />Has Finance / Hypothecation</label>{isHypothecated(hypothecation) && <><div className="space-y-2"><label className={labelClass}>Finance</label><PriceInput value={financeFacing} onChange={setFinanceFacing} /></div><div className="space-y-2"><label className={labelClass}>Funded By</label><FormSelect name="fundedBy" placeholder="Select lender" value={fundedBy} options={asOptions(["Bank", "NBFC", "Local finance"])} onValueChange={setFundedBy} /></div></>}</>}
 </>);
 
   // ---- Render ----
@@ -2553,8 +2532,9 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
             {/* Property Type */}
             <div className="space-y-2" id="pf-propertyType">
-              <label className={labelClass}>Property Type *</label>
+              <label htmlFor="property-type-select" className={labelClass}>Property Type *</label>
               <FormSelect
+                id="property-type-select"
                 name="propertyType"
                 disabled={mode === "edit"}
                 placeholder="Select Type"
@@ -2562,6 +2542,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 value={propertyType || null}
                 onValueChange={(v) => {
                   setPropertyType(v);
+                  if (v === "coworking" && propertyType !== "coworking") setFurnishingStatus("FULLY FURNISHED");
                   clearFieldError("propertyType");
                 }}
                 required
@@ -2573,6 +2554,12 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   : "Select a type to see the relevant property fields."}
               </p>
             </div>
+
+              {isFieldVisible("zoning") && (<div className="space-y-2">
+                <label className={labelClass}>Zoning / Usage</label>
+                <FormSelect name="zoning" placeholder="Select option" options={asOptions(PLOT_ZONING)} value={zoning || null} onValueChange={setZoning} />
+              </div>)}
+
 
             {/* Status */}
             <div className="space-y-2">
@@ -2660,10 +2647,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 <FormSelect
                   name="ownershipType"
                   placeholder="Select Ownership"
-                  options={[
-                    { label: "Freehold", value: "Freehold" },
-                    { label: "Leasehold", value: "Leasehold" }
-                  ]}
+                  options={asOptions(OWNERSHIP_OPTIONS)}
                   value={ownershipType || null}
                   onValueChange={setOwnershipType}
                 />
@@ -2796,15 +2780,16 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
             {/* Price */}
-            <div className="space-y-2" id="pf-price">
-              <label className={labelClass}>{listingType === "Rent" || isRentalOnlyPropertyType(propertyType) ? "Monthly rent *" : "Sale price *"}</label>
+            {propertyType !== "coworking" && (<div className="space-y-2" id="pf-price">
+              <label htmlFor="mainPropertyPrice" className={labelClass}>{listingType === "Rent" || isRentalOnlyPropertyType(propertyType) ? "Monthly rent *" : "Sale price *"}</label>
               <PriceInput
+                id="mainPropertyPrice"
                 value={price}
                 onChange={(v) => { setPrice(v); clearFieldError("price"); }}
                 placeholder="e.g. 50L or 1.2Cr"
               />
               <FormErr field="price" />
-            </div>
+            </div>)}
 
             {/* Negotiable */}
             <div className="space-y-2">
@@ -2884,26 +2869,14 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               </div>
             )}
 
-            {isFieldVisible("pricePerSqft") && (
-              <div className="space-y-2" id="pf-pricePerSqft">
-                <label className={labelClass}>{propertyType === "plot" ? `Price per ${rateLabel(measurementUnits.pricePerSqft || "Sq Ft")}` : "Sqft Price"}</label>
-                <PriceInput
-                  value={propertyType === "villa" ? villaPricePerSqft?.toFixed(2) ?? "" : pricePerSqft}
-                  readOnly={propertyType === "villa"}
-                  onChange={(v) => { setPricePerSqft(v); clearFieldError("pricePerSqft"); }}
-                  placeholder="e.g. 6500"
-                />
-                {propertyType === "plot" && <FormSelect name="pricePerSqftUnit" placeholder="Rate unit" options={AREA_UNIT_OPTIONS} value={measurementUnits.pricePerSqft || "Sq Ft"} onValueChange={(unit) => { if (pricePerSqft.trim()) setPricePerSqft(String(convertRate(parseIndianCurrency(pricePerSqft), measurementUnits.pricePerSqft || "Sq Ft", unit) ?? pricePerSqft)); setMeasurementUnits((current) => ({ ...current, pricePerSqft: unit })); }} />}
-                <p className="text-sm text-muted-foreground">Price in ₹ per {propertyType === "plot" ? rateLabel(measurementUnits.pricePerSqft || "Sq Ft") : "sq ft"}{propertyType === "villa" ? "; calculated from sale price and built-up area" : ""}</p>
-                <FormErr field="pricePerSqft" />
-              </div>
-            )}
+            {isFieldVisible("pricePerSqft") && <div className="space-y-2" id="pf-pricePerSqft"><label className={labelClass}>{propertyType === "farmland" ? "Price per Area" : propertyType === "plot" ? `Price per ${rateLabel(measurementUnits.pricePerSqft || "Sq Ft")}` : "Price per Sqft"} (auto)</label><Input readOnly aria-label="Calculated price per area" value={automaticPricePerSqft == null ? "" : String(convertRate(automaticPricePerSqft, "Sq Ft", measurementUnits.pricePerSqft || "Sq Ft")?.toFixed(2) ?? "")} placeholder="Calculated automatically" className={inputClass} />{["plot", "farmland"].includes(propertyType) && <FormSelect name="pricePerSqftUnit" placeholder="Rate unit" options={AREA_UNIT_OPTIONS} value={measurementUnits.pricePerSqft || "Sq Ft"} onValueChange={unit => setMeasurementUnits(current => ({ ...current, pricePerSqft: unit }))} />}<p className="text-sm text-muted-foreground">Calculated from sale price and {["plot", "farmland"].includes(propertyType) ? "land area" : "built-up area"}. ₹ per {rateLabel(measurementUnits.pricePerSqft || "Sq Ft")}.</p></div>}
+            {propertyType === "commercial" && listingType === "Buy" && <div className="space-y-2"><label className={labelClass}>Expected Monthly Sqft Price</label><Input readOnly aria-label="Expected Monthly Sqft Price" value={expectedMonthlyRentPerSqft?.toFixed(2) ?? ""} placeholder="Calculated automatically" className={inputClass} /><p className="text-sm text-muted-foreground">Expected monthly rent divided by built-up area in sqft.</p></div>}
 
             {isFieldVisible("rentPerSqft") && (
               <div className="space-y-2">
                 <label htmlFor="rent-per-sqft" className={labelClass}>Rent per sqft</label>
                 <Input id="rent-per-sqft" value={rentPerSqft === null ? "" : rentPerSqft.toFixed(2)} readOnly placeholder="Calculated automatically" aria-describedby="rent-per-sqft-hint" className={inputClass} />
-                <p id="rent-per-sqft-hint" className="text-xs text-muted-foreground">₹ per sqft per month. Calculated from monthly rent and Area. Enter both to see the rate.</p>
+                <p id="rent-per-sqft-hint" className="text-xs text-muted-foreground">₹ per sqft per month. Calculated from monthly rent and land area or built-up area. Enter both to see the rate.</p>
               </div>
             )}
 
@@ -3139,8 +3112,8 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
               {isFieldVisible("noOfLifts") && <div className="space-y-2"><label className={labelClass}>No of Lifts</label><Input type="number" min={0} step="1" value={noOfLifts} onChange={(event) => setNoOfLifts(event.target.value)} className={inputClass} /></div>}
               {isFieldVisible("parking") && <div className="space-y-2"><label className={labelClass}>No of Parking</label><Input type="number" min={0} step="1" value={parking} onChange={(event) => setParking(event.target.value)} className={inputClass} /></div>}
-              {isFieldVisible("numberOfPortions") && <div className="space-y-2"><label className={labelClass}>No of Portions</label><Input type="number" min={0} step="1" value={numberOfPortions} onChange={(event) => setNumberOfPortions(event.target.value)} className={inputClass} /></div>}
-              {isFieldVisible("plotFacing") && <div className="space-y-2"><label className={labelClass}>Plot Facing</label><FormSelect name="plotFacing" placeholder="Select direction" options={FACING_DIRECTION_OPTIONS} value={plotFacing || null} onValueChange={setPlotFacing} /></div>}
+
+
 
 
               {isFieldVisible("unitType") && (
@@ -3196,15 +3169,15 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 </div>
               )}
 
-              <div className="space-y-2">
+              {isFieldVisible("builtUpArea") && (<div className="space-y-2">
                 <label className={labelClass}>Built Up Area</label>
                 <PropertyAreaInput name="builtUpArea" value={builtUpArea} unit={measurementUnits.builtUpArea || "Sq Ft"} onChange={setBuiltUpArea} onUnitChange={(unit) => setMeasurementUnits((current) => ({ ...current, builtUpArea: unit }))} />
-              </div>
+              </div>)}
 
-              <div className="space-y-2">
+              {isFieldVisible("carpetArea") && (<div className="space-y-2">
                 <label className={labelClass}>Carpet Area</label>
                 <PropertyAreaInput name="carpetArea" value={carpetArea} unit={measurementUnits.carpetArea || "Sq Ft"} onChange={setCarpetArea} onUnitChange={(unit) => setMeasurementUnits((current) => ({ ...current, carpetArea: unit }))} />
-              </div>
+              </div>)}
 
               {isFieldVisible("superBuiltUpArea") && (
                 <div className="space-y-2">
@@ -3325,7 +3298,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 </div>
               )}
 
-              <div className="space-y-2">
+              {isFieldVisible("outdoorSpaces") && (<div className="space-y-2">
                 <label className={labelClass}>Outdoor Spaces</label>
                 <Input
                   value={outdoorSpaces}
@@ -3333,14 +3306,14 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   placeholder="e.g. Terrace, Garden"
                   className={inputClass}
                 />
-              </div>
+              </div>)}
 
               <div className="space-y-2 lg:col-span-3">
-                <label className={labelClass}>Additional amenity notes</label>
+                <label className={labelClass}>Additional Notes</label>
                 <Textarea
                   value={amenities}
                   onChange={(e) => setAmenities(e.target.value)}
-                  placeholder="Any additional amenity notes..."
+                  placeholder="Additional property notes..."
                   rows={3}
                   className="rounded-xl bg-muted/30 resize-none"
                 />
@@ -3369,15 +3342,15 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               Commercial Space Details
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{listingType === "Rent" && <>
-<div className="space-y-2"><label className={labelClass}>Special Purpose</label><FormSelect name="specialPurpose" placeholder="Select special purpose" options={asOptions(COMMERCIAL_SPECIAL_PURPOSES)} value={specialPurpose || null} onValueChange={setSpecialPurpose} /></div>
+{isFieldVisible("specialPurpose") && (<div className="space-y-2"><label className={labelClass}>Special Purpose</label><FormSelect name="specialPurpose" placeholder="Select special purpose" options={asOptions(COMMERCIAL_SPECIAL_PURPOSES)} value={specialPurpose || null} onValueChange={setSpecialPurpose} /></div>)}
 <div className="space-y-2"><label className={labelClass}>Property Accessibility</label><FormSelect name="accessibility" placeholder="Select property accessibility" options={asOptions(PROPERTY_ACCESSIBILITY)} value={accessibility || null} onValueChange={setAccessibility} /></div>
 </>}
 {commonSpecifications}
-<div className="space-y-2"><label className={labelClass}>Built Up Area</label><PropertyAreaInput name="builtUpArea" value={builtUpArea} unit={measurementUnits.builtUpArea || "Sq Ft"} onChange={setBuiltUpArea} onUnitChange={(unit) => setMeasurementUnits((current) => ({ ...current, builtUpArea: unit }))} /></div>
-<div className="space-y-2"><label className={labelClass}>Carpet Area</label><PropertyAreaInput name="carpetArea" value={carpetArea} unit={measurementUnits.carpetArea || "Sq Ft"} onChange={setCarpetArea} onUnitChange={(unit) => setMeasurementUnits((current) => ({ ...current, carpetArea: unit }))} /></div>
-<div className="space-y-2"><label className={labelClass}>UDS Area</label><PropertyAreaInput name="udsArea" value={udsArea} unit={measurementUnits.udsArea || "Sq Ft"} onChange={setUdsArea} onUnitChange={(unit) => setMeasurementUnits((current) => ({ ...current, udsArea: unit }))} /></div>
+{isFieldVisible("builtUpArea") && (<div className="space-y-2"><label className={labelClass}>Built Up Area</label><PropertyAreaInput name="builtUpArea" value={builtUpArea} unit={measurementUnits.builtUpArea || "Sq Ft"} onChange={setBuiltUpArea} onUnitChange={(unit) => setMeasurementUnits((current) => ({ ...current, builtUpArea: unit }))} /></div>)}
+{isFieldVisible("carpetArea") && (<div className="space-y-2"><label className={labelClass}>Carpet Area</label><PropertyAreaInput name="carpetArea" value={carpetArea} unit={measurementUnits.carpetArea || "Sq Ft"} onChange={setCarpetArea} onUnitChange={(unit) => setMeasurementUnits((current) => ({ ...current, carpetArea: unit }))} /></div>)}
+{isFieldVisible("udsArea") && (<div className="space-y-2"><label className={labelClass}>UDS Area</label><PropertyAreaInput name="udsArea" value={udsArea} unit={measurementUnits.udsArea || "Sq Ft"} onChange={setUdsArea} onUnitChange={(unit) => setMeasurementUnits((current) => ({ ...current, udsArea: unit }))} /></div>)}
 
-              <div className="space-y-2">
+              {isFieldVisible("propertyUse") && (<div className="space-y-2">
                 <label className={labelClass}>Property Use (Office/Retail...)</label>
                 {listingType === "Rent" ? <FormSelect name="propertyUse" placeholder="Select property use" options={asOptions(COMMERCIAL_RENT_USES)} value={propertyUse || null} onValueChange={setPropertyUse} /> : (<Input
                   value={propertyUse}
@@ -3385,9 +3358,9 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   placeholder="e.g. Office"
                   className={inputClass}
                 />)}
-              </div>
+              </div>)}
 
-              <div className="space-y-2">
+              {isFieldVisible("noOfLifts") && (<div className="space-y-2">
                 <label className={labelClass}>No of Lifts</label>
                 <Input
                   type="number"
@@ -3397,14 +3370,14 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   min={0}
                   className={inputClass}
                 />
-              </div>
+              </div>)}
 
               <div className="space-y-2">
                 <label className={labelClass}>Dimension</label>
                 <Input
                   value={dimension}
                   onChange={(e) => setDimension(e.target.value)}
-                  placeholder="e.g. 40x60"
+                  placeholder="e.g. 40 × 60 ft"
                   className={inputClass}
                 />
               </div>
@@ -3419,7 +3392,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 />
               </div>
 
-              <div className="space-y-2">
+              {isFieldVisible("carParking") && (<div className="space-y-2">
                 <label className={labelClass}>Car Parking</label>
                 <Input
                   type="number"
@@ -3429,9 +3402,9 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   min={0}
                   className={inputClass}
                 />
-              </div>
+              </div>)}
 
-              <div className="space-y-2">
+              {isFieldVisible("bikeParking") && (<div className="space-y-2">
                 <label className={labelClass}>Bike Parking</label>
                 <Input
                   type="number"
@@ -3441,11 +3414,11 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   min={0}
                   className={inputClass}
                 />
-              </div>
+              </div>)}
 
 
 
-              <div className="space-y-2">
+              {isFieldVisible("utilitiesProvided") && (<div className="space-y-2">
                 <label className={labelClass}>Utilities Provided</label>
                 <FormSelect
                   name="utilitiesProvided"
@@ -3464,7 +3437,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   value={utilitiesProvided || null}
                   onValueChange={setUtilitiesProvided}
                 />
-              </div>
+              </div>)}
 
               <div className="space-y-2">
                 <label className={labelClass}>Ceiling Height (ft)</label>
@@ -3480,12 +3453,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
               <div className="space-y-2">
                 <label className={labelClass}>Electricity</label>
-                <Input
-                  value={electricityConnection}
-                  onChange={(e) => setElectricityConnection(e.target.value)}
-                  placeholder="e.g. 3 Phase"
-                  className={inputClass}
-                />
+                <FormSelect name="electricityConnection" placeholder="Select option" options={asOptions(ELECTRICITY_OPTIONS)} value={electricityConnection} onValueChange={setElectricityConnection} />
               </div>
 
               {isFieldVisible("conferenceRoom") && (<div className="space-y-2">
@@ -3512,7 +3480,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 />
               </div>)}
 
-              <div className="space-y-2">
+              {isFieldVisible("tenantMix") && (<div className="space-y-2">
                 <label className={labelClass}>Tenant Mix</label>
                 <Input
                   value={tenantMix}
@@ -3520,7 +3488,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   placeholder="e.g. IT, Retail"
                   className={inputClass}
                 />
-              </div>
+              </div>)}
 
               <div className="space-y-2">
                 <label className={labelClass}>Outside Parking</label>
@@ -3615,15 +3583,10 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
               <div className="space-y-2">
                 <label className={labelClass}>Water Supply</label>
-                <Input
-                  value={waterSupply}
-                  onChange={(e) => setWaterSupply(e.target.value)}
-                  placeholder="e.g. Corporation + Bore"
-                  className={inputClass}
-                />
+                <FormSelect name="waterSupply" placeholder="Select option" options={asOptions(WATER_SUPPLY_OPTIONS)} value={waterSupply} onValueChange={setWaterSupply} />
               </div>
 
-              <div className="space-y-2">
+              {isFieldVisible("elevatorAccess") && (<div className="space-y-2">
                 <label className={labelClass}>Lift Facility</label>
                 <div className={checkboxRowClass}>
                   <Checkbox
@@ -3635,7 +3598,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                     Lift Facility Available
                   </label>
                 </div>
-              </div>
+              </div>)}
 
               {isFieldVisible("privateCabins") && (<div className="space-y-2">
                 <label className={labelClass}>{listingType === "Rent" ? "No of Cabins" : "Private Cabins"}</label>
@@ -3649,7 +3612,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 />
               </div>)}
 
-              <div className="space-y-2">
+              {isFieldVisible("furnished") && (<div className="space-y-2">
                 <label className={labelClass}>Fully Furnished</label>
                 <div className={checkboxRowClass}>
                   <Checkbox
@@ -3661,7 +3624,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                     Fully Furnished
                   </label>
                 </div>
-              </div>
+              </div>)}
 
               <div className="space-y-2">
                 <label className={labelClass}>Shared Washrooms</label>
@@ -3708,7 +3671,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               </div>)}
 
               <div className="space-y-2 lg:col-span-3">
-                <label className={labelClass}>Amenities (Commercial notes)</label>
+                <label className={labelClass}>Additional Notes</label>
                 <Textarea
                   value={commercialAmenities}
                   onChange={(e) => setCommercialAmenities(e.target.value)}
@@ -3731,15 +3694,15 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 {commonSpecifications}
 
 
-              <div className="space-y-2">
+              {isFieldVisible("builtUpArea") && (<div className="space-y-2">
                 <label className={labelClass}>Built Up Area</label>
                 <PropertyAreaInput name="builtUpArea" value={builtUpArea} unit={measurementUnits.builtUpArea || "Sq Ft"} onChange={setBuiltUpArea} onUnitChange={(unit) => setMeasurementUnits((current) => ({ ...current, builtUpArea: unit }))} />
-              </div>
+              </div>)}
 
-              <div className="space-y-2">
+              {isFieldVisible("carpetArea") && (<div className="space-y-2">
                 <label className={labelClass}>Carpet Area</label>
                 <PropertyAreaInput name="carpetArea" value={carpetArea} unit={measurementUnits.carpetArea || "Sq Ft"} onChange={setCarpetArea} onUnitChange={(unit) => setMeasurementUnits((current) => ({ ...current, carpetArea: unit }))} />
-              </div>
+              </div>)}
 
               <div className="space-y-2">
                 <label className={labelClass}>Available Workstations</label>
@@ -3857,7 +3820,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 </div>
               )}
 
-              <div className="space-y-2">
+              {isFieldVisible("electricityCharges") && (<div className="space-y-2">
                 <label className={labelClass}>Electricity Charges</label>
                 <Input
                   value={electricityCharges}
@@ -3865,7 +3828,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   placeholder="e.g. Included"
                   className={inputClass}
                 />
-              </div>
+              </div>)}
 
               <div className="space-y-2">
                 <label className={labelClass}>High Speed Wifi</label>
@@ -3996,9 +3959,9 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
               Industrial Details
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"><div className="space-y-2"><label className={labelClass}>Plot Area</label><PropertyAreaInput name="plotArea" value={plotArea} unit={measurementUnits.plotArea || "Sq Ft"} onChange={setPlotArea} onUnitChange={(unit) => setMeasurementUnits((current) => ({ ...current, plotArea: unit }))} /></div>
-<div className="space-y-2"><label className={labelClass}>Built Up Area</label><PropertyAreaInput name="builtUpArea" value={builtUpArea} unit={measurementUnits.builtUpArea || "Sq Ft"} onChange={setBuiltUpArea} onUnitChange={(unit) => setMeasurementUnits((current) => ({ ...current, builtUpArea: unit }))} /></div>
-<div className="space-y-2"><label className={labelClass}>Carpet Area</label><PropertyAreaInput name="carpetArea" value={carpetArea} unit={measurementUnits.carpetArea || "Sq Ft"} onChange={setCarpetArea} onUnitChange={(unit) => setMeasurementUnits((current) => ({ ...current, carpetArea: unit }))} /></div><div className="space-y-2"><label className={labelClass}>No of Labor Rooms</label><Input type="number" min={0} step="1" value={laborRooms} onChange={(event) => setLaborRooms(event.target.value)} className={inputClass} /></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{isFieldVisible("plotArea") && (<div className="space-y-2"><label className={labelClass}>Plot Area</label><PropertyAreaInput name="plotArea" value={plotArea} unit={measurementUnits.plotArea || "Sq Ft"} onChange={setPlotArea} onUnitChange={(unit) => setMeasurementUnits((current) => ({ ...current, plotArea: unit }))} /></div>)}
+{isFieldVisible("builtUpArea") && (<div className="space-y-2"><label className={labelClass}>Built Up Area</label><PropertyAreaInput name="builtUpArea" value={builtUpArea} unit={measurementUnits.builtUpArea || "Sq Ft"} onChange={setBuiltUpArea} onUnitChange={(unit) => setMeasurementUnits((current) => ({ ...current, builtUpArea: unit }))} /></div>)}
+{isFieldVisible("carpetArea") && (<div className="space-y-2"><label className={labelClass}>Carpet Area</label><PropertyAreaInput name="carpetArea" value={carpetArea} unit={measurementUnits.carpetArea || "Sq Ft"} onChange={setCarpetArea} onUnitChange={(unit) => setMeasurementUnits((current) => ({ ...current, carpetArea: unit }))} /></div>)}<div className="space-y-2"><label className={labelClass}>No of Labor Rooms</label><Input type="number" min={0} step="1" value={laborRooms} onChange={(event) => setLaborRooms(event.target.value)} className={inputClass} /></div>
 <div className="space-y-2"><label className={labelClass}>No of Toilets</label><Input type="number" min={0} step="1" value={toilets} onChange={(event) => setToilets(event.target.value)} className={inputClass} /></div><div className="space-y-2"><label className={labelClass}>Container Access</label><FormSelect name="containerAccess" placeholder="Select container access" options={asOptions(CONTAINER_ACCESS_OPTIONS)} value={containerAccess || null} onValueChange={setContainerAccess} /></div>
 {commonSpecifications}
 
@@ -4064,7 +4027,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 />
               </div>
 
-              <div className="space-y-2">
+              {isFieldVisible("powerSupplyHp") && (<div className="space-y-2">
                 <label className={labelClass}>Power Supply (HP)</label>
                 <Input
                   type="number"
@@ -4074,16 +4037,11 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   min={0}
                   className={inputClass}
                 />
-              </div>
+              </div>)}
 
               <div className="space-y-2">
                 <label className={labelClass}>Water Supply</label>
-                <Input
-                  value={waterSupply}
-                  onChange={(e) => setWaterSupply(e.target.value)}
-                  placeholder="e.g. Municipal + Bore Well"
-                  className={inputClass}
-                />
+                <FormSelect name="waterSupply" placeholder="Select option" options={asOptions(WATER_SUPPLY_OPTIONS)} value={waterSupply} onValueChange={setWaterSupply} />
               </div>
 
               <div className="space-y-2">
@@ -4210,7 +4168,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 </div>
               </div>
 
-              <div className="space-y-2">
+              {isFieldVisible("truckTrailerAccess") && (<div className="space-y-2">
                 <label className={labelClass}>Truck/Trailer Access</label>
                 <div className={checkboxRowClass}>
                   <Checkbox
@@ -4222,7 +4180,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                     Truck / Trailer Access
                   </label>
                 </div>
-              </div>
+              </div>)}
 
               <div className="space-y-2">
                 <label className={labelClass}>Crane Available</label>
@@ -4252,7 +4210,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 </div>
               </div>
 
-              <div className="space-y-2">
+              {isFieldVisible("heavyVehicleAccess") && (<div className="space-y-2">
                 <label className={labelClass}>Heavy Vehicle Access</label>
                 <div className={checkboxRowClass}>
                   <Checkbox
@@ -4264,9 +4222,9 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                     Heavy Vehicle Access
                   </label>
                 </div>
-              </div>
+              </div>)}
 
-              <div className="space-y-2">
+              {isFieldVisible("powerSupply2") && (<div className="space-y-2">
                 <label className={labelClass}>Power Supply 2</label>
                 <Input
                   value={powerSupply2}
@@ -4274,9 +4232,9 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   placeholder="e.g. 50 HP"
                   className={inputClass}
                 />
-              </div>
+              </div>)}
 
-              <div className="space-y-2">
+              {isFieldVisible("powerSupply3") && (<div className="space-y-2">
                 <label className={labelClass}>Power Supply 3</label>
                 <Input
                   value={powerSupply3}
@@ -4284,9 +4242,9 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   placeholder="e.g. 25 HP"
                   className={inputClass}
                 />
-              </div>
+              </div>)}
 
-              <div className="space-y-2">
+              {isFieldVisible("truckTrailerCount") && (<div className="space-y-2">
                 <label className={labelClass}>Truck/Trailer Count</label>
                 <Input
                   type="number"
@@ -4296,7 +4254,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   min={0}
                   className={inputClass}
                 />
-              </div>
+              </div>)}
 
               <div className="space-y-2">
                 <label className={labelClass}>Public Transport Access</label>
@@ -4308,10 +4266,10 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 />
               </div>
 
-              <div className="space-y-2">
+              {isFieldVisible("ownershipProofVerified") && (<div className="space-y-2">
                 <label className={labelClass}>Ownership Proof Verified</label>
                 <FormSelect name="ownershipProofVerified" placeholder="Select status" value={ownershipProofVerified || null} options={["N/A","Yes","No"].map((value) => ({ value, label: value }))} onValueChange={setOwnershipProofVerified} />
-              </div>
+              </div>)}
 
               <div className="space-y-2">
                 <label className={labelClass}>Building Approval Certification</label>
@@ -4325,14 +4283,14 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
 
 
-              <div className="space-y-2">
+              {isFieldVisible("otherLegalClearance") && (<div className="space-y-2">
                 <label className={labelClass}>Other Legal Clearance</label>
                 <FormSelect name="otherLegalClearance" placeholder="Select status" value={otherLegalClearance || null} options={["Available","Not Available"].map((value) => ({ value, label: value }))} onValueChange={setOtherLegalClearance} />
-              </div>
+              </div>)}
 
 
 
-              <div className="space-y-2 lg:col-span-3">
+              {isFieldVisible("otherLegalClearance") && (<div className="space-y-2 lg:col-span-3">
                 <label className={labelClass}>Other Legal Clearance Details</label>
                 <Textarea
                   value={otherLegalDetails}
@@ -4341,7 +4299,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   rows={3}
                   className="rounded-xl bg-muted/30 resize-none"
                 />
-              </div>
+              </div>)}
 
               <div className="space-y-2 lg:col-span-3">
                 <label className={labelClass}>Worker Facilities</label>
@@ -4393,35 +4351,8 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 className={inputClass}
               />
             </div>
-<div className="space-y-2">
-              <label className={labelClass}>Alternative Name</label>
-              <Input
-                value={alternateName}
-                onChange={(e) => setAlternateName(e.target.value)}
-                placeholder="Alternate Name"
-                className={inputClass}
-              />
-            </div>
-<div className="space-y-2">
-              <label className={labelClass}>Alternative Phone</label>
-              <Input
-                value={alternatePhone}
-                onChange={(e) => setAlternatePhone(e.target.value)}
-                placeholder="+91 98765 00000"
-                className={inputClass}
-              />
-            </div>
-<div className="space-y-2">
-              <label className={labelClass}>Alternative Email</label>
-              <Input
-                type="email"
-                value={alternateEmail}
-                onChange={(e) => setAlternateEmail(e.target.value)}
-                placeholder="alternate@email.com"
-                className={inputClass}
-              />
-            </div>
           </div>
+          <OwnerAlternativeContacts value={ownerContacts} onChange={changeOwnerContacts} />
         </div>
         )}
 
@@ -4429,17 +4360,10 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         {canViewPropertyContacts() && (
         <div className="bg-card border rounded-2xl p-8 shadow-sm">
           <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">Agent</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="space-y-6"><AgentContactFields value={contactDetails} onChange={setContactDetails} name={agentName} onNameChange={setAgentName} /></div>
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
-            <div className="space-y-2">
-              <label className={labelClass}>Agent Name</label>
-              <Input
-                value={agentName}
-                onChange={(e) => setAgentName(e.target.value)}
-                placeholder="Agent Name"
-                className={inputClass}
-              />
-            </div>
+
 
             <div className="space-y-2">
               <label className={labelClass}>Agency Name</label>
@@ -4467,6 +4391,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
 
           </div>
+
         </div>
         )}
 
@@ -4477,15 +4402,15 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
-            <div className="space-y-2">
+            {isFieldVisible("ownershipTitleVerified") && (<div className="space-y-2">
               <label className={labelClass}>Ownership Title Verified</label>
               <FormSelect name="ownershipTitleVerified" placeholder="Select status" value={ownershipTitleVerified || null} options={["N/A","Yes","No"].map((value) => ({ value, label: value }))} onValueChange={setOwnershipTitleVerified} />
-            </div>
+            </div>)}
 
-            <div className="space-y-2">
+            {isFieldVisible("encumbranceCertificate") && (<div className="space-y-2">
               <label className={labelClass}>Encumbrance Certificate</label>
               <FormSelect name="encumbranceCertificate" placeholder="Select status" value={encumbranceCertificate || null} options={["Available","Not Available"].map((value) => ({ value, label: value }))} onValueChange={setEncumbranceCertificate} />
-            </div>
+            </div>)}
 
             {/* Rental Agreement Draft — rental listings only */}
             {isFieldVisible("rentalAgreementDraft") && (
@@ -4502,10 +4427,10 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               </div>
             )}
 
-            <div className="space-y-2">
+            {isFieldVisible("taxReceipt") && (<div className="space-y-2">
               <label className={labelClass}>Tax Receipt</label>
               <FormSelect name="taxReceipt" placeholder="Select status" value={taxReceipt || null} options={["Available","Not Available"].map((value) => ({ value, label: value }))} onValueChange={setTaxReceipt} />
-            </div>
+            </div>)}
 
             {/* EB Receipt — hidden for plot / farmland */}
             {isFieldVisible("ebReceipt") && (
@@ -4522,12 +4447,12 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               </div>
             )}
 
-            <div className="space-y-2">
+            {!isResidential && (<div className="space-y-2">
               <label className={labelClass}>Approvals</label>
               <PropertyApprovalsSelect value={approvals} onChange={setApprovals} />
-            </div>
+            </div>)}
 
-            {isFieldVisible("hypothecation") && (
+            {!generalFinance && isFieldVisible("hypothecation") && (
               <div className="space-y-2">
                 <label className={labelClass}>Hypothecation</label>
                 <label className="flex h-12 cursor-pointer items-center gap-3 rounded-xl border border-border/60 bg-muted/30 px-4 text-sm font-medium text-foreground transition-colors hover:border-[#0052FF]/40 hover:bg-muted/50 has-checked:border-[#0052FF]/50 has-checked:bg-[#0052FF]/8">
@@ -4541,14 +4466,14 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
               </div>
             )}
 
-            {isFieldVisible("financeFacing") && (isHypothecated(hypothecation)) && (
+            {!generalFinance && isFieldVisible("financeFacing") && (isHypothecated(hypothecation)) && (
               <div className="space-y-2">
                 <label className={labelClass}>Finance</label>
                 <PriceInput value={financeFacing} onChange={setFinanceFacing} placeholder="e.g. 1 Lakh" />
               </div>
             )}
 
-            {isFieldVisible("financeFacing") && isHypothecated(hypothecation) && <div className="space-y-2"><label className={labelClass}>Funded By</label><FormSelect name="fundedBy" placeholder="Select funding source" options={["Bank", "NDFC", "Local finance"].map((value) => ({ value, label: value }))} value={fundedBy || null} onValueChange={setFundedBy} /></div>}
+            {!generalFinance && isFieldVisible("financeFacing") && isHypothecated(hypothecation) && <div className="space-y-2"><label className={labelClass}>Funded By</label><FormSelect name="fundedBy" placeholder="Select funding source" options={["Bank", "NBFC", "Local finance"].map((value) => ({ value, label: value }))} value={fundedBy || null} onValueChange={setFundedBy} /></div>}
 {isFieldVisible("deviation") && (
               <div className="space-y-2">
                 <label className={labelClass}>Deviation</label>
@@ -5023,8 +4948,8 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           >
             {isFieldVisible("roomDimensions") && <div className="mt-6 space-y-4"><h3 className="text-lg font-semibold">Room dimensions</h3><div className="space-y-4">
               {roomDimensions.map((room, idx) => (
-                <div key={idx} className="flex gap-4 items-start">
-                  <div className="flex-1 space-y-2">
+                <div key={idx} className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                  <div className="w-full flex-1 space-y-2">
                     <FormSelect
                       name={`room-name-${idx}`}
                       placeholder="Room Name (e.g. Master Bedroom)"
@@ -5040,28 +4965,13 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                       }}
                     />
                   </div>
-                  <div className="flex-1 space-y-2">
-                    <FormSelect
-                      name={`room-dimensions-${idx}`}
-                      placeholder="Dimensions (e.g. 12x14 ft)"
-                      options={withLegacyOption(
-                        formData.roomDimensions.map((d) => {
-                          const dims = formatRoomDimension(d.lengthFt, d.widthFt) ?? d.value;
-                          return { value: dims, label: d.label && dims !== d.label ? `${d.label} (${dims})` : dims };
-                        }),
-                        room.dimensions
-                      )}
-                      value={room.dimensions || null}
-                      onValueChange={(v) => {
-                        const newRooms = [...roomDimensions];
-                        newRooms[idx].dimensions = v;
-                        setRoomDimensions(newRooms);
-                      }}
-                    />
+                  <div className="w-full flex-1 space-y-2">
+                    <PropertyRoomDimensions value={room.dimensions} onChange={dimensions => setRoomDimensions(current => current.map((row, i) => i === idx ? { ...row, dimensions } : row))} />
                   </div>
                   <Button
                     type="button"
                     variant="ghost"
+                    aria-label={`Remove room ${idx + 1}`}
                     onClick={() => {
                       const newRooms = [...roomDimensions];
                       newRooms.splice(idx, 1);
