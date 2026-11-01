@@ -52,8 +52,10 @@ An additional local MySQL transaction verified that default property queries exc
 
 - CRM frontend: 59 files, 606 tests passed, including real dropdown/input interactions, every type/listing profile, draft restoration and save payloads.
 - CRM API: 72 suites, 495 tests passed.
-- Site API: 73 suites, 461 tests passed, including partial edits, legacy aggregate compatibility, contact permissions/storage and idempotent migration checks. Malformed nested rows receive a validation error rather than crashing the API.
+- Site API: 73 suites, 462 tests passed, including partial edits, legacy aggregate compatibility, contact permissions/storage and idempotent migration checks. Malformed nested rows receive a validation error rather than crashing the API.
 - Public frontend: 765 tests passed; four existing failures reproduce on an unchanged master checkout. They concern the property-wizard basic-info fixture, two ProjectGallery expectations and the Step3Location City-label query. The changed property mapping and area/rate tests pass.
 - Production builds passed for both frontends and both APIs.
 
 The four unrelated website test failures are baseline issues; this branch does not claim a completely green website suite. This feature has not been merged to master or deployed to production.
+
+Follow-up review: reproduced and fixed a partial-update edge case where adding BHK configurations to an older record with a NULL portion total restored NULL over the derived total. A regression test now checks that two 3-BHK portions and one 2-BHK portion derive a total of three without losing other legacy details. Rechecked all CRM frontend/API tests, the site API suite and 86 website mapping/measurement tests.
