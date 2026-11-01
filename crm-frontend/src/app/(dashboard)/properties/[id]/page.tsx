@@ -1,4 +1,5 @@
 "use client";
+import { pgReadFields, isPgFurnished } from "../_components/pg-accommodation";
 
 import { restoreRoomDimensions } from "../_components/PropertyRoomDimensions";
 import { curationReadFields, restoreContactDetails } from "../_components/property-curation-two";
@@ -220,7 +221,7 @@ export default function PropertyViewPage() {
   const salePricePerSqft = type === "villa" ? calculateRentPerSqft(Number(property.price), Number(det.builtUpArea || 0)) : property.pricePerSqft;
   const displayedPriceUnit = ["plot", "farmland"].includes(type) ? det.measurementUnits?.pricePerSqft || "Sq Ft" : "Sq Ft";
   const displayedPriceRate = convertRate(salePricePerSqft ?? "", "Sq Ft", displayedPriceUnit);
-  const curationRows = curationReadFields(det.curationDetails, field => isFieldVisible(field) && (field !== "restroomCount" || det.hasRestroom === true));
+  const curationRows = [...curationReadFields(det.curationDetails, field => isFieldVisible(field) && (field !== "restroomCount" || det.hasRestroom === true)), ...(type === "pg_service_apartment" ? pgReadFields(det.curationDetails?.pgDetails).filter(row => !["In room furnishings", "Common area furnishings"].includes(row.label) || isPgFurnished(det.furnishingStatus)) : [])];
   const contacts = restoreContactDetails(property.contactDetails);
   const boundarySides = restorePlotBoundaries(det.plotBoundaries, det.plotLength, det.plotWidth);
   const hypothecated = !["", "no", "nil", "n/a", "na", "none", "-"].includes(String(property.hypothecation ?? "").trim().toLowerCase());

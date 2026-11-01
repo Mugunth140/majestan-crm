@@ -1,5 +1,7 @@
 "use client";
 
+import { PgAccommodationFields } from "./PgAccommodationFields";
+import { restorePgDetails, pgPayload, pgErrors } from "./pg-accommodation";
 import { AdditionalCurationFields, PortionFields, ParkingFields, OwnerAlternativeContacts, AgentContactFields } from "./PropertyCurationFields";
 import { PropertyRoomDimensions, roomSides, restoreRoomDimensions } from "./PropertyRoomDimensions";
 import { WATER_SUPPLY_OPTIONS, ELECTRICITY_OPTIONS, OWNERSHIP_OPTIONS, IRRIGATION_OPTIONS, PLOT_RENT_USES, restoreContactDetails, restoreCurationDetails, curationPayload, curationErrors, bathroomTotal } from "./property-curation-two";
@@ -701,6 +703,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   const imgInputRef = useRef<HTMLInputElement>(null);
 
   const [curation, setCuration] = useState(() => restoreCurationDetails({ propertyUses: det?.propertyUse, specialPurposes: det?.specialPurpose, utilities: det?.utilitiesProvided, powerSupplyCapacity: det?.powerSupplyHp ? `${det.powerSupplyHp} HP` : "", ...det?.curationDetails }));
+  const [pgDetails, setPgDetails] = useState(() => restorePgDetails(det?.curationDetails?.pgDetails));
   const [contactDetails, setContactDetails] = useState(() => restoreContactDetails(d?.contactDetails));
   const ownerContacts = { ...contactDetails, ownerAlternatives: contactDetails.ownerAlternatives.map((row, index) => index === 0 ? { ...row, name: alternateName, phone: alternatePhone, email: alternateEmail } : row) };
   const changeOwnerContacts = (next: typeof contactDetails) => {
@@ -743,6 +746,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
   type DraftKind = "s" | "b" | "a" | "listing" | "amenityIds" | "furnishingItemIds" | "images" | "docs" | "uploads" | "plans" | "object";
   const draftFields: Array<{ key: string; kind: DraftKind; get: () => unknown; set: (v: any) => void }> = [
+    { key: "pgDetails", kind: "object", get: () => pgDetails, set: (v) => setPgDetails(restorePgDetails(v)) },
     { key: "curationDetails", kind: "object", get: () => curation, set: (v) => setCuration(restoreCurationDetails(v)) },
     { key: "contactDetails", kind: "object", get: () => ownerContacts, set: (v) => changeOwnerContacts(restoreContactDetails(v)) },
     { key: "measurementUnits", kind: "object", get: () => measurementUnits, set: setMeasurementUnits },
@@ -1591,6 +1595,18 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         directions.add(side.direction);
       }
     }
+    if (propertyType === "pg_service_apartment") {
+      for (const message of pgErrors(pgDetails, effectiveFurnishingStatus)) errs.push({ field: "pgDetails", message });
+      if (mode === "create" && !pgDetails.roomType) errs.push({ field: "pgDetails", message: "Choose whether the PG room is shared or private." });
+      if (mode === "create") {
+        if (!bedrooms.trim() || Number(bedrooms) < 1 || !bathrooms.trim() || Number(bathrooms) < 1) errs.push({ field: "pgDetails", message: "Enter the PG bedrooms and bathrooms." });
+        if (!furnishingStatus || !propertyAge || !availableFrom || !totalFloors.trim() || Number(totalFloors) < 1 || !floorNumber.trim()) errs.push({ field: "pgDetails", message: "Complete the furnishing, age, availability date and floor details." });
+        if (!pgDetails.category || !pgDetails.availableFor) errs.push({ field: "pgDetails", message: "Choose an accommodation category and who the PG is available for." });
+        if (!pgDetails.availableCapacity?.trim() || Number(pgDetails.availableCapacity) < 1) errs.push({ field: "pgDetails", message: "Enter the available rooms or beds." });
+        if (pgDetails.roomType === "Sharing" && !pgDetails.sharingCount?.trim()) errs.push({ field: "pgDetails", message: "Enter how many people share the room." });
+        if (![builtUpArea, carpetArea, superBuiltUpArea].some(value => Number(value) > 0)) errs.push({ field: "pgDetails", message: "Enter at least one area: built-up, carpet or super built-up." });
+      }
+    }
     for (const message of curationErrors(curation, field => isFieldVisible(field) && (field !== "restroomCount" || hasRestroom), numberOfPortions)) errs.push({ field: "curationDetails", message });
     if (isFieldVisible("roomDimensions")) for (const room of roomDimensions) {
       if (!restoreRoomDimensions(det?.roomDimensions).some(original => original.dimensions === room.dimensions) && room.dimensions.includes("×") && (!roomSides(room.dimensions) || roomSides(room.dimensions)!.some(side => Number(side) <= 0))) errs.push({ field: "roomDimensions", message: "Enter a positive length and width for each room in feet." });
@@ -1700,7 +1716,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           )),
         },
         contactDetails: canViewPropertyContacts() ? ownerContacts : undefined,
-        curationDetails: { ...curationPayload(curation, isFieldVisible), ...(propertyType === "commercial" && listingType === "Buy" ? { expectedMonthlyRentPerSqft } : {}) },
+        curationDetails: { ...curationPayload(curation, isFieldVisible), ...(propertyType === "pg_service_apartment" ? { pgDetails: pgPayload(pgDetails, effectiveFurnishingStatus) } : {}), ...(propertyType === "commercial" && listingType === "Buy" ? { expectedMonthlyRentPerSqft } : {}) },
         numberOfPortions: numberOfPortions !== "" ? Number(numberOfPortions) : undefined,
         hasGroundFloor,
         plotFacing: plotFacing.trim() || undefined,
@@ -1709,7 +1725,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         noOfLifts: noOfLifts !== "" ? Number(noOfLifts) : undefined,
         // Specifications — curated by property type before submission.
         bedrooms: bedrooms ? Number(bedrooms) : undefined,
-        bathrooms: bathroomTotal(curation, bathrooms),
+        bathrooms: propertyType === "pg_service_apartment" ? (bathrooms.trim() ? Number(bathrooms) : undefined) : bathroomTotal(curation, bathrooms),
         areaSqft: areaSqft ? Number(areaSqft) : undefined,
         areaUnit,
         furnishingStatus: effectiveFurnishingStatus.trim() || undefined,
@@ -1981,9 +1997,10 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
         curatedPayload.areaUnit = "Sq Ft";
       }
 
-      if (propertyType === "coworking" || (propertyType === "commercial" && listingType === "Rent")) {
+      if (["coworking", "pg_service_apartment"].includes(propertyType) || (propertyType === "commercial" && listingType === "Rent")) {
         const selected = effectiveFurnishingStatus.toLowerCase().replace(/[^a-z]/g, "");
         if (["fullyfurnished", "semifurnished", "unfurnished", "bareshell"].includes(selected)) curatedPayload.furnished = ["fullyfurnished", "semifurnished"].includes(selected);
+        if (propertyType === "pg_service_apartment" && selected === "furnished") curatedPayload.furnished = true;
       }
 
       // Remove undefined fields
@@ -2284,7 +2301,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
             {/* Bathrooms — residential only */}
             {isFieldVisible("bathrooms") && (
-              <div className="space-y-3"><label className={labelClass}>Bathrooms</label><div className="grid grid-cols-2 gap-3"><div className="space-y-2"><label htmlFor="individualBathrooms" className="text-sm">Individual bathrooms</label><Input className={inputClass} id="individualBathrooms" type="number" min={0} step={1} value={curation.individualBathrooms} onChange={e => setCuration(current => ({ ...current, individualBathrooms: e.target.value }))} /></div><div className="space-y-2"><label htmlFor="attachedBathrooms" className="text-sm">Attached bathrooms</label><Input className={inputClass} id="attachedBathrooms" type="number" min={0} step={1} value={curation.attachedBathrooms} onChange={e => setCuration(current => ({ ...current, attachedBathrooms: e.target.value }))} /></div></div><p className="text-sm text-muted-foreground">Total bathrooms: {bathroomTotal(curation, bathrooms) ?? 0}{!curation.individualBathrooms && !curation.attachedBathrooms && bathrooms ? " (saved total; split not yet recorded)" : ""}</p></div>
+              propertyType === "pg_service_apartment" ? <div className="space-y-2"><label htmlFor="pg-bathrooms" className={labelClass}>Bathrooms</label><Input id="pg-bathrooms" type="number" min={0} step={1} value={bathrooms} onChange={e => setBathrooms(e.target.value)} className={inputClass}/></div> : <div className="space-y-3"><label className={labelClass}>Bathrooms</label><div className="grid grid-cols-2 gap-3"><div className="space-y-2"><label htmlFor="individualBathrooms" className="text-sm">Individual bathrooms</label><Input className={inputClass} id="individualBathrooms" type="number" min={0} step={1} value={curation.individualBathrooms} onChange={e => setCuration(current => ({ ...current, individualBathrooms: e.target.value }))} /></div><div className="space-y-2"><label htmlFor="attachedBathrooms" className="text-sm">Attached bathrooms</label><Input className={inputClass} id="attachedBathrooms" type="number" min={0} step={1} value={curation.attachedBathrooms} onChange={e => setCuration(current => ({ ...current, attachedBathrooms: e.target.value }))} /></div></div><p className="text-sm text-muted-foreground">Total bathrooms: {bathroomTotal(curation, bathrooms) ?? 0}{!curation.individualBathrooms && !curation.attachedBathrooms && bathrooms ? " (saved total; split not yet recorded)" : ""}</p></div>
             )}
 
             {isFieldVisible("landArea") && <div className="space-y-2"><label className={labelClass}>{propertyType === "plot" && listingType === "Buy" ? "Total Project Area" : "Land Area"}</label><PropertyAreaInput name="landArea" value={areaSqft} unit={areaUnit} onChange={setAreaSqft} onUnitChange={setAreaUnit} /></div>}
@@ -2296,7 +2313,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 <FormSelect
                   name="furnishingStatus"
                   placeholder="Select Furnishing"
-                  options={FURNISHING_STATUS_OPTIONS}
+                  options={propertyType === "pg_service_apartment" ? withLegacyOption(FURNISHING_STATUS_OPTIONS.filter(option => option.value !== "BARESHELL").map(option => option.value === "FULLY FURNISHED" ? { ...option, label: "Furnished" } : option), furnishingStatus) : FURNISHING_STATUS_OPTIONS}
                   value={effectiveFurnishingStatus || null}
                   onValueChange={setFurnishingStatus}
                 />
@@ -2306,7 +2323,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
 
             {/* Property Facing */}
-            <div className="space-y-2">
+            {isFieldVisible("propertyFacing") && <div className="space-y-2">
               <label className={labelClass}>Property Facing</label>
               <FormSelect
                 name="propertyFacing"
@@ -2315,7 +2332,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 value={propertyFacing || null}
                 onValueChange={setPropertyFacing}
               />
-            </div>
+            </div>}
 
             {/* Floor Facing — hidden for plot / farmland */}
             {isFieldVisible("floorFacing") && (
@@ -2385,7 +2402,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 <FormSelect
                   name="propertyAge"
                   placeholder="Select Age Band"
-                  options={withLegacyOption(PROPERTY_AGE_OPTIONS, propertyAge)}
+                  options={withLegacyOption(propertyType === "pg_service_apartment" ? asOptions(["0-1 years", "1-5 years", "5-10 years", "10+ years"]) : PROPERTY_AGE_OPTIONS, propertyAge)}
                   value={propertyAge || null}
                   onValueChange={setPropertyAge}
                 />
@@ -2425,7 +2442,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   {isFieldVisible("parkingSpaces") && <ParkingFields value={curation} onChange={setCuration} />}
   {isFieldVisible("plotFacing") && <div className="space-y-2"><label className={labelClass}>Plot Facing</label><FormSelect name="plotFacing" placeholder="Select direction" options={FACING_DIRECTION_OPTIONS} value={plotFacing} onValueChange={setPlotFacing} /></div>}
   {isFieldVisible("plotBoundaries") && !["plot", "farmland", "farm_house"].includes(propertyType) && <div className="space-y-4 lg:col-span-3"><h3 className="text-lg font-semibold">Plot boundaries</h3><PropertyPlotBoundaries value={plotBoundaries} onChange={setPlotBoundaries} facing={plotFacing} /><FormErr field="plotBoundaries" /></div>}
-  {isResidential && <div className="space-y-2"><label className={labelClass}>Approvals</label><PropertyApprovalsSelect value={approvals} onChange={setApprovals} /></div>}
+  {isResidential && propertyType !== "pg_service_apartment" && <div className="space-y-2"><label className={labelClass}>Approvals</label><PropertyApprovalsSelect value={approvals} onChange={setApprovals} /></div>}
   {generalFinance && <><label className="flex items-center gap-3 text-sm font-semibold"><Checkbox checked={isHypothecated(hypothecation)} onCheckedChange={checked => setHypothecation(checked === true ? "Yes" : "No")} />Has Finance / Hypothecation</label>{isHypothecated(hypothecation) && <><div className="space-y-2"><label className={labelClass}>Finance</label><PriceInput value={financeFacing} onChange={setFinanceFacing} /></div><div className="space-y-2"><label className={labelClass}>Funded By</label><FormSelect name="fundedBy" placeholder="Select lender" value={fundedBy} options={asOptions(["Bank", "NBFC", "Local finance"])} onValueChange={setFundedBy} /></div></>}</>}
 </>);
 
@@ -2781,18 +2798,18 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
             {/* Price */}
             {propertyType !== "coworking" && (<div className="space-y-2" id="pf-price">
-              <label htmlFor="mainPropertyPrice" className={labelClass}>{listingType === "Rent" || isRentalOnlyPropertyType(propertyType) ? "Monthly rent *" : "Sale price *"}</label>
+              <label htmlFor="mainPropertyPrice" className={labelClass}>{propertyType === "pg_service_apartment" ? `Monthly rent per ${pgDetails.roomType === "Private" ? "room" : "bed"} *` : listingType === "Rent" || isRentalOnlyPropertyType(propertyType) ? "Monthly rent *" : "Sale price *"}</label>
               <PriceInput
                 id="mainPropertyPrice"
                 value={price}
                 onChange={(v) => { setPrice(v); clearFieldError("price"); }}
-                placeholder="e.g. 50L or 1.2Cr"
+                placeholder={propertyType === "pg_service_apartment" ? "e.g. 8,000" : "e.g. 50L or 1.2Cr"}
               />
               <FormErr field="price" />
             </div>)}
 
             {/* Negotiable */}
-            <div className="space-y-2">
+            {isFieldVisible("negotiable") && (<div className="space-y-2">
               <label className={labelClass}>Negotiable</label>
               <div className={checkboxRowClass}>
                 <Checkbox
@@ -2804,7 +2821,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                   Price is negotiable
                 </label>
               </div>
-            </div>
+            </div>)}
 
             {/* Booking Amount */}
             {isFieldVisible("bookingAmount") && (
@@ -2935,7 +2952,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             )}
 
             {/* Taxes */}
-            <div className="space-y-2">
+            {isFieldVisible("taxes") && (<div className="space-y-2">
               <label className={labelClass}>Taxes</label>
               <FormSelect
                 name="taxes"
@@ -2953,7 +2970,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
                 value={taxes || null}
                 onValueChange={setTaxes}
               />
-            </div>
+            </div>)}
 
             {/* Registration Charge — options from Master Registry, legacy free text still displays */}
             {isFieldVisible("registrationCharge") && (
@@ -3099,8 +3116,20 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
           </div>
         </div>
 
+        {propertyType === "pg_service_apartment" && <section className="bg-card border rounded-2xl p-8 shadow-sm">
+          <h3 className="text-lg font-bold border-b pb-3 mb-6">PG / Service Apartment details</h3>
+          <FormErr field="pgDetails" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {commonSpecifications}
+            <div className="space-y-2"><label className={labelClass}>Built Up Area</label><PropertyAreaInput name="builtUpArea" value={builtUpArea} unit={measurementUnits.builtUpArea || "Sq Ft"} onChange={setBuiltUpArea} onUnitChange={unit => setMeasurementUnits(current => ({...current,builtUpArea:unit}))}/></div>
+            <div className="space-y-2"><label className={labelClass}>Carpet Area</label><PropertyAreaInput name="carpetArea" value={carpetArea} unit={measurementUnits.carpetArea || "Sq Ft"} onChange={setCarpetArea} onUnitChange={unit => setMeasurementUnits(current => ({...current,carpetArea:unit}))}/></div>
+            <div className="space-y-2"><label className={labelClass}>Super Built Up Area</label><PropertyAreaInput name="superBuiltUpArea" value={superBuiltUpArea} unit={measurementUnits.superBuiltUpArea || "Sq Ft"} onChange={setSuperBuiltUpArea} onUnitChange={unit => setMeasurementUnits(current => ({...current,superBuiltUpArea:unit}))}/></div>
+            <div className="space-y-2"><label htmlFor="pg-balconies" className={labelClass}>Balconies</label><Input id="pg-balconies" type="number" min={0} step={1} value={balconies} onChange={event => setBalconies(event.target.value)} className={inputClass}/></div>
+            <PgAccommodationFields value={pgDetails} onChange={setPgDetails} furnishingStatus={effectiveFurnishingStatus}/>
+          </div>
+        </section>}
         {/* ---- Apartment / Villa / Individual House Details ---- */}
-        {["apartment", "villa", "individual_portion", "investment_property", "pg_service_apartment", "farm_house"].includes(propertyType) && (
+        {["apartment", "villa", "individual_portion", "investment_property", "farm_house"].includes(propertyType) && (
           <div className="bg-card border rounded-2xl p-8 shadow-sm">
             <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
               {PROPERTY_TYPE_LABELS[propertyType]}

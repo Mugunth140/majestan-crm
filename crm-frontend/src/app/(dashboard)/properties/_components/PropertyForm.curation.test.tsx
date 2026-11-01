@@ -115,14 +115,16 @@ describe("Investment Property form", () => {
 });
 
 describe("PG / Service Apartment form", () => {
-  it("renders the Apartment rental fields with the new category name", () => {
+  it("renders the dedicated researched PG fields", () => {
     const apartment = render("apartment", "Rent");
     const pg = render("pg_service_apartment", "Rent");
     const fieldLabels = (markup: string) => markup.match(/<label[^>]*>[\s\S]*?<\/label>/g);
-    expect(fieldLabels(pg)).toEqual(fieldLabels(apartment)?.filter((label) => !/Builder Name|Project Name/.test(label)));
+    expect(pg).toContain("Room type");
+    expect(pg).toContain("Food availability");
+    expect(pg).not.toContain("No of Lifts");
     expect(pg).toContain("PG / Service Apartment details");
-    expect(pg).toContain("Monthly rent *");
-    expect(pg).toContain("Security Deposit");
+    expect(pg).toContain("Monthly rent per bed *");
+    expect(pg).toContain("Security deposit");
     expect(pg).not.toContain("Sale price *");
     expect(pg).not.toContain("Expected Sale Price");
   });
@@ -157,7 +159,10 @@ describe("Rental form fields", () => {
     expect(markup).not.toContain("RERA Number");
     expect(markup.includes(">Builder Name</label>")).toBe(["apartment", "villa"].includes(type));
     expect(markup.includes(">Project Name</label>")).toBe(["apartment", "villa"].includes(type));
-    if (type === "coworking") {
+    if (type === "pg_service_apartment") {
+      expect(markup).toContain("Monthly rent per bed *");
+      expect(markup).not.toContain("Rent per sqft");
+    } else if (type === "coworking") {
       expect(markup).toContain("Rent per Seat");
       expect(markup).not.toContain("Rent per sqft");
     } else {

@@ -1,3 +1,4 @@
+import { PgAccommodationDto } from './pg-accommodation.dto';
 import {
   ArrayMaxSize,
   ArrayUnique,
@@ -8,6 +9,7 @@ import {
   IsNumber,
   IsNotEmpty,
   IsOptional,
+  IsObject,
   IsString,
   Max,
   MaxLength,
@@ -51,6 +53,7 @@ export class PropertyParkingDto {
 
 /** Additive, typed specifications; legacy columns remain untouched. */
 export class PropertyCurationDto {
+ @IsOptional() @IsObject() @ValidateNested() @Type(() => PgAccommodationDto) pgDetails?: PgAccommodationDto;
   @IsOptional()
   @Type(() => Number)
   @IsInt()

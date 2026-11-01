@@ -246,3 +246,20 @@ it.each(['individual_portion', 'investment_property', 'farm_house', 'plot'])('om
  const p = await save({ propertyType, expectedSalePrice: 6000000, propertyDetails: { builtUpArea: 1000, areaSqft: 1200 } });
  expect(p).not.toHaveProperty('expectedSalePrice');
 });
+
+it('saves the dedicated PG profile with per-bed rent and typed details', async()=>{
+ const p=await save({propertyType:'pg_service_apartment',listingType:'Rent',price:8000,propertyDetails:{builtUpArea:1200,unitNumber:'hidden',curationDetails:{pgDetails:{category:'Serviced Apartment',roomType:'Sharing',sharingCount:2,totalCapacity:8,availableCapacity:3,attachedBathroom:false,foodAvailable:'Available',mealType:'Only Veg',foodChargeType:'Included in rent',weekdayMeals:['Breakfast','Dinner'],services:[{name:'Wifi',status:'Included in rent'}]}}}});
+ expect(p.price).toBe(8000);
+ expect(p.curationDetails.pgDetails).toMatchObject({roomType:'Sharing',sharingCount:2,attachedBathroom:false,weekdayMeals:['Breakfast','Dinner'],services:[{name:'Wifi',status:'Included in rent'}]});
+ expect(p).not.toHaveProperty('unitNumber');expect(p).not.toHaveProperty('rentPerSqft');expect(p).not.toHaveProperty('securityDeposit');
+});
+
+it('derives searchable furnishing for PG from its status without a duplicate checkbox', async()=>{
+ const p=await save({propertyType:'pg_service_apartment',listingType:'Rent',price:8000,propertyDetails:{furnishingStatus:'FULLY FURNISHED',furnished:false,curationDetails:{pgDetails:{roomType:'Private'}}}});
+ expect(p.furnished).toBe(true);
+});
+
+it('retains legacy PG Furnished classification when saving',async()=>{
+ const p=await save({propertyType:'pg_service_apartment',listingType:'Rent',price:8000,propertyDetails:{furnishingStatus:'Furnished',furnished:false}});
+ expect(p.furnished).toBe(true);expect(p.furnishingStatus).toBe('Furnished');
+});

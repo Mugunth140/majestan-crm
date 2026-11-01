@@ -133,10 +133,9 @@ describe("PG / Service Apartment", () => {
     expect(propertyTypesForListing([option], "Buy")).toEqual([]);
     expect(propertyTypesForListing([{ value: "pg", label: "PG / Co living" }], "Rent")).toEqual([]);
   });
-  it("uses exactly the Apartment rental field profile", () => {
-    for (const field of Object.keys(PROPERTY_FIELD_RULES)) {
-      expect(visible(field, "pg_service_apartment", "Rent"), field).toBe(["builderName", "projectName"].includes(field) ? false : visible(field, "apartment", "Rent"));
-    }
+  it("uses a dedicated PG profile without unrelated apartment inputs", () => {
+    for (const field of ["rentPerSqft", "unitNumber", "noOfLifts", "securityDeposit", "approvals", "udsArea", "roomDimensions"]) expect(visible(field, "pg_service_apartment", "Rent"), field).toBe(false);
+    for (const field of ["bedrooms", "bathrooms", "furnishingStatus", "builtUpArea", "carpetArea", "superBuiltUpArea", "floorNumber", "totalFloors"]) expect(visible(field, "pg_service_apartment", "Rent"), field).toBe(true);
   });
 });
 
@@ -158,7 +157,7 @@ describe("Rental listing requirements", () => {
     expect(visible("projectName", type, "Rent")).toBe(hasProject);
     const payload = curatePropertyPayload({ reraNumber: "Legacy RERA", builderName: "Builder", projectName: "Project", price: 24000 }, type, "Rent");
     expect(payload).toEqual(hasProject ? { builderName: "Builder", projectName: "Project", price: 24000 } : { price: 24000 });
-    expect(visible("rentPerSqft", type, "Rent")).toBe(type !== "coworking");
+    expect(visible("rentPerSqft", type, "Rent")).toBe(!["coworking", "pg_service_apartment"].includes(type));
   });
 });
 

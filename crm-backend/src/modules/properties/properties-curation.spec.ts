@@ -209,3 +209,11 @@ describe('Property curation 2 payloads', () => {
   expect(siteApi.patch.mock.calls[0][1].contactDetails).toEqual(contactDetails);
  });
 });
+
+it('does not reset hidden negotiability while editing the PG profile', async()=>{
+ const {service,siteApi}=setup('pg_service_apartment',{});
+ await service.update(7,{curationDetails:{pgDetails:{roomType:'Private'}}});
+ expect(siteApi.patch.mock.calls[0][1]).not.toHaveProperty('negotiable');
+ await service.update(7,{negotiable:false});
+ expect(siteApi.patch.mock.calls[1][1]).toHaveProperty('negotiable',false);
+});

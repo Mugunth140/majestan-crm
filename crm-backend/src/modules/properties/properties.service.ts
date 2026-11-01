@@ -729,6 +729,7 @@ export class PropertiesService {
       throw new BadRequestException('This property type is available for Buy only.');
     }
     const payload = await this.buildSitePayload(body);
+    if (body.negotiable === undefined) delete payload.negotiable;
     // The site API replaces the details row on PATCH. Preserve omitted details
     // so curating a form never erases fields imported from the old CRM.
     if (payload.details && existing.propertyDetails) {

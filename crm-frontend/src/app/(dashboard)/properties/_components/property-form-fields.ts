@@ -96,6 +96,10 @@ export function isPropertyFieldVisible(
   // values like an empty selection, including older drafts and API records.
   propertyType ??= "";
   furnishingStatus ??= "";
+  if (propertyType === "pg_service_apartment") {
+    if (field === "superBuiltUpArea") return true;
+    if (["individualBathrooms", "attachedBathrooms", "negotiable", "taxes", "roadName", "roadAccess", "rentPerSqft", "unitType", "unitNumber", "numberOfFlats", "towerNos", "noOfLifts", "parking", "parkingType", "guestParking", "udsArea", "outdoorSpaces", "floorFacing", "propertyFacing", "openSides", "suitableFor", "securityDeposit", "maintenanceCharges", "lockInPeriod", "tenantOccupied", "roomDimensions", "furnishingItemIds", "approvals"].includes(field)) return false;
+  }
   const residential = [
     "apartment",
     "villa",

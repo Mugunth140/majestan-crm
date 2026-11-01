@@ -74,7 +74,8 @@ describe("Property curation 2", () => {
   ])("hides verification for residential Rent: %s", (type) => {
     const markup = form(type, "Rent");
     expect(markup).not.toContain("Documents &amp; Verification");
-    expect(labels(markup)).toContain("Approvals");
+    if (type === "pg_service_apartment") expect(labels(markup)).not.toContain("Approvals");
+    else expect(labels(markup)).toContain("Approvals");
   });
   it("retains Buy verification and puts apartment funding in general details", () => {
     const markup = form("apartment", "Sell");

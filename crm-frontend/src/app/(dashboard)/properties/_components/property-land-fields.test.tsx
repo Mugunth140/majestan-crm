@@ -45,7 +45,7 @@ describe("Land rates and boundaries", () => {
     );
     expect(markup.includes("North East")).toBe(true);
     expect(markup.includes("43.5 m")).toBe(true);
-    expect(markup.includes("layout not to scale")).toBe(true);
+    expect(markup.includes("Approximate shape from side lengths.")).toBe(true);
     expect(
       (markup.match(/aria-label="Boundary [1-4] length"/g) || []).length,
     ).toBe(4);

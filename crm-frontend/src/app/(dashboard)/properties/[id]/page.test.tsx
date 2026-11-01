@@ -56,7 +56,9 @@ describe("Rental property details", () => {
     expect(markup).not.toContain("RERA Number");
     expect(markup.includes(">Builder Name</span>")).toBe(["apartment", "villa"].includes(type));
     expect(markup.includes(">Project Name</span>")).toBe(["apartment", "villa"].includes(type));
-    if (type === "coworking") {
+    if (type === "pg_service_apartment") {
+      expect(markup).not.toContain("Rent per sqft");
+    } else if (type === "coworking") {
       expect(markup).not.toContain("Rent per sqft");
       expect(markup).toContain("Rent / Seat");
     } else {

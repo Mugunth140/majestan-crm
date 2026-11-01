@@ -52,6 +52,7 @@ beforeEach(() => {
       { value: "villa", label: "Villa" },
       { value: "commercial", label: "Commercial" },
       { value: "coworking", label: "Co-working" },
+      { value: "pg_service_apartment", label: "PG / Service Apartment" },
       { value: "farm_house", label: "Farmhouse" },
       { value: "farm_house", label: "Farm House" },
     ],
@@ -135,4 +136,17 @@ it("does not offer the duplicate Farmhouse master label", async () => {
   expect(
     screen.queryByRole("option", { name: "Farmhouse", exact: true }),
   ).toBeNull();
+});
+
+it("changes PG rent labels from per bed to per room using real controls", async () => {
+ const {container} = await open();
+ fireEvent.click(screen.getByRole("button",{name:"Rent",exact:true}));
+ await choose(container,"PG / Service Apartment");
+ expect(screen.getByLabelText("Monthly rent per bed *")).toBeTruthy();
+ fireEvent.keyDown(document.getElementById("pg-roomType")!,{key:"ArrowDown"});
+ const option = await screen.findByRole("option",{name:"Private",exact:true});
+ fireEvent.pointerDown(option,{pointerType:"mouse",button:0});fireEvent.click(option);
+ expect(screen.getByLabelText("Monthly rent per room *")).toBeTruthy();
+ expect(screen.queryByText("No of Lifts")).toBeNull();
+ expect(screen.queryByText("Rent per sqft")).toBeNull();
 });
