@@ -31,12 +31,6 @@ export const PROPERTY_FIELD_RULES: Record<string, FieldRule> = {
   saleType: { listing: "Buy" },
   tenantOccupied: { types: BUILDINGS, listing: "Rent" },
   bookingAmount: { listing: "Buy" },
-  expectedSalePrice: {
-    types: ALL.filter(
-      (type) => !["commercial", "industrial", "villa"].includes(type),
-    ),
-    listing: "Buy",
-  },
   pricePerSqft: { types: ["commercial", "industrial"], listing: "Buy" },
   monthlyRent: { types: BUILDINGS, listing: "Buy", occupiedSale: true },
   maintenanceCharges: { types: BUILDINGS },
@@ -139,11 +133,7 @@ export function isPropertyFieldVisible(
   }
   if (field === "areaSqft") return false;
   if (field === "landArea") return ["plot", "farmland"].includes(propertyType);
-  if (
-    field === "expectedSalePrice" &&
-    ["apartment", "farmland"].includes(propertyType)
-  )
-    return false;
+  if (field === "expectedSalePrice") return false;
   if (field === "pricePerSqft")
     return (
       listingType === "Buy" &&

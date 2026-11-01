@@ -153,7 +153,7 @@ describe("Commercial and industrial pricing and specifications", () => {
 
 describe("Rental form fields", () => {
   it.each(["apartment", "villa", "individual_portion", "plot", "commercial", "coworking", "industrial", "pg_service_apartment"])("renders the requested fields for %s", (type) => {
-    const markup = render(type, "Rent", { price: 30000, reraNumber: "Old RERA", builderName: "Builder", projectName: "Project", propertyDetails: { areaSqft: 1200 } });
+    const markup = render(type, "Rent", { price: 30000, reraNumber: "Old RERA", builderName: "Builder", projectName: "Project", propertyDetails: { areaSqft: 1200, builtUpArea: 1200 } });
     expect(markup).not.toContain("RERA Number");
     expect(markup.includes(">Builder Name</label>")).toBe(["apartment", "villa"].includes(type));
     expect(markup.includes(">Project Name</label>")).toBe(["apartment", "villa"].includes(type));
@@ -170,7 +170,7 @@ describe("Rental form fields", () => {
 
 describe("Calculated rental area units", () => {
   it("calculates from formatted monthly rent and converts square metres to square feet", () => {
-    const markup = render("apartment", "Rent", { price: "30k", propertyDetails: { areaSqft: 111.483648, areaUnit: "Sq M" } });
+    const markup = render("apartment", "Rent", { price: "30k", propertyDetails: { builtUpArea: 1200, measurementUnits: { builtUpArea: "Sq M" } } });
     expect(markup.includes('value="25.00"')).toBe(true);
     expect(markup.includes('readOnly=""')).toBe(true);
   });

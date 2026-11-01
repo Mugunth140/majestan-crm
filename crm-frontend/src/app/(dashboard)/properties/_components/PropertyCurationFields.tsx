@@ -32,7 +32,7 @@ function ContactRow({ label, value, onChange, role }: ContactRowProps) {
     <fieldset className="space-y-3">
       <legend className="mb-3 text-sm font-semibold">{label}</legend>
       <div
-        className={`grid gap-4 md:grid-cols-3 ${role ? "lg:grid-cols-4" : ""}`}
+        className={`grid gap-4 ${role ? "md:grid-cols-3" : "md:grid-cols-2"}`}
       >
         {role && (
           <div className="space-y-2">
@@ -49,7 +49,7 @@ function ContactRow({ label, value, onChange, role }: ContactRowProps) {
             />
           </div>
         )}
-        {(["name", "phone", "email"] as const).map((key) => (
+        {(["name", "phone"] as const).map((key) => (
           <div key={key} className="space-y-2">
             <label className="text-sm capitalize" htmlFor={`${fieldId}-${key}`}>
               {key}
@@ -58,9 +58,7 @@ function ContactRow({ label, value, onChange, role }: ContactRowProps) {
               className="h-12 rounded-xl bg-muted/30"
               id={`${fieldId}-${key}`}
               aria-label={`${label} ${key}`}
-              type={
-                key === "email" ? "email" : key === "phone" ? "tel" : "text"
-              }
+              type={key === "phone" ? "tel" : "text"}
               value={value[key]}
               onChange={(event) =>
                 onChange({ ...value, [key]: event.target.value })

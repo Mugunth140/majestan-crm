@@ -18,7 +18,8 @@ Every row below was traced through rendering, submission and the applicable API/
 | Owner primary name/phone/email and two alternatives with Care Taker/Security/Manager roles | Implemented; first alternative also maps to legacy columns, second is preserved in private JSON |
 | Agent primary name/phone/email and one alternative | Implemented; new contacts obey CRM contact permissions and are excluded from default public ORM selection |
 | Individual/attached bathrooms and combined website total | Implemented; existing unsplit totals are preserved rather than guessed |
-| Automatic price per sqft across Buy profiles | Implemented using built-up area for buildings and land area for land; zero/missing denominators do not calculate a rate |
+| Expected Sale Price removal across every type | Implemented per latest clarification; omitted from submissions without deleting stored legacy values |
+| Automatic price per sqft across Buy profiles | Implemented using built-up area for buildings and land area for land; zero/missing denominators do not calculate a rate; legacy normal Area is not used to fill missing built-up area |
 | Water supply options and Individual/Company/Joint ownership | Implemented |
 | Residential Rent verification removal and Approvals retention | Implemented using the clarified AND condition; Buy and commercial/industrial Rent retain applicable fields |
 | Manual room length × width | Implemented in feet, included in drafts; unparseable legacy measurements survive ordinary edits |
@@ -67,3 +68,11 @@ Every row below was traced through rendering, submission and the applicable API/
 - Both frontend and both API production builds passed in the implementation run; the CRM production build was repeated after the multi-select fix.
 
 The review covers the checked-out source, automated tests and local database evidence. It is not a claim that this branch has been verified on the production deployment.
+
+## Latest requested correction — local changes only
+
+- Expected Sale Price is now excluded for every property type and from form submissions. Stored legacy values are preserved.
+- Normal Area remains hidden. Building rate calculations use explicit built-up area, without inferring it from the old Area value. Website listing/detail price-per-sqft calculations follow the same rule.
+- Without built-up area, building rate calculations remain blank. Plot/Farmland retain their previously approved dedicated land area; co-working uses seat rent.
+- Current correction verification: 612 CRM frontend tests and 31 website listing tests passed. Both frontend production builds passed.
+- No commits or pushes were made for this correction, per the user's instruction.

@@ -106,12 +106,7 @@ describe("Property curation 2", () => {
   ])("offers an automatic sale rate for %s", (type) => {
     const markup = form(type);
     expect(markup).toContain('aria-label="Calculated price per area"');
-    if (
-      ["apartment", "villa", "farmland", "commercial", "industrial"].includes(
-        type,
-      )
-    )
-      expect(markup).not.toContain(">Expected Sale Price</label>");
+    expect(markup).not.toContain(">Expected Sale Price</label>");
   });
   it.each([
     "villa",

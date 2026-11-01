@@ -21,7 +21,7 @@ Source: `/home/zendex/Documents/GenOffice/Majestan/Property_Curation2.md`.
 - Requested per-type visibility changes, ground-floor controls, investment income fields, industrial canteen and co-working refreshment/restroom controls.
 - Fully Furnished is the default for new co-working listings. Editing an existing listing retains its furnishing choice. Unknown legacy facility values remain unset until staff explicitly choose them.
 
-Expected Sale Price is removed for Apartment/Farmland and types where it was already removed. Other existing fields not mentioned for removal retain their previous behavior.
+Latest clarification: Expected Sale Price is removed from every property type. Building calculations use only explicitly entered built-up area; legacy normal Area is never inferred as built-up area. Plot/Farmland retain dedicated land area, and co-working uses Rent per Seat. Existing database values remain stored.
 
 ## Storage and preservation
 

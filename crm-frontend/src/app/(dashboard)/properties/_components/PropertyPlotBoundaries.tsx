@@ -1,4 +1,5 @@
 "use client";
+import { plotBoundaryGeometry } from "./plot-boundary-geometry";
 import { Input } from "@/components/ui/input";
 import { PropertyFormSelect } from "./PropertyFormSelect";
 export interface PlotBoundary {
@@ -67,6 +68,29 @@ export function PropertyPlotBoundaries({
   facing?: string;
 }) {
   const sides = value.length === 4 ? value : emptyPlotBoundaries();
+  const normalize = (direction: string) =>
+    direction.toLowerCase().replace(/[^a-z]/g, "");
+  const facingSides = new Set<number>();
+  for (const direction of (facing ?? "").split(/\s+to\s+/i)) {
+    const target = normalize(direction);
+    if (!target) continue;
+    const exact = sides.flatMap((side, index) =>
+      normalize(side.direction) === target ? [index] : [],
+    );
+    // A diagonal facing highlights its two cardinal sides when no boundary
+    // has that exact diagonal label. Never infer facing from row position.
+    const matches = exact.length
+      ? exact
+      : sides.flatMap((side, index) => {
+          const cardinal = normalize(side.direction);
+          return ["north", "south", "east", "west"].includes(cardinal) &&
+            target.includes(cardinal)
+            ? [index]
+            : [];
+        });
+    for (const index of matches) facingSides.add(index);
+  }
+  const { corners, complete, invalid } = plotBoundaryGeometry(sides);
   const change = (index: number, key: keyof PlotBoundary, next: string) =>
     onChange?.(
       sides.map((side, i) =>
@@ -132,48 +156,128 @@ export function PropertyPlotBoundaries({
           </div>
         )}
         <figure className="rounded-xl border bg-muted/20 p-4">
-          {facing && <p className="mb-3 text-right text-sm font-semibold">Plot facing: {facing}</p>}
-          <svg
-            viewBox="0 0 400 300"
-            className="w-full"
-            role="img"
-            aria-label="Plot boundary preview"
-          >
-            <polygon
-              points="115,75 285,90 275,225 90,210"
-              fill="currentColor"
-              fillOpacity="0.08"
-              stroke="currentColor"
-              strokeWidth="2"
-            />
-            {sides.map((side, index) => {
-              const point = [
-                { x: 200, y: 45 },
-                { x: 335, y: 145 },
-                { x: 195, y: 260 },
-                { x: 48, y: 145 },
-              ][index];
-              return (
-                <text
-                  key={index}
-                  x={point.x}
-                  y={point.y}
-                  textAnchor="middle"
-                  fill="currentColor"
-                  fontSize="12"
-                >
-                  <tspan x={point.x}>{side.direction}</tspan>
-                  <tspan x={point.x} dy="18">
-                    {side.length
-                      ? `${side.length} ${side.unit}`
-                      : "Enter length"}
-                  </tspan>
-                </text>
-              );
-            })}
-          </svg>
+          {facing ? (
+            <div
+              aria-label="Boundary legend"
+              className="mb-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs"
+            >
+              <span className="inline-flex items-center gap-2 font-semibold text-blue-600 dark:text-blue-400">
+                <span aria-hidden className="h-1 w-6 rounded-full bg-current" />
+                Plot facing: {facing}
+              </span>
+              <span className="inline-flex items-center gap-2 text-muted-foreground">
+                <span
+                  aria-hidden
+                  className="w-6 border-t-2 border-dashed border-current"
+                />
+                Other boundaries
+              </span>
+            </div>
+          ) : (
+            <p className="mb-3 text-xs text-muted-foreground">
+              {readOnly
+                ? "Plot facing not recorded."
+                : "Select plot facing to highlight the facing sides."}
+            </p>
+          )}
+          {!invalid && (
+            <svg
+              viewBox="0 0 400 300"
+              className="w-full"
+              role="img"
+              aria-label="Plot boundary preview"
+            >
+              <polygon
+                points={corners.map((point) => point.join(",")).join(" ")}
+                fill="currentColor"
+                fillOpacity="0.08"
+                stroke="none"
+              />
+              {sides.map((side, index) => {
+                const start = corners[index];
+                const end = corners[(index + 1) % corners.length];
+                const highlighted = facingSides.has(index);
+                return (
+                  <line
+                    key={`edge-${index}`}
+                    x1={start[0]}
+                    y1={start[1]}
+                    x2={end[0]}
+                    y2={end[1]}
+                    data-boundary-direction={side.direction}
+                    data-facing={highlighted}
+                    className={
+                      highlighted
+                        ? "text-blue-600 dark:text-blue-400"
+                        : "text-muted-foreground"
+                    }
+                    stroke="currentColor"
+                    strokeWidth={highlighted ? 6 : 2}
+                    strokeDasharray={highlighted ? undefined : "5 5"}
+                    strokeLinecap="round"
+                  />
+                );
+              })}
+              {sides.map((side, index) => {
+                const start = corners[index],
+                  end = corners[(index + 1) % 4];
+                const dx = end[0] - start[0],
+                  dy = end[1] - start[1];
+                const distance = Math.hypot(dx, dy) || 1;
+                const point = {
+                  x: Math.max(
+                    48,
+                    Math.min(
+                      352,
+                      (start[0] + end[0]) / 2 + (dy / distance) * 32,
+                    ),
+                  ),
+                  y: Math.max(
+                    28,
+                    Math.min(
+                      260,
+                      (start[1] + end[1]) / 2 - (dx / distance) * 32 - 6,
+                    ),
+                  ),
+                };
+                return (
+                  <text
+                    key={index}
+                    x={point.x}
+                    y={point.y}
+                    textAnchor="middle"
+                    fill="currentColor"
+                    fontSize="12"
+                    className={
+                      facingSides.has(index)
+                        ? "text-blue-600 dark:text-blue-400 font-semibold"
+                        : undefined
+                    }
+                  >
+                    <tspan x={point.x}>{side.direction}</tspan>
+                    <tspan x={point.x} dy="18">
+                      {side.length
+                        ? `${side.length} ${side.unit}`
+                        : "Enter length"}
+                    </tspan>
+                  </text>
+                );
+              })}
+            </svg>
+          )}
+          {facing && !facingSides.size && (
+            <p className="mb-2 text-center text-xs text-muted-foreground">
+              No boundary direction matches this facing.
+            </p>
+          )}
           <figcaption className="text-center text-xs text-muted-foreground">
-            Live boundary labels · layout not to scale
+            {invalid
+              ? complete
+                ? "These lengths cannot form a closed plot. Each side must be shorter than the other three combined."
+                : "Enter the remaining lengths to preview this plot."
+              : complete
+                ? "Approximate shape from side lengths. Actual angles may differ."
+                : "Approximate preview. Enter all four lengths to update the shape."}
           </figcaption>
         </figure>
       </div>

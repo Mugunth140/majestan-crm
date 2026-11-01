@@ -234,3 +234,15 @@ it('does not overwrite an existing coworking furnishing choice with the new-form
  const p = await save({ propertyType: 'coworking', listingType: 'Rent', propertyDetails: { rentPerSeat: 8000, furnishingStatus: 'UNFURNISHED', furnished: false } });
  expect(p.furnishingStatus).toBe('UNFURNISHED'); expect(p.furnished).toBe(false);
 });
+
+it('does not use legacy normal Area as built-up area when built-up area is missing', async () => {
+ const p = await save({ propertyType: 'apartment', expectedSalePrice: 6000000, propertyDetails: { areaSqft: 1200, areaUnit: 'Sq Ft' } });
+ expect(p).not.toHaveProperty('expectedSalePrice');
+ expect(p).not.toHaveProperty('pricePerSqft');
+ expect(p).not.toHaveProperty('builtUpArea');
+ expect(p).not.toHaveProperty('areaSqft');
+});
+it.each(['individual_portion', 'investment_property', 'farm_house', 'plot'])('omits removed expected sale price from %s updates', async propertyType => {
+ const p = await save({ propertyType, expectedSalePrice: 6000000, propertyDetails: { builtUpArea: 1000, areaSqft: 1200 } });
+ expect(p).not.toHaveProperty('expectedSalePrice');
+});

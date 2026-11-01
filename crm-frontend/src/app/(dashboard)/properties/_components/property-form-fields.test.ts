@@ -53,7 +53,7 @@ describe("Property form curation", () => {
 
   it.each(types)("separates sale and rental financial fields: %s", (type) => {
     for (const field of ["bookingAmount", "expectedSalePrice", "registrationCharge", "timeForRegistration", "saleType", "ownershipType", "modeOfPayment", "hypothecation", "financeFacing", "tslrFmb"]) {
-      expect(visible(field, type, "Buy")).toBe(type !== "coworking" && !(type === "farmland" && ["hypothecation", "financeFacing", "tslrFmb"].includes(field)) && (field !== "expectedSalePrice" || !["apartment", "commercial", "industrial", "villa", "farmland"].includes(type)));
+      expect(visible(field, type, "Buy")).toBe(type !== "coworking" && !(type === "farmland" && ["hypothecation", "financeFacing", "tslrFmb"].includes(field)) && field !== "expectedSalePrice");
       expect(visible(field, type, "Rent")).toBe(false);
     }
     for (const field of ["securityDeposit", "lockInPeriod", "rentalAgreementDraft"]) {

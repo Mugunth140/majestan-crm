@@ -486,7 +486,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
   const [unitNumber, setUnitNumber] = useState(det?.unitNumber ?? "");
   const [numberOfFlats, setNumberOfFlats] = useState(det?.numberOfFlats ? String(det.numberOfFlats) : "");
   const [towerNos, setTowerNos] = useState(det?.towerNos ? String(det.towerNos) : "");
-  const [builtUpArea, setBuiltUpArea] = useState(initialArea(det?.builtUpArea ?? areaInSqft(det?.areaSqft ?? "", det?.areaUnit || "Sq Ft"), "builtUpArea", det?.measurementUnits ?? {}, "Sq Ft"));
+  const [builtUpArea, setBuiltUpArea] = useState(initialArea(det?.builtUpArea, "builtUpArea", det?.measurementUnits ?? {}, "Sq Ft"));
   const [carpetArea, setCarpetArea] = useState(initialArea(det?.carpetArea, "carpetArea", det?.measurementUnits ?? {}, "Sq Ft"));
   const [superBuiltUpArea, setSuperBuiltUpArea] = useState(initialArea(det?.superBuiltUpArea, "superBuiltUpArea", det?.measurementUnits ?? {}, "Sq Ft"));
   const [udsArea, setUdsArea] = useState(initialArea(det?.udsArea, "udsArea", det?.measurementUnits ?? {}, "Sq Ft"));
