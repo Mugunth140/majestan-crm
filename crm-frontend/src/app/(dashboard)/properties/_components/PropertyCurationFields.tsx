@@ -541,6 +541,7 @@ export function AdditionalCurationFields({
             <div key={key} className="space-y-2">
               <label className="text-sm font-semibold">{label}</label>
               <PropertyMultiSelect
+                serializeAsJson
                 name={label}
                 value={value[key]}
                 options={options}

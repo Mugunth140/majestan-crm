@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
+  AdditionalCurationFields,
   OwnerAlternativeContacts,
   PortionFields,
   ParkingFields,
@@ -174,4 +175,42 @@ it("edits manual room dimensions and responds to a restored draft", () => {
   expect(
     (screen.getByLabelText("Room width in feet") as HTMLInputElement).value,
   ).toBe("11");
+});
+
+it("keeps utility names containing commas intact across multiple selections and save", () => {
+  function Form() {
+    const [value, onChange] = useState(() => restoreCurationDetails(null));
+    return createElement(
+      "div",
+      null,
+      createElement(AdditionalCurationFields, {
+        value,
+        onChange,
+        visible: (field) => field === "utilities",
+        hasRestroom: false,
+        utilities: ["Water, power and backup", "Internet"],
+      }),
+      createElement(
+        "output",
+        { "data-testid": "result" },
+        JSON.stringify(
+          curationPayload(value, (field) => field === "utilities"),
+        ),
+      ),
+    );
+  }
+  render(createElement(Form));
+  fireEvent.click(screen.getByText("Select utilities provided"));
+  fireEvent.click(
+    screen.getByRole("checkbox", { name: "Water, power and backup" }),
+  );
+  fireEvent.click(screen.getByRole("checkbox", { name: "Internet" }));
+  expect(
+    JSON.parse(screen.getByTestId("result").textContent!).utilities,
+  ).toEqual(["Water, power and backup", "Internet"]);
+  expect(
+    screen
+      .getByRole("checkbox", { name: "Water, power and backup" })
+      .getAttribute("aria-checked"),
+  ).toBe("true");
 });

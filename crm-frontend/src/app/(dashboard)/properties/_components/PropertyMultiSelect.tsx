@@ -31,11 +31,13 @@ export function PropertyMultiSelect({
   value,
   options,
   onChange,
+  serializeAsJson = false,
 }: {
   name: string;
   value: string;
   options: readonly string[];
   onChange: (value: string) => void;
+  serializeAsJson?: boolean;
 }) {
   const selected = parseMultiValue(value, options);
   const choices = [
@@ -66,14 +68,14 @@ export function PropertyMultiSelect({
           >
             <Checkbox
               checked={selected.includes(choice)}
-              onCheckedChange={(checked) =>
+              onCheckedChange={(checked) => {
+                const next = checked
+                  ? [...selected, choice]
+                  : selected.filter((item) => item !== choice);
                 onChange(
-                  (checked
-                    ? [...selected, choice]
-                    : selected.filter((item) => item !== choice)
-                  ).join(", "),
-                )
-              }
+                  serializeAsJson ? JSON.stringify(next) : next.join(", "),
+                );
+              }}
             />
             {choice}
           </label>
