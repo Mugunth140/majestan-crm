@@ -1,0 +1,43 @@
+/* ── Login ─────────────────────────────────────────────── */
+.login-panel {
+  background: linear-gradient(180deg, #0B9A6E 0%, #017D58 55%, #016347 100%);
+}
+/* Faint grid that fades toward the edges */
+.login-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.07) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: center;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 30%, transparent 100%);
+}
+
+/* Prism canvas fades up from black */
+.login-prism {
+  animation: login-fade 1.2s ease-out both;
+}
+@keyframes login-fade {
+  from { opacity: 0; }
+}
+
+.login-panel-enter {
+  animation: login-panel-enter 1s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+}
+@keyframes login-panel-enter {
+  from { opacity: 0; transform: translateX(40px) scale(0.98); }
+}
+.login-rise {
+  animation: login-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) var(--d, 0s) both;
+}
+@keyframes login-rise {
+  from { opacity: 0; transform: translateY(12px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-prism,
+  .login-panel-enter,
+  .login-rise { animation: none; }
+}

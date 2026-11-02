@@ -61,7 +61,7 @@ function defaultTitle(pathname: string): string {
   }
   if (pathname === "/") return "Dashboard";
   let best = "";
-  let title = "Majestan";
+  let title = "Prismark";
   for (const [p, t] of LIST_TITLES) {
     if (p.length > best.length && (pathname === p || pathname.startsWith(p + "/"))) {
       best = p;

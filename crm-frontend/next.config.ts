@@ -9,6 +9,8 @@ const withPWA = withPWAInit({
 
 const nextConfig: NextConfig = {
   turbopack: {},
+  // Keep the dev badge clear of the login page's bottom-left accessibility button
+  devIndicators: { position: 'bottom-right' },
   allowedDevOrigins: ['192.168.13.167', 'localhost'],
   async rewrites() {
     const backendBase = process.env.BACKEND_URL || 'http://localhost:8000';

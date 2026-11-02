@@ -15,13 +15,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Majestan CRM",
-  description: "Internal CRM for Majestan Realty",
+  title: "Prismark CRM",
+  description: "Prismark CRM",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Majestan",
+    title: "Prismark",
   },
 };
 
@@ -44,6 +44,8 @@ const themeScript = `
     } else {
       document.documentElement.classList.remove('dark');
     }
+    // Kumo UI reads dark mode from data-mode
+    document.documentElement.setAttribute('data-mode', isDark ? 'dark' : 'light');
     var color = isDark ? '#1C1C1E' : '#ffffff';
     var meta = document.querySelector('meta[name="theme-color"]');
     if (!meta) {
@@ -69,7 +71,7 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} text-[14px] bg-background text-foreground transition-colors duration-500 ease-in-out antialiased`}>
         <ThemeProvider
-          attribute="class"
+          attribute={["class", "data-mode"]}
           defaultTheme="system"
           enableSystem
           storageKey="theme"

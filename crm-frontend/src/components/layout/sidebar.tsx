@@ -1,5 +1,6 @@
 "use client";
 
+import { PrismarkMark } from "@/components/brand/prismark-mark";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
@@ -31,7 +32,6 @@ import {
 } from "lucide-react";
 import { can } from "@/lib/permissions";
 import { canViewAds } from "@/lib/ads-access";
-import Image from "next/image";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: Astroid },
@@ -233,11 +233,11 @@ export function Sidebar() {
       )}>
         <Link href="/" className="flex items-center gap-3">
           <div className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden">
-            <Image src="/logo/logo.png" alt="Majestan CRM" width={30} height={30} className="object-contain" />
+            <PrismarkMark className="h-6 w-6 text-[#017D58] dark:text-[#2FB585]" />
           </div>
           {!isCollapsed && (
             <span className="font-semibold tracking-normal truncate whitespace-nowrap">
-              Majestan CRM
+              Prismark CRM
             </span>
           )}
         </Link>

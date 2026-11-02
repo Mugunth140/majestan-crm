@@ -1,3 +1,6 @@
+/* Kumo UI — must load before tailwindcss so its @theme tokens register first */
+@source "../../node_modules/@cloudflare/kumo/dist/**/*.{js,jsx,ts,tsx}";
+@import "@cloudflare/kumo/styles";
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -82,6 +85,13 @@
   --sidebar-accent-foreground: #27427F;
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: #27427F;
+}
+
+/* Prismark brand — overrides Kumo's default blue brand token */
+:root {
+  --prismark-green: #017D58;
+  --color-kumo-brand: light-dark(#017D58, #0B8F66);
+  --color-kumo-brand-hover: light-dark(#01694A, #0A7D59);
 }
 
 .dark {
