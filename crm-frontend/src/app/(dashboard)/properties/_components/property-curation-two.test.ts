@@ -84,3 +84,16 @@ it("keeps untouched new facility flags unknown, including after a draft restore"
       .hasCanteen,
   ).toBe(false);
 });
+
+it.each([ ["apartment", "Buy"], ["apartment", "Rent"], ["villa", "Buy"], ["villa", "Rent"] ])("saves classified parking and keeps unclassified legacy data for %s %s", (type, listing) => {
+  const visible = (field: string) => isPropertyFieldVisible(field, type, listing);
+  const stored = { parkingSpaces: [{ vehicle: "Car", type: "Open", count: 2 }, { vehicle: "Bike", type: "Covered", count: 1 }] };
+  const draft = restoreCurationDetails(stored);
+  expect(curationPayload(draft, visible)).toMatchObject(stored);
+  expect(curationErrors(draft, visible, "")).toEqual([]);
+  expect(curationPayload(restoreCurationDetails(null), visible)).not.toHaveProperty("parkingSpaces");
+  expect(curationPayload({ ...draft, parkingSpaces: [], parkingRecorded: true }, visible).parkingSpaces).toEqual([]);
+  for (const oldField of ["parking", "parkingType", "carParking", "bikeParking"]) expect(visible(oldField)).toBe(false);
+  // PG has its separate source-specific covered/open room accommodation fields.
+  expect(isPropertyFieldVisible("parkingSpaces", "pg_service_apartment", "Rent")).toBe(false);
+});

@@ -57,8 +57,8 @@ export const ADS_PLACEMENTS: readonly AdPlacementOption[] = [
     label: 'Listing pages',
     description:
       'Banners between property / project cards on the listing pages. Target Buy, Rent or Projects listings; an "All" ad fills in where none is targeted.',
-    desktop: { label: 'Desktop image', ratio: [4, 1], example: '1600×400' },
-    mobile: { ratio: [16, 9], example: '1080×608', required: false },
+    desktop: { label: 'Desktop image', ratio: [3, 1], example: '1800×600' },
+    mobile: { ratio: [4, 5], example: '1080×1350', required: false },
     audiences: [
       { value: 'buy', label: 'Buy listings' },
       { value: 'rent', label: 'Rent listings' },

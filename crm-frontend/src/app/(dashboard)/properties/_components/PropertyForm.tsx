@@ -1990,11 +1990,14 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
       if (!hasRestroom && payload.curationDetails) delete payload.curationDetails.restroomCount;
       const curatedPayload = curatePropertyPayload(payload, propertyType, listingType, tenantOccupied, effectiveFurnishingStatus);
 
-      // Keep the searchable base area derived from built-up area when its
-      // standalone input is intentionally hidden for Villa / Apartment rentals.
-      if (!isFieldVisible("areaSqft") && measuredAreaSqft !== undefined) {
+      // Seed searchable area for new buildings, but do not overwrite a saved
+      // general area merely because its input is hidden. Land area remains editable.
+      const hasStoredGeneralArea = mode === "edit" && det.areaSqft != null && String(det.areaSqft).trim() !== "";
+      if (!isFieldVisible("areaSqft") && measuredAreaSqft !== undefined && (isFieldVisible("landArea") || !hasStoredGeneralArea)) {
         curatedPayload.areaSqft = measuredAreaSqft;
         curatedPayload.areaUnit = "Sq Ft";
+      } else if (hasStoredGeneralArea && !isFieldVisible("areaSqft") && !isFieldVisible("landArea")) {
+        delete curatedPayload.areaUnit;
       }
 
       if (["coworking", "pg_service_apartment"].includes(propertyType) || (propertyType === "commercial" && listingType === "Rent")) {
@@ -2280,9 +2283,14 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
 
                 </>
               )}
-{isFieldVisible("plotBoundaries") && <div className="space-y-4 lg:col-span-3" id="pf-plotBoundaries"><h3 className="text-lg font-semibold">Plot boundaries</h3><PropertyPlotBoundaries value={plotBoundaries} onChange={setPlotBoundaries} facing={plotFacing} /><FormErr field="plotBoundaries" /></div>}{isFieldVisible("boreWellCount") && boreWell && <div className="space-y-2"><label className={labelClass}>No of Borewells</label><Input type="number" min={1} step="1" value={boreWellCount} onChange={(event) => setBoreWellCount(event.target.value)} className={inputClass} /></div>}</>);
+{isFieldVisible("plotBoundaries") && <div className="space-y-4 lg:col-span-3" id="pf-plotBoundaries"><h3 className="text-lg font-semibold">Plot boundaries</h3><PropertyPlotBoundaries value={plotBoundaries} onChange={setPlotBoundaries} facing={plotFacing || (propertyType === "commercial" ? propertyFacing : "")} /><FormErr field="plotBoundaries" /></div>}{isFieldVisible("boreWellCount") && boreWell && <div className="space-y-2"><label className={labelClass}>No of Borewells</label><Input type="number" min={1} step="1" value={boreWellCount} onChange={(event) => setBoreWellCount(event.target.value)} className={inputClass} /></div>}</>);
 
   const commonSpecifications = (<>
+
+    {mode === "edit" && !isFieldVisible("landArea") && Number(det.areaSqft) > 0 && <div className="space-y-2 rounded-xl border p-4 md:col-span-2 lg:col-span-3" role="note" aria-label="Previously recorded area">
+      <p className="text-sm font-semibold">Previously recorded area: {det.areaSqft} {det.areaUnit || "Sq Ft"}</p>
+      <p className="text-sm text-muted-foreground">This saved general area is kept unchanged. Built-up and carpet area are separate measurements; enter their confirmed values where applicable.</p>
+    </div>}
 
             {/* Bedrooms — residential only */}
             {isFieldVisible("bedrooms") && (
@@ -2439,9 +2447,9 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             )}
   <AdditionalCurationFields value={curation} onChange={setCuration} visible={isFieldVisible} hasRestroom={hasRestroom} utilities={formData.utilities.map((u: any) => u.name)} />
   {isFieldVisible("numberOfPortions") && <PortionFields count={numberOfPortions} onCountChange={setNumberOfPortions} value={curation} onChange={setCuration} />}
-  {isFieldVisible("parkingSpaces") && <ParkingFields value={curation} onChange={setCuration} />}
+  {isFieldVisible("parkingSpaces") && <ParkingFields value={curation} onChange={setCuration} legacyParkingCount={parking} legacyParkingType={parkingType} />}
   {isFieldVisible("plotFacing") && <div className="space-y-2"><label className={labelClass}>Plot Facing</label><FormSelect name="plotFacing" placeholder="Select direction" options={FACING_DIRECTION_OPTIONS} value={plotFacing} onValueChange={setPlotFacing} /></div>}
-  {isFieldVisible("plotBoundaries") && !["plot", "farmland", "farm_house"].includes(propertyType) && <div className="space-y-4 lg:col-span-3"><h3 className="text-lg font-semibold">Plot boundaries</h3><PropertyPlotBoundaries value={plotBoundaries} onChange={setPlotBoundaries} facing={plotFacing} /><FormErr field="plotBoundaries" /></div>}
+  {isFieldVisible("plotBoundaries") && !["plot", "farmland", "farm_house"].includes(propertyType) && <div className="space-y-4 lg:col-span-3"><h3 className="text-lg font-semibold">Plot boundaries</h3><PropertyPlotBoundaries value={plotBoundaries} onChange={setPlotBoundaries} facing={plotFacing || (propertyType === "commercial" ? propertyFacing : "")} /><FormErr field="plotBoundaries" /></div>}
   {isResidential && propertyType !== "pg_service_apartment" && <div className="space-y-2"><label className={labelClass}>Approvals</label><PropertyApprovalsSelect value={approvals} onChange={setApprovals} /></div>}
   {generalFinance && <><label className="flex items-center gap-3 text-sm font-semibold"><Checkbox checked={isHypothecated(hypothecation)} onCheckedChange={checked => setHypothecation(checked === true ? "Yes" : "No")} />Has Finance / Hypothecation</label>{isHypothecated(hypothecation) && <><div className="space-y-2"><label className={labelClass}>Finance</label><PriceInput value={financeFacing} onChange={setFinanceFacing} /></div><div className="space-y-2"><label className={labelClass}>Funded By</label><FormSelect name="fundedBy" placeholder="Select lender" value={fundedBy} options={asOptions(["Bank", "NBFC", "Local finance"])} onValueChange={setFundedBy} /></div></>}</>}
 </>);
@@ -3370,6 +3378,7 @@ export function PropertyForm({ mode, initialData, onSuccess }: PropertyFormProps
             <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
               Commercial Space Details
             </h3>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{listingType === "Rent" && <>
 {isFieldVisible("specialPurpose") && (<div className="space-y-2"><label className={labelClass}>Special Purpose</label><FormSelect name="specialPurpose" placeholder="Select special purpose" options={asOptions(COMMERCIAL_SPECIAL_PURPOSES)} value={specialPurpose || null} onValueChange={setSpecialPurpose} /></div>)}
 <div className="space-y-2"><label className={labelClass}>Property Accessibility</label><FormSelect name="accessibility" placeholder="Select property accessibility" options={asOptions(PROPERTY_ACCESSIBILITY)} value={accessibility || null} onValueChange={setAccessibility} /></div>

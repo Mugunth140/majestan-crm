@@ -409,12 +409,13 @@ export default function PropertyViewPage() {
           <Section title="Specifications" icon={<Ruler className="h-4 w-4 text-purple-500" />}>
             {curationRows.map(row => <SectionField key={row.label} label={row.label} value={row.value} />)}
             {isFieldVisible("landArea") && <SectionField label={type === "plot" && property.listingType !== "Rent" ? "Total Project Area" : "Land Area"} value={det.areaSqft ? `${initialArea(areaInSqft(det.areaSqft, det.areaUnit || "Sq Ft"), "landArea", det.measurementUnits ?? {})} ${det.measurementUnits?.landArea || "Sq Ft"}` : undefined} />}
-            {isFieldVisible("plotBoundaries") && boundarySides.some(side => side.length) && <div className="sm:col-span-2"><PropertyPlotBoundaries value={boundarySides} facing={det.plotFacing} readOnly /></div>}
+            {isFieldVisible("plotBoundaries") && boundarySides.some(side => side.length) && <div className="sm:col-span-2"><PropertyPlotBoundaries value={boundarySides} facing={det.plotFacing || (type === "commercial" ? det.propertyFacing : "")} readOnly /></div>}
             {!isPlotLike && (<>
             {isFieldVisible("bedrooms") && (<SectionField label="Bedrooms" value={det.bedrooms} />)}
             {isFieldVisible("bathrooms") && (<SectionField label="Bathrooms" value={det.bathrooms} />)}
             </>)}
             {isFieldVisible("areaSqft") && (<SectionField label={type === "plot" ? "Total Project Area" : "Area"} value={det.areaSqft ? `${det.areaSqft} ${det.areaUnit || "Sq Ft"}` : undefined} />)}
+            {!isFieldVisible("landArea") && Number(det.areaSqft) > 0 && <SectionField label="Previously recorded area" value={`${det.areaSqft} ${det.areaUnit || "Sq Ft"}`} />}
             {!isPlotLike && (<>
             {isFieldVisible("furnished") && (<SectionField label="Furnished" value={bool(det.furnished)} />)}
             {isFieldVisible("furnishingStatus") && (<SectionField label="Furnishing Status" value={det.furnishingStatus} />)}

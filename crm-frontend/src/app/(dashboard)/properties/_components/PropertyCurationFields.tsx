@@ -274,13 +274,22 @@ export function PortionFields({
 export function ParkingFields({
   value,
   onChange,
+  legacyParkingCount,
+  legacyParkingType,
 }: {
   value: CurationDraft;
   onChange: (value: CurationDraft) => void;
+  legacyParkingCount?: string;
+  legacyParkingType?: string;
 }) {
   return (
     <fieldset className="space-y-4 md:col-span-2 lg:col-span-3">
       <legend className="mb-3 text-sm font-semibold">Parking spaces</legend>
+      {!value.parkingRecorded && value.parkingSpaces.length === 0 && (legacyParkingCount || legacyParkingType) && (
+        <p className="text-sm text-muted-foreground">
+          Existing parking: {legacyParkingCount ? `${legacyParkingCount} spaces` : "count not recorded"}{legacyParkingType ? ` (${legacyParkingType})` : ""}. Breakdown not yet recorded. Existing values are kept until you add combinations or select No parking.
+        </p>
+      )}
       {value.parkingSpaces.map((row, index) => (
         <div
           key={index}

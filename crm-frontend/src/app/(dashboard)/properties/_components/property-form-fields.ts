@@ -144,6 +144,8 @@ export function isPropertyFieldVisible(
       !!propertyType &&
       !isRentalOnlyPropertyType(propertyType)
     );
+  if (field === "plotBoundaries" && propertyType === "commercial")
+    return listingType === "Buy";
   if (field === "plotBoundaries" || field === "plotFacing")
     return [
       "plot",
@@ -168,16 +170,16 @@ export function isPropertyFieldVisible(
       (propertyType === "commercial" && listingType === "Buy")
     );
   if (
-    ["carParking", "bikeParking", "parkingType"].includes(field) &&
-    propertyType === "commercial" &&
-    listingType === "Buy"
+    ["parking", "carParking", "bikeParking", "parkingType"].includes(field) &&
+    (["apartment", "villa"].includes(propertyType) ||
+      (propertyType === "commercial" && listingType === "Buy"))
   )
     return false;
   if (field === "expectedMonthlyRentPerSqft")
     return propertyType === "commercial" && listingType === "Buy";
   if (field === "parkingSpaces")
     return (
-      propertyType === "investment_property" ||
+      ["apartment", "villa", "investment_property"].includes(propertyType) ||
       (propertyType === "commercial" && listingType === "Buy")
     );
   if (["totalRentPerMonth", "expectedRentPerMonth"].includes(field))

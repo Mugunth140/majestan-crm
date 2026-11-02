@@ -186,7 +186,9 @@ describe("Fine-grained property requirements", () => {
     const markup = render("apartment", "Rent");
     for (const label of ["Area", "Possession Status", "Super Built Up Area"]) expect(markup.includes(`>${label}</label>`)).toBe(false);
     expect(markup.includes(">No of Lifts</label>")).toBe(true);
-    expect(markup.includes(">No of Parking</label>")).toBe(true);
+    expect(markup.includes(">No of Parking</label>")).toBe(false);
+    expect(markup.includes("Parking spaces")).toBe(true);
+    expect(markup.includes("Add parking combination")).toBe(true);
     expect(markup.includes(">Details</h3>")).toBe(false);
     expect(markup.includes("Floor plans &amp; room dimensions")).toBe(true);
     expect(markup.includes('name="builtUpAreaUnit"')).toBe(true);

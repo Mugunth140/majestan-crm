@@ -217,3 +217,24 @@ it('does not reset hidden negotiability while editing the PG profile', async()=>
  await service.update(7,{negotiable:false});
  expect(siteApi.patch.mock.calls[1][1]).toHaveProperty('negotiable',false);
 });
+
+describe('Commercial area preservation', () => {
+  it('keeps general, built-up and carpet measurements independent on an ordinary edit', async () => {
+    const { service, siteApi } = setup('commercial', {
+      areaSqft: '3200', areaUnit: 'Sq Ft', builtUpArea: '2500', carpetArea: '2100',
+      measurementUnits: { builtUpArea: 'Sq Ft', carpetArea: 'Sq Ft' },
+    });
+    await service.update(7, { title: 'Updated title', builtUpArea: 2500, carpetArea: 2100 });
+    expect(siteApi.patch).toHaveBeenCalledWith('/admin/properties/commercial/7', expect.objectContaining({
+      details: expect.objectContaining({ areaSqft: 3200, areaUnit: 'Sq Ft', buildUpArea: 2500, carpetArea: 2100 }),
+    }));
+  });
+});
+
+describe('Area preservation across property profiles', () => {
+  it.each(['apartment', 'villa', 'individual_portion', 'investment_property', 'farm_house', 'commercial', 'industrial', 'coworking', 'pg_service_apartment', 'plot', 'farmland'])('does not erase omitted stored measurements on a %s metadata edit', async propertyType => {
+    const {service, siteApi} = setup(propertyType, {areaSqft:'1900',areaUnit:'Sq Ft',builtUpArea:'1700',carpetArea:'1500',superBuiltUpArea:'1800',plotArea:'2400'});
+    await service.update(7, {title:'Updated title', curationDetails:{}});
+    expect(siteApi.patch.mock.calls[0][1].details).toMatchObject({areaSqft:1900,areaUnit:'Sq Ft',buildUpArea:1700,carpetArea:1500,superBuiltUpArea:1800,plotArea:2400});
+  });
+});

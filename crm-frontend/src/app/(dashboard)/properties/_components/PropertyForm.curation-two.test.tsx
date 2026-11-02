@@ -263,3 +263,36 @@ describe("Property curation 2", () => {
     expect(labels(markup)).toContain("Agent Email");
   });
 });
+
+it.each([ ["apartment", "Sell"], ["apartment", "Rent"], ["villa", "Sell"], ["villa", "Rent"] ])("uses parking combinations for %s %s and restores saved rows", (type, listing) => {
+  const markup = form(type, listing, { curationDetails: { parkingSpaces: [
+    { vehicle: "Car", type: "Open", count: 2 },
+    { vehicle: "Bike", type: "Covered", count: 1 },
+  ] } });
+  expect(markup).toContain("Parking spaces");
+  expect(markup).toContain("Remove parking 1");
+  expect(markup).toContain("Remove parking 2");
+  expect(markup).toContain("Add parking combination");
+  for (const oldLabel of ["No of Parking", "Parking Type", "Car Parking", "Bike Parking"]) expect(labels(markup)).not.toContain(oldLabel);
+  const legacy = form(type, listing, { parking: 3, parkingType: "Covered" });
+  expect(legacy).toContain("3 spaces");
+  expect(legacy).toContain("Breakdown not yet recorded");
+});
+
+it.each(["Sell", "Rent"])("shows saved commercial general area as a reference for %s without guessing dedicated measurements", listing => {
+  const markup = form("commercial", listing, { areaSqft: "1900", areaUnit: "Sq Ft", builtUpArea: null, carpetArea: null });
+  expect(markup).toContain("Previously recorded area: 1900 Sq Ft");
+  expect(markup).toContain("Built-up and carpet area are separate measurements");
+  expect(markup).not.toContain('name="areaSqft"');
+  expect(markup).toContain('name="builtUpArea"');
+  expect(markup).toContain('name="carpetArea"');
+  expect(markup).not.toContain('value="1900"');
+});
+
+it("shows plot boundaries on Commercial Buy only", () => {
+  const sides = [ {direction:"North",length:40,unit:"ft"}, {direction:"South",length:40,unit:"ft"}, {direction:"East",length:60,unit:"ft"}, {direction:"West",length:60,unit:"ft"} ];
+  const markup = form("commercial", "Sell", {plotBoundaries:sides, propertyFacing:"East"});
+  expect(markup).toContain("Plot boundaries");
+  expect(markup).toContain("Plot facing: East");
+  expect(form("commercial", "Rent", {plotBoundaries:sides})).not.toContain("Plot boundaries");
+});

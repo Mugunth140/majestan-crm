@@ -263,3 +263,52 @@ it('retains legacy PG Furnished classification when saving',async()=>{
  const p=await save({propertyType:'pg_service_apartment',listingType:'Rent',price:8000,propertyDetails:{furnishingStatus:'Furnished',furnished:false}});
  expect(p.furnished).toBe(true);expect(p.furnishingStatus).toBe('Furnished');
 });
+it.each(["Sell", "Rent"])("preserves distinct legacy commercial areas on a %s edit", async (listingType) => {
+  const p = await save({ propertyType: "commercial", listingType, propertyDetails: {
+    areaSqft: "3200", areaUnit: "Sq Ft", builtUpArea: "2500", carpetArea: "2100",
+  } });
+  // The hidden general area is independent of built-up/carpet area.
+  expect(p).not.toHaveProperty("areaSqft");
+  expect(p).not.toHaveProperty("areaUnit");
+  expect(p.builtUpArea).toBe(2500);
+  expect(p.carpetArea).toBe(2100);
+  expect(probe.markup).toContain('name="builtUpArea"');
+  expect(probe.markup).toContain('name="carpetArea"');
+  expect(probe.markup).toContain('value="2500"');
+  expect(probe.markup).toContain('value="2100"');
+});
+
+const buildingProfiles = [
+  ["apartment", "Sell"], ["apartment", "Rent"], ["villa", "Sell"], ["villa", "Rent"],
+  ["individual_portion", "Sell"], ["individual_portion", "Rent"], ["investment_property", "Sell"],
+  ["farm_house", "Sell"], ["commercial", "Sell"], ["commercial", "Rent"],
+  ["industrial", "Sell"], ["industrial", "Rent"], ["coworking", "Rent"], ["pg_service_apartment", "Rent"],
+];
+it.each(buildingProfiles)("keeps saved general area independent from dedicated areas for %s %s", async (propertyType, listingType) => {
+  const p = await save({propertyType, listingType, price: 100000, propertyDetails: {
+    areaSqft: "1", areaUnit: "Acres", builtUpArea: "2500", carpetArea: "2100", superBuiltUpArea: "3000", rentPerSeat: 8000,
+  }});
+  expect(p).not.toHaveProperty("areaSqft");
+  expect(p).not.toHaveProperty("areaUnit");
+  if (propertyType !== "coworking") {
+    expect(p.builtUpArea).toBe(2500);
+    expect(p.carpetArea).toBe(2100);
+  }
+  expect(probe.markup).toContain("Previously recorded area: 1 Acres");
+});
+it.each([["plot", "Sell"], ["plot", "Rent"], ["farmland", "Sell"], ["farmland", "Rent"]])("retains editable land measurements for %s %s", async (propertyType, listingType) => {
+  const p = await save({ propertyType, listingType, propertyDetails: {areaSqft: "2", areaUnit: "Acres"} });
+  expect(p.areaSqft).toBe(87120);
+  expect(p.areaUnit).toBe("Sq Ft");
+  expect(p.measurementUnits.landArea).toBe("Acres");
+  expect(probe.markup).not.toContain("Previously recorded area:");
+});
+
+it("saves Commercial Buy boundaries without adding them to Rent payloads", async () => {
+  const plotBoundaries = [{direction:"North",length:40,unit:"ft"},{direction:"South",length:40,unit:"ft"},{direction:"East",length:60,unit:"ft"},{direction:"West",length:60,unit:"ft"}];
+  const buy = await save({propertyType:"commercial",listingType:"Sell",propertyDetails:{plotBoundaries}});
+  expect(buy.plotBoundaries).toEqual(plotBoundaries);
+  probe.calls=0;probe.update.mockClear();probe.submit=undefined;
+  const rent = await save({propertyType:"commercial",listingType:"Rent",propertyDetails:{plotBoundaries}});
+  expect(rent).not.toHaveProperty("plotBoundaries");
+});
