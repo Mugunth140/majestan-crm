@@ -3,7 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { ThemeStatusBar } from "@/components/layout/theme-status-bar";
-import { Toaster } from "sonner";
+import { Toaster } from "@/components/ui/toaster";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -78,12 +78,7 @@ export default function RootLayout({
         >
           <ThemeStatusBar />
           {children}
-          <Toaster
-            position="top-right"
-            richColors
-            offset={{ top: "calc(env(safe-area-inset-top) + 12px)", right: 16 }}
-            mobileOffset={{ top: "calc(env(safe-area-inset-top) + 12px)", right: 12 }}
-          />
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

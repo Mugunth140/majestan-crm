@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, type DragEvent } from "react";
 import { Lock, Phone } from "lucide-react";
+import { NameAvatar } from "@/components/shared/name-avatar";
 import { LEAD_STATUS_DOTS, LEAD_STATUS_ORDER } from "@/lib/lead-constants";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +24,6 @@ export interface KanbanLead {
 export const KANBAN_LOCKED_STATUSES = ["Site Visit Scheduled", "Re Visit Scheduled", "Not Interested", "Dropped"];
 
 const DRAG_TYPE = "application/x-crm-lead";
-const initial = (s?: string) => (s?.trim().charAt(0) || "?").toUpperCase();
 
 // Leads as a board, one column per status in pipeline order. Cards drag between columns to change status.
 export function LeadsKanban({
@@ -126,9 +126,7 @@ export function LeadsKanban({
                   )}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-medium text-muted-foreground">
-                      {initial(lead.name)}
-                    </span>
+                    <NameAvatar name={lead.name} />
                     <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-foreground">{lead.name}</span>
                     <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{lead.id}</span>
                   </div>
@@ -141,9 +139,7 @@ export function LeadsKanban({
                   <div className="mt-3 flex items-center gap-2 border-t border-border/60 pt-2.5">
                     {lead.staff && lead.staff !== "Unassigned" ? (
                       <span className="flex min-w-0 items-center gap-1.5 text-xs text-foreground/80">
-                        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#017D58]/10 text-[10px] font-medium text-[#017D58] dark:bg-[#2FB585]/15 dark:text-[#2FB585]">
-                          {initial(lead.staff)}
-                        </span>
+                        <NameAvatar name={lead.staff} className="size-5 text-[10px]" />
                         <span className="truncate">{lead.staff}</span>
                       </span>
                     ) : (

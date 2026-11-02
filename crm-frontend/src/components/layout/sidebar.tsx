@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactElement } from "react";
+import { useEffect, useState, type CSSProperties, type ReactElement } from "react";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import { Bell, ChevronRight, Search } from "lucide-react";
 import { useNotifications } from "@/context/notification-context";
@@ -59,6 +59,12 @@ function RailTip({ label, collapsed, children }: { label: string; collapsed: boo
 }
 
 export function Sidebar() {
+  // Rows reveal once on first load; afterwards collapsing (which remounts rows) shouldn't replay it.
+  const [entering, setEntering] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setEntering(false), 1400);
+    return () => clearTimeout(t);
+  }, []);
   const pathname = usePathname();
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const { unreadCount } = useNotifications();
@@ -82,7 +88,7 @@ export function Sidebar() {
       )}
     >
       {/* Workspace menu */}
-      <div className="p-2">
+      <div className={cn(entering && "sb-enter", "p-2")} style={{ "--sb-base": 0 } as CSSProperties}>
         <WorkspaceMenu
           userName={user?.name ?? ""}
           role={user?.role ?? ""}
@@ -92,7 +98,7 @@ export function Sidebar() {
       </div>
 
       {/* Quick actions */}
-      <div className="flex flex-col gap-0.5 px-2">
+      <div className={cn(entering && "sb-enter", "flex flex-col gap-0.5 px-2")} style={{ "--sb-base": 1 } as CSSProperties}>
         <RailTip label="Search (⌘K)" collapsed={isCollapsed}>
           <button type="button" onClick={() => setSearchOpen(true)} className={rowClass(false, isCollapsed)}>
             <Search className={mutedIcon} strokeWidth={1.75} />
@@ -130,7 +136,7 @@ export function Sidebar() {
 
       {/* Navigation: scrolls on its own, rows keep their height */}
       <nav className="sb-scroll mt-2 min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2">
-        <div className="flex flex-col gap-0.5">
+        <div className={cn(entering && "sb-enter", "flex flex-col gap-0.5")} style={{ "--sb-base": 3 } as CSSProperties}>
           {NAVIGATION.map((item) => {
             if (!canSee(item.access, user)) return null;
             const Icon = item.icon;

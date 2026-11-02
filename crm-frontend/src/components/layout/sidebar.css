@@ -20,3 +20,47 @@
 @media (prefers-reduced-motion: reduce) {
   .update-card-enter { animation: none; }
 }
+
+
+/* First load: sidebar rows reveal top to bottom, one after another.
+   --sb-base offsets each group so the stagger runs on across groups. */
+.sb-enter > * {
+  animation: sb-row-enter 360ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation-delay: calc((var(--sb-base, 0) + var(--sb-n, 0)) * 22ms);
+}
+.sb-enter > :nth-child(1) { --sb-n: 0; }
+.sb-enter > :nth-child(2) { --sb-n: 1; }
+.sb-enter > :nth-child(3) { --sb-n: 2; }
+.sb-enter > :nth-child(4) { --sb-n: 3; }
+.sb-enter > :nth-child(5) { --sb-n: 4; }
+.sb-enter > :nth-child(6) { --sb-n: 5; }
+.sb-enter > :nth-child(7) { --sb-n: 6; }
+.sb-enter > :nth-child(8) { --sb-n: 7; }
+.sb-enter > :nth-child(9) { --sb-n: 8; }
+.sb-enter > :nth-child(10) { --sb-n: 9; }
+.sb-enter > :nth-child(11) { --sb-n: 10; }
+.sb-enter > :nth-child(12) { --sb-n: 11; }
+.sb-enter > :nth-child(13) { --sb-n: 12; }
+.sb-enter > :nth-child(14) { --sb-n: 13; }
+.sb-enter > :nth-child(15) { --sb-n: 14; }
+.sb-enter > :nth-child(16) { --sb-n: 15; }
+.sb-enter > :nth-child(17) { --sb-n: 16; }
+.sb-enter > :nth-child(18) { --sb-n: 17; }
+.sb-enter > :nth-child(19) { --sb-n: 18; }
+.sb-enter > :nth-child(20) { --sb-n: 19; }
+.sb-enter > :nth-child(21) { --sb-n: 20; }
+.sb-enter > :nth-child(22) { --sb-n: 21; }
+.sb-enter > :nth-child(23) { --sb-n: 22; }
+.sb-enter > :nth-child(24) { --sb-n: 23; }
+.sb-enter > :nth-child(25) { --sb-n: 24; }
+.sb-enter > :nth-child(26) { --sb-n: 25; }
+.sb-enter > :nth-child(27) { --sb-n: 26; }
+.sb-enter > :nth-child(28) { --sb-n: 27; }
+.sb-enter > :nth-child(29) { --sb-n: 28; }
+.sb-enter > :nth-child(30) { --sb-n: 29; }
+@keyframes sb-row-enter {
+  from { opacity: 0; transform: translateX(-6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-enter > * { animation: none; }
+}

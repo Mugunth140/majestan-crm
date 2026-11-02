@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Fragment } from "react";
+import { Fragment, useEffect } from "react";
 import { NAVIGATION } from "./nav-items";
 import { useMobileHeader } from "./mobile-header-context";
 import { PageActionsSlot, PageCrumbSlot, usePageSlots } from "./page-actions";
@@ -41,6 +41,13 @@ export function PageHeader() {
     if (!label && looksLikeId(seg)) label = (last && pageTitle) || "…";
     return { href, label: label ?? titleCase(decodeURIComponent(seg)) };
   });
+
+  // Browser tab reads "<page> · CRM", e.g. "Leads · CRM" or "Asha Raman · CRM" on a record.
+  const pageName = crumbs[crumbs.length - 1]?.label;
+  useEffect(() => {
+    if (!pageName || pageName === "…") return;
+    document.title = `${pageName} · CRM`;
+  }, [pageName, pathname]);
 
   return (
     <header className="hidden h-12 shrink-0 items-center gap-4 border-b bg-background px-5 md:flex">

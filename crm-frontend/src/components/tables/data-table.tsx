@@ -12,8 +12,9 @@ import {
   getFilteredRowModel,
   RowSelectionState,
   PaginationState,
+  type Row,
 } from "@tanstack/react-table";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState, type CSSProperties, type ReactElement, type RefObject } from "react";
 import { usePathname } from "next/navigation";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 
@@ -107,6 +108,19 @@ export function DataTable<TData, TValue>({
   const clientPagination: PaginationState = { pageIndex, pageSize };
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  // Rows are memoised, so they read the latest click handler through a ref.
+  const onRowClickRef = useRef(onRowClick);
+  useEffect(() => {
+    onRowClickRef.current = onRowClick;
+  });
+  // List rows reveal one by one the first time data arrives, then never again.
+  const [entering, setEntering] = useState(isList);
+  const hasRows = data.length > 0;
+  useEffect(() => {
+    if (!entering || !hasRows) return;
+    const t = setTimeout(() => setEntering(false), ENTER_STAGGER_MS * ENTER_MAX_ROWS + 400);
+    return () => clearTimeout(t);
+  }, [entering, hasRows]);
 
   const table = useReactTable({
     data,
@@ -248,7 +262,7 @@ export function DataTable<TData, TValue>({
                       isList
                         ? "h-8 whitespace-nowrap bg-muted/70 px-3 text-left text-[13px] font-normal text-muted-foreground first:rounded-l-md last:rounded-r-md"
                         : "text-[13px] h-11 font-semibold tracking-wide text-muted-foreground whitespace-nowrap border-r border-border last:border-r-0 px-4 text-center bg-muted",
-                      idx === 0 ? "sticky left-0 z-30" : "",
+                      idx === 0 ? cn("sticky left-0 z-30", isList && STICKY_HEAD) : "",
                       (header.column.columnDef.meta as any)?.hideOnMobile ? "hidden md:table-cell" : ""
                     )}
                   >
@@ -263,38 +277,15 @@ export function DataTable<TData, TValue>({
           <TableBody>
             {table.getRowModel().rows?.length ? (
               <>
-                {table.getRowModel().rows.map((row) => (
-                  <TableRow
+                {table.getRowModel().rows.map((row, i) => (
+                  <DataRow
                     key={row.id}
-                    data-state={row.getIsSelected() && "selected"}
-                    onClick={(e) => {
-                      if ((e.target as HTMLElement).closest("a,button")) return;
-                      row.toggleSelected();
-                      if (onRowClick) onRowClick(row.original);
-                    }}
-                    className={cn(
-                      "cursor-pointer transition-colors duration-150",
-                      isList
-                        ? "group/row border-0 hover:bg-transparent data-[state=selected]:bg-transparent"
-                        : "hover:bg-muted/50 border-b border-border/40 active:scale-[0.998]"
-                    )}
-                  >
-                    {row.getVisibleCells().map((cell, idx) => (
-                      <TableCell
-                        key={cell.id}
-                        style={(cell.column.columnDef.meta as any)?.fixedWidth ? { width: (cell.column.columnDef.meta as any).fixedWidth, maxWidth: (cell.column.columnDef.meta as any).fixedWidth } : undefined}
-                        className={cn(
-                          isList
-                            ? "h-11 border-b border-border/60 px-3 text-left text-[14px] text-foreground transition-colors group-hover/row:bg-muted/40 group-data-[state=selected]/row:bg-muted/60 first:rounded-l-md last:rounded-r-md"
-                            : "py-2.5 px-4 text-[14px] border-r border-border/40 last:border-r-0 text-center",
-                          idx === 0 ? cn("sticky left-0 z-10", isList ? "bg-background" : "bg-card") : "",
-                          (cell.column.columnDef.meta as any)?.hideOnMobile ? "hidden md:table-cell" : ""
-                        )}
-                      >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
-                    ))}
-                  </TableRow>
+                    row={row}
+                    selected={row.getIsSelected()}
+                    isList={isList}
+                    onRowClick={onRowClickRef}
+                    enterIndex={entering ? i : undefined}
+                  />
                 ))}
                 {Array.from({ length: hidePagination || isList ? 0 : Math.max(0, table.getState().pagination.pageSize - table.getRowModel().rows.length) }).map((_, i) => (
                   <TableRow key={`empty-${i}`} className="hover:bg-transparent border-b border-border/40">
@@ -417,3 +408,74 @@ export function DataTable<TData, TValue>({
     </div>
   );
 }
+
+const ENTER_STAGGER_MS = 28;
+const ENTER_MAX_ROWS = 16;
+
+// The list scroller has a 20px gutter (px-5): sticky cells paint it too, with
+// opaque colours, so rows scrolling sideways never show through or beside them.
+const GUTTER = "before:pointer-events-none before:absolute before:inset-y-0 before:-left-5 before:w-5 before:bg-background";
+const STICKY_HEAD = cn("bg-[color-mix(in_oklab,var(--muted)_70%,var(--background))]", GUTTER);
+const STICKY_CELL = cn(
+  GUTTER,
+  "bg-background group-hover/row:bg-[color-mix(in_oklab,var(--muted)_40%,var(--background))] group-data-[state=selected]/row:bg-[color-mix(in_oklab,var(--muted)_60%,var(--background))]",
+);
+
+// One body row. Memoised so typing in a search box or opening a menu on the
+// page doesn't re-render every cell; TanStack keeps row objects stable until
+// the data or columns change.
+const DataRow = memo(function DataRow<TData>({
+  row,
+  selected,
+  isList,
+  onRowClick,
+  enterIndex,
+}: {
+  row: Row<TData>;
+  selected: boolean;
+  isList: boolean;
+  onRowClick: RefObject<((row: TData) => void) | undefined>;
+  enterIndex?: number;
+}) {
+  const entering = enterIndex !== undefined && enterIndex < ENTER_MAX_ROWS;
+  return (
+    <TableRow
+      data-state={selected ? "selected" : undefined}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest("a,button")) return;
+        row.toggleSelected();
+        onRowClick.current?.(row.original);
+      }}
+      style={entering ? ({ "--enter-delay": `${enterIndex * ENTER_STAGGER_MS}ms` } as CSSProperties) : undefined}
+      className={cn(
+        "cursor-pointer transition-colors duration-150",
+        isList
+          ? "group/row border-0 hover:bg-transparent data-[state=selected]:bg-transparent"
+          : "hover:bg-muted/50 border-b border-border/40 active:scale-[0.998]",
+        entering && "row-enter",
+      )}
+    >
+      {row.getVisibleCells().map((cell, idx) => (
+        <TableCell
+          key={cell.id}
+          style={cell.column.columnDef.meta?.fixedWidth ? { width: cell.column.columnDef.meta.fixedWidth, maxWidth: cell.column.columnDef.meta.fixedWidth } : undefined}
+          className={cn(
+            isList
+              ? "h-11 border-b border-border/60 px-3 text-left text-[14px] text-foreground transition-colors group-hover/row:bg-muted/40 group-data-[state=selected]/row:bg-muted/60 first:rounded-l-md last:rounded-r-md"
+              : "py-2.5 px-4 text-[14px] border-r border-border/40 last:border-r-0 text-center",
+            idx === 0 ? cn("sticky left-0 z-10", isList ? STICKY_CELL : "bg-card") : "",
+            cell.column.columnDef.meta?.hideOnMobile ? "hidden md:table-cell" : ""
+          )}
+        >
+          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+        </TableCell>
+      ))}
+    </TableRow>
+  );
+}) as <TData>(props: {
+  row: Row<TData>;
+  selected: boolean;
+  isList: boolean;
+  onRowClick: RefObject<((row: TData) => void) | undefined>;
+  enterIndex?: number;
+}) => ReactElement;

@@ -31,6 +31,7 @@ import { Device } from "@/components/shared/device";
 import { LEAD_STATUS_DOTS, LEAD_STATUS_ORDER } from "@/lib/lead-constants";
 import { ViewSwitcher, type ViewType } from "@/components/views/view-switcher";
 import { LeadsKanban } from "@/components/leads/leads-kanban";
+import { NameAvatar } from "@/components/shared/name-avatar";
 import { GroupedList } from "@/components/tables/grouped-list";
 import { GroupByPicker, LEAD_GROUP_FIELDS, type LeadGroupField } from "@/components/leads/group-by-picker";
 import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
@@ -509,7 +510,8 @@ export default function LeadsPage() {
     setContactModal({ open: true, type, to: lead.mobile, rawId: lead.rawId });
   };
 
-  const columns: ColumnDef<any>[] = [
+  // Memoised: a new array each render would make the table rebuild every row.
+  const columns = useMemo<ColumnDef<any>[]>(() => [
     {
       id: "select",
       header: ({ table }) => (
@@ -540,9 +542,7 @@ export default function LeadsPage() {
       header: "Name",
       cell: ({ row }) => (
         <span className="inline-flex items-center gap-2">
-          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-medium text-muted-foreground">
-            {row.original.name.charAt(0).toUpperCase()}
-          </span>
+          <NameAvatar name={row.original.name} />
           <span className="font-medium text-foreground">{row.original.name}</span>
         </span>
       ),
@@ -628,9 +628,7 @@ export default function LeadsPage() {
         if (assignedStaff && assignedStaff !== "Unassigned") {
           return (
             <span className="inline-flex items-center gap-1.5" title={preAssignee ? "Assigned on insert" : undefined}>
-              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#017D58]/10 text-[10px] font-medium text-[#017D58] dark:bg-[#2FB585]/15 dark:text-[#2FB585]">
-                {assignedStaff.charAt(0).toUpperCase()}
-              </span>
+              <NameAvatar name={assignedStaff} className="size-5 text-[10px]" />
               <span>{assignedStaff}</span>
             </span>
           );
@@ -658,7 +656,7 @@ export default function LeadsPage() {
       cell: ({ row }) => <LastFollowupCell row={row.original} />,
     },
     { accessorKey: "source", header: "Source" },
-  ];
+  ], [activeTab, todayViewMode, pendingAssignments, unresolvedStaffIds]);
 
   // Pending-review extras: duplicate badge + per-row remove (Open Pipeline only)
   const reviewColumn: ColumnDef<any> = {
@@ -695,7 +693,8 @@ export default function LeadsPage() {
     enableHiding: false,
   };
 
-  const visibleColumns = isReviewingImports ? [...columns, reviewColumn] : columns;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- reviewColumn only reads existingByMobile
+  const visibleColumns = useMemo(() => (isReviewingImports ? [...columns, reviewColumn] : columns), [columns, isReviewingImports, existingByMobile]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
