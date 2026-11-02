@@ -1,3 +1,4 @@
+import { ninetyNineAcresJsonParser } from './common/middleware/ninety-nine-acres-json';
 import { hrImportJsonParser } from './common/middleware/hr-import-json';
 import { mailJsonParser } from './common/middleware/mail-json';
 import { NestFactory } from '@nestjs/core';
@@ -14,6 +15,7 @@ async function bootstrap() {
   app.enableShutdownHooks();
   // Allow the validated 500-row HR import without changing other JSON limits.
   app.use('/api/v1/hr/bulk', hrImportJsonParser);
+  app.use('/api/v1/leads/99acres', ninetyNineAcresJsonParser);
   // Email bodies and templates from the composer (attachments use multipart, not JSON).
   app.use('/api/v1/mail', mailJsonParser);
 

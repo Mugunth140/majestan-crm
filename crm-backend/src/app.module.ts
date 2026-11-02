@@ -1,3 +1,4 @@
+import { SENSITIVE_REQUEST_LOG_PATHS } from './common/logging/request-redactions';
 import { BlogModule } from './modules/blog/blog.module';
 import { Module } from '@nestjs/common';
 import { MiddlewareConsumer, NestModule } from '@nestjs/common';
@@ -182,6 +183,7 @@ export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer.apply(CorrelationIdMiddleware).forRoutes('*');
     consumer.apply(pinoHttp({
+      redact: SENSITIVE_REQUEST_LOG_PATHS,
       customProps: (req: any, res: any) => ({
         reqId: (req as any).id,
       }),

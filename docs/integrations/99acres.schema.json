@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "99acres minimal lead push",
+  "type": "object",
+  "required": [
+    "leads"
+  ],
+  "properties": {
+    "leads": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "mobile"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "\\S"
+          },
+          "mobile": {
+            "type": [
+              "string",
+              "number"
+            ],
+            "description": "10-digit Indian mobile number, optionally formatted with a +91 prefix."
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional email address; omit or leave empty when unavailable."
+          },
+          "remarks": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000,
+            "description": "Optional enquiry message; omit or leave empty when unavailable."
+          }
+        }
+      }
+    }
+  }
+}
