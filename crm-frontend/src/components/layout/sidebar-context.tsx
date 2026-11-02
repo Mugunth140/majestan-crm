@@ -1,6 +1,8 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+
+const STORAGE_KEY = "crm_sidebar_collapsed";
 
 interface SidebarContextValue {
   isCollapsed: boolean;
@@ -16,6 +18,19 @@ const SidebarContext = createContext<SidebarContextValue>({
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Remember the collapsed rail across reloads.
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (localStorage.getItem(STORAGE_KEY) === "1") setIsCollapsed(true);
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, isCollapsed ? "1" : "0");
+    } catch {}
+  }, [isCollapsed]);
 
   return (
     <SidebarContext.Provider 

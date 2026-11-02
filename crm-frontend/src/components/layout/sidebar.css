@@ -1,0 +1,22 @@
+/* Sidebar scroll area: thin scrollbar that only shows on hover */
+.sb-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.sb-scroll:hover {
+  scrollbar-color: color-mix(in oklab, currentColor 18%, transparent) transparent;
+}
+
+/* Update card slides up into the footer when a new build is found */
+.update-card-enter {
+  animation-name: update-card-enter;
+  animation-duration: 0.5s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-fill-mode: both;
+}
+@keyframes update-card-enter {
+  from { opacity: 0; transform: translateY(8px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .update-card-enter { animation: none; }
+}

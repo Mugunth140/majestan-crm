@@ -15,13 +15,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Prismark CRM",
+  title: "CRM",
   description: "Prismark CRM",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Prismark",
+    title: "CRM",
   },
 };
 

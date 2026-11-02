@@ -19,6 +19,31 @@ export const LEAD_STATUS_STYLES: Record<string, string> = {
   "Future Follow-up":     "bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-800 dark:text-slate-300",
 };
 
+// Solid dot colour per status, for list rows, kanban columns and group headers.
+export const LEAD_STATUS_DOTS: Record<string, string> = {
+  "New Lead": "bg-gray-400",
+  "Contacted": "bg-blue-500",
+  "Qualified": "bg-indigo-500",
+  "Property Shared": "bg-purple-500",
+  "Other Location": "bg-violet-500",
+  "Interested": "bg-fuchsia-500",
+  "Site Visit Scheduled": "bg-amber-500",
+  "Site Visit Completed": "bg-yellow-500",
+  "Re Visit Scheduled": "bg-orange-500",
+  "Re Visit Completed": "bg-rose-500",
+  "Negotiation": "bg-pink-500",
+  "Booking Advance": "bg-emerald-500",
+  "Agreement": "bg-teal-500",
+  "Closed Won": "bg-green-600",
+  "Not Interested": "bg-red-500",
+  "Dropped": "bg-red-600",
+  "Lost": "bg-red-700",
+  "Future Follow-up": "bg-slate-500",
+};
+
+// Pipeline order, used for kanban columns and status grouping.
+export const LEAD_STATUS_ORDER = Object.keys(LEAD_STATUS_STYLES);
+
 export const PURCHASE_TYPES = [
   { label: "Rental", value: "rental" },
   { label: "Construction", value: "construction" },

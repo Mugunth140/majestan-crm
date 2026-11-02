@@ -1,388 +1,208 @@
 "use client";
 
-import { PrismarkMark } from "@/components/brand/prismark-mark";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
+import { useEffect, useState, type ReactElement } from "react";
+import { Tooltip } from "@cloudflare/kumo/components/tooltip";
+import { Bell, ChevronRight, Search } from "lucide-react";
+import { useNotifications } from "@/context/notification-context";
+import { can } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "./sidebar-context";
-import { 
-  Users, 
-  Home, 
-  Astroid,
-  Activity, 
-  Settings,
-  Database,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
-  Inbox,
-  Route,
-  Network,
-  Briefcase,
-  Package,
-  TrendingUp,
-  Target,
-  UserPen,
-  PhoneIncoming,
-  Megaphone,
-  Hammer,
-  Sparkles,
-  BookOpen
-} from "lucide-react";
-import { can } from "@/lib/permissions";
-import { canViewAds } from "@/lib/ads-access";
+import { NotificationsSheet } from "./notifications-sheet";
+import { UpdateButton } from "./app-update";
+import { NAVIGATION, canSee, type NavViewer } from "./nav-items";
+import { SearchPalette, useSearchShortcut } from "./search-palette";
+import { WorkspaceMenu } from "./workspace-menu";
+import "./sidebar.css";
 
-const navigation = [
-  { name: "Dashboard", href: "/", icon: Astroid },
-  { name: "Leads", href: "/leads", icon: TrendingUp },
-  { name: "Lead Routing", href: "/lead-routing", icon: Route },
-  { name: "Inbound", href: "/inbound", icon: Inbox },
-  { name: "Agent Network", href: "/agent-network", icon: Network },
-  { name: "Projects", href: "/projects", icon: Briefcase },
-  { name: "Properties", href: "/properties", icon: Home },
-  { name: "Builder", href: "/builders", icon: Hammer },
-  { name: "Advertisement", href: "/ads", icon: Megaphone, adsAccess: true },
-  { name: "Blog", href: "/blog", icon: BookOpen, blogAccess: true },
-  { name: "Showcases", href: "/showcases", icon: Sparkles, adsAccess: true },
-  { name: "Asset Inventory", href: "/asset-inventory", icon: Package },
-  { name: "HR Panel", href: "/hr", icon: UserPen },
-  { name: "Tasks", href: "/tasks", icon: Target },
-  { name: "Logger", href: "/logger", icon: PhoneIncoming, adminOrManager: true },
-  { name: "Activity Logs", adminOnly: true, href: "/activity-logs", icon: Activity },
-    { 
-    name: "Users", 
-    icon: Users, 
-    adminOnly: true,
-    href: "/users"
-  },
-  { 
-    name: "Master Registry", 
-    icon: Database,
-    adminOnly: true,
-    subItems: [
-      { name: "Amenities", href: "/master/amenities" },
-      { name: "Lead Sources", href: "/master/sources" },
-      { name: "HR Sources", href: "/master/hr-sources" },
-      { name: "Property Types", href: "/master/property-types" },
-      { name: "Cities", href: "/master/cities" },
-      { name: "Sublocations", href: "/master/sublocations" },
-      { name: "Road Names", href: "/master/road-names" },
-      { name: "Registration Charges", href: "/master/registration-charges" },
-      { name: "Furnishing Items", href: "/master/furnishing-items" },
-      { name: "Room Names", href: "/master/room-names" },
-      { name: "Room Dimensions", href: "/master/room-dimensions" },
-      { name: "Specifications", href: "/master/specifications" },
-      { name: "Utilities", href: "/master/utilities" },
-    ]
-  },
-];
+interface StoredUser extends NavViewer {
+  name: string;
+}
+
+function readUser(): StoredUser | null {
+  try {
+    const raw = localStorage.getItem("crm_user");
+    if (!raw) return null;
+    const user = JSON.parse(raw);
+    return {
+      name: user?.name ?? user?.email ?? "",
+      role: user?.role?.name ?? user?.role ?? "",
+      department: user?.department?.name ?? user?.department ?? "",
+      blogAccess: can("blog.manage", user),
+    };
+  } catch {
+    return null;
+  }
+}
+
+const isActivePath = (pathname: string, href: string) =>
+  href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
+
+// Row styles shared by links and buttons
+const rowClass = (active: boolean, collapsed: boolean) =>
+  cn(
+    "group/row relative flex h-8 w-full shrink-0 items-center gap-2.5 rounded-md px-2 text-[14px] outline-none transition-colors",
+    "focus-visible:ring-2 focus-visible:ring-[#017D58]/40",
+    active
+      ? "bg-background font-medium text-foreground shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.06)] dark:bg-white/10 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.06)]"
+      : "text-foreground/75 hover:bg-black/[0.045] hover:text-foreground dark:hover:bg-white/[0.06]",
+    collapsed && "justify-center px-0",
+  );
+
+const mutedIcon = "size-4 shrink-0 text-muted-foreground group-hover/row:text-foreground";
+
+// In the collapsed rail, every row gets a tooltip with its label.
+function RailTip({ label, collapsed, children }: { label: string; collapsed: boolean; children: ReactElement }) {
+  if (!collapsed) return children;
+  return <Tooltip content={label} side="right" render={children} />;
+}
 
 export function Sidebar() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const { isCollapsed, setIsCollapsed } = useSidebar();
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [blogAccess, setBlogAccess] = useState(false);
-  const [userDept, setUserDept] = useState<string>("");
-  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
-  const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const { unreadCount } = useNotifications();
+  const [user, setUser] = useState<StoredUser | null>(null);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  useSearchShortcut(setSearchOpen);
 
   useEffect(() => {
-    try {
-      const userStr = localStorage.getItem("crm_user");
-      if (userStr) {
-        const user = JSON.parse(userStr);
-        setBlogAccess(can("blog.manage", user));
-        setUserRole(user?.role?.name || user?.role || "");
-        setUserDept(((user?.department as any)?.name ?? user?.department ?? "") as string);
-      }
-    } catch (err) {
-      console.error("FailLocationed to parse user from local storage");
-    }
+    // localStorage is client-only; read once after mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setUser(readUser());
   }, []);
 
-  // Initialize expanded state based on active path
-  useEffect(() => {
-    setExpandedItems(prev => {
-      const next = { ...prev };
-      navigation.forEach(item => {
-        if (item.subItems && item.subItems.some((sub: any) => pathname.startsWith(sub.href))) {
-          next[item.name] = true;
-        }
-      });
-      return next;
-    });
-  }, [pathname]);
-
-  const toggleExpand = (name: string) => {
-    const opening = !expandedItems[name];
-    setExpandedItems(prev => ({ ...prev, [name]: !prev[name] }));
-    if (!opening) return;
-    // After the expand animation, nudge only the sidebar's own scroll
-    // container so the revealed sub-items are visible (never the page).
-    setTimeout(() => {
-      const el = itemRefs.current[name];
-      const container = el?.closest(".sidebar-scroll") as HTMLElement | null;
-      if (!el || !container) return;
-      const cRect = container.getBoundingClientRect();
-      const eRect = el.getBoundingClientRect();
-      if (eRect.bottom > cRect.bottom) {
-        container.scrollTo({ top: container.scrollTop + (eRect.bottom - cRect.bottom) + 8, behavior: "smooth" });
-      } else if (eRect.top < cRect.top) {
-        container.scrollTo({ top: container.scrollTop - (cRect.top - eRect.top) - 8, behavior: "smooth" });
-      }
-    }, 230);
-  };
-
-  const isAdmin = userRole === "Admin" || userRole === "Super Admin";
-  const canViewLogger = isAdmin || userRole === "Manager";
-
-
-  const navStyles = `
-    .side-nav-item-v8 {
-      position: relative;
-      transition: all 0.5s ease;
-      border: 1px solid transparent;
-      z-index: 0;
-      background-color: transparent;
-      background-image: linear-gradient(to right, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.08));
-      background-size: 0% 100%;
-      background-repeat: no-repeat;
-      background-position: left center;
-    }
-    .dark .side-nav-item-v8 {
-      background-image: linear-gradient(to right, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.01));
-    }
-    
-    .side-nav-active-v8 {
-      color: #0052FF;
-    }
-    
-    /* Crossfade overlays for Active State */
-    .side-nav-active-fill {
-      background-image: linear-gradient(to right, #dbeafe 0%, #eff6ff 100%);
-    }
-    .dark .side-nav-active-fill {
-      background-image: linear-gradient(to right, rgba(59, 130, 246, 0.2) 0%, rgba(30, 58, 138, 0.1) 100%);
-    }
-    
-    .side-nav-active-border {
-      padding: 1px;
-      background: linear-gradient(70deg, rgba(0, 82, 255, 0.8) 0%, rgba(0, 82, 255, 0.1) 100%);
-      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-      -webkit-mask-composite: xor; mask-composite: exclude;
-    }
-    .dark .side-nav-active-border {
-      background: linear-gradient(70deg, rgba(59, 130, 246, 0.8) 0%, rgba(59, 130, 246, 0.1) 100%);
-    }
-
-    /* Hover State Border Shimmer on ::before */
-    .side-nav-item-v8::before {
-      content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
-      background: linear-gradient(70deg, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.1) 45%, rgba(0, 0, 0, 0.3) 50%, transparent 55%, transparent 100%);
-      background-size: 300% 100%; background-position: 100% 0;
-      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-      -webkit-mask-composite: xor; mask-composite: exclude;
-      z-index: 2; opacity: 0; transition: opacity 0.3s ease; pointer-events: none;
-    }
-    .dark .side-nav-item-v8::before {
-      background: linear-gradient(70deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.15) 45%, rgba(255, 255, 255, 0.8) 50%, transparent 55%, transparent 100%);
-      background-size: 300% 100%;
-    }
-
-    .side-nav-item-v8:not(.side-nav-active-v8):hover {
-      color: var(--color-foreground);
-      animation: nav-bg-wipe-v8 0.7s ease-out forwards;
-    }
-    .side-nav-item-v8:not(.side-nav-active-v8):hover::before {
-      opacity: 1; animation: border-sweep-fill-v8 0.7s ease-out forwards;
-    }
-
-    @keyframes border-sweep-fill-v8 {
-      0% { background-position: 100% 0; }
-      100% { background-position: 0% 0; }
-    }
-    @keyframes nav-bg-wipe-v8 {
-      0% { background-size: 0% 100%; }
-      100% { background-size: 100% 100%; }
-    }
-  `;
-
   return (
-    <>
-      <style dangerouslySetInnerHTML={{ __html: navStyles }} />
-      <aside
-
+    <aside
       className={cn(
-        "hidden md:flex flex-col my-3 ml-3 rounded-xl border bg-card shadow-sm transition-all duration-300 overflow-hidden relative group",
-        isCollapsed ? "w-16" : "w-64"
+        "hidden h-full shrink-0 flex-col border-r bg-sidebar transition-[width] duration-200 ease-out md:flex",
+        isCollapsed ? "w-[52px]" : "w-[232px]",
       )}
     >
-      {/* Toggle Button */}
-      <button
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-2 top-13 z-20 flex h-7 w-7 items-center justify-center rounded-lg border bg-background shadow-sm transition-all hover:bg-accent opacity-0 group-hover:opacity-100"
-      >
-        {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-      </button>
-
-      <div className={cn(
-        "flex h-16 items-center border-b transition-all",
-        isCollapsed ? "justify-center px-0" : "px-6"
-      )}>
-        <Link href="/" className="flex items-center gap-3">
-          <div className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden">
-            <PrismarkMark className="h-6 w-6 text-[#017D58] dark:text-[#2FB585]" />
-          </div>
-          {!isCollapsed && (
-            <span className="font-semibold tracking-normal truncate whitespace-nowrap">
-              Prismark CRM
-            </span>
-          )}
-        </Link>
+      {/* Workspace menu */}
+      <div className="p-2">
+        <WorkspaceMenu
+          userName={user?.name ?? ""}
+          role={user?.role ?? ""}
+          collapsed={isCollapsed}
+          onToggleCollapsed={() => setIsCollapsed(!isCollapsed)}
+        />
       </div>
 
-      <div className="sidebar-scroll flex-1 overflow-x-hidden overflow-y-auto py-3 scrollbar-none">
-        <nav className="grid items-start px-2 gap-1 text-[14px] font-medium">
-          {navigation.map((item: any) => {
-            if (item.blogAccess && !blogAccess) return null;
-            if (item.adminOnly && !isAdmin) return null;
-            if (item.adminOrManager && !canViewLogger) return null;
-            if ((item as any).adsAccess && !canViewAds({ role: userRole ?? "", department: userDept })) return null;
-
-            const hasSub = item.subItems && item.subItems.length > 0;
-            const isActive = item.href ? (pathname === item.href || pathname.startsWith(item.href + "/")) : (hasSub && item.subItems?.some((sub: any) => pathname.startsWith(sub.href)));
-            const isExpanded = expandedItems[item.name] || false;
-
-            const ItemContent = (
+      {/* Quick actions */}
+      <div className="flex flex-col gap-0.5 px-2">
+        <RailTip label="Search (⌘K)" collapsed={isCollapsed}>
+          <button type="button" onClick={() => setSearchOpen(true)} className={rowClass(false, isCollapsed)}>
+            <Search className={mutedIcon} strokeWidth={1.75} />
+            {!isCollapsed && (
               <>
-                <div className={cn("absolute inset-0 rounded-xl z-0 transition-opacity duration-500 pointer-events-none side-nav-active-fill", isActive ? "opacity-100" : "opacity-0")} />
-                <div className={cn("absolute inset-0 rounded-xl z-0 transition-opacity duration-500 pointer-events-none side-nav-active-border", isActive ? "opacity-100" : "opacity-0")} />
-                <item.icon className={cn("h-[22px] w-[22px] shrink-0 relative z-10 transition-colors duration-500", isActive ? "text-[#0052FF]" : "text-muted-foreground")} />
-                {!isCollapsed && <span className="truncate whitespace-nowrap flex-1 text-left relative z-10 transition-colors duration-500">{item.name}</span>}
-                {!isCollapsed && hasSub && (
-                  <ChevronDown className={cn("h-4 w-4 transition-transform duration-200 text-muted-foreground relative z-10", isExpanded && "rotate-180")} />
+                <span className="flex-1 truncate text-left">Search</span>
+                <kbd className="flex h-5 items-center gap-0.5 rounded border bg-background px-1.5 font-sans text-[11px] font-medium text-muted-foreground">
+                  <span className="text-[13px] leading-none">⌘</span>K
+                </kbd>
+              </>
+            )}
+          </button>
+        </RailTip>
+        <RailTip label="Notifications" collapsed={isCollapsed}>
+          <button type="button" onClick={() => setNotificationsOpen(true)} className={rowClass(false, isCollapsed)}>
+            <span className="relative">
+              <Bell className={mutedIcon} strokeWidth={1.75} />
+              {unreadCount > 0 && isCollapsed && (
+                <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-red-500" />
+              )}
+            </span>
+            {!isCollapsed && (
+              <>
+                <span className="flex-1 truncate text-left">Notifications</span>
+                {unreadCount > 0 && (
+                  <span className="min-w-5 rounded-full bg-red-500 px-1.5 text-center text-[11px] font-semibold leading-5 text-white">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
                 )}
               </>
-            );
+            )}
+          </button>
+        </RailTip>
+      </div>
 
-            return (
-              <div
-                key={item.name}
-                ref={(el) => {
-                  itemRefs.current[item.name] = el;
-                }}
-                className="flex flex-col gap-1"
-              >
-                {hasSub ? (
-                  <button
-                    title={isCollapsed ? item.name : undefined}
-                    onClick={() => toggleExpand(item.name)}
-                    className={cn(
-                      "side-nav-item-v8 relative flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
-                      isActive 
-                        ? "side-nav-active-v8 font-semibold shadow-sm" 
-                        : "text-muted-foreground hover:text-foreground",
-                      isCollapsed && "justify-center px-0"
-                    )}
-                  >
-                    {ItemContent}
-                  </button>
-                ) : (
-                  <Link
-                    href={item.href || "#"}
-                    title={isCollapsed ? item.name : undefined}
-                    className={cn(
-                      "side-nav-item-v8 relative flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
-                      isActive 
-                        ? "side-nav-active-v8 font-semibold shadow-sm" 
-                        : "text-muted-foreground hover:text-foreground",
-                      isCollapsed && "justify-center px-0"
-                    )}
-                  >
-                    {ItemContent}
-                  </Link>
-                )}
-                
-                {/* Sub Items */}
-                {!isCollapsed && hasSub && (
-                  <div className={cn(
-                    "grid transition-all duration-200 ease-in-out",
-                    isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
-                  )}>
+      {/* Navigation: scrolls on its own, rows keep their height */}
+      <nav className="sb-scroll mt-2 min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2">
+        <div className="flex flex-col gap-0.5">
+          {NAVIGATION.map((item) => {
+            if (!canSee(item.access, user)) return null;
+            const Icon = item.icon;
+
+            if (item.subItems) {
+              const childActive = item.subItems.some((s) => isActivePath(pathname, s.href));
+              const open = !isCollapsed && (expanded[item.name] ?? childActive);
+              return (
+                <div key={item.name} className="flex flex-col">
+                  <RailTip label={item.name} collapsed={isCollapsed}>
+                    <button
+                      type="button"
+                      aria-expanded={open}
+                      onClick={() =>
+                        isCollapsed
+                          ? (setIsCollapsed(false), setExpanded((e) => ({ ...e, [item.name]: true })))
+                          : setExpanded((e) => ({ ...e, [item.name]: !open }))
+                      }
+                      className={rowClass(isCollapsed && childActive, isCollapsed)}
+                    >
+                      <Icon className={cn("size-4 shrink-0", item.color)} strokeWidth={1.75} />
+                      {!isCollapsed && (
+                        <>
+                          <span className="flex-1 truncate text-left">{item.name}</span>
+                          <ChevronRight
+                            className={cn("size-3.5 text-muted-foreground transition-transform duration-200", open && "rotate-90")}
+                          />
+                        </>
+                      )}
+                    </button>
+                  </RailTip>
+                  <div className={cn("grid transition-[grid-template-rows] duration-200 ease-out", open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
                     <div className="overflow-hidden">
-                      <div className="ml-9 mt-1 flex flex-col gap-1 border-l-2 border-muted/50 pl-3">
-                        {item.subItems?.map((sub: any) => {
-                          let isSubActive = false;
-                          if (sub.href.includes("?")) {
-                            const paramString = sub.href.split("?")[1];
-                            const urlParams = new URLSearchParams(paramString);
-                            isSubActive = pathname === sub.href.split("?")[0];
-                            urlParams.forEach((val, key) => {
-                              if (searchParams.get(key) !== val) isSubActive = false;
-                            });
-                          } else {
-                            isSubActive = pathname === sub.href;
-                            // Don't highlight the base "All Users" if a specific department filter is active
-                            if (sub.href === "/users" && searchParams.get("dept")) {
-                              isSubActive = false;
-                            }
-                          }
-                                              
+                      <div className="ml-[15px] mt-0.5 flex flex-col gap-0.5 border-l py-0.5 pl-2">
+                        {item.subItems.map((sub) => {
+                          const active = isActivePath(pathname, sub.href);
                           return (
                             <Link
-                              key={sub.name}
+                              key={sub.href}
                               href={sub.href}
-                              className={cn(
-                                "side-nav-item-v8 overflow-hidden rounded-lg px-3 py-2 text-[13px] transition-all duration-300",
-                                isSubActive 
-                                  ? "side-nav-active-v8 font-semibold" 
-                                  : "text-muted-foreground hover:text-foreground"
-                              )}
+                              tabIndex={open ? undefined : -1}
+                              className={cn(rowClass(active, false), "h-7 text-[13px]")}
                             >
-                              <div className={cn("absolute inset-0 rounded-lg z-0 transition-opacity duration-500 pointer-events-none side-nav-active-fill", isSubActive ? "opacity-100" : "opacity-0")} />
-                              <div className={cn("absolute inset-0 rounded-lg z-0 transition-opacity duration-500 pointer-events-none side-nav-active-border", isSubActive ? "opacity-100" : "opacity-0")} />
-                              <span className="relative z-10 transition-colors duration-500">{sub.name}</span>
+                              <span className="truncate">{sub.name}</span>
                             </Link>
                           );
                         })}
                       </div>
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
+              );
+            }
+
+            const active = isActivePath(pathname, item.href!);
+            return (
+              <RailTip key={item.name} label={item.name} collapsed={isCollapsed}>
+                <Link href={item.href!} aria-current={active ? "page" : undefined} className={rowClass(active, isCollapsed)}>
+                  <Icon className={cn("size-4 shrink-0", item.color)} strokeWidth={active ? 2 : 1.75} />
+                  {!isCollapsed && <span className="truncate">{item.name}</span>}
+                </Link>
+              </RailTip>
             );
           })}
-        </nav>
-      </div>
+        </div>
+      </nav>
 
-      <div className={cn("px-3 py-2 mt-auto border-t border-border/50", isCollapsed && "p-2")}>
-        <Link
-          href="/settings"
-          title={isCollapsed ? (userRole ? userRole + " Settings" : "Settings") : undefined}
-          className={cn(
-            "side-nav-item-v8 relative flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-300 ease-out active:scale-[0.98]",
-            pathname.startsWith("/settings")
-              ? "side-nav-active-v8 font-semibold shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
-            isCollapsed && "justify-center px-0"
-          )}
-        >
-          <div className={cn("absolute inset-0 rounded-xl z-0 transition-opacity duration-500 pointer-events-none side-nav-active-fill", pathname.startsWith("/settings") ? "opacity-100" : "opacity-0")} />
-          <div className={cn("absolute inset-0 rounded-xl z-0 transition-opacity duration-500 pointer-events-none side-nav-active-border", pathname.startsWith("/settings") ? "opacity-100" : "opacity-0")} />
-          <Settings className={cn(
-            "h-[22px] w-[22px] shrink-0 relative z-10 transition-colors duration-500",
-            pathname.startsWith("/settings") ? "text-[#0052FF]" : "text-muted-foreground"
-          )} />
-          {!isCollapsed && (
-            <span className="truncate whitespace-nowrap flex-1 text-left relative z-10 transition-colors duration-500">
-              {userRole ? userRole + " Settings" : "Settings"}
-            </span>
-          )}
-        </Link>
-      </div>
+      {/* Footer: only appears when an update is waiting */}
+      <UpdateButton collapsed={isCollapsed} className="border-t p-2" />
+
+      <NotificationsSheet open={notificationsOpen} onOpenChange={setNotificationsOpen} />
+      <SearchPalette open={searchOpen} onOpenChange={setSearchOpen} viewer={user} />
     </aside>
-    </>
   );
 }

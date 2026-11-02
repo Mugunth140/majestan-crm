@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
 import { Popover } from "@cloudflare/kumo/components/popover";
-import { MoonIcon, PersonArmsSpreadIcon, SunIcon } from "@phosphor-icons/react";
+import { MoonIcon,WheelchairMotionIcon, SunIcon } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 
 const THEMES = [
@@ -26,11 +26,11 @@ export function AccessibilityMenu({ className }: { className?: string }) {
       <Popover.Trigger
         aria-label="Accessibility options"
         className={cn(
-          "flex size-9 items-center justify-center rounded-full bg-white/10 text-gray-400 ring-1 ring-white/15 backdrop-blur-md transition-colors hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white data-[popup-open]:bg-white/20",
+          "flex size-8 items-center justify-center rounded-full bg-white/10 text-gray-300 ring-1 ring-white/15 backdrop-blur-md transition-colors hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white data-[popup-open]:bg-white/20",
           className,
         )}
       >
-        <PersonArmsSpreadIcon size={20} weight="regular" />
+        <WheelchairMotionIcon size={18} weight="fill" />
       </Popover.Trigger>
       <Popover.Content side="top" align="start" sideOffset={10} className="w-60 p-3">
         <Popover.Title className="text-sm font-semibold">Accessibility</Popover.Title>
