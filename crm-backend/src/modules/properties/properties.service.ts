@@ -1,3 +1,5 @@
+import { In } from 'typeorm';
+import { User } from '../../database/entities/user.entity';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { SiteApiService } from './site-api.service';
 import { PermissionsService, VIEW_PROPERTY_CONTACTS } from '../permissions/permissions.service';
@@ -175,6 +177,22 @@ export class PropertiesService {
     return copy as T;
   }
 
+  private uploaderId(reqUser: any): number | undefined {
+    const id = Number(reqUser?.sub ?? reqUser?.id);
+    return Number.isSafeInteger(id) && id > 0 ? id : undefined;
+  }
+
+  private async withUploaderNames(items: any[]): Promise<any[]> {
+    const ids = [...new Set(items.map(item => Number(item.uploadedByCrmUserId)).filter(id => Number.isSafeInteger(id) && id > 0))];
+    if (!ids.length) return items;
+    let users: Pick<User, 'id' | 'name'>[] = [];
+    try {
+      users = await this.crmDataSource.getRepository(User).find({ where: { id: In(ids) }, select: { id: true, name: true } });
+    } catch (error) { console.error('[Properties] uploader names lookup failed', error); }
+    const names = new Map(users.map(user => [user.id, user.name]));
+    return items.map(item => ({ ...item, uploadedByName: names.get(Number(item.uploadedByCrmUserId)) ?? null }));
+  }
+
   private async formDataCached(): Promise<{ cities: any[]; sublocations: any[]; amenities: any[]; furnishings: any[]; utilities: any[] }> {
     if (this.citiesCache && Date.now() - this.citiesCache.at < 5 * 60 * 1000) {
       return this.citiesCache;
@@ -212,12 +230,12 @@ export class PropertiesService {
     if (query.status === 'archived') params.append('statusFilter', 'archived');
     else if (query.status) params.append('statusFilter', query.status);
     if (query.cityId) params.append('cityId', String(query.cityId));
-    for (const key of ['sublocationId', 'minSqft', 'maxSqft', 'minBudget', 'maxBudget', 'floor', 'specialPurpose', 'furnishingStatus', 'roadName'] as const) {
+    for (const key of ['sublocationId', 'minSqft', 'maxSqft', 'minBudget', 'maxBudget', 'floor', 'specialPurpose', 'furnishingStatus', 'roadName', 'uploadedById', 'uploadedFrom', 'uploadedTo'] as const) {
       if (query[key] !== undefined && query[key] !== '') params.append(key, String(query[key]));
     }
 
     const res = await this.siteApi.get(`/admin/properties/all?${params.toString()}`);
-    const items = res?.items ?? [];
+    const items = await this.withUploaderNames(res?.items ?? []);
     const total = Number(res?.total) || 0;
     const canSee = await this.canSeeContacts(reqUser);
     return {
@@ -298,7 +316,12 @@ export class PropertiesService {
       console.error('[Properties] specifications lookup failed, degrading to empty list', e);
     }
 
+    let staff: User[] = [];
+    try {
+      staff = await this.crmDataSource.getRepository(User).find({ select: { id: true, name: true, is_active: true }, order: { name: 'ASC', id: 'ASC' } });
+    } catch (error) { console.error('[Properties] staff lookup failed, degrading to empty list', error); }
     return {
+      staff: staff.map(user => ({ id: user.id, name: user.name, isActive: user.is_active })),
       amenities,
       furnishings,
       utilities,
@@ -703,6 +726,7 @@ export class PropertiesService {
       for (const k of PropertiesService.CONTACT_KEYS) delete body[k];
     }
     const payload = await this.buildSitePayload(body);
+    payload.uploadedByCrmUserId = this.uploaderId(reqUser);
     const created = await this.siteApi.post(`/admin/properties/${payload.propertyType}`, payload);
     return this.findOne(created.id, reqUser);
   }
@@ -858,6 +882,7 @@ export class PropertiesService {
           },
         };
 
+        payload.uploadedByCrmUserId = this.uploaderId(reqUser);
         await this.siteApi.post(`/admin/properties/${propertyType}`, payload);
         created++;
       } catch (e: any) {

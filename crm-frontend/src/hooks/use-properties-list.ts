@@ -15,6 +15,7 @@ export function usePropertiesList() {
   const [properties, setProperties] = useState<any[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [staff, setStaff] = useState<{id: number; name: string; isActive: boolean}[]>([]);
   const [cities, setCities] = useState<{ id: number; cityName: string }[]>([]);
   const [sublocations, setSublocations] = useState<{id: number; cityId: number; name: string}[]>([]);
   const [roadNames, setRoadNames] = useState<{label: string; value: string}[]>([]);
@@ -31,6 +32,7 @@ export function usePropertiesList() {
         setCities(list.map((c: any) => ({ id: c.id, cityName: c.cityName ?? c.city_name ?? "" })));
         const data = res?.data ?? res;
         setSublocations((data.sublocations || []).map((item: any) => ({ id: item.id, cityId: Number(item.cityId ?? item.city_id), name: item.localityName ?? item.locality_name ?? "" })));
+        setStaff(data.staff || []);
         setRoadNames(data.roadNames || []);
         setPropertyTypes(data.propertyTypes || []);
       })
@@ -121,5 +123,5 @@ export function usePropertiesList() {
     }
   };
 
-  return { properties, totalCount, isLoading, cities, sublocations, roadNames, propertyTypes, fetchProperties, toggleVisibility, deleteBulk };
+  return { properties, totalCount, isLoading, staff, cities, sublocations, roadNames, propertyTypes, fetchProperties, toggleVisibility, deleteBulk };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { EMPTY_PROPERTY_FILTERS } from "@/lib/property-list-filters";
+import { EMPTY_PROPERTY_FILTERS, propertyUploaderLabel } from "@/lib/property-list-filters";
 import { propertyStatusLabel } from "@/lib/property-status";
 
 import { useState, useEffect } from "react";
@@ -75,7 +75,7 @@ export default function PropertiesPage() {
   const [pagination, setPagination] = usePersistedState("properties:page", { pageIndex: 0, pageSize: 10 });
   const [role, setRole] = useState("");
 
-  const { properties, totalCount, isLoading, cities, sublocations, roadNames, propertyTypes, fetchProperties, toggleVisibility, deleteBulk } = usePropertiesList();
+  const { properties, totalCount, isLoading, staff, cities, sublocations, roadNames, propertyTypes, fetchProperties, toggleVisibility, deleteBulk } = usePropertiesList();
   useClampedPage(pagination, setPagination, totalCount, isLoading);
 
   useEffect(() => {
@@ -259,11 +259,16 @@ export default function PropertiesPage() {
       },
     },
     {
+      id: "uploadedBy",
+      header: "Uploaded by",
+      cell: ({ row }) => <span className="text-sm whitespace-nowrap">{propertyUploaderLabel(row.original)}</span>,
+    },
+    {
       accessorKey: "createdAt",
-      header: "Created",
+      header: "Uploaded on",
       cell: ({ row }) => (
         <span className="text-sm text-muted-foreground whitespace-nowrap">
-          {row.original.createdAt ? new Date(row.original.createdAt).toLocaleDateString("en-GB") : "-"}
+          {row.original.createdAt ? new Date(row.original.createdAt).toLocaleDateString("en-GB", {timeZone: "Asia/Kolkata"}) : "-"}
         </span>
       ),
     },
@@ -352,6 +357,18 @@ export default function PropertiesPage() {
           )}
         </div>
         <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-muted-foreground" htmlFor={`uploaded-by-${isMobile ? 'mobile' : 'desktop'}`}>Uploaded by</label>
+            <FormSelect id={`uploaded-by-${isMobile ? 'mobile' : 'desktop'}`} name="uploadedById" options={staff.map(user => ({label: `${user.name}${user.isActive ? '' : ' (Inactive)'}`, value: String(user.id)}))}
+              value={filters.uploadedById} onValueChange={value => { setFilters(f => ({...f, uploadedById: value || ""})); resetPage(); }} placeholder="All staff" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2"><label className="text-xs font-bold text-muted-foreground" htmlFor={`uploaded-from-${isMobile ? 'mobile' : 'desktop'}`}>Uploaded from</label>
+              <Input id={`uploaded-from-${isMobile ? 'mobile' : 'desktop'}`} type="date" value={filters.uploadedFrom} max={filters.uploadedTo || undefined} onChange={event => { const value=event.target.value; setFilters(f => ({...f, uploadedFrom:value, uploadedTo: value && f.uploadedTo && f.uploadedTo < value ? value : f.uploadedTo})); resetPage(); }} /></div>
+            <div className="space-y-2"><label className="text-xs font-bold text-muted-foreground" htmlFor={`uploaded-to-${isMobile ? 'mobile' : 'desktop'}`}>Uploaded to</label>
+              <Input id={`uploaded-to-${isMobile ? 'mobile' : 'desktop'}`} type="date" value={filters.uploadedTo} min={filters.uploadedFrom || undefined} onChange={event => { const value=event.target.value; setFilters(f => ({...f, uploadedTo:value, uploadedFrom: value && f.uploadedFrom && f.uploadedFrom > value ? value : f.uploadedFrom})); resetPage(); }} /></div>
+          </div>
+          <p className="text-xs text-muted-foreground">Includes both dates, using India time.</p>
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-muted-foreground">Location</label>
             <FormSelect name="sublocationId" options={sublocations.filter(item => !filters.cityId || String(item.cityId) === filters.cityId).map(item => ({label: item.name, value: String(item.id)}))}
@@ -445,7 +462,7 @@ export default function PropertiesPage() {
 
   const tableSection = (
     <div className="w-full max-w-full min-w-0 md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col">
-      {isLoading ? <TableSkeleton columns={11} rows={10} flush /> : <DataTable key={activeTab} {...tableProps} />}
+      {isLoading ? <TableSkeleton columns={12} rows={10} flush /> : <DataTable key={activeTab} {...tableProps} />}
     </div>
   );
 
