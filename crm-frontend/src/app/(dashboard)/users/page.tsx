@@ -4,9 +4,9 @@ import { apiFetch } from "@/lib/api-fetch";
 
 import { useEffect, useState, Suspense } from "react";
 import { DataTable } from "@/components/tables/data-table";
+import { ActiveCell, IdCell, NameCell } from "@/components/tables/cells";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ColumnDef } from "@tanstack/react-table";
-import { Badge } from "@/components/ui/badge";
 import { Edit, Plus, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -127,16 +127,14 @@ function UsersList() {
       enableSorting: false,
       enableHiding: false,
     },
-    { accessorKey: "id", header: "ID" },
-    { accessorKey: "name", header: "Name" },
-    { accessorKey: "email", header: "Email" },
+    { accessorKey: "id", header: "ID", cell: ({ row }) => <IdCell>{row.original.id}</IdCell> },
+    { accessorKey: "name", header: "Name", cell: ({ row }) => <NameCell name={row.original.name} avatar /> },
+    { accessorKey: "email", header: "Email", cell: ({ row }) => <span className="text-muted-foreground">{row.original.email}</span> },
     { 
       accessorKey: "role", 
       header: "Role",
       cell: ({ row }) => (
-        <Badge variant="outline" className="font-medium bg-muted/30">
-          {row.original.role?.name || "No Role"}
-        </Badge>
+        <span>{row.original.role?.name || "No Role"}</span>
       )
     },
     { 
@@ -148,9 +146,7 @@ function UsersList() {
       accessorKey: "is_active", 
       header: "Status",
       cell: ({ row }) => (
-        <Badge variant="secondary" className={row.original.is_active ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-red-50 text-red-600 border-red-200"}>
-          {row.original.is_active ? "Active" : "Inactive"}
-        </Badge>
+        <ActiveCell active={row.original.is_active} />
       )
     }
   ];

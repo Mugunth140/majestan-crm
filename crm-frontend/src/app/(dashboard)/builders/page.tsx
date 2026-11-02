@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DataTable } from "@/components/tables/data-table";
+import { ActiveCell, DateCell, IdCell, NameCell } from "@/components/tables/cells";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -158,38 +158,37 @@ export default function BuildersPage() {
       enableHiding: false,
     },
     {
+      accessorKey: "id",
+      header: "ID",
+      cell: ({ row }) => <IdCell>{row.original.id}</IdCell>,
+    },
+    {
       accessorKey: "name",
-      header: "Builder Name",
-      cell: ({ row }) => {
-        return (
-          <span className="font-semibold text-foreground text-sm truncate max-w-[240px] block" title={row.original.name}>
-            {row.original.name}
-          </span>
-        );
-      },
+      header: "Name",
+      cell: ({ row }) => <NameCell name={row.original.name} avatar className="max-w-[260px]" />,
     },
     {
       id: "phone",
-      header: "Phone Number",
+      header: "Phone",
       cell: ({ row }) => {
         const phone = row.original.phone;
         return phone ? (
-          <span className="text-foreground text-sm font-medium">{phone}</span>
+          <span className="tabular-nums">{phone}</span>
         ) : (
-          <span className="text-muted-foreground text-sm">-</span>
+          <span className="text-muted-foreground">—</span>
         );
       },
     },
     {
       id: "email",
-      header: "Email ID",
+      header: "Email",
       cell: ({ row }) => {
         const email = row.original.email;
         if (!email) {
-          return <span className="text-muted-foreground text-sm">-</span>;
+          return <span className="text-muted-foreground">—</span>;
         }
         return (
-          <span className="text-muted-foreground text-sm truncate max-w-[200px] block" title={email}>
+          <span className="block max-w-[220px] truncate text-muted-foreground" title={email}>
             {email}
           </span>
         );
@@ -199,26 +198,13 @@ export default function BuildersPage() {
       accessorKey: "isActive",
       header: "Status",
       cell: ({ row }) => {
-        const active = row.original.isActive;
-        return active ? (
-          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 font-medium shadow-sm border">
-            Active
-          </Badge>
-        ) : (
-          <Badge className="bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400 font-medium shadow-sm border">
-            Inactive
-          </Badge>
-        );
+        return <ActiveCell active={row.original.isActive} />;
       },
     },
     {
       accessorKey: "createdAt",
       header: "Created",
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground whitespace-nowrap">
-          {row.original.createdAt ? new Date(row.original.createdAt).toLocaleDateString("en-GB") : "-"}
-        </span>
-      ),
+      cell: ({ row }) => <DateCell value={row.original.createdAt} />,
     },
   ];
 

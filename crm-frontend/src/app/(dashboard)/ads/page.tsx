@@ -5,10 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DataTable } from "@/components/tables/data-table";
+import { DateCell, IdCell, NameCell } from "@/components/tables/cells";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -196,6 +196,11 @@ export default function AdsPage() {
       enableHiding: false,
     },
     {
+      accessorKey: "id",
+      header: "ID",
+      cell: ({ row }) => <IdCell>{row.original.id}</IdCell>,
+    },
+    {
       id: "thumbnail",
       header: "Thumbnail",
       cell: ({ row }) => {
@@ -226,11 +231,9 @@ export default function AdsPage() {
       accessorKey: "title",
       header: "Title",
       cell: ({ row }) => {
-        const title = row.original.title || "-";
+        const title = row.original.title || "—";
         return (
-          <span className="font-medium text-foreground truncate max-w-[220px] inline-block" title={title}>
-            {title}
-          </span>
+          <span title={title}><NameCell name={title} className="max-w-[240px]" /></span>
         );
       },
     },
@@ -242,13 +245,9 @@ export default function AdsPage() {
             cell: ({ row }) => {
               const match = placementSpec.audiences.find((x) => x.value === row.original.audience);
               return match ? (
-                <Badge className="bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 font-medium shadow-sm border">
-                  {match.label}
-                </Badge>
+                <span>{match.label}</span>
               ) : (
-                <Badge variant="outline" className="bg-muted/40 text-muted-foreground border-border/60" title="Shown wherever no targeted ad is active">
-                  All — fallback
-                </Badge>
+                <span className="text-muted-foreground" title="Shown wherever no targeted ad is active">All — fallback</span>
               );
             },
           } satisfies ColumnDef<AdItem>,
@@ -261,7 +260,7 @@ export default function AdsPage() {
         const index = displayedAds.findIndex((a) => a.id === row.original.id);
         return (
           <div className="flex items-center justify-center gap-1">
-            <span className="font-semibold tabular-nums min-w-[2ch]">{row.original.sortOrder ?? "-"}</span>
+            <span className="font-semibold tabular-nums min-w-[2ch]">{row.original.sortOrder ?? "—"}</span>
             <div className="flex flex-col">
               <button
                 onClick={(e) => { e.stopPropagation(); handleMove(index, -1); }}
@@ -299,7 +298,7 @@ export default function AdsPage() {
               onCheckedChange={(next) => handleToggleStatus(ad, next)}
               aria-label={`Toggle status for ${ad.title}`}
             />
-            <span className={cn("text-xs font-medium", ad.isActive ? "text-green-700 dark:text-green-400" : "text-muted-foreground")}>
+            <span className={cn("text-[13px]", ad.isActive ? "text-foreground" : "text-muted-foreground")}>
               {ad.isActive ? "Active" : "Inactive"}
             </span>
           </div>
@@ -307,21 +306,20 @@ export default function AdsPage() {
       },
     },
     {
+      accessorKey: "updatedAt",
+      header: "Updated",
+      cell: ({ row }) => <DateCell value={row.original.updatedAt} />,
+    },
+    {
       id: "actions",
       header: "Actions",
       cell: ({ row }) => (
-        <Link href={`/ads/new?edit=${row.original.id}`} className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-primary hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring">
-          <Edit className="h-4 w-4" /> Edit
-        </Link>
-      ),
-    },
-    {
-      accessorKey: "updatedAt",
-      header: "Updated",
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground whitespace-nowrap">
-          {row.original.updatedAt ? new Date(row.original.updatedAt).toLocaleDateString("en-GB") : "-"}
-        </span>
+        <div className="flex items-center justify-center">
+          <Link href={`/ads/new?edit=${row.original.id}`} onClick={(e) => e.stopPropagation()} title="Edit" aria-label={`Edit ${row.original.title || "ad"}`}
+            className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-blue-50 hover:text-[#0052FF] focus-visible:outline-2 focus-visible:outline-ring">
+            <Edit size={15} />
+          </Link>
+        </div>
       ),
     },
   ];

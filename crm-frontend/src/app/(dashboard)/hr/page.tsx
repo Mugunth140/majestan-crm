@@ -1,9 +1,9 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { DataTable } from "@/components/tables/data-table";
+import { IdCell, NameCell, StatusCell, type StatusTone } from "@/components/tables/cells";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Plus, Eye, Edit, Search, Filter, X, FileSpreadsheet } from "lucide-react";
 import Link from "next/link";
@@ -29,16 +29,16 @@ import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
-const STATUS_STYLES: Record<string, string> = {
-  "New Application": "bg-gray-100 text-gray-800",
-  "Resume Shortlisted": "bg-blue-100 text-blue-800",
-  "Interview Scheduled": "bg-purple-100 text-purple-800",
-  "Interview Completed": "bg-indigo-100 text-indigo-800",
-  "Selected": "bg-emerald-100 text-emerald-800",
-  "Offer Sent": "bg-teal-100 text-teal-800",
-  "Joined": "bg-green-100 text-green-800",
-  "Rejected": "bg-red-200 text-red-900",
-  "Hold": "bg-yellow-100 text-yellow-800",
+const STATUS_TONES: Record<string, StatusTone> = {
+  "New Application": "gray",
+  "Resume Shortlisted": "blue",
+  "Interview Scheduled": "violet",
+  "Interview Completed": "violet",
+  "Selected": "green",
+  "Offer Sent": "blue",
+  "Joined": "green",
+  "Rejected": "red",
+  "Hold": "amber",
 };
 
 export default function HrPage() {
@@ -95,9 +95,8 @@ export default function HrPage() {
     apiFetch(`${API_URL}/hr`)
       .then(res => { if (!res.ok) throw new Error("Failed to load candidates"); return res.json(); })
       .then(data => {
-        const mapped = data.map((c: any, i: number) => ({
+        const mapped = data.map((c: any) => ({
           ...c,
-          sno: i + 1,
           formattedId: "HRC" + String(c.id).padStart(4, "0")
         }));
         setCandidates(mapped);
@@ -200,14 +199,11 @@ export default function HrPage() {
       enableSorting: false,
       enableHiding: false,
     },
-    { accessorKey: "sno", header: "#" },
     {
       accessorKey: "formattedId",
-      header: "Candidate ID",
+      header: "ID",
       cell: ({ row }: any) => (
-        <Link href={`/hr/${row.original.id}`} className="text-[#0052FF] hover:underline font-medium">
-          {row.getValue("formattedId")}
-        </Link>
+        <IdCell href={`/hr/${row.original.id}`}>{row.getValue("formattedId")}</IdCell>
       ),
     },
     ...(activeTab === "Action Required" ? [{
@@ -222,8 +218,8 @@ export default function HrPage() {
         );
       },
     }] : []),
-    { accessorKey: "name", header: "Candidate Name" },
-    { accessorKey: "mobile", header: "Mobile Number" },
+    { accessorKey: "name", header: "Name", cell: ({ row }: any) => <NameCell name={row.original.name} avatar /> },
+    { accessorKey: "mobile", header: "Mobile", cell: ({ row }: any) => <span className="tabular-nums">{row.original.mobile}</span> },
     { id: "assignee", header: "Assigned staff", cell: ({ row }: any) => (
       <button type="button" disabled={!canAssign} onClick={() => setAssignmentIds([row.original.id])}
         className="text-left text-sm disabled:cursor-default enabled:text-[#0052FF] enabled:hover:underline">
@@ -238,8 +234,7 @@ export default function HrPage() {
       header: "Status",
       cell: ({ row }: any) => {
         const s = row.getValue("status") as string;
-        const cls = STATUS_STYLES[s] ?? "bg-gray-100 text-gray-800 border-gray-200";
-        return <Badge className={`font-medium shadow-sm border whitespace-nowrap ${cls}`}>{s}</Badge>;
+        return <StatusCell status={s} tone={STATUS_TONES[s] ?? "gray"} />;
       },
     }
   ];

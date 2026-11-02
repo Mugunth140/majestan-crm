@@ -6,10 +6,10 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/tables/data-table";
+import { IdCell, NameCell, StatusCell, type StatusTone } from "@/components/tables/cells";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -28,15 +28,15 @@ import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
-const STATUS_STYLES: Record<string, string> = {
-  "New": "bg-gray-100 text-gray-800 border-gray-200",
-  "Contacted": "bg-blue-100 text-blue-800 border-blue-200",
-  "Meeting Done": "bg-purple-100 text-purple-800 border-purple-200",
-  "Documents Pending": "bg-amber-100 text-amber-800 border-amber-200",
-  "Approved": "bg-emerald-100 text-emerald-800 border-emerald-200",
-  "Active": "bg-green-100 text-green-800 border-green-200",
-  "Hold": "bg-orange-100 text-orange-800 border-orange-200",
-  "Rejected": "bg-red-100 text-red-800 border-red-200",
+const STATUS_TONES: Record<string, StatusTone> = {
+  "New": "gray",
+  "Contacted": "blue",
+  "Meeting Done": "violet",
+  "Documents Pending": "amber",
+  "Approved": "green",
+  "Active": "green",
+  "Hold": "amber",
+  "Rejected": "red",
 };
 
 export default function AgentsPage() {
@@ -75,7 +75,7 @@ export default function AgentsPage() {
       const res = await apiFetch(API_URL + "/agents");
       const data = await res.json();
       if (data.success) {
-        setAgents(data.data.map((a: any, i: number) => ({ ...a, sno: i + 1 })));
+        setAgents(data.data);
       }
     } catch {
       toast.error("Failed to load agents.");
@@ -198,37 +198,29 @@ export default function AgentsPage() {
       enableSorting: false,
       enableHiding: false,
     },
-    { accessorKey: "sno", header: "#" },
     {
       accessorKey: "id",
       header: "ID",
       cell: ({ row }) => (
-        <Link href={`/agent-network/${row.original.id}`} className="text-[#0052FF] hover:underline font-medium">
-          A{String(row.original.id).padStart(5, "0")}
-        </Link>
+        <IdCell href={`/agent-network/${row.original.id}`}>A{String(row.original.id).padStart(5, "0")}</IdCell>
       ),
     },
     {
       accessorKey: "name",
       header: "Name",
       cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center font-bold text-xs text-blue-900 dark:text-blue-300 shrink-0">
-            {row.original.name?.charAt(0).toUpperCase() || 'A'}
-          </div>
-          <span className="font-semibold text-foreground whitespace-nowrap">{row.original.name}</span>
-        </div>
+        <NameCell name={row.original.name} avatar />
       ),
     },
     {
       accessorKey: "company_name",
       header: "Company",
-      cell: ({ row }) => <span className="text-foreground/80 whitespace-nowrap">{row.original.company_name || "\u2014"}</span>,
+      cell: ({ row }) => <span className="whitespace-nowrap">{row.original.company_name || "\u2014"}</span>,
     },
     {
       accessorKey: "mobile",
       header: "Mobile",
-      cell: ({ row }) => <span className="font-mono text-muted-foreground whitespace-nowrap">{row.original.mobile}</span>,
+      cell: ({ row }) => <span className="whitespace-nowrap tabular-nums">{row.original.mobile}</span>,
     },
     {
       accessorKey: "partner_type",
@@ -240,8 +232,7 @@ export default function AgentsPage() {
       header: "Status",
       cell: ({ row }) => {
         const s = row.original.status as string;
-        const cls = STATUS_STYLES[s] ?? "bg-gray-100 text-gray-800 border-gray-200";
-        return <Badge className={`font-medium shadow-sm border whitespace-nowrap ${cls}`}>{s}</Badge>;
+        return <StatusCell status={s} tone={STATUS_TONES[s] ?? "gray"} />;
       }
     }
   ];

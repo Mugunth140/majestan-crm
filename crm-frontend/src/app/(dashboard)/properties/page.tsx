@@ -8,9 +8,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DataTable } from "@/components/tables/data-table";
+import { DateCell, IdCell, NameCell, StatusCell, statusTone, type StatusTone } from "@/components/tables/cells";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -44,20 +44,16 @@ const PROPERTY_TYPE_OPTIONS = [
   { value: "pg_service_apartment", label: "PG / Service Apartment" },
 ];
 
-const STATUS_STYLES: Record<string, string> = {
-  available: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
-  archived: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400",
-  sold: "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400",
-  rented: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
-};
-
-const APPROVAL_STYLES: Record<string, string> = {
-  approved: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
-  pending: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
+const PROPERTY_TONES: Record<string, StatusTone> = {
+  available: "green",
+  rented: "blue",
+  sold: "violet",
+  archived: "gray",
+  "pending review": "amber",
 };
 
 function formatPrice(price: number): string {
-  if (!price) return "-";
+  if (!price) return "—";
   if (price >= 10000000) return `₹${(price / 10000000).toFixed(2)} Cr`;
   if (price >= 100000) return `₹${(price / 100000).toFixed(2)} L`;
   return `₹${price.toLocaleString("en-IN")}`;
@@ -162,61 +158,43 @@ export default function PropertiesPage() {
     },
     {
       accessorKey: "id",
-      header: "Id",
+      header: "ID",
       cell: ({ row }) => (
-        <Link href={`/properties/${row.original.id}`} className="text-[#0052FF] hover:underline font-medium">
-          {row.original.propertyCode || row.original.id}
-        </Link>
+        <IdCell href={`/properties/${row.original.id}`}>{row.original.propertyCode || row.original.id}</IdCell>
       ),
     },
     {
       accessorKey: "title",
       header: "Title",
       cell: ({ row }) => {
-        const title = row.original.title || "-";
-        return (
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="h-7 w-7 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center font-bold text-xs text-blue-900 dark:text-blue-300 shrink-0">
-              {title.charAt(0).toUpperCase()}
-            </div>
-            <Link href={`/properties/${row.original.id}`} className="font-medium text-foreground hover:text-[#0052FF] hover:underline truncate max-w-[220px]" title={title}>
-              {title}
-            </Link>
-          </div>
-        );
+        const title = row.original.title || "—";
+        return <NameCell name={title} avatar className="max-w-[260px]" />;
       },
     },
     {
       accessorKey: "propertyType",
       header: "Type",
       cell: ({ row }) => (
-        <span className="capitalize">{row.original.propertyType?.replace(/_/g, " ") || "-"}</span>
+        <span className="capitalize">{row.original.propertyType?.replace(/_/g, " ") || "—"}</span>
       ),
     },
     {
       accessorKey: "listingType",
       header: "Listing",
-      cell: ({ row }) =>
-        row.original.listingType === "Rent" ? (
-          <Badge className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 font-medium shadow-sm border">Rent</Badge>
-        ) : (
-          <Badge className="bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 font-medium shadow-sm border">Buy</Badge>
-        ),
+      cell: ({ row }) => <span>{row.original.listingType === "Rent" ? "Rent" : "Buy"}</span>,
     },
     {
       accessorKey: "price",
       header: "Price",
-      cell: ({ row }) => <span className="font-semibold">{formatPrice(Number(row.original.price))}</span>,
+      cell: ({ row }) => <span className="whitespace-nowrap tabular-nums">{formatPrice(Number(row.original.price))}</span>,
     },
     {
       id: "locality",
       header: "Locality",
       cell: ({ row }) => {
-        const locality = row.original.localityName || "-";
+        const locality = row.original.localityName || "—";
         return (
-          <div className="min-w-0">
-            <div className="font-medium text-foreground text-sm truncate">{locality}</div>
-          </div>
+          <span className="block truncate">{locality}</span>
         );
       },
     },
@@ -233,11 +211,11 @@ export default function PropertiesPage() {
         }
         return row.original.ownerName || row.original.ownerPhone ? (
           <div className="min-w-0">
-            {row.original.ownerName && <div className="font-medium text-foreground text-sm truncate">{row.original.ownerName}</div>}
-            {row.original.ownerPhone && <div className="text-xs text-muted-foreground">{row.original.ownerPhone}</div>}
+            {row.original.ownerName && <div className="truncate">{row.original.ownerName}</div>}
+            {row.original.ownerPhone && <div className="text-[12px] tabular-nums text-muted-foreground">{row.original.ownerPhone}</div>}
           </div>
         ) : (
-          <span className="text-muted-foreground">-</span>
+          <span className="text-muted-foreground">—</span>
         );
       },
     },
@@ -245,9 +223,8 @@ export default function PropertiesPage() {
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => {
-        const s = (row.original.status || "").toLowerCase();
-        const cls = STATUS_STYLES[s] ?? "bg-gray-100 text-gray-800 border-gray-200";
-        return <Badge className={"font-medium shadow-sm border whitespace-nowrap capitalize " + cls}>{propertyStatusLabel(row.original.status, row.original.approvalStatus)}</Badge>;
+        const label = propertyStatusLabel(row.original.status, row.original.approvalStatus);
+        return <span className="capitalize"><StatusCell status={label} tone={PROPERTY_TONES[label.toLowerCase()] ?? statusTone(label)} /></span>;
       },
     },
     {
@@ -255,23 +232,18 @@ export default function PropertiesPage() {
       header: "Approval",
       cell: ({ row }) => {
         const a = (row.original.approvalStatus || "Pending").toLowerCase();
-        const cls = APPROVAL_STYLES[a] ?? "bg-gray-100 text-gray-800 border-gray-200";
-        return <Badge className={"font-medium shadow-sm border whitespace-nowrap capitalize " + cls}>{a}</Badge>;
+        return <span className="capitalize"><StatusCell status={a} /></span>;
       },
     },
     {
       id: "uploadedBy",
       header: "Uploaded by",
-      cell: ({ row }) => <span className="text-sm whitespace-nowrap">{propertyUploaderLabel(row.original)}</span>,
+      cell: ({ row }) => <span className="whitespace-nowrap">{propertyUploaderLabel(row.original)}</span>,
     },
     {
       accessorKey: "createdAt",
       header: "Uploaded on",
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground whitespace-nowrap">
-          {row.original.createdAt ? new Date(row.original.createdAt).toLocaleDateString("en-GB", {timeZone: "Asia/Kolkata"}) : "-"}
-        </span>
-      ),
+      cell: ({ row }) => <DateCell value={row.original.createdAt} />,
     },
   ];
 

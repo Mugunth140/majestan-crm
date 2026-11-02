@@ -3,10 +3,10 @@
 import { apiFetch } from "@/lib/api-fetch";
 import { useState, useEffect, useCallback } from "react";
 import { DataTable } from "@/components/tables/data-table";
+import { ActiveCell, IdCell } from "@/components/tables/cells";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { Edit, Trash2, Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -233,7 +233,7 @@ export default function MasterSublocationsPage() {
         </div>
       ),
     },
-    { accessorKey: "id", header: "ID" },
+    { accessorKey: "id", header: "ID", cell: ({ row }) => <IdCell>{row.original.id}</IdCell> },
     {
       accessorKey: "locality_name",
       header: "Sublocation",
@@ -266,16 +266,7 @@ export default function MasterSublocationsPage() {
     {
       accessorKey: "is_active",
       header: "Status",
-      cell: ({ row }) => (
-        <Badge
-          variant={row.original.is_active ? "default" : "secondary"}
-          className={row.original.is_active
-            ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border-none shadow-none"
-            : "bg-gray-100 text-gray-600 hover:bg-gray-200 border-none shadow-none"}
-        >
-          {row.original.is_active ? "Active" : "Inactive"}
-        </Badge>
-      ),
+      cell: ({ row }) => <ActiveCell active={row.original.is_active} />,
     },
     {
       id: "actions",

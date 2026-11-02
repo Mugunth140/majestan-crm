@@ -4,10 +4,10 @@ import { apiFetch } from "@/lib/api-fetch";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { DataTable } from "@/components/tables/data-table";
+import { IdCell, StatusCell } from "@/components/tables/cells";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { Edit, Plus, Eye, Search, X, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,13 +25,6 @@ import { FormSelect } from "@/components/shared/form-select";
 
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
-
-const STATUS_STYLES: Record<string, string> = {
-  "New": "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400",
-  "Sold": "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
-  "Available": "bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/30 dark:text-teal-400",
-  "Pending": "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
-};
 
 export default function AssetInventoryPage() {
   const router = useRouter();
@@ -108,7 +101,7 @@ export default function AssetInventoryPage() {
   };
 
   function formatBudget(expectation: number | null | undefined): string {
-    if (!expectation) return "-";
+    if (!expectation) return "—";
     const val = expectation * 100000;
     if (val >= 10000000) return `${(val / 10000000).toFixed(2)} Cr`;
     if (val >= 100000) return `${(val / 100000).toFixed(2)} Lakhs`;
@@ -116,7 +109,7 @@ export default function AssetInventoryPage() {
   }
 
   function formatTotalPrice(price: number | null | undefined): string {
-    if (!price) return "-";
+    if (!price) return "—";
     if (price >= 10000000) return `${(price / 10000000).toFixed(2)} Cr`;
     if (price >= 100000) return `${(price / 100000).toFixed(2)} Lakhs`;
     return String(price);
@@ -213,11 +206,9 @@ export default function AssetInventoryPage() {
     },
     {
       accessorKey: "id",
-      header: "Asset ID",
+      header: "ID",
       cell: ({ row }) => (
-        <Link href={`/asset-inventory/${row.original.id}`} className="text-[#0052FF] hover:underline font-medium">
-          AST{String(row.original.id).padStart(5, "0")}
-        </Link>
+        <IdCell href={`/asset-inventory/${row.original.id}`}>AST{String(row.original.id).padStart(5, "0")}</IdCell>
       ),
     },
     {
@@ -225,13 +216,13 @@ export default function AssetInventoryPage() {
       header: "Address",
       cell: ({ row }) => {
         const loc = row.original.location;
-        if (!loc) return <span className="text-muted-foreground">-</span>;
+        if (!loc) return <span className="text-muted-foreground">—</span>;
         const parts = [loc.district, loc.taluk, loc.village].filter(Boolean);
         const zone = loc.zone || null;
         return (
           <div>
-            <div className="font-medium">{parts.join(", ") || "-"}</div>
-            {zone && <div className="text-xs text-muted-foreground">{zone}</div>}
+            <div className="font-medium text-foreground">{parts.join(", ") || "—"}</div>
+            {zone && <div className="text-[12px] text-muted-foreground">{zone}</div>}
           </div>
         );
       },
@@ -242,7 +233,7 @@ export default function AssetInventoryPage() {
       cell: ({ row }) => {
         const feat = row.original.feature;
         const extent = feat?.extent ?? null;
-        return <div className="text-muted-foreground">{extent != null ? `${extent} Acres` : "-"}</div>;
+        return <span className="whitespace-nowrap tabular-nums">{extent != null ? `${extent} Acres` : "—"}</span>;
       },
     },
     {
@@ -250,7 +241,7 @@ export default function AssetInventoryPage() {
       header: "Budget",
       cell: ({ row }) => {
         const fin = row.original.financials;
-        return <div className="text-muted-foreground">{formatBudget(fin?.expectation)}</div>;
+        return <span className="whitespace-nowrap tabular-nums">{formatBudget(fin?.expectation)}</span>;
       },
     },
     {
@@ -258,7 +249,7 @@ export default function AssetInventoryPage() {
       header: "Total Price",
       cell: ({ row }) => {
         const fin = row.original.financials;
-        return <div className="text-muted-foreground">{formatTotalPrice(fin?.land_price)}</div>;
+        return <span className="whitespace-nowrap tabular-nums">{formatTotalPrice(fin?.land_price)}</span>;
       },
     },
     {
@@ -266,12 +257,7 @@ export default function AssetInventoryPage() {
       header: "Status",
       cell: ({ row }) => {
         const status = row.original.status || "New";
-        const style = STATUS_STYLES[status] || "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-300";
-        return (
-          <Badge variant="outline" className={`font-semibold border ${style}`}>
-            {status}
-          </Badge>
-        );
+        return <StatusCell status={status} tone={status === "Sold" ? "violet" : undefined} />;
       },
     }
   ];

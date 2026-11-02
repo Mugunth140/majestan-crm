@@ -4,10 +4,10 @@ import { apiFetch } from "@/lib/api-fetch";
 
 import { useState, useEffect, useCallback } from "react";
 import { DataTable } from "@/components/tables/data-table";
+import { ActiveCell, IdCell } from "@/components/tables/cells";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { Edit, Trash2, Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -227,17 +227,17 @@ export default function AmenitiesMasterPage() {
         </div>
       ),
     },
-    { accessorKey: "id", header: "ID" },
+    { accessorKey: "id", header: "ID", cell: ({ row }) => <IdCell>{row.original.id}</IdCell> },
     {
       accessorKey: "name",
       header: "Amenity",
       cell: ({ row }) => {
         const Icon = resolveIcon(row.original.icon_key);
         return (
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted">
               {Icon ? (
-                <Icon className="h-4 w-4 text-muted-foreground" />
+                <Icon className="size-3.5 text-muted-foreground" />
               ) : (
                 <span className="text-xs text-muted-foreground">—</span>
               )}
@@ -251,24 +251,13 @@ export default function AmenitiesMasterPage() {
       accessorKey: "category",
       header: "Category",
       cell: ({ row }) => (
-        <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-200 border-none shadow-none capitalize">
-          {categoryLabel(row.original.category)}
-        </Badge>
+        <span className="capitalize">{categoryLabel(row.original.category)}</span>
       ),
     },
     {
       accessorKey: "is_active",
       header: "Status",
-      cell: ({ row }) => (
-        <Badge
-          variant={row.original.is_active ? "default" : "secondary"}
-          className={row.original.is_active
-            ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border-none shadow-none"
-            : "bg-gray-100 text-gray-600 hover:bg-gray-200 border-none shadow-none"}
-        >
-          {row.original.is_active ? "Active" : "Inactive"}
-        </Badge>
-      ),
+      cell: ({ row }) => <ActiveCell active={row.original.is_active} />,
     },
     {
       id: "actions",

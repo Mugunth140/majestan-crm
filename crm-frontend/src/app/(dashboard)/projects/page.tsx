@@ -4,9 +4,9 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/tables/data-table";
+import { IdCell, NameCell, StatusCell } from "@/components/tables/cells";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -42,19 +42,6 @@ const UNITS_FILTER_OPTIONS = [
   { value: "50", label: "50+ units" },
   { value: "100", label: "100+ units" },
 ];
-
-const STATUS_STYLES: Record<string, string> = {
-  published: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
-  draft: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
-  booked: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400",
-  archived: "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400",
-};
-
-const PROJECT_TYPE_STYLES: Record<string, string> = {
-  apartment: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400",
-  villa: "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400",
-  plot: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400",
-};
 
 const PROJECT_TABS = ["All", "Published", "Draft", "Booked", "Archived"];
 
@@ -149,44 +136,24 @@ export default function ProjectsPage() {
     },
     {
       accessorKey: "id",
-      header: "Id",
+      header: "ID",
       cell: ({ row }) => (
-        <Link href={`/projects/${row.original.id}`} className="text-[#0052FF] hover:underline font-medium font-mono text-xs tracking-wide">
-          {row.original.projectCode || row.original.id}
-        </Link>
+        <IdCell href={`/projects/${row.original.id}`}>{row.original.projectCode || row.original.id}</IdCell>
       ),
     },
     {
       accessorKey: "name",
       header: "Project",
       cell: ({ row }) => {
-        const name = row.original.name || "-";
-        return (
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="h-7 w-7 rounded-full bg-rose-100 dark:bg-rose-900/40 flex items-center justify-center font-bold text-xs text-rose-900 dark:text-rose-300 shrink-0">
-              {name.charAt(0).toUpperCase()}
-            </div>
-            <div className="min-w-0">
-              <Link href={`/projects/${row.original.id}`} className="font-medium text-foreground hover:text-[#0052FF] hover:underline truncate max-w-[220px] block" title={name}>
-                {name}
-              </Link>
-              {row.original.city && <div className="text-xs text-muted-foreground truncate">{row.original.city}</div>}
-            </div>
-          </div>
-        );
+        const name = row.original.name || "—";
+        return <NameCell name={name} avatar sub={row.original.city} className="max-w-[260px]" />;
       },
     },
     {
       accessorKey: "projectType",
       header: "Type",
       cell: ({ row }) => {
-        const t = (row.original.projectType || "").toLowerCase();
-        const cls = PROJECT_TYPE_STYLES[t] ?? "bg-gray-100 text-gray-800 border-gray-200";
-        return (
-          <Badge className={"font-medium shadow-sm border capitalize " + cls}>
-            {row.original.projectType || "-"}
-          </Badge>
-        );
+        return <span className="capitalize">{row.original.projectType || "—"}</span>;
       },
     },
     {
@@ -194,7 +161,7 @@ export default function ProjectsPage() {
       header: "Price Range",
       cell: ({ row }) => {
         const r = computeProjectRanges(row.original.units);
-        return <span className="font-semibold whitespace-nowrap">{formatPriceRange(r.minPrice, r.maxPrice)}</span>;
+        return <span className="whitespace-nowrap tabular-nums">{formatPriceRange(r.minPrice, r.maxPrice)}</span>;
       },
     },
     {
@@ -202,7 +169,7 @@ export default function ProjectsPage() {
       header: "BHK",
       cell: ({ row }) => {
         const r = computeProjectRanges(row.original.units);
-        return <span className="whitespace-nowrap">{r.bhk.length ? `${r.bhk.join(",")} BHK` : "-"}</span>;
+        return <span className="whitespace-nowrap">{r.bhk.length ? `${r.bhk.join(",")} BHK` : "—"}</span>;
       },
     },
     {
@@ -210,7 +177,7 @@ export default function ProjectsPage() {
       header: "Units",
       cell: ({ row }) => {
         const count = (row.original.units ?? []).length;
-        return <span>{count}</span>;
+        return <span className="tabular-nums">{count}</span>;
       },
     },
     {
@@ -218,8 +185,7 @@ export default function ProjectsPage() {
       header: "Status",
       cell: ({ row }) => {
         const s = (row.original.status || "").toLowerCase();
-        const cls = STATUS_STYLES[s] ?? "bg-gray-100 text-gray-800 border-gray-200";
-        return <Badge className={"font-medium shadow-sm border whitespace-nowrap capitalize " + cls}>{s || "-"}</Badge>;
+        return <span className="capitalize"><StatusCell status={s} /></span>;
       },
     },
   ];

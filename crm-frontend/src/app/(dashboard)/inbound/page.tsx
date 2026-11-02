@@ -8,10 +8,10 @@ import { apiFetch, apiJson } from "@/lib/api-fetch";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { DataTable } from "@/components/tables/data-table";
+import { DateCell, IdCell, StatusCell, type StatusTone } from "@/components/tables/cells";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { Edit, Plus, Eye, Search, Filter, X, Lock } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
@@ -35,15 +35,15 @@ import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
-const STATUS_STYLES: Record<string, string> = {
-  "New Inbound": "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300",
-  "Contacting Owner": "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400",
-  "Terms not Accepted": "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400",
-  "On Hold": "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400",
-  "Pending Verification": "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
-  "Approved": "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400",
-  "Rejected": "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400",
-  "Closed": "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
+const STATUS_TONES: Record<string, StatusTone> = {
+  "New Inbound": "gray",
+  "Contacting Owner": "blue",
+  "Terms not Accepted": "red",
+  "On Hold": "gray",
+  "Pending Verification": "amber",
+  "Approved": "green",
+  "Rejected": "red",
+  "Closed": "green",
 };
 
 export default function InboundPage() {
@@ -230,29 +230,14 @@ export default function InboundPage() {
       enableSorting: false,
       enableHiding: false,
     },
-    { 
-      id: "sno", 
-      header: "#",
-      
-      cell: ({ row }) => <span>{row.index + 1}</span>
-    },
     {
       accessorKey: "propertyId",
-      header: "Id",
+      header: "ID",
       cell: ({ row }) => (
-        <Link href={`/inbound/${row.original.rawId || row.original.id}`} className="text-[#0052FF] hover:underline font-medium">
-          {row.getValue("propertyId") || row.original.property_id || "N/A"}
-        </Link>
+        <IdCell href={`/inbound/${row.original.rawId || row.original.id}`}>
+          {row.getValue("propertyId") || row.original.property_id || "—"}
+        </IdCell>
       ),
-    },
-    { 
-      accessorKey: "date", 
-      header: activeTab === "Queue" ? "Created at" : "Date",
-      
-      cell: ({ row }) => {
-        const d = row.original.createdAt || row.original.created_at || row.original.date;
-        return <span>{activeTab === "Queue" ? formatInboundCreated(d) : d ? new Date(d).toLocaleDateString() : "-"}</span>;
-      }
     },
     { 
       id: "categoryType", 
@@ -260,7 +245,7 @@ export default function InboundPage() {
       cell: ({ row }) => {
         const cat = (row.original.property_category || row.original.propertyCategory || "");
         const type = (row.original.property_type || row.original.propertyType || "").replace(/_/g, ' ');
-        if (!cat && !type) return <span>-</span>;
+        if (!cat && !type) return <span className="text-muted-foreground">—</span>;
         return <span className="capitalize">{cat} - {type}</span>;
       },
     },
@@ -276,7 +261,7 @@ export default function InboundPage() {
             </span>
           );
         }
-        return <span>{row.original.mobile_number || row.original.owner_mobile || "-"}</span>;
+        return <span>{row.original.mobile_number || row.original.owner_mobile || "—"}</span>;
       },
     },
     ...(activeTab === "Queue" ? [{
@@ -284,10 +269,9 @@ export default function InboundPage() {
       header: "Submission",
       cell: ({ row }) => {
         const repeat = row.original.submission_status === "Repeat";
-        return <Badge variant="outline" title={repeat ? "This mobile number appears on an earlier inbound. Staff verification required." : "First inbound for this mobile number."}
-          className={repeat ? STATUS_STYLES["Pending Verification"] : STATUS_STYLES["Approved"]}>
-          {repeat ? "Repeat" : "New"}
-        </Badge>;
+        return <span title={repeat ? "This mobile number appears on an earlier inbound. Staff verification required." : "First inbound for this mobile number."}>
+          <StatusCell status={repeat ? "Repeat" : "New"} tone={repeat ? "amber" : "green"} />
+        </span>;
       },
     },
     ] as ColumnDef<any>[] : []),
@@ -304,7 +288,7 @@ export default function InboundPage() {
       
       cell: ({ row }) => {
         const addr = row.original.address || row.original.location || "";
-        if (!addr) return <span>-</span>;
+        if (!addr) return <span className="text-muted-foreground">—</span>;
         
         return (
           <TooltipProvider delay={150}>
@@ -328,9 +312,8 @@ export default function InboundPage() {
       cell: ({ row }) => {
         const value = row.original.inbound_status;
         if (!value) return <span>—</span>;
-        const style = value === "available" ? STATUS_STYLES["Approved"]
-          : value === "not_available" ? STATUS_STYLES["Rejected"] : STATUS_STYLES["Pending Verification"];
-        return <Badge variant="outline" className={style}>{inboundStatusLabel(value)}</Badge>;
+        const tone = value === "available" ? "green" : value === "not_available" ? "red" : "amber";
+        return <StatusCell status={inboundStatusLabel(value)} tone={tone} />;
       },
     },
     {
@@ -338,20 +321,25 @@ export default function InboundPage() {
       header: "Status",
       cell: ({ row }) => {
         const s = (row.original.status as string) || "New";
-        const cls = STATUS_STYLES[s] ?? "bg-gray-100 text-gray-800 border-gray-200";
-        return <Badge className={"font-medium shadow-sm border whitespace-nowrap " + cls}>{s}</Badge>;
+        return <StatusCell status={s} tone={STATUS_TONES[s] ?? "gray"} />;
       },
+    },
+    { 
+      accessorKey: "date", 
+      header: activeTab === "Queue" ? "Created at" : "Date",
+      
+      cell: ({ row }) => {
+        const d = row.original.createdAt || row.original.created_at || row.original.date;
+        return activeTab === "Queue" ? <span className="whitespace-nowrap tabular-nums text-muted-foreground">{formatInboundCreated(d)}</span> : <DateCell value={d} />;
+      }
     },
   ];
 
   const columnKey = (column: ColumnDef<any>) => column.id || ("accessorKey" in column ? String(column.accessorKey) : "");
   const columns = activeTab === "Queue"
-    ? [
-        ...allColumns.filter(column => !["sno", "assigned", "address", "status", "date"].includes(columnKey(column))),
-        ...allColumns.filter(column => columnKey(column) === "date"),
-      ]
+    ? allColumns.filter(column => !["assigned", "address", "status"].includes(columnKey(column)))
     : activeTab === "All Inbound"
-      ? allColumns.filter(column => !["sno", "date"].includes(columnKey(column)))
+      ? allColumns.filter(column => columnKey(column) !== "date")
       : allColumns;
 
   const uniqueCategories = Array.from(new Set(inbounds.map(l => l.property_category || l.propertyCategory).filter(c => c && c !== "—")));

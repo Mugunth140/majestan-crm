@@ -5,16 +5,20 @@ import { normalizeDepartment } from "@/lib/department";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { format } from "date-fns";
 import { DataTable } from "@/components/tables/data-table";
+import { DateCell, IdCell, NameCell, StatusCell, type StatusTone } from "@/components/tables/cells";
+import { LEAD_STATUS_DOTS } from "@/lib/lead-constants";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ColumnDef } from "@tanstack/react-table";
+import type { ColumnDef, PaginationState } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Filter, ChevronDown, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
+import { EmptyState } from "@/components/shared/empty-state";
 import { AssignLeadModal } from "@/components/shared/assign-lead-modal";
 import { FormSelect } from "@/components/shared/form-select";
 import { DatePicker } from "@/components/shared/date-picker";
@@ -114,10 +118,7 @@ const EVENT_TYPE_OPTIONS = [
   { label: "Queued", value: "Queued" },
 ];
 
-function formatDate(d?: string) {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-}
+type PaginationUpdate = PaginationState | ((old: PaginationState) => PaginationState);
 
 function formatDateTime(d?: string) {
   if (!d) return "—";
@@ -128,11 +129,7 @@ function formatDateTime(d?: string) {
 
 function PurposeBadge({ intent }: { intent: string }) {
   const isVisit = intent === "site_visit";
-  return (
-    <Badge className={`border text-xs whitespace-nowrap ${isVisit ? "bg-violet-100 text-violet-700 border-violet-200" : "bg-slate-100 text-slate-600 border-slate-200"}`}>
-      {isVisit ? "Site Visit" : "Enquiry"}
-    </Badge>
-  );
+  return <StatusCell status={isVisit ? "Site Visit" : "Enquiry"} tone={isVisit ? "violet" : "gray"} />;
 }
 
 // ── Matched-lead decision dialog ─────────────────────────────────────────────
@@ -689,57 +686,45 @@ export default function LeadRoutingPage() {
     },
     {
       accessorKey: "display_id",
-      header: "Lead ID",
+      header: "ID",
       cell: ({ row }) => (
-        <span 
-          onClick={() => router.push(`/leads/${row.original.id}`)}
-          className="font-mono text-[13px] text-[#0052FF] font-medium cursor-pointer hover:underline"
-        >
-          {row.original.display_id || `L${String(row.original.id).padStart(5, "0")}`}
-        </span>
+        <IdCell href={`/leads/${row.original.id}`}>{row.original.display_id || `L${String(row.original.id).padStart(5, "0")}`}</IdCell>
       ),
     },
     {
       accessorKey: "name",
       header: "Name",
       cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center font-bold text-xs text-blue-900 dark:text-blue-300 shrink-0">
-            {row.original.name?.charAt(0)?.toUpperCase() ?? "?"}
-          </div>
-          <span className="font-medium">{row.original.name}</span>
-        </div>
+        <NameCell name={row.original.name} avatar />
       ),
     },
     {
       accessorKey: "mobile_number",
       header: "Mobile",
-      cell: ({ row }) => <span>{row.original.mobile_number || "—"}</span>,
+      cell: ({ row }) => <span className="tabular-nums">{row.original.mobile_number || "—"}</span>,
     },
     {
       accessorKey: "status",
       header: "Last Status",
       cell: ({ row }) => (
-        <Badge variant="outline" className="text-xs whitespace-nowrap">
-          {row.original.status || "—"}
-        </Badge>
+        <StatusCell status={row.original.status} dotClass={LEAD_STATUS_DOTS[row.original.status ?? ""] ?? "bg-gray-400"} />
       ),
     },
     {
       accessorKey: "last_follow_up_date",
       header: "Last Follow-up",
-      cell: ({ row }) => <span className="text-sm">{formatDate(row.original.last_follow_up_date)}</span>,
+      cell: ({ row }) => <DateCell value={row.original.last_follow_up_date} />,
     },
     {
       accessorKey: "previously_held_by",
       header: "Previously Held By",
-      cell: ({ row }) => <span className="text-sm">{row.original.previously_held_by || "—"}</span>,
+      cell: ({ row }) => <span>{row.original.previously_held_by || "—"}</span>,
     },
     {
       accessorKey: "release_reason",
       header: "Release Reason",
       cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground max-w-[140px] truncate block">
+        <span className="block max-w-[160px] truncate text-muted-foreground">
           {row.original.release_reason || "—"}
         </span>
       ),
@@ -750,7 +735,7 @@ export default function LeadRoutingPage() {
       cell: ({ row }) => {
         const days = row.original.days_in_queue ?? 0;
         return (
-          <span className={`font-semibold text-sm ${days > 7 ? "text-red-500" : days > 3 ? "text-amber-500" : "text-green-600"}`}>
+          <span className={`tabular-nums ${days > 7 ? "text-rose-600 dark:text-rose-400" : days > 3 ? "text-amber-600 dark:text-amber-400" : "text-foreground"}`}>
             {days}d
           </span>
         );
@@ -810,48 +795,30 @@ export default function LeadRoutingPage() {
     },
     {
       accessorKey: "display_id",
-      header: "Lead ID",
+      header: "ID",
       cell: ({ row }) => {
         const ev = row.original;
-        return ev.id != null ? (
-          <span
-            onClick={() => router.push(`/leads/${ev.id}`)}
-            className="font-mono text-[13px] text-[#0052FF] font-medium cursor-pointer hover:underline"
-          >
-            {ev.display_id}
-          </span>
-        ) : (
-          <span className="font-mono text-[13px] text-muted-foreground">{ev.display_id}</span>
-        );
+        return <IdCell href={ev.id != null ? `/leads/${ev.id}` : undefined}>{ev.display_id}</IdCell>;
       },
     },
     {
       accessorKey: "name",
       header: "Name",
       cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center font-bold text-xs text-blue-900 dark:text-blue-300 shrink-0">
-            {row.original.name?.charAt(0)?.toUpperCase() ?? "?"}
-          </div>
-          <span className="font-medium">{row.original.name}</span>
-        </div>
+        <NameCell name={row.original.name} avatar />
       ),
     },
     {
       accessorKey: "mobile_number",
       header: "Mobile",
-      cell: ({ row }) => <span>{row.original.mobile_number || "—"}</span>,
+      cell: ({ row }) => <span className="tabular-nums">{row.original.mobile_number || "—"}</span>,
     },
     {
       accessorKey: "type",
       header: "Type",
       cell: ({ row }) => {
         const isRepeat = row.original.type === "Repeat";
-        return (
-          <Badge className={`border text-xs whitespace-nowrap ${isRepeat ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-blue-100 text-blue-700 border-blue-200"}`}>
-            {row.original.type}
-          </Badge>
-        );
+        return <StatusCell status={row.original.type} tone={isRepeat ? "amber" : "blue"} />;
       },
     },
     {
@@ -893,25 +860,25 @@ export default function LeadRoutingPage() {
       },
     },
     {
-      accessorKey: "enquiry_at",
-      header: "Enquired On",
-      cell: ({ row }) => (
-        <span className="text-sm whitespace-nowrap" title={formatDateTime(row.original.enquiry_at)}>
-          {timeAgo(row.original.enquiry_at) || "—"}
-        </span>
-      ),
-    },
-    {
       id: "assigned",
       header: "Assigned",
       cell: ({ row }) => {
         const ev = row.original;
         return ev.assigned_staff_name ? (
-          <span className="text-sm truncate">{ev.assigned_staff_name}</span>
+          <span className="truncate">{ev.assigned_staff_name}</span>
         ) : (
-          <Badge variant="outline" className="text-xs whitespace-nowrap">Unassigned</Badge>
+          <span className="text-muted-foreground">Unassigned</span>
         );
       },
+    },
+    {
+      accessorKey: "enquiry_at",
+      header: "Enquired On",
+      cell: ({ row }) => (
+        <span className="whitespace-nowrap text-muted-foreground" title={formatDateTime(row.original.enquiry_at)}>
+          {timeAgo(row.original.enquiry_at) || "—"}
+        </span>
+      ),
     },
     {
       id: "actions",
@@ -968,25 +935,17 @@ export default function LeadRoutingPage() {
 
   const historyColumns = useMemo<ColumnDef<HistoryEntry>[]>(() => [
     {
-      accessorKey: "created_at",
-      header: "Date",
-      cell: ({ row }) => <span className="text-sm">{formatDateTime(row.original.created_at)}</span>,
-    },
-    {
       id: "lead_name",
-      header: "Lead Name",
+      header: "Lead",
       cell: ({ row }) => {
         if (row.original.lead?.id) {
           return (
-            <span 
-              onClick={() => router.push(`/leads/${row.original.lead!.id}`)}
-              className="font-medium text-[#0052FF] cursor-pointer hover:underline"
-            >
-              {row.original.lead?.name || "—"}
-            </span>
+            <Link href={`/leads/${row.original.lead.id}`} className="hover:underline">
+              <NameCell name={row.original.lead?.name} avatar />
+            </Link>
           );
         }
-        return <span className="font-medium">{row.original.lead?.name || "—"}</span>;
+        return <NameCell name={row.original.lead?.name} avatar />;
       },
     },
     {
@@ -994,43 +953,40 @@ export default function LeadRoutingPage() {
       header: "Event Type",
       cell: ({ row }) => {
         const evt = row.original.event_type || "";
-        const styles: Record<string, string> = {
-          assigned: "bg-blue-100 text-blue-700 border-blue-200",
-          claimed: "bg-green-100 text-green-700 border-green-200",
-          released: "bg-amber-100 text-amber-700 border-amber-200",
-          converted: "bg-purple-100 text-purple-700 border-purple-200",
-        };
-        const cls = styles[evt.toLowerCase()] || "bg-gray-100 text-gray-700 border-gray-200";
-        return (
-          <Badge className={`capitalize border text-xs ${cls}`}>{evt || "—"}</Badge>
-        );
+        const tones: Record<string, StatusTone> = { assigned: "blue", claimed: "green", released: "amber", converted: "violet" };
+        return <span className="capitalize"><StatusCell status={evt} tone={tones[evt.toLowerCase()] ?? "gray"} /></span>;
       },
     },
     {
       id: "from_staff",
       header: "From Staff",
-      cell: ({ row }) => <span className="text-sm">{row.original.from_staff?.name || "—"}</span>,
+      cell: ({ row }) => <span>{row.original.from_staff?.name || "—"}</span>,
     },
     {
       id: "to_staff",
       header: "To Staff",
-      cell: ({ row }) => <span className="text-sm">{row.original.to_staff?.name || "—"}</span>,
+      cell: ({ row }) => <span>{row.original.to_staff?.name || "—"}</span>,
     },
     {
       id: "department",
       header: "Department",
       cell: ({ row }) => (
-        <span className="text-sm capitalize">{row.original.department?.name || "—"}</span>
+        <span className="capitalize">{row.original.department?.name || "—"}</span>
       ),
     },
     {
       accessorKey: "feedback",
       header: "Feedback",
       cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground max-w-[200px] truncate block">
+        <span className="block max-w-[220px] truncate text-muted-foreground">
           {row.original.feedback || "—"}
         </span>
       ),
+    },
+    {
+      accessorKey: "created_at",
+      header: "Date",
+      cell: ({ row }) => <DateCell value={row.original.created_at} withTime />,
     },
   ], [router]);
 
@@ -1193,8 +1149,12 @@ export default function LeadRoutingPage() {
                 <DataTable
                   variant="list"
                   flush={true}
-                  hidePagination={true}
-                  pageSize={100}
+manualPagination
+                  pageCount={totalQueuePages}
+                  totalCount={queueTotal}
+                  pagination={{ pageIndex: queuePage - 1, pageSize: LIMIT }}
+                  onPaginationChange={(u: PaginationUpdate) => setQueuePage((p) => (typeof u === "function" ? u({ pageIndex: p - 1, pageSize: LIMIT }) : u).pageIndex + 1)}
+                  pageSizeOptions={[LIMIT]}
                   persistKey="queue"
                   columns={queueColumns} 
                   data={queue} 
@@ -1247,32 +1207,6 @@ export default function LeadRoutingPage() {
                     );
                   }}
                 />
-                {/* Server-side pagination */}
-                {true && (
-                  <div className="flex items-center justify-between px-6 pb-24 pt-4 md:py-4 border-t border-border/40 mt-auto sticky bottom-0 bg-background z-30 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none">
-                    <span className="text-sm text-muted-foreground">
-                      Showing {queueTotal > 0 ? Math.min((queuePage - 1) * LIMIT + 1, queueTotal) : 0} to {Math.min(queuePage * LIMIT, queueTotal)} of {queueTotal} entries
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setQueuePage((p) => Math.max(1, p - 1))}
-                        disabled={queuePage <= 1}
-                      >
-                        Previous
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setQueuePage((p) => Math.min(totalQueuePages, p + 1))}
-                        disabled={queuePage >= totalQueuePages}
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </div>
               </>
             )}
@@ -1288,13 +1222,17 @@ export default function LeadRoutingPage() {
               <>
                 <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col pt-2">
                 {groupedEnquiry.length === 0 ? (
-                  <p className="px-4 md:px-6 py-8 text-sm text-muted-foreground text-center">No open enquiries.</p>
+                  <EmptyState kind="inbox" title="No open enquiries" description="New website and app enquiries will show up here." />
                 ) : (
                 <DataTable
                   variant="list"
                   flush={true}
-                  hidePagination={true}
-                  pageSize={100}
+manualPagination
+                  pageCount={totalEnquiryPages}
+                  totalCount={enquiryTotal}
+                  pagination={{ pageIndex: enquiryPage - 1, pageSize: LIMIT }}
+                  onPaginationChange={(u: PaginationUpdate) => setEnquiryPage((p) => (typeof u === "function" ? u({ pageIndex: p - 1, pageSize: LIMIT }) : u).pageIndex + 1)}
+                  pageSizeOptions={[LIMIT]}
                   persistKey="enquiry"
                   columns={enquiryColumns}
                   data={groupedEnquiry}
@@ -1344,32 +1282,6 @@ export default function LeadRoutingPage() {
                     );
                   }}
                 />
-                )}
-                {/* Server-side pagination */}
-                {true && (
-                  <div className="flex items-center justify-between px-6 pb-24 pt-4 md:py-4 border-t border-border/40 mt-auto sticky bottom-0 bg-background z-30 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none">
-                    <span className="text-sm text-muted-foreground">
-                      Showing {enquiryTotal > 0 ? Math.min((enquiryPage - 1) * LIMIT + 1, enquiryTotal) : 0} to {Math.min(enquiryPage * LIMIT, enquiryTotal)} of {enquiryTotal} entries
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setEnquiryPage((p) => Math.max(1, p - 1))}
-                        disabled={enquiryPage <= 1}
-                      >
-                        Previous
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setEnquiryPage((p) => Math.min(totalEnquiryPages, p + 1))}
-                        disabled={enquiryPage >= totalEnquiryPages}
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  </div>
                 )}
               </div>
               </>
@@ -1431,33 +1343,19 @@ export default function LeadRoutingPage() {
             ) : (
               <>
                 <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col pt-2">
-                  <DataTable variant="list" flush={true} hidePagination={true} pageSize={100} persistKey="history" columns={historyColumns} data={history} />
-                {/* Server-side pagination */}
-                {true && (
-                  <div className="flex items-center justify-between px-6 pb-24 pt-4 md:py-4 border-t border-border/40 mt-auto sticky bottom-0 bg-background z-30 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none">
-                    <span className="text-sm text-muted-foreground">
-                      Showing {historyTotal > 0 ? Math.min((historyPage - 1) * LIMIT + 1, historyTotal) : 0} to {Math.min(historyPage * LIMIT, historyTotal)} of {historyTotal} entries
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
-                        disabled={historyPage <= 1}
-                      >
-                        Previous
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setHistoryPage((p) => Math.min(totalHistoryPages, p + 1))}
-                        disabled={historyPage >= totalHistoryPages}
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                  <DataTable
+                    variant="list"
+                    flush={true}
+                    manualPagination
+                    pageCount={totalHistoryPages}
+                    totalCount={historyTotal}
+                    pagination={{ pageIndex: historyPage - 1, pageSize: LIMIT }}
+                    onPaginationChange={(u: PaginationUpdate) => setHistoryPage((p) => (typeof u === "function" ? u({ pageIndex: p - 1, pageSize: LIMIT }) : u).pageIndex + 1)}
+                    pageSizeOptions={[LIMIT]}
+                    persistKey="history"
+                    columns={historyColumns}
+                    data={history}
+                  />
               </div>
               </>
             )}

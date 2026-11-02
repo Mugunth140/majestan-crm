@@ -1,9 +1,9 @@
 "use client";
 import { DataTable } from "@/components/tables/data-table";
+import { DateCell, IdCell, NameCell, StatusCell } from "@/components/tables/cells";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { Pencil } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { BlogPost } from "@/lib/blog-api";
@@ -61,14 +61,17 @@ export function BlogPostList({
       meta: { fixedWidth: 48 },
     },
     {
+      accessorKey: "id",
+      header: "ID",
+      meta: { hideOnMobile: true },
+      cell: ({ row }) => <IdCell>{row.original.id}</IdCell>,
+    },
+    {
       accessorKey: "title",
-      header: "Article title",
+      header: "Title",
       cell: ({ row }) => (
-        <span
-          className="font-semibold text-foreground text-sm truncate max-w-[280px] block"
-          title={row.original.title}
-        >
-          {row.original.title}
+        <span title={row.original.title}>
+          <NameCell name={row.original.title} className="max-w-[320px]" />
         </span>
       ),
     },
@@ -77,9 +80,7 @@ export function BlogPostList({
       header: "Category",
       meta: { hideOnMobile: true },
       cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">
-          {row.original.category || "—"}
-        </span>
+        <span>{row.original.category || "—"}</span>
       ),
     },
     {
@@ -92,33 +93,14 @@ export function BlogPostList({
             : new Date(row.original.published_at!).getTime() > now
               ? "Scheduled"
               : "Published";
-        return (
-          <Badge
-            variant="outline"
-            className={
-              status === "Published"
-                ? "border-green-200 bg-green-50 text-green-700 dark:border-green-900 dark:bg-green-950/40 dark:text-green-400"
-                : status === "Scheduled"
-                  ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-400"
-                  : "bg-muted/50 text-muted-foreground"
-            }
-          >
-            {status}
-          </Badge>
-        );
+        return <StatusCell status={status} tone={status === "Published" ? "green" : status === "Scheduled" ? "blue" : "amber"} />;
       },
     },
     {
       accessorKey: "published_at",
-      header: "Publication date",
+      header: "Published",
       meta: { hideOnMobile: true },
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground whitespace-nowrap">
-          {row.original.published_at
-            ? new Date(row.original.published_at).toLocaleDateString("en-GB")
-            : "—"}
-        </span>
-      ),
+      cell: ({ row }) => <DateCell value={row.original.published_at} />,
     },
   ];
   return (
