@@ -1,37 +1,40 @@
 "use client";
 
 import { useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { AlertCircle } from "lucide-react";
+import { RotateCcw } from "lucide-react";
+import { EmptyState } from "@/components/shared/empty-state";
+import { headerButtonClass, headerPrimaryClass } from "@/components/layout/list-page";
 
+// A page that throws is replaced by this; the sidebar and top row stay usable.
 export default function DashboardError({
   error,
-  reset,
+  unstable_retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  unstable_retry: () => void;
 }) {
   useEffect(() => {
     console.error("Dashboard caught an error:", error);
   }, [error]);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[70vh] px-4 text-center">
-      <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center mb-6 shadow-sm border border-red-200 dark:border-red-900/50">
-        <AlertCircle className="w-8 h-8" />
-      </div>
-      <h2 className="text-2xl font-bold tracking-tight mb-2">Something went wrong!</h2>
-      <p className="text-muted-foreground max-w-md mx-auto mb-8">
-        We've encountered an unexpected rendering error. Please try reloading the view or contact support if the issue persists.
-      </p>
-      <div className="flex gap-4">
-        <Button onClick={() => window.location.reload()} variant="outline">
-          Hard Reload
-        </Button>
-        <Button onClick={() => reset()}>
-          Try Again
-        </Button>
-      </div>
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <EmptyState
+        kind="error"
+        title="This page hit a problem"
+        description="Something went wrong while showing it. Try again, and if it keeps happening, reload the app."
+        action={
+          <div className="flex items-center gap-2">
+            <button type="button" className={headerButtonClass} onClick={() => window.location.reload()}>
+              Reload app
+            </button>
+            <button type="button" className={headerPrimaryClass} onClick={() => unstable_retry()}>
+              <RotateCcw className="size-4" />
+              Try again
+            </button>
+          </div>
+        }
+      />
     </div>
   );
 }

@@ -31,6 +31,7 @@ import { LEAD_STATUS_DOTS, LEAD_STATUS_ORDER } from "@/lib/lead-constants";
 import { ViewSwitcher, type ViewType } from "@/components/views/view-switcher";
 import { LeadsKanban } from "@/components/leads/leads-kanban";
 import { NameAvatar } from "@/components/shared/name-avatar";
+import { EmptyState } from "@/components/shared/empty-state";
 import { GroupedList } from "@/components/tables/grouped-list";
 import { GroupByPicker, LEAD_GROUP_FIELDS, type LeadGroupField } from "@/components/leads/group-by-picker";
 import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
@@ -993,6 +994,14 @@ export default function LeadsPage() {
   
   const tableProps = {
     flush: true as const,
+    emptyState: (
+      <EmptyState
+        className="sticky left-0"
+        kind="people"
+        title={searchQuery || activeFiltersCount > 0 ? "No leads match" : "No leads here yet"}
+        description={searchQuery || activeFiltersCount > 0 ? "Try a different search or clear the filters." : "New leads will show up here as they come in."}
+      />
+    ),
     columns: visibleColumns,
     data: displayedLeads,
     showToolbar: !isReviewingImports,
@@ -1249,7 +1258,7 @@ export default function LeadsPage() {
               )
             }
             onRowClick={(lead) => router.push(`/leads/${lead.rawId}`)}
-            emptyLabel="No leads to show."
+            emptyState={<EmptyState className="sticky left-0" kind="people" title="No leads to show" description="Try a different search or filter." />}
           />
         ) : (
           <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden">

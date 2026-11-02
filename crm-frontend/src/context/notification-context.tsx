@@ -76,7 +76,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data && data.notifications) {
+        if (data && Array.isArray(data.notifications)) {
           setNotifications(data.notifications);
         }
       } catch (err) {}

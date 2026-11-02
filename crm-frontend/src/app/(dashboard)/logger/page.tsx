@@ -4,6 +4,7 @@ import { apiFetch } from "@/lib/api-fetch";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { EmptyState as IllustratedEmpty } from "@/components/shared/empty-state";
 import { PageActions } from "@/components/layout/page-actions";
 import { headerButtonClass } from "@/components/layout/list-page";
 import { AlertTriangle, CheckCircle2, CircleHelp, Loader2, RefreshCw, ShieldAlert, Smartphone, WifiOff } from "lucide-react";
@@ -178,5 +179,5 @@ function DeviceRow({ device }: { device: LoggerDevice }) {
 }
 
 function Summary({ label, value }: { label: string; value: number }) { return <div className="rounded-2xl border border-border/80 bg-muted/20 p-5 shadow-sm"><p className="text-sm font-semibold text-muted-foreground">{label}</p><p className="mt-3 text-3xl font-bold tracking-tight text-foreground">{value}</p></div>; }
-function EmptyState() { return <div className="px-6 py-24 text-center"><Smartphone className="mx-auto h-10 w-10 text-muted-foreground/35" /><h2 className="mt-4 font-semibold">No logger devices have registered</h2><p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">Install the APK, sign in with a staff CRM account, and ensure it can reach the production API. The device will then appear here.</p></div>; }
+function EmptyState() { return <IllustratedEmpty kind="records" className="py-16" title="No logger devices have registered" description="Install the APK, sign in with a staff CRM account, and make sure it can reach the production API. The device will then appear here." />; }
 function AccessDenied() { return <div className="rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center dark:border-amber-900/60 dark:bg-amber-950/20"><ShieldAlert className="mx-auto h-8 w-8 text-amber-600" /><h2 className="mt-3 font-semibold">Admin or manager access required</h2><p className="mt-1 text-sm text-muted-foreground">Device health is restricted to admins and managers.</p></div>; }

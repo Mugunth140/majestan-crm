@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState, type DragEvent } from "react";
 import { Lock, Phone } from "lucide-react";
 import { NameAvatar } from "@/components/shared/name-avatar";
+import { EmptyState } from "@/components/shared/empty-state";
 import { LEAD_STATUS_DOTS, LEAD_STATUS_ORDER } from "@/lib/lead-constants";
 import { cn } from "@/lib/utils";
 
@@ -53,7 +54,7 @@ export function LeadsKanban({
   }, [leads, onMove]);
 
   if (leads.length === 0) {
-    return <div className="flex h-60 items-center justify-center text-sm text-muted-foreground">No leads to show.</div>;
+    return <EmptyState kind="people" title="No leads to show" description="Leads that match this view will appear here as cards." />;
   }
 
   const canDrop = (status: string) =>

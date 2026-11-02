@@ -6,6 +6,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ArrowBigDownDash, Bell, CheckCheck, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { EmptyState as IllustratedEmpty } from "@/components/shared/empty-state";
 import { PageActions } from "@/components/layout/page-actions";
 import { useState } from "react";
 
@@ -58,11 +59,7 @@ export default function InboxPage() {
           </div>
 
           {notifications.length === 0 ? (
-            <div className="px-6 py-24 text-center">
-              <Bell className="mx-auto h-10 w-10 text-muted-foreground/35" />
-              <h2 className="mt-4 font-semibold">Your inbox is clear</h2>
-              <p className="mt-1 text-sm text-muted-foreground">New assignments and reminders will land here.</p>
-            </div>
+            <IllustratedEmpty kind="inbox" className="py-20" title="Your inbox is clear" description="New assignments and reminders will land here." />
           ) : (
             <div className="divide-y divide-border/70">
               {notifications.map((item) => (

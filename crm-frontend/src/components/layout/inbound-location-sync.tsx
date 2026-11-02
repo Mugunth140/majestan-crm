@@ -10,7 +10,8 @@ export function InboundLocationSync() {
     window.addEventListener('online', retry);
     window.addEventListener('focus', retry);
     document.addEventListener('visibilitychange', visible);
-    const timer = window.setInterval(retry, 30000);
+    // Background tabs skip the periodic retry; becoming visible retries at once.
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') retry(); }, 30000);
     let permission: PermissionStatus | undefined;
     let disposed = false;
     navigator.permissions?.query({ name: 'geolocation' }).then(status => {

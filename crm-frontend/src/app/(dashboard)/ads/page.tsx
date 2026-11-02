@@ -14,7 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { ListBody, ListFrame, ListToolbar, SegmentTabs, ToolbarClear, ToolbarEnd, ToolbarSearch, headerPrimaryClass } from "@/components/layout/list-page";
+import { EmptyState as IllustratedEmpty } from "@/components/shared/empty-state";
+import { ListBody, ListFrame, ListToolbar, SegmentTabs, ToolbarClear, ToolbarEnd, ToolbarSearch, headerPrimaryClass, headerButtonClass } from "@/components/layout/list-page";
 import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
@@ -413,13 +414,21 @@ export default function AdsPage() {
   );
 
   const emptyState = (
-    <div className="flex min-h-64 flex-col items-center justify-center gap-4 p-8 text-center" role={loadError ? "alert" : "status"}>
-      <div className="rounded-2xl bg-muted p-4"><Search className="h-6 w-6 text-muted-foreground" /></div>
-      <div className="space-y-2 max-w-md">
-        <h2 className="text-lg font-semibold">{loadError ? "Could not load advertisements" : searchQuery.trim() ? "No matching advertisements" : `No ${activeTab.toLowerCase()} advertisements`}</h2>
-        <p className="text-sm text-muted-foreground">{loadError || (searchQuery.trim() ? "Try a different title or clear your search." : `Advertisements in ${placementSpec.label.toLowerCase()} will appear here. Add one or check the ${activeTab === "Active" ? "inactive" : "active"} tab.`)}</p>
-      </div>
-      {loadError ? <Button variant="outline" onClick={() => fetchAds()}>Try again</Button> : searchQuery.trim() ? <Button variant="outline" onClick={() => setSearchQuery("")}>Clear search</Button> : <Link href={`/ads/new?placement=${placement}`} className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground">Add advertisement</Link>}
+    <div role={loadError ? "alert" : "status"}>
+      <IllustratedEmpty
+        kind={loadError ? "error" : searchQuery.trim() ? "search" : "records"}
+        title={loadError ? "Couldn't load advertisements" : searchQuery.trim() ? "No matching advertisements" : `No ${activeTab.toLowerCase()} advertisements`}
+        description={loadError || (searchQuery.trim() ? "Try a different title or clear your search." : `Advertisements in ${placementSpec.label.toLowerCase()} will appear here. Add one or check the ${activeTab === "Active" ? "inactive" : "active"} tab.`)}
+        action={
+          loadError ? (
+            <button type="button" className={headerButtonClass} onClick={() => fetchAds()}>Try again</button>
+          ) : searchQuery.trim() ? (
+            <button type="button" className={headerButtonClass} onClick={() => setSearchQuery("")}>Clear search</button>
+          ) : (
+            <Link href={`/ads/new?placement=${placement}`} className={headerPrimaryClass}>Add advertisement</Link>
+          )
+        }
+      />
     </div>
   );
 

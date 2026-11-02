@@ -1,5 +1,3 @@
-"use client";
-
 import type { ReactNode } from "react";
 import { Filter, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";

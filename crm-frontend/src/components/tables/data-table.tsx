@@ -14,7 +14,7 @@ import {
   PaginationState,
   type Row,
 } from "@tanstack/react-table";
-import { memo, useEffect, useRef, useState, type CSSProperties, type ReactElement, type RefObject } from "react";
+import { memo, useEffect, useRef, useState, type CSSProperties, type ReactElement, type ReactNode, type RefObject } from "react";
 import { usePathname } from "next/navigation";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 
@@ -37,6 +37,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/shared/empty-state";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -70,6 +71,8 @@ interface DataTableProps<TData, TValue> {
    * hairline row dividers, a floating selection bar and a page-size footer.
    */
   variant?: "default" | "list";
+  /** Shown when there are no rows; defaults to an illustrated "No results" */
+  emptyState?: ReactNode;
   /** Page sizes offered in the list variant's footer */
   pageSizeOptions?: number[];
 }
@@ -93,6 +96,7 @@ export function DataTable<TData, TValue>({
   onSelectionChange,
   persistKey,
   variant = "default",
+  emptyState,
   pageSizeOptions = [20, 50, 100],
 }: DataTableProps<TData, TValue>) {
   const isList = variant === "list";
@@ -302,15 +306,19 @@ export function DataTable<TData, TValue>({
                   </TableRow>
                 ))}
               </>
-            ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className={cn("h-24 text-center text-muted-foreground", isList && "h-40 border-0")}>
-                  No results.
-                </TableCell>
-              </TableRow>
-            )}
+            ) : null}
           </TableBody>
         </table>
+        {/* Outside the table so it centres in the visible width, not across every column */}
+        {!table.getRowModel().rows?.length &&
+          (emptyState ?? (
+            <EmptyState
+              className="sticky left-0"
+              kind="search"
+              title="No results"
+              description="Nothing to show here yet. Try a different search or filter."
+            />
+          ))}
       </div>
 
       {!hidePagination && isList && (() => {

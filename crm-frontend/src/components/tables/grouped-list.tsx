@@ -4,6 +4,7 @@ import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/shared/empty-state";
 
 // Frappe-style "Group By" list: one header, then a collapsible section per group value.
 export function GroupedList<TData>({
@@ -13,7 +14,7 @@ export function GroupedList<TData>({
   groupOrder,
   renderGroupLabel,
   onRowClick,
-  emptyLabel = "No results.",
+  emptyState,
 }: {
   columns: ColumnDef<TData, unknown>[];
   data: TData[];
@@ -22,7 +23,7 @@ export function GroupedList<TData>({
   groupOrder?: string[];
   renderGroupLabel?: (key: string) => ReactNode;
   onRowClick?: (row: TData) => void;
-  emptyLabel?: string;
+  emptyState?: ReactNode;
 }) {
   const table = useReactTable({ data, columns, getCoreRowModel: getCoreRowModel() });
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -61,15 +62,7 @@ export function GroupedList<TData>({
             </tr>
           ))}
         </thead>
-        {groups.length === 0 ? (
-          <tbody>
-            <tr>
-              <td colSpan={colCount} className="h-40 text-center text-muted-foreground">
-                {emptyLabel}
-              </td>
-            </tr>
-          </tbody>
-        ) : (
+        {groups.length === 0 ? null : (
           groups.map(([key, rows]) => {
             const open = !collapsed[key];
             return (
@@ -118,6 +111,8 @@ export function GroupedList<TData>({
           })
         )}
       </table>
+      {groups.length === 0 &&
+        (emptyState ?? <EmptyState className="sticky left-0" kind="search" title="No results" description="Nothing to show here yet. Try a different search or filter." />)}
     </div>
   );
 }

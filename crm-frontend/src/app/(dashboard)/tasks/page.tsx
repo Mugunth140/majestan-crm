@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Target, RefreshCw, Search, X } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { EmptyState as IllustratedEmpty } from "@/components/shared/empty-state";
 import { ListFrame, ListToolbar, SegmentTabs, ToolbarClear, ToolbarEnd, ToolbarSearch, headerPrimaryClass } from "@/components/layout/list-page";
 import { PageActions } from "@/components/layout/page-actions";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -338,20 +339,17 @@ function EmptyState({
   action?: { label: string; onClick: () => void };
 }) {
   return (
-    <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-border rounded-xl bg-muted/10">
-      <div className="h-16 w-16 bg-[#0052FF]/10 rounded-full flex items-center justify-center mb-4 border border-[#0052FF]/20">
-        <Target className="h-8 w-8 text-[#0052FF]" />
-      </div>
-      <p className="text-muted-foreground text-sm max-w-xs">{message}</p>
-      {action && (
-        <button
-          onClick={action.onClick}
-          className="mt-6 inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 active:scale-95 transition-transform"
-        >
-          <Plus size={16} />
-          {action.label}
-        </button>
-      )}
-    </div>
+    <IllustratedEmpty
+      kind="tasks"
+      title={message}
+      action={
+        action && (
+          <button type="button" onClick={action.onClick} className={headerPrimaryClass}>
+            <Plus className="size-4" />
+            {action.label}
+          </button>
+        )
+      }
+    />
   );
 }
