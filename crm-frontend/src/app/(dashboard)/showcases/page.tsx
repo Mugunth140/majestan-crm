@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { PageActions } from "@/components/layout/page-actions";
+import { headerButtonClass } from "@/components/layout/list-page";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useLeaveGuard } from "@/hooks/use-leave-guard";
@@ -339,15 +341,13 @@ export default function ShowcasesPage() {
     <>
       <MobileHeader title="Showcases" />
       <div className="w-full flex flex-col gap-5 px-4 pt-4 pb-28 md:px-0 md:pt-0 md:pb-24 md:h-full">
-        <div className="hidden md:flex items-center justify-between pr-[150px] min-h-[48px]">
-          <div>
-            <h1 className="text-[28px] font-bold tracking-tight">Showcases</h1>
-            <p className="text-muted-foreground text-sm mt-0.5">Pick what the home page features, and in what order.</p>
-          </div>
-          <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={() => setReloadToken((t) => t + 1)} title="Refresh" disabled={isDirty}>
-            <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
-          </Button>
-        </div>
+        <PageActions>
+          <button type="button" className={headerButtonClass} onClick={() => setReloadToken((t) => t + 1)} disabled={isDirty} title={isDirty ? "Save or discard your changes first" : undefined}>
+            <RefreshCw className={`size-4 text-muted-foreground ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+        </PageActions>
+        <p className="hidden text-[13px] text-muted-foreground md:block">Pick what the home page features, and in what order.</p>
 
         <div className="flex flex-col gap-2">
           {sectionTabs}

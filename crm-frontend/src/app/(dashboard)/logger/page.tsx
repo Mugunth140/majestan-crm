@@ -4,8 +4,8 @@ import { apiFetch } from "@/lib/api-fetch";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { Device } from "@/components/shared/device";
-import { Button } from "@/components/ui/button";
+import { PageActions } from "@/components/layout/page-actions";
+import { headerButtonClass } from "@/components/layout/list-page";
 import { AlertTriangle, CheckCircle2, CircleHelp, Loader2, RefreshCw, ShieldAlert, Smartphone, WifiOff } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -115,7 +115,7 @@ export default function LoggerPage() {
     <>
       <MobileHeader title="Logger devices" />
       <main className="flex w-full flex-col gap-6 pt-4 lg:p-0 md:h-full">
-        <Device desktop={<div className="flex h-[48px] items-center justify-between px-4 md:px-0"><div><h1 className="text-[28px] font-bold tracking-tight">Logger Control</h1></div><Button variant="outline" size="sm" disabled={isRefreshing} onClick={() => load(true)}><RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />Refresh</Button></div>} mobile={null} />
+        <PageActions><button type="button" className={headerButtonClass} disabled={isRefreshing} onClick={() => load(true)}><RefreshCw className={`size-4 text-muted-foreground ${isRefreshing ? "animate-spin" : ""}`} />Refresh</button></PageActions>
 
         {isAllowed === false ? <AccessDenied /> : <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

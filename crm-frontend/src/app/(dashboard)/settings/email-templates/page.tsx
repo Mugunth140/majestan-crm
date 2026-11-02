@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { useRouter } from "next/navigation";
 import type { Editor } from "@tiptap/react";
-import { AlertTriangle, ArrowLeft, Eye, FilePlus2, Loader2, Lock, Mail, PencilLine, RotateCcw, Save, Trash2, Zap } from "lucide-react";
+import { AlertTriangle, Eye, FilePlus2, Loader2, Lock, Mail, PencilLine, RotateCcw, Save, Trash2, Zap } from "lucide-react";
 import { toast } from "sonner";
 import {
   canEditTemplates,
@@ -30,7 +29,6 @@ type Draft = { name: string; subject: string; body: string; isActive: boolean; s
 const EMPTY_BODY = "<p>Dear {{lead.name}},</p><p></p>";
 
 export default function EmailTemplatesPage() {
-  const router = useRouter();
   const [entities, setEntities] = useState<MailTemplateEntity[] | null>(null);
   const [entityType, setEntityType] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<MailTemplateCatalog | null>(null);
@@ -180,15 +178,7 @@ export default function EmailTemplatesPage() {
     <div className="flex flex-col md:h-full animate-in fade-in duration-500">
       <MobileHeader title="Email templates" showBack />
 
-      <div className="hidden md:flex items-center gap-4 pr-[150px] min-h-[48px] mb-6 shrink-0">
-        <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shrink-0" onClick={() => router.push("/settings")}>
-          <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Email templates</h1>
-          <p className="text-sm text-muted-foreground">The wording of emails the CRM sends, and saved templates for writing your own.</p>
-        </div>
-      </div>
+      <p className="mb-3 hidden shrink-0 text-[13px] text-muted-foreground md:block">The wording of emails the CRM sends, and saved templates for writing your own.</p>
 
       {entities === null ? (
         <div className="flex flex-1 items-center justify-center py-20"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>

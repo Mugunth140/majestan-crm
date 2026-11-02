@@ -123,14 +123,12 @@ export function BlogPostList({
   ];
   return (
     <section
-      className="bg-card border rounded-xl overflow-hidden shadow-sm md:flex md:flex-col md:flex-1 md:min-h-0"
+      className="flex flex-col md:min-h-0 md:flex-1 lg:-mx-6 lg:-mb-8 lg:-mt-6"
       aria-label="Blog articles"
     >
-      <div className="flex items-center justify-between px-6 border-b bg-muted/10 pt-4 gap-4">
-        <span className="pb-4 text-sm font-semibold text-[#0052FF] border-b-2 border-[#0052FF]">
-          All articles
-        </span>
-        <span className="pb-4 text-xs text-muted-foreground">
+      <div className="flex items-center gap-2 px-4 pb-1 pt-3 md:px-5">
+        <span className="text-[13px] font-medium text-foreground">All articles</span>
+        <span className="text-[13px] tabular-nums text-muted-foreground">
           {total} {total === 1 ? "article" : "articles"}
         </span>
       </div>
@@ -142,7 +140,8 @@ export function BlogPostList({
             key={page}
             columns={columns}
             data={posts}
-            flush
+            variant="list"
+            pageSizeOptions={[30]}
             showToolbar
             showDeleteAction
             onDeleteSelected={onDelete}

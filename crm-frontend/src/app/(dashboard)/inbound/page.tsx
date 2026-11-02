@@ -12,7 +12,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Plus, RefreshCw, Eye, Search, Filter, X, Lock } from "lucide-react";
+import { Edit, Plus, Eye, Search, Filter, X, Lock } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -26,6 +26,8 @@ import { useRouter } from "next/navigation";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { ListFrame, ListToolbar, SegmentTabs, ToolbarEnd, ToolbarSearch, headerPrimaryClass, toolbarFilterButton } from "@/components/layout/list-page";
+import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { cn } from "@/lib/utils";
 import { canViewInboundContacts } from "@/lib/permissions";
@@ -399,13 +401,7 @@ export default function InboundPage() {
             )}
           </Button>
         ) : (
-          <Button variant="outline" className="h-10 rounded-xl bg-muted/30 border-border/60 px-4 flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium text-[13.5px]">Filters</span>
-            {activeFiltersCount > 0 && (
-              <Badge className="ml-1 bg-[#0052FF] text-white px-1.5 py-0.5 rounded-md text-[10px]">{activeFiltersCount}</Badge>
-            )}
-          </Button>
+          toolbarFilterButton(activeFiltersCount)
         )
       } />
       <PopoverContent align={isMobile ? "end" : "start"} className="w-[calc(100vw-32px)] sm:w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60 mx-4 sm:mx-0">
@@ -549,50 +545,18 @@ export default function InboundPage() {
 
 
   const desktopFilters = (
-    <div className="bg-card border rounded-xl overflow-hidden shadow-sm md:flex md:flex-col md:flex-1 md:min-h-0">
-      {/* Search & Tabs Row */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between px-6 border-b bg-muted/10 pt-4 gap-6">
-        {/* Search & Filters */}
-        <div className="flex items-center gap-3 pb-3 xl:pb-4 w-full xl:w-auto">
-          <div className="relative w-64 xl:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search ID, Type, Phone..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="pl-9 h-10 bg-background rounded-xl border-border/60 shadow-sm text-[13.5px] focus-visible:ring-1 focus-visible:ring-primary"
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-muted-foreground/10 rounded-full text-foreground hover:bg-muted-foreground/20">
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {renderFilterPopover(false)}
-          </div>
-        </div>
-
-        {/* Tabs Row */}
-        <div className="flex items-center gap-6 overflow-x-auto scrollbar-hide relative pb-3 xl:pb-4">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={"relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " + (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")}
-            >
-              {tab}
-              {activeTab === tab && (
-                <motion.div layoutId="desktopActiveTabUnderline" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full" initial={false} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
+    <ListFrame>
+      <ListToolbar>
+        <SegmentTabs tabs={tabs} value={activeTab} onChange={setActiveTab} label="Views" />
+        <ToolbarEnd>
+          <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search ID, Type, Phone" />
+          {renderFilterPopover(false)}
+        </ToolbarEnd>
+      </ListToolbar>
 
       {/* Action Required Row */}
       {activeTab === "Action Required" && (
-        <div className="flex items-center gap-4 px-6 py-3 bg-muted/5 border-b border-border/40 animate-in slide-in-from-top-2 fade-in duration-200">
+        <div className="flex flex-wrap items-center gap-2 px-5 pb-1 animate-in slide-in-from-top-2 fade-in duration-200">
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
             {actionFilters.map((filter) => {
               const isActive = actionFilter === filter;
@@ -603,7 +567,7 @@ export default function InboundPage() {
               return (
                 <button
                   key={filter}
-                  className={"h-9 shrink-0 flex items-center justify-center cursor-pointer px-4 rounded-full text-[13px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
+                  className={"h-7 shrink-0 flex items-center justify-center cursor-pointer px-2.5 rounded-md text-[13px] font-medium leading-none transition-colors border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
                   onClick={() => setActionFilter(filter)}
                 >
                   {getActionFilterLabel(filter)}
@@ -612,7 +576,7 @@ export default function InboundPage() {
             })}
           </div>
           
-          <div className={`ml-auto shrink-0 flex items-center h-9 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "hidden opacity-0 pointer-events-none"}`}>
+          <div className={`ml-auto shrink-0 flex h-8 items-center bg-muted/70 p-0.5 rounded-md relative transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "hidden opacity-0 pointer-events-none"}`}>
             {[
               { id: "pending", label: "Follow Up" },
               { id: "completed", label: "Followed Up" }
@@ -622,12 +586,12 @@ export default function InboundPage() {
                 <button
                   key={mode.id}
                   onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
-                  className={`relative h-full flex items-center px-4 rounded-full text-[12px] font-bold transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
+                  className={`relative h-full flex items-center px-2.5 rounded text-[13px] font-medium leading-none transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
                 >
                   {isSelected && (
                     <motion.div
                       layoutId="todayToggleBgDesktop"
-                      className="absolute inset-0 bg-[#0052FF] shadow-md rounded-full"
+                      className="absolute inset-0 rounded bg-background shadow-[0_1px_2px_rgba(0,0,0,0.08),0_0_0_1px_rgba(0,0,0,0.04)] dark:bg-white/10"
                       initial={false}
                       transition={{ type: "spring", stiffness: 500, damping: 30 }}
                       style={{ zIndex: -1 }}
@@ -642,10 +606,10 @@ export default function InboundPage() {
       )}
 
       {/* Table */}
-      <div className="w-full md:flex-1 md:min-h-0 md:overflow-hidden">
-        {isLoading ? <TableSkeleton /> : <DataTable {...tableProps} />}
+      <div className="flex w-full min-w-0 flex-col md:min-h-0 md:flex-1 md:overflow-hidden">
+        {isLoading ? <TableSkeleton flush /> : <DataTable {...tableProps} variant="list" />}
       </div>
-    </div>
+    </ListFrame>
   );
 
 
@@ -653,26 +617,13 @@ export default function InboundPage() {
   return (
     <>
       <MobileHeader title="Inbound Dashboard" />
-      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:h-full">
-        <Device
-          mobile={null}
-          desktop={
-            <div className="flex h-[48px] items-center justify-between pr-[150px]">
-              <h1 className="text-[28px] font-bold tracking-tight">Inbound Dashboard</h1>
-
-              <div className="flex items-center gap-3">
-                <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={fetchInbounds} title="Refresh">
-                  <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
-                </Button>
-
-                <Link href="/inbound/new" className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
-                  <Plus size={18} />
-                  Add New Inbound
-                </Link>
-              </div>
-            </div>
-          }
-        />
+      <div className="w-full flex flex-col space-y-6 pt-4 md:space-y-0 md:pt-0 md:h-full">
+        <PageActions>
+          <Link href="/inbound/new" className={headerPrimaryClass}>
+            <Plus className="size-4" />
+            Add Inbound
+          </Link>
+        </PageActions>
         
         <Device mobile={mobileFilters} desktop={desktopFilters} />
 

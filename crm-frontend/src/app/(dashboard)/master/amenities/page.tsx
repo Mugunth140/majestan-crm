@@ -8,7 +8,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Plus, Loader2, Search } from "lucide-react";
+import { Edit, Trash2, Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -18,6 +18,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { IconPicker, resolveIcon } from "@/components/shared/icon-picker";
 
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { PageActions } from "@/components/layout/page-actions";
+import { ListBody, ListFrame, ListToolbar, ToolbarSearch, headerPrimaryClass } from "@/components/layout/list-page";
+import { TableSkeleton } from "@/components/tables/table-skeleton";
+import { cn } from "@/lib/utils";
+
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -316,48 +321,36 @@ export default function AmenitiesMasterPage() {
   return (
     <>
       <MobileHeader title="Master: Amenities" showBack />
-      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:h-full px-4 md:px-8">
+      <div className="w-full flex flex-col md:h-full">
 
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pr-0 md:pr-[150px] min-h-[48px]">
-          <h1 className="text-[28px] font-bold tracking-tight hidden md:block">Master: Amenities</h1>
-        </div>
+        <PageActions>
+          <button type="button" className={headerPrimaryClass} onClick={() => { setFormData(emptyForm); setIsAddOpen(true); }}>
+            <Plus className="size-4" /> Add Amenity
+          </button>
+        </PageActions>
 
-        <div className="bg-card border rounded-xl overflow-hidden shadow-sm md:flex md:flex-col md:flex-1 md:min-h-0 mb-20 md:mb-0">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 md:px-6 py-4 border-b bg-background">
-            <div className="relative flex-1 min-w-[200px] max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search amenities..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-10 bg-muted/30 rounded-xl border-border/60 text-[13.5px]"
-              />
-            </div>
-            <Button
-              className="h-10 px-5 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC] shrink-0 w-full sm:w-auto sm:ml-auto shadow-sm"
-              onClick={() => { setFormData(emptyForm); setIsAddOpen(true); }}
-            >
-              <Plus className="mr-1.5 h-4 w-4" /> Add Amenity
-            </Button>
-          </div>
-
-          <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col">
-          {isLoading ? (
-            <div className="flex h-40 items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <DataTable
+        <ListFrame>
+          <ListToolbar>
+            <ToolbarSearch value={search} onChange={setSearch} placeholder="Search amenities" className="flex-1 md:flex-none" />
+            <button type="button" className={cn(headerPrimaryClass, "md:hidden")} onClick={() => { setFormData(emptyForm); setIsAddOpen(true); }}>
+              <Plus className="size-4" /> Add Amenity
+            </button>
+          </ListToolbar>
+          <ListBody>
+            {isLoading ? (
+              <TableSkeleton columns={5} rows={8} flush />
+            ) : (
+              <DataTable
+              variant="list"
               columns={columns}
               data={filteredAmenities}
-              flush
               showToolbar={true}
               showDeleteAction={true}
               onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
             />
-          )}
-          </div>
-        </div>
+            )}
+          </ListBody>
+        </ListFrame>
 
         {/* Add Dialog */}
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>

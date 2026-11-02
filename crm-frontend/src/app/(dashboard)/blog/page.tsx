@@ -7,6 +7,8 @@ import { BlogImageUpload } from "@/components/blog/image-upload";
 import { RichEditor } from "@/components/blog/rich-editor";
 import { useLeaveGuard } from "@/hooks/use-leave-guard";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { PageActions } from "@/components/layout/page-actions";
+import { headerButtonClass, headerPrimaryClass } from "@/components/layout/list-page";
 import {
   Dialog,
   DialogContent,
@@ -18,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { FormSelect } from "@/components/shared/form-select";
 import { BlogPostList } from "@/components/blog/post-list";
-import { ArrowLeft, Plus, RefreshCw, Save } from "lucide-react";
+import { ArrowLeft, Plus, Save } from "lucide-react";
 import "./blog.css";
 const site = "https://www.majestanrealty.com";
 const subscribePermissions = (onChange: () => void) => {
@@ -155,56 +157,46 @@ export default function BlogPage() {
     );
   return (
     <div
-      className={`blog-admin w-full flex flex-col gap-6 px-4 pt-4 pb-24 lg:p-0 ${post ? "" : "md:h-full"}`}
+      className={`blog-admin w-full flex flex-col gap-6 px-4 pt-4 pb-24 md:gap-4 lg:p-0 ${post ? "" : "md:h-full"}`}
     >
       <MobileHeader
         title={post ? (post.id ? "Edit article" : "New article") : "Blog"}
       />
-      <header className="flex flex-wrap items-center justify-between gap-4 md:pr-[150px] min-h-12">
-        <div className="flex items-center gap-4">
-          {post && (
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-10 w-10 rounded-xl shrink-0"
-              aria-label="Back to articles"
-              title="Back to articles"
-              onClick={() => (dirty ? setDiscard(true) : back())}
-              disabled={busy}
-            >
-              <ArrowLeft size={18} />
-            </Button>
-          )}
-          <div className="hidden md:block">
-            <h1 className="text-[28px] font-bold tracking-tight">
-              {post ? (post.id ? "Edit article" : "New article") : "Blog"}
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Manage website articles and drafts.
-            </p>
-          </div>
-        </div>
-        {!post && (
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-10 w-10 rounded-full border-border/60"
-              onClick={() => load(page)}
-              disabled={loading}
-              aria-label="Refresh articles"
-            >
-              <RefreshCw size={16} />
-            </Button>
-            <Button
-              className="h-11 rounded-full px-5 bg-[#0052FF] text-white shadow-md hover:bg-[#0052FF]/90"
-              onClick={() => edit()}
-              disabled={busy}
-            >
-              <Plus size={18} />
-              Create article
-            </Button>
-          </div>
+      <PageActions>
+        {post ? (
+          <button type="button" className={headerButtonClass} onClick={() => (dirty ? setDiscard(true) : back())} disabled={busy}>
+            <ArrowLeft className="size-4 text-muted-foreground" />
+            All articles
+          </button>
+        ) : (
+          <button type="button" className={headerPrimaryClass} onClick={() => edit()} disabled={busy}>
+            <Plus className="size-4" />
+            Create article
+          </button>
+        )}
+      </PageActions>
+      <header className="flex items-center gap-2 md:hidden">
+        {post ? (
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-10 w-10 rounded-xl shrink-0"
+            aria-label="Back to articles"
+            title="Back to articles"
+            onClick={() => (dirty ? setDiscard(true) : back())}
+            disabled={busy}
+          >
+            <ArrowLeft size={18} />
+          </Button>
+        ) : (
+          <Button
+            className="h-11 flex-1 rounded-xl px-5 bg-[#0052FF] text-white shadow-md hover:bg-[#0052FF]/90"
+            onClick={() => edit()}
+            disabled={busy}
+          >
+            <Plus size={18} />
+            Create article
+          </Button>
         )}
       </header>
       {!post && error && (

@@ -17,30 +17,23 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="flex flex-col space-y-6 animate-in fade-in duration-500">
+    <div className="flex flex-col space-y-6 md:space-y-0">
       <MobileHeader title="Settings" />
       <div className="px-4 md:px-0">
-        <div className="hidden md:flex items-center justify-between">
-          <h1 className="text-[28px] font-bold tracking-tight">System Settings</h1>
-        </div>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3 md:pt-1">
           <button
             type="button"
             onClick={() => router.push("/settings/email-templates")}
-            className="group flex items-start gap-4 rounded-2xl border bg-card p-5 text-left shadow-sm transition-colors hover:border-[#0052FF]/40"
+            className="group flex items-center gap-3 rounded-lg border bg-background px-3.5 py-3 text-left outline-none transition-[background-color,box-shadow] hover:bg-muted/40 hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.08)] focus-visible:ring-2 focus-visible:ring-[#017D58]/40"
           >
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-[#0052FF] dark:border-blue-900 dark:bg-blue-950/40">
-              <Mail className="h-5 w-5" />
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted/70">
+              <Mail className="size-[18px] text-blue-600 dark:text-blue-400" strokeWidth={1.75} />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="flex items-center justify-between gap-2 text-[15px] font-bold text-foreground">
-                Email templates
-                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-              </span>
-              <span className="mt-1 block text-[13px] leading-snug text-muted-foreground">
-                Wording of the emails the CRM sends, and saved templates for writing your own.
-              </span>
+              <span className="block truncate text-[14px] font-medium text-foreground">Email templates</span>
+              <span className="block truncate text-[13px] text-muted-foreground">Wording of the emails the CRM sends, and your saved templates.</span>
             </span>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5" />
           </button>
         </div>
 

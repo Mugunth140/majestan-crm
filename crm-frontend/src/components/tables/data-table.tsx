@@ -321,7 +321,8 @@ export function DataTable<TData, TValue>({
         const to = pageRows > 0 ? Math.min((pi + 1) * ps, total) : 0;
         return (
           <div className="flex items-center justify-between border-t px-5 py-2.5 md:mt-auto">
-            <div className="flex items-center rounded-md bg-muted/70 p-0.5">
+            {/* A fixed page size needs no picker */}
+            <div className={cn("flex items-center rounded-md bg-muted/70 p-0.5", pageSizeOptions.length < 2 && "invisible")}>
               {pageSizeOptions.map((size) => (
                 <button
                   key={size}

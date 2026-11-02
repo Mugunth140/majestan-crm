@@ -12,15 +12,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, RefreshCw, Filter, ChevronDown, Check, X } from "lucide-react";
+import { Loader2, Filter, ChevronDown, Check, X } from "lucide-react";
 import { toast } from "sonner";
-import { motion } from "motion/react";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { AssignLeadModal } from "@/components/shared/assign-lead-modal";
 import { FormSelect } from "@/components/shared/form-select";
 import { DatePicker } from "@/components/shared/date-picker";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { Device } from "@/components/shared/device";
+import { SegmentTabs, toolbarButtonClass } from "@/components/layout/list-page";
 import { canTakeLeadFromQueue, canConvertEnquiry, assignRoutingLeads } from "@/lib/lead-routing";
 import { timeAgo } from "@/lib/time-ago";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -1051,89 +1050,41 @@ export default function LeadRoutingPage() {
   return (
     <>
       <MobileHeader title="Lead Routing" />
-      <div className="w-full flex flex-col space-y-4 md:space-y-6 pt-4 lg:p-0 md:h-full">
-        <Device
-          mobile={null}
-          desktop={
-            <div className="flex h-[48px] items-center justify-between pr-[150px]">
-              <h1 className="text-[28px] font-bold tracking-tight">Lead Routing</h1>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-10 w-10 rounded-full border-border/60"
-                onClick={() => mainTab === "queue" ? fetchQueue() : mainTab === "enquiry" ? fetchEnquiry() : fetchHistory()}
-                title="Refresh"
-              >
-                <RefreshCw size={16} className={(queueLoading || enquiryLoading || historyLoading) ? "animate-spin" : ""} />
-              </Button>
-            </div>
-          }
-        />
-
-        <div className="bg-card border-y md:border md:rounded-xl overflow-hidden shadow-sm md:flex md:flex-col md:flex-1 md:min-h-0">
-        <div className="flex flex-col xl:flex-row xl:items-center justify-between px-4 md:px-6 border-b bg-muted/10 pt-4 gap-4">
-          <div className="flex items-center gap-8">
-            {(["queue", "enquiry", "history"] as MainTab[]).map((tab) => {
-              const labels = { queue: "Routing Queue", enquiry: "Enquiry Queue", history: "Routing History" };
-              return (
-                <button
-                  key={tab}
-                  onClick={() => setMainTab(tab)}
-                  className={[
-                    "relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out",
-                    mainTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground",
-                  ].join(" ")}
-                >
-                  {labels[tab]}
-                  {mainTab === tab && (
-                    <motion.div
-                      layoutId="routingTabUnderline"
-                      className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full"
-                      initial={false}
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </div>
+      <div className="w-full flex flex-col space-y-4 pt-4 md:space-y-0 md:pt-0 md:h-full">
+        <div className="flex flex-col md:min-h-0 md:flex-1 lg:-mx-6 lg:-mb-8 lg:-mt-6">
+        <div className="flex flex-wrap items-center gap-2 px-4 pb-2 pt-3 md:px-5">
+          <SegmentTabs
+            label="Routing views"
+            value={mainTab}
+            onChange={setMainTab}
+            tabs={[
+              { value: "queue", label: "Routing Queue" },
+              { value: "enquiry", label: "Enquiry Queue" },
+              { value: "history", label: "Routing History" },
+            ]}
+          />
 
           {mainTab === "queue" && visibleDeptTabs.length > 1 && (
-            <div className="flex items-center gap-2 pb-3 sm:pb-4">
-              {visibleDeptTabs.map((d) => (
-                <button
-                  key={d.value}
-                  onClick={() => setDeptTab(d.value)}
-                  className={[
-                    "h-9 px-4 rounded-full text-[13px] font-medium border transition-all duration-200",
-                    deptTab === d.value
-                      ? "bg-[#0052FF] text-white border-[#0052FF] shadow-sm"
-                      : "bg-background text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground",
-                  ].join(" ")}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
+            <SegmentTabs label="Pipeline" value={deptTab} onChange={setDeptTab} tabs={visibleDeptTabs.map((d) => ({ value: d.value, label: d.label }))} />
           )}
 
           {mainTab === "enquiry" && (
-            <div className="relative pb-3 sm:pb-4">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 gap-2 border-border/60"
+            <div className="relative ml-auto">
+              <button
+                type="button"
+                className={toolbarButtonClass}
+                data-state={enquiryFilterOpen ? "open" : undefined}
                 onClick={() => setEnquiryFilterOpen((o) => !o)}
               >
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                Filters
+                <Filter className="size-4 text-muted-foreground" strokeWidth={1.75} />
+                Filter
                 {enquiryActiveFilterCount > 0 && (
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#0052FF] text-[11px] font-semibold text-white">
+                  <span className="rounded bg-[#017D58] px-1.5 text-[11px] font-medium leading-[18px] text-white">
                     {enquiryActiveFilterCount}
                   </span>
                 )}
-                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${enquiryFilterOpen ? "rotate-180" : ""}`} />
-              </Button>
+                <ChevronDown className={`size-3.5 text-muted-foreground transition-transform ${enquiryFilterOpen ? "rotate-180" : ""}`} />
+              </button>
 
               {enquiryFilterOpen && (
                 <>
@@ -1239,7 +1190,8 @@ export default function LeadRoutingPage() {
             ) : (
               <>
                 <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col pt-2">
-                <DataTable 
+                <DataTable
+                  variant="list"
                   flush={true}
                   hidePagination={true}
                   pageSize={100}
@@ -1297,7 +1249,7 @@ export default function LeadRoutingPage() {
                 />
                 {/* Server-side pagination */}
                 {true && (
-                  <div className="flex items-center justify-between px-6 pb-24 pt-4 md:py-4 border-t border-border/40 mt-auto sticky bottom-0 bg-card z-30 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none">
+                  <div className="flex items-center justify-between px-6 pb-24 pt-4 md:py-4 border-t border-border/40 mt-auto sticky bottom-0 bg-background z-30 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none">
                     <span className="text-sm text-muted-foreground">
                       Showing {queueTotal > 0 ? Math.min((queuePage - 1) * LIMIT + 1, queueTotal) : 0} to {Math.min(queuePage * LIMIT, queueTotal)} of {queueTotal} entries
                     </span>
@@ -1339,6 +1291,7 @@ export default function LeadRoutingPage() {
                   <p className="px-4 md:px-6 py-8 text-sm text-muted-foreground text-center">No open enquiries.</p>
                 ) : (
                 <DataTable
+                  variant="list"
                   flush={true}
                   hidePagination={true}
                   pageSize={100}
@@ -1394,7 +1347,7 @@ export default function LeadRoutingPage() {
                 )}
                 {/* Server-side pagination */}
                 {true && (
-                  <div className="flex items-center justify-between px-6 pb-24 pt-4 md:py-4 border-t border-border/40 mt-auto sticky bottom-0 bg-card z-30 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none">
+                  <div className="flex items-center justify-between px-6 pb-24 pt-4 md:py-4 border-t border-border/40 mt-auto sticky bottom-0 bg-background z-30 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none">
                     <span className="text-sm text-muted-foreground">
                       Showing {enquiryTotal > 0 ? Math.min((enquiryPage - 1) * LIMIT + 1, enquiryTotal) : 0} to {Math.min(enquiryPage * LIMIT, enquiryTotal)} of {enquiryTotal} entries
                     </span>
@@ -1478,10 +1431,10 @@ export default function LeadRoutingPage() {
             ) : (
               <>
                 <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col pt-2">
-                  <DataTable flush={true} hidePagination={true} pageSize={100} persistKey="history" columns={historyColumns} data={history} />
+                  <DataTable variant="list" flush={true} hidePagination={true} pageSize={100} persistKey="history" columns={historyColumns} data={history} />
                 {/* Server-side pagination */}
                 {true && (
-                  <div className="flex items-center justify-between px-6 pb-24 pt-4 md:py-4 border-t border-border/40 mt-auto sticky bottom-0 bg-card z-30 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none">
+                  <div className="flex items-center justify-between px-6 pb-24 pt-4 md:py-4 border-t border-border/40 mt-auto sticky bottom-0 bg-background z-30 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none">
                     <span className="text-sm text-muted-foreground">
                       Showing {historyTotal > 0 ? Math.min((historyPage - 1) * LIMIT + 1, historyTotal) : 0} to {Math.min(historyPage * LIMIT, historyTotal)} of {historyTotal} entries
                     </span>

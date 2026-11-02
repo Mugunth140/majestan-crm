@@ -8,7 +8,7 @@ import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Plus, FileSpreadsheet, UploadCloud, RefreshCw, Eye, Search, Filter, X, Loader2, Download } from "lucide-react";
+import { Plus, FileSpreadsheet, UploadCloud, RefreshCw, Search, Filter, X, Loader2, Download } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -25,7 +25,6 @@ import { AssignLeadModal } from "@/components/shared/assign-lead-modal";
 import { ContactModal } from "@/components/shared/contact-modal";
 import { PageActions } from "@/components/layout/page-actions";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { MobileLeadList } from "@/components/leads/mobile-lead-list";
 import { LastFollowupCell } from "./last-followup-column";
 import { Device } from "@/components/shared/device";
 import { LEAD_STATUS_DOTS, LEAD_STATUS_ORDER } from "@/lib/lead-constants";
@@ -538,16 +537,6 @@ export default function LeadsPage() {
       enableHiding: false,
     },
     {
-      accessorKey: "name",
-      header: "Name",
-      cell: ({ row }) => (
-        <span className="inline-flex items-center gap-2">
-          <NameAvatar name={row.original.name} />
-          <span className="font-medium text-foreground">{row.original.name}</span>
-        </span>
-      ),
-    },
-    {
       accessorKey: "id",
       header: "ID",
       cell: ({ row }) => row.original.isPendingImport ? (
@@ -558,30 +547,15 @@ export default function LeadsPage() {
         </Link>
       ),
     },
-    { 
-      accessorKey: "date", 
-      header: activeTab === "Action Required" 
-        ? (todayViewMode === "completed" ? "Followed Up" : "Next Follow Up") 
-        : "Date",
-      cell: ({ row }) => {
-        if (activeTab === "Action Required") {
-          if (todayViewMode === "completed") {
-            if (row.original.lastFollowedUpDate) {
-              const dateStr = new Date(row.original.lastFollowedUpDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-              return <span>{dateStr}{row.original.lastFollowedUpTime ? ` ${row.original.lastFollowedUpTime.slice(0,5)}` : ''}</span>;
-            }
-            return <span className="text-muted-foreground italic">No record</span>;
-          }
-          if (todayViewMode === "pending") {
-            if (row.original.nextFollowUpDate) {
-              const dateStr = new Date(row.original.nextFollowUpDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-              return <span>{dateStr}{row.original.nextFollowUpTime ? ` ${row.original.nextFollowUpTime.slice(0,5)}` : ''}</span>;
-            }
-            return <span className="text-muted-foreground italic">Not Scheduled</span>;
-          }
-        }
-        return <span className="text-muted-foreground">{row.original.date}</span>;
-      }
+    {
+      accessorKey: "name",
+      header: "Name",
+      cell: ({ row }) => (
+        <span className="inline-flex items-center gap-2">
+          <NameAvatar name={row.original.name} />
+          <span className="font-medium text-foreground">{row.original.name}</span>
+        </span>
+      ),
     },
     {
       accessorKey: "status",
@@ -656,6 +630,31 @@ export default function LeadsPage() {
       cell: ({ row }) => <LastFollowupCell row={row.original} />,
     },
     { accessorKey: "source", header: "Source" },
+    { 
+      accessorKey: "date", 
+      header: activeTab === "Action Required" 
+        ? (todayViewMode === "completed" ? "Followed Up" : "Next Follow Up") 
+        : "Date",
+      cell: ({ row }) => {
+        if (activeTab === "Action Required") {
+          if (todayViewMode === "completed") {
+            if (row.original.lastFollowedUpDate) {
+              const dateStr = new Date(row.original.lastFollowedUpDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+              return <span>{dateStr}{row.original.lastFollowedUpTime ? ` ${row.original.lastFollowedUpTime.slice(0,5)}` : ''}</span>;
+            }
+            return <span className="text-muted-foreground italic">No record</span>;
+          }
+          if (todayViewMode === "pending") {
+            if (row.original.nextFollowUpDate) {
+              const dateStr = new Date(row.original.nextFollowUpDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+              return <span>{dateStr}{row.original.nextFollowUpTime ? ` ${row.original.nextFollowUpTime.slice(0,5)}` : ''}</span>;
+            }
+            return <span className="text-muted-foreground italic">Not Scheduled</span>;
+          }
+        }
+        return <span className="text-muted-foreground">{row.original.date}</span>;
+      }
+    },
   ], [activeTab, todayViewMode, pendingAssignments, unresolvedStaffIds]);
 
   // Pending-review extras: duplicate badge + per-row remove (Open Pipeline only)

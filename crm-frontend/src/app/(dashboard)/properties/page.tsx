@@ -17,6 +17,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FormSelect } from "@/components/shared/form-select";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { ListBody, ListFrame, ListToolbar, SegmentTabs, ToolbarClear, ToolbarEnd, ToolbarSearch, headerPrimaryClass, toolbarFilterButton } from "@/components/layout/list-page";
+import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -26,7 +28,6 @@ import { PROPERTY_TABS } from "@/lib/property-tabs";
 import { usePropertiesList } from "@/hooks/use-properties-list";
 import { canViewPropertyContacts } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
-import { motion } from "motion/react";
 import { Check, Edit, Eye, Filter, Lock, Plus, RefreshCw, Search, X } from "lucide-react";
 
 const PROPERTY_TYPE_OPTIONS = [
@@ -338,13 +339,7 @@ export default function PropertiesPage() {
             )}
           </Button>
         ) : (
-          <Button variant="outline" className="h-10 rounded-xl bg-muted/30 border-border/60 px-4 flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium text-[13.5px]">Filters</span>
-            {activeFiltersCount > 0 && (
-              <Badge className="ml-1 bg-[#0052FF] text-white px-1.5 py-0.5 rounded-md text-[10px]">{activeFiltersCount}</Badge>
-            )}
-          </Button>
+          toolbarFilterButton(activeFiltersCount)
         )
       } />
       <PopoverContent align="start" className="w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60">
@@ -467,37 +462,19 @@ export default function PropertiesPage() {
   );
 
   const desktopFilters = (
-    <div className="bg-card border rounded-xl overflow-hidden shadow-sm md:flex md:flex-col md:flex-1 md:min-h-0">
-      <div className="flex items-center justify-between px-6 border-b bg-muted/10 pt-4 gap-4">
-        <div className="flex items-center gap-8 overflow-x-auto scrollbar-hide relative">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              aria-pressed={activeTab === tab}
-              onClick={() => { setActiveTab(tab); resetPage(); }}
-              className={"relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " + (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")}
-            >
-              {tab}
-              {activeTab === tab && (
-                <motion.div layoutId="desktopActiveTabUnderline" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full" initial={false} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3 px-6 py-4 border-b bg-background">
-        <div className="flex-1 min-w-[240px] max-w-md">{searchBar(false)}</div>
-        {renderFilterPopover(false)}
-        {(searchQuery || activeFiltersCount > 0) && (
-          <Button variant="ghost" size="icon" onClick={() => { setSearchQuery(""); clearFilters(); }} className="h-10 w-10 rounded-full text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors" title="Clear Search & Filters">
-            <X className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
-
-      <div className="w-full max-w-full min-w-0 md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col">{tableSection}</div>
-    </div>
+    <ListFrame>
+      <ListToolbar>
+        <SegmentTabs tabs={tabs} value={activeTab} onChange={(tab) => { setActiveTab(tab); resetPage(); }} label="Properties views" />
+        <ToolbarEnd>
+          <ToolbarSearch value={searchQuery} onChange={(v) => { setSearchQuery(v); resetPage(); }} placeholder="Search title, code, owner, city" />
+          {renderFilterPopover(false)}
+          {(searchQuery || activeFiltersCount > 0) && <ToolbarClear onClick={() => { setSearchQuery(""); clearFilters(); }} />}
+        </ToolbarEnd>
+      </ListToolbar>
+      <ListBody>
+        {isLoading ? <TableSkeleton columns={12} rows={10} flush /> : <DataTable key={activeTab} {...tableProps} variant="list" />}
+      </ListBody>
+    </ListFrame>
   );
 
   const mobileFilters = (
@@ -517,27 +494,13 @@ export default function PropertiesPage() {
   return (
     <>
       <MobileHeader title="Properties" />
-      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:h-full">
-        <Device
-          mobile={null}
-          desktop={
-            <div className="flex h-[48px] items-center justify-between pr-[150px]">
-              <div>
-                <h1 className="text-[28px] font-bold tracking-tight">Properties</h1>
-                {/* <p className="text-muted-foreground text-sm mt-0.5">Manage your property listings</p> */}
-              </div>
-              <div className="flex items-center gap-3">
-                <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={() => fetchProperties({ pagination, debouncedSearchQuery, activeTab, filters })} title="Refresh">
-                  <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
-                </Button>
-                <Link href="/properties/new" className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
-                  <Plus size={18} />
-                  Add Property
-                </Link>
-              </div>
-            </div>
-          }
-        />
+      <div className="w-full flex flex-col space-y-6 pt-4 md:space-y-0 md:pt-0 md:h-full">
+        <PageActions>
+          <Link href="/properties/new" className={headerPrimaryClass}>
+            <Plus className="size-4" />
+            Add Property
+          </Link>
+        </PageActions>
 
         <Device mobile={mobileFilters} desktop={desktopFilters} />
         <Device desktop={null} mobile={<div className="w-full px-4 md:px-0">{tableSection}</div>} />

@@ -7,11 +7,13 @@ import { DataTable } from "@/components/tables/data-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Plus, ShieldAlert } from "lucide-react";
+import { Edit, Plus, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
+import { PageActions } from "@/components/layout/page-actions";
+import { ListBody, ListFrame, ListToolbar, ToolbarEnd, ToolbarSearch, headerPrimaryClass } from "@/components/layout/list-page";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -60,6 +62,11 @@ function UsersList() {
   const displayedUsers = deptFilter 
     ? users.filter(u => u.department?.name === deptFilter)
     : users;
+  const [search, setSearch] = useState("");
+  const q = search.trim().toLowerCase();
+  const searchedUsers = q
+    ? displayedUsers.filter((u: { name?: string; email?: string }) => u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q))
+    : displayedUsers;
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -149,43 +156,46 @@ function UsersList() {
   ];
 
   return (
-    <div className="flex flex-col space-y-6">
-      <div className="flex h-[48px] items-center justify-between pr-[150px]">
-        <div>
-          <h1 className="text-[28px] font-bold tracking-tight">
-            {deptFilter ? `${deptFilter} Users` : "Users Management"}
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1 flex items-center gap-2">
-            <ShieldAlert className="h-4 w-4" /> Only Administrators can view and manage this section.
-          </p>
-        </div>
-
-        <Button onClick={() => router.push("/users/new")} className="bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md h-10 p-5 rounded-full font-semibold gap-2">
-          <Plus size={16} />
+    <div className="flex flex-col md:h-full">
+      <PageActions>
+        <button type="button" onClick={() => router.push("/users/new")} className={headerPrimaryClass}>
+          <Plus className="size-4" />
           Add User
-        </Button>
-      </div>
+        </button>
+      </PageActions>
 
-      <div className="bg-card border rounded-xl overflow-hidden shadow-sm p-6">
-        {isLoading ? <TableSkeleton /> : (
-          <DataTable 
-            columns={columns} 
-            data={displayedUsers} 
-            showToolbar={true} 
-            showDeleteAction={role === "Admin"}
-            onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
-            renderToolbarActions={(selectedRows) => {
-              if (selectedRows.length !== 1) return null;
-              const row = selectedRows[0];
-              return (
-                <Button variant="outline" size="sm" onClick={() => router.push("/users/new?edit=" + row.id)}>
-                  <Edit size={15} className="mr-1.5" /> Edit
-                </Button>
-              );
-            }}
-          />
-        )}
-      </div>
+      <ListFrame>
+        <ListToolbar>
+          {deptFilter && <span className="text-[14px] font-medium">{deptFilter} users</span>}
+          <span className="hidden items-center gap-1.5 text-[13px] text-muted-foreground md:flex">
+            <ShieldAlert className="size-4" strokeWidth={1.75} /> Only administrators can manage users.
+          </span>
+          <ToolbarEnd>
+            <ToolbarSearch value={search} onChange={setSearch} placeholder="Search name or email" />
+          </ToolbarEnd>
+        </ListToolbar>
+        <ListBody>
+          {isLoading ? <TableSkeleton columns={7} rows={10} flush /> : (
+            <DataTable
+              variant="list"
+              columns={columns}
+              data={searchedUsers}
+              showToolbar={true}
+              showDeleteAction={role === "Admin"}
+              onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
+              renderToolbarActions={(selectedRows) => {
+                if (selectedRows.length !== 1) return null;
+                const row = selectedRows[0];
+                return (
+                  <Button variant="outline" size="sm" onClick={() => router.push("/users/new?edit=" + row.id)}>
+                    <Edit size={15} className="mr-1.5" /> Edit
+                  </Button>
+                );
+              }}
+            />
+          )}
+        </ListBody>
+      </ListFrame>
 
       <Dialog open={deleteId !== null || bulkDeleteIds !== null} onOpenChange={(open) => {
         if (!open) {

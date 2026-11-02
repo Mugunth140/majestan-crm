@@ -3,10 +3,10 @@
 import { useNotifications } from "@/context/notification-context";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
-import { ArrowBigDownDash, Bell, CheckCheck, Loader2, Trash2 } from "lucide-react";
+import { ArrowBigDownDash, Bell, CheckCheck, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Device } from "@/components/shared/device";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { PageActions } from "@/components/layout/page-actions";
 import { useState } from "react";
 
 function destination(notification: any): string | null {
@@ -43,18 +43,9 @@ export default function InboxPage() {
     <>
       <MobileHeader title="Inbox" />
       <div className="flex w-full flex-col gap-5 pt-4 lg:p-0 md:h-full">
-        <Device 
-          desktop={
-            <div className="flex h-[48px] items-center justify-between px-4 md:px-0">
-              <div>
-                <h1 className="text-[28px] font-bold tracking-tight">Inbox</h1>
-                <p className="text-sm text-muted-foreground">Assignments, follow-ups, and updates that need your attention.</p>
-              </div>
-              <InboxActions unreadCount={unreadCount} isUpdating={isUpdating} onMarkAllRead={handleMarkAllRead} />
-            </div>
-          } 
-          mobile={null} 
-        />
+        <PageActions>
+          <InboxActions unreadCount={unreadCount} isUpdating={isUpdating} onMarkAllRead={handleMarkAllRead} />
+        </PageActions>
 
         <section className="overflow-hidden rounded-2xl border bg-card shadow-sm md:flex-1 md:overflow-y-auto">
           <div className="flex items-center justify-between border-b px-5 py-4 md:hidden">

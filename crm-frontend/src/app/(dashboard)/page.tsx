@@ -55,16 +55,6 @@ export default function DashboardPage() {
       <MobileHeader title="Dashboard" />
       <div className="space-y-6 px-2 pt-4 lg:p-0">
         
-        {/* Universal Greeting */}
-        <div className="hidden md:flex flex-col gap-1">
-          <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">
-            Welcome back, {user?.name?.split(' ')[0] || "Team"} 👋
-          </h1>
-          <p className="text-muted-foreground text-sm lg:text-base">
-            <span className="hidden md:inline">Overview of all CRM activities.</span>
-          </p>
-        </div>
-
       {/* MOBILE ONLY: Master Navigation Hub */}
       <Device 
         desktop={null}

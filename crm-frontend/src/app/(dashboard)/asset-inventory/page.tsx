@@ -8,7 +8,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Plus, RefreshCw, Eye, Search, X, Filter } from "lucide-react";
+import { Edit, Plus, Eye, Search, X, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -16,6 +16,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { ListFrame, ListToolbar, ToolbarEnd, ToolbarSearch, headerPrimaryClass, toolbarFilterButton } from "@/components/layout/list-page";
+import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -155,13 +157,7 @@ export default function AssetInventoryPage() {
             )}
           </Button>
         ) : (
-          <Button variant="outline" className="h-10 rounded-xl bg-muted/30 border-border/60 px-4 flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium text-[13.5px]">Filters</span>
-            {activeFiltersCount > 0 && (
-              <Badge className="ml-1 bg-[#0052FF] text-white px-1.5 py-0.5 rounded-md text-[10px]">{activeFiltersCount}</Badge>
-            )}
-          </Button>
+          toolbarFilterButton(activeFiltersCount)
         )
       } />
       <PopoverContent align={isMobile ? "end" : "start"} className="w-[calc(100vw-32px)] sm:w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60 mx-4 sm:mx-0">
@@ -326,60 +322,33 @@ export default function AssetInventoryPage() {
   );
 
   const desktopFilters = (
-    <div className="bg-card border rounded-xl overflow-hidden shadow-sm md:flex md:flex-col md:flex-1 md:min-h-0">
-      {/* Search & Filters Row */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between px-6 border-b bg-muted/10 pt-4 gap-6">
-        <div className="flex items-center gap-3 pb-3 xl:pb-4 w-full xl:w-auto">
-          <div className="relative w-64 xl:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search ID, Owner, Address..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="pl-9 h-10 bg-background rounded-xl border-border/60 shadow-sm text-[13.5px] focus-visible:ring-1 focus-visible:ring-primary"
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-muted-foreground/10 rounded-full text-foreground hover:bg-muted-foreground/20">
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {renderFilterPopover(false)}
-          </div>
-        </div>
-      </div>
+    <ListFrame>
+      <ListToolbar>
+        <ToolbarEnd>
+          <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search ID, Owner, Address" />
+          {renderFilterPopover(false)}
+        </ToolbarEnd>
+      </ListToolbar>
 
       {/* Table */}
-      <div className="w-full md:flex-1 md:min-h-0 md:overflow-hidden">
-        {isLoading ? <TableSkeleton /> : <DataTable {...tableProps} />}
+      <div className="flex w-full min-w-0 flex-col md:min-h-0 md:flex-1 md:overflow-hidden">
+        {isLoading ? <TableSkeleton flush /> : <DataTable {...tableProps} variant="list" />}
       </div>
-    </div>
+    </ListFrame>
   );
 
   return (
     <>
       <MobileHeader title="Assets" />
 
-      <div className="flex flex-col space-y-4 md:space-y-6 md:h-full">
+      <div className="flex flex-col space-y-4 md:space-y-0 md:h-full">
         {/* Desktop page header */}
-        <Device
-          mobile={null}
-          desktop={
-            <div className="flex h-[48px] items-center justify-between pr-[150px]">
-              <h1 className="text-[28px] font-bold tracking-tight">Asset Inventory</h1>
-              <div className="flex items-center gap-3">
-                <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={fetchAssets} title="Refresh">
-                  <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
-                </Button>
-                <Link href="/asset-inventory/new" className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
-                  <Plus size={18} />
-                  Add New Asset
-                </Link>
-              </div>
-            </div>
-          }
-        />
+        <PageActions>
+          <Link href="/asset-inventory/new" className={headerPrimaryClass}>
+            <Plus className="size-4" />
+            Add Asset
+          </Link>
+        </PageActions>
 
         {/* Filters + Table */}
         <Device mobile={mobileFilters} desktop={desktopFilters} />

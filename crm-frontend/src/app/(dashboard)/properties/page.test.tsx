@@ -17,7 +17,7 @@ beforeEach(()=>{sessionStorage.clear();localStorage.clear();mock.fetch.mockClear
 it('shows the uploader column and combines staff/date filters before fetching the list',async()=>{
  render(<PropertiesPage/>);
  expect(screen.getByText('Kavya')).toBeTruthy();expect(screen.getByText('Uploaded on')).toBeTruthy();
- fireEvent.click(screen.getByRole('button',{name:'Filters',exact:true}));
+ fireEvent.click(screen.getByRole('button',{name:'Filter',exact:true}));
  const staff=await screen.findByRole('combobox',{name:'Uploaded by'});
  fireEvent.click(staff);
  fireEvent.click(await screen.findByRole('option',{name:'Kavya',exact:true}));

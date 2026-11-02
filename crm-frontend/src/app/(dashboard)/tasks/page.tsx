@@ -3,15 +3,15 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Target, RefreshCw, Search, X } from "lucide-react";
-import { motion } from "motion/react";
 import { apiFetch } from "@/lib/api-fetch";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { ListFrame, ListToolbar, SegmentTabs, ToolbarClear, ToolbarEnd, ToolbarSearch, headerPrimaryClass } from "@/components/layout/list-page";
+import { PageActions } from "@/components/layout/page-actions";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Device } from "@/components/shared/device";
 import { TaskCard } from "@/components/tasks/task-card";
 import { TaskMetricRow } from "@/components/tasks/task-metric-row";
 import { TaskLogModal } from "@/components/tasks/task-log-modal";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
@@ -88,60 +88,20 @@ export default function TasksPage() {
 
   // ── Desktop view (Admin/Manager/TL) ────────────────────────────────────────
   const desktopManage = (
-    <div className="bg-card border rounded-xl overflow-hidden shadow-sm md:flex md:flex-col md:flex-1 md:min-h-0">
-      {/* Tabs + search row */}
-      <div className="flex items-center justify-between px-6 border-b bg-muted/10 pt-4 gap-4">
-        <div className="flex items-center gap-8 overflow-x-auto scrollbar-hide relative">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={cn(
-                "relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200",
-                activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {tab}
-              {activeTab === tab && (
-                <motion.div
-                  layoutId="tasksDesktopUnderline"
-                  className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full"
-                  initial={false}
-                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                />
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Search */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b bg-background">
-        <div className="relative flex-1 min-w-[240px] max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search tasks, staff, department..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 h-10 bg-muted/30 rounded-xl border-border/60 text-[13.5px]"
-          />
-        </div>
-        {searchQuery && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSearchQuery("")}
-            className="h-10 w-10 rounded-full text-muted-foreground hover:bg-red-50 hover:text-red-500"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
+    <ListFrame>
+      <ListToolbar>
+        <SegmentTabs tabs={tabs} value={activeTab} onChange={setActiveTab} label="Task views" />
+        <Badge className="border-transparent bg-muted/70 text-[12px] font-medium text-muted-foreground">{monthDisplay}</Badge>
+        <ToolbarEnd>
+          <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search tasks, staff, department" />
+          {searchQuery && <ToolbarClear onClick={() => setSearchQuery("")} title="Clear search" />}
+        </ToolbarEnd>
+      </ListToolbar>
 
       {/* Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-6">
+      <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-6 pt-2">
         {loading ? (
-          <TableSkeleton />
+          <TableSkeleton flush />
         ) : filteredTasks.length === 0 ? (
           <EmptyState
             message={
@@ -180,7 +140,7 @@ export default function TasksPage() {
           </div>
         )}
       </div>
-    </div>
+    </ListFrame>
   );
 
   // ── Mobile view (Admin/Manager/TL) ─────────────────────────────────────────
@@ -316,40 +276,16 @@ export default function TasksPage() {
   return (
     <>
       <MobileHeader title={isStaff ? "My Tasks" : "Tasks"} />
-      <div className="flex flex-col space-y-4 md:space-y-6 md:h-full">
+      <div className="flex flex-col space-y-4 md:space-y-0 md:h-full">
         {/* Desktop page header */}
-        <Device
-          mobile={null}
-          desktop={
-            <div className="flex h-[48px] items-center justify-between pr-[150px]">
-              <div>
-                <h1 className="text-[28px] font-bold tracking-tight">
-                  {isStaff ? "My Tasks" : "Tasks"}
-                </h1>
-              </div>
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-10 w-10 rounded-full border-border/60"
-                  onClick={loadTasks}
-                  title="Refresh"
-                >
-                  <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-                </Button>
-                {canCreate && (
-                  <button
-                    onClick={() => router.push("/tasks/new")}
-                    className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95"
-                  >
-                    <Plus size={18} />
-                    Create Task
-                  </button>
-                )}
-              </div>
-            </div>
-          }
-        />
+        <PageActions>
+          {canCreate && (
+            <button type="button" onClick={() => router.push("/tasks/new")} className={headerPrimaryClass}>
+              <Plus className="size-4" />
+              Create Task
+            </button>
+          )}
+        </PageActions>
 
         {/* Mobile header sub-row (month + refresh) */}
         <Device

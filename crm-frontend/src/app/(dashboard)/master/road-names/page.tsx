@@ -8,14 +8,19 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Plus, Loader2, MapPin } from "lucide-react";
+import { Edit, Trash2, Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { PageActions } from "@/components/layout/page-actions";
+import { ListBody, ListFrame, ListToolbar, ToolbarSearch, headerPrimaryClass } from "@/components/layout/list-page";
+import { TableSkeleton } from "@/components/tables/table-skeleton";
+import { cn } from "@/lib/utils";
+
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -232,41 +237,36 @@ export default function RoadNamesMasterPage() {
   return (
     <>
       <MobileHeader title="Master: Road Names" showBack />
-      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:h-full px-4 md:px-8">
+      <div className="w-full flex flex-col md:h-full">
 
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pr-0 md:pr-[150px] min-h-[48px]">
-          <h1 className="text-[28px] font-bold tracking-tight hidden md:block">Master: Road Names</h1>
-          <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-            <Input
-              placeholder="Search road names..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-11 rounded-full w-full sm:w-64 bg-background"
-            />
-            <Button
-              className="h-11 px-5 rounded-full bg-[#0052FF] text-white hover:bg-[#0040CC] shrink-0 w-full sm:w-auto shadow-sm"
-              onClick={() => { setFormData({ name: "", is_active: true }); setIsAddOpen(true); }}
-            >
-              <Plus className="mr-1.5 h-4 w-4" /> Add Road Name
-            </Button>
-          </div>
-        </div>
+        <PageActions>
+          <button type="button" className={headerPrimaryClass} onClick={() => { setFormData({ name: "", is_active: true }); setIsAddOpen(true); }}>
+            <Plus className="size-4" /> Add Road Name
+          </button>
+        </PageActions>
 
-        <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col bg-card border rounded-2xl shadow-sm p-4 md:p-6 mb-20 md:mb-0">
-          {isLoading ? (
-            <div className="flex h-40 items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <DataTable
+        <ListFrame>
+          <ListToolbar>
+            <ToolbarSearch value={search} onChange={setSearch} placeholder="Search road names" className="flex-1 md:flex-none" />
+            <button type="button" className={cn(headerPrimaryClass, "md:hidden")} onClick={() => { setFormData({ name: "", is_active: true }); setIsAddOpen(true); }}>
+              <Plus className="size-4" /> Add Road Name
+            </button>
+          </ListToolbar>
+          <ListBody>
+            {isLoading ? (
+              <TableSkeleton columns={5} rows={8} flush />
+            ) : (
+              <DataTable
+              variant="list"
               columns={columns}
               data={filteredRoads}
               showToolbar={true}
               showDeleteAction={true}
               onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
             />
-          )}
-        </div>
+            )}
+          </ListBody>
+        </ListFrame>
 
         {/* Add Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>

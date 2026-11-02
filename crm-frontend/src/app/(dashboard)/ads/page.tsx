@@ -14,14 +14,15 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { ListBody, ListFrame, ListToolbar, SegmentTabs, ToolbarClear, ToolbarEnd, ToolbarSearch, headerPrimaryClass } from "@/components/layout/list-page";
+import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
 import { adsApi } from "@/lib/ads-api";
 import { ADS_PLACEMENTS, getPlacement } from "@/lib/ads-link-presets";
 import { cn } from "@/lib/utils";
-import { motion } from "motion/react";
-import { ChevronDown, ChevronUp, Edit, Plus, RefreshCw, Search, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Edit, Plus, Search, X } from "lucide-react";
 
 interface AdItem {
   id: number;
@@ -453,44 +454,42 @@ export default function AdsPage() {
 
   const tableSection = (
     <div className="w-full max-w-full min-w-0 md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col" aria-busy={isLoading}>
-      {isLoading ? <TableSkeleton columns={8} rows={6} flush /> : loadError || !displayedAds.length ? emptyState : <Device mobile={mobileList} desktop={<DataTable key={displayedAds.map((ad) => ad.id).join(",")} {...tableProps} />} />}
+      {isLoading ? <TableSkeleton columns={8} rows={6} flush /> : loadError || !displayedAds.length ? emptyState : <Device mobile={mobileList} desktop={<DataTable key={displayedAds.map((ad) => ad.id).join(",")} {...tableProps} variant="list" />} />}
     </div>
   );
 
   const desktopFilters = (
-    <div className="bg-card border rounded-xl overflow-hidden shadow-sm md:flex md:flex-col md:flex-1 md:min-h-0">
-      <div className="flex flex-wrap items-center justify-between px-6 border-b bg-muted/10 pt-4 gap-4">
-        <div className="flex items-center gap-8 overflow-x-auto scrollbar-hide relative">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-            aria-pressed={activeTab === tab}
-            disabled={isBusy}
-              className={"relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " + (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")}
-            >
-              {tab} <span className="ml-2 tabular-nums opacity-70">{isLoading ? "…" : tab === "Active" ? activeCount : ads.length - activeCount}</span>
-              {activeTab === tab && (
-                <motion.div layoutId="desktopActiveTabUnderline" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full" initial={false} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
-              )}
-            </button>
-          ))}
-        </div>
-        {placementPicker(false)}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3 px-6 py-4 border-b bg-background">
-        <div className="flex-1 min-w-[240px] max-w-md">{searchBar(false)}</div>
-        <p className="text-xs text-muted-foreground max-w-md">{placementSpec.description}</p>
-        {searchQuery && (
-          <Button variant="ghost" size="icon" onClick={() => setSearchQuery("")} aria-label="Clear search" className="h-10 w-10 rounded-full text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors" title="Clear Search">
-            <X className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
-
-      <div className="w-full max-w-full min-w-0 md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col">{tableSection}</div>
-    </div>
+    <ListFrame>
+      <ListToolbar>
+        <SegmentTabs
+          label="Placement"
+          disabled={isBusy}
+          value={placement}
+          onChange={setPlacement}
+          tabs={ADS_PLACEMENTS.map((p) => ({ value: p.value, label: p.label, title: p.description }))}
+        />
+        <SegmentTabs
+          label="Status"
+          disabled={isBusy}
+          value={activeTab}
+          onChange={setActiveTab}
+          tabs={tabs.map((tab) => ({
+            value: tab,
+            label: (
+              <>
+                {tab} <span className="ml-1 tabular-nums text-muted-foreground">{isLoading ? "…" : tab === "Active" ? activeCount : ads.length - activeCount}</span>
+              </>
+            ),
+          }))}
+        />
+        <ToolbarEnd>
+          <p className="hidden max-w-xs truncate text-xs text-muted-foreground xl:block" title={placementSpec.description}>{placementSpec.description}</p>
+          <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search ads by title" />
+          {searchQuery && <ToolbarClear onClick={() => setSearchQuery("")} title="Clear search" />}
+        </ToolbarEnd>
+      </ListToolbar>
+      <ListBody>{tableSection}</ListBody>
+    </ListFrame>
   );
 
   const mobileFilters = (
@@ -511,28 +510,13 @@ export default function AdsPage() {
   return (
     <>
       <MobileHeader title="Advertisement" />
-      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:h-full">
-        <Device
-          mobile={null}
-          desktop={
-            <div className="flex flex-wrap items-center justify-between gap-4 min-h-12">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight">Advertisements</h1>
-                <p className="mt-1 text-sm text-muted-foreground">Manage website creatives, visibility, and display order.</p>
-                {/* <p className="text-muted-foreground text-sm mt-0.5">Manage your hero carousel advertisements</p> */}
-              </div>
-              <div className="flex items-center gap-3">
-                <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={() => fetchAds()} disabled={isLoading || isBusy} aria-label="Refresh advertisements" title="Refresh">
-                  <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
-                </Button>
-                <Link href={`/ads/new?placement=${placement}`} className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
-                  <Plus size={18} />
-                  Add Advertisement
-                </Link>
-              </div>
-            </div>
-          }
-        />
+      <div className="w-full flex flex-col space-y-6 pt-4 md:space-y-0 md:pt-0 md:h-full">
+        <PageActions>
+          <Link href={`/ads/new?placement=${placement}`} className={headerPrimaryClass}>
+            <Plus className="size-4" />
+            Add Advertisement
+          </Link>
+        </PageActions>
 
         <Device mobile={mobileFilters} desktop={desktopFilters} />
         <Device desktop={null} mobile={<div className="w-full px-4 md:px-0">{tableSection}</div>} />
