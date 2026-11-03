@@ -83,8 +83,9 @@ export class InboundsController {
   async addFollowUp(
     @Param('id') id: string,
     @Body() payload: CreateInboundFollowUpDto,
+    @Request() req: any,
   ) {
-    const data = await this.inboundsService.addFollowUp(+id, payload, 1);
+    const data = await this.inboundsService.addFollowUp(+id, payload, req.user?.id ?? null);
     return { success: true, data };
   }
 
@@ -92,8 +93,9 @@ export class InboundsController {
   async addContactLog(
     @Param('id') id: string,
     @Body() payload: CreateInboundContactLogDto,
+    @Request() req: any,
   ) {
-    const data = await this.inboundsService.addContactLog(+id, payload, 1);
+    const data = await this.inboundsService.addContactLog(+id, payload, req.user?.id ?? null);
     return { success: true, data };
   }
 

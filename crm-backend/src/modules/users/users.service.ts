@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from '../../database/entities/user.entity';
+import { User, fullUser } from '../../database/entities/user.entity';
 import * as bcrypt from 'bcrypt';
 import { PermissionsService } from '../permissions/permissions.service';
 import { ContactLogsService } from '../contact-logs/contact-logs.service';
@@ -34,7 +34,7 @@ export class UsersService {
     });
     return Promise.all(
       users.map(async (u) => ({
-        ...u,
+        ...fullUser(u),
         permissions: await this.permissionsService.listUserPermissions(u.id),
       })),
     );
@@ -47,7 +47,7 @@ export class UsersService {
     });
     if (!user) throw new NotFoundException('User not found');
     return {
-      ...user,
+      ...fullUser(user),
       permissions: await this.permissionsService.listUserPermissions(user.id),
     };
   }
@@ -79,11 +79,18 @@ export class UsersService {
     if (Array.isArray(body.permissionKeys)) {
       await this.permissionsService.setUserPermissions(saved.id, body.permissionKeys);
     }
-    return saved;
+    return fullUser(saved);
+  }
+
+  /** The stored entity, for changes; findOne is the response shape. */
+  private async mustFind(id: number) {
+    const user = await this.userRepository.findOne({ where: { id }, relations: { role: true, department: true } });
+    if (!user) throw new NotFoundException('User not found');
+    return user;
   }
 
   async update(id: number, body: any) {
-    const user = await this.findOne(id);
+    const user = await this.mustFind(id);
 
     if (body.email && body.email !== user.email) {
       const existing = await this.userRepository.findOne({ where: { email: body.email } });
@@ -130,12 +137,12 @@ export class UsersService {
       // Password change kills all device sessions — staff re-register on next sign-in.
       await this.contactLogsService.revokeAllUserDevices(saved.id);
     }
-    return saved;
+    return fullUser(saved);
   }
 
   async delete(id: number) {
-    const user = await this.findOne(id);
+    const user = await this.mustFind(id);
     user.is_active = false; // Soft delete / disable
-    return this.userRepository.save(user);
+    return fullUser(await this.userRepository.save(user));
   }
 }

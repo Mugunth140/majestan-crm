@@ -307,7 +307,7 @@ export class InboundsService {
     const inbound = await this.inboundsRepository.findOne({
       where: { id },
       relations: {
-        follow_ups: true,
+        follow_ups: { created_by: true },
         contact_logs: {
           sent_by: true
         },
@@ -382,25 +382,26 @@ export class InboundsService {
   }
 
   
-  async addContactLog(inboundId: number, payload: Partial<InboundContactLog>, userId: number): Promise<InboundContactLog> {
+  async addContactLog(inboundId: number, payload: Partial<InboundContactLog>, userId: number | null): Promise<InboundContactLog> {
     const inbound = await this.mustFindOne(inboundId);
     
     const contactLog = this.contactLogsRepository.create({
       ...payload,
       inbound_id: inboundId,
-      sent_by_id: userId,
+      sent_by_id: userId ?? undefined,
     });
     
     return this.contactLogsRepository.save(contactLog);
   }
 
-  async addFollowUp(inboundId: number, body: any, userId: number): Promise<InboundFollowUp> {
+  async addFollowUp(inboundId: number, body: any, userId: number | null): Promise<InboundFollowUp> {
     const inbound = await this.mustFindOne(inboundId);
     
     const followUp = this.followUpsRepository.create({
       inbound_id: inboundId,
-      created_by_id: userId,
-      follow_up_date: body.followUpDate || null,
+      created_by_id: userId ?? undefined,
+      // A follow-up logged without a date happened now.
+      follow_up_date: body.followUpDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
       follow_up_time: body.followUpTime || null,
       contacted_via: body.contactedVia || null,
       next_follow_up_date: body.nextFollowUpDate || null,
