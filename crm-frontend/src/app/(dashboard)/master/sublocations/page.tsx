@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { DataTable } from "@/components/tables/data-table";
 import { ActiveCell, IdCell, statusDot } from "@/components/tables/cells";
 import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { activeValue, moveRow } from "@/lib/move-row";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -353,6 +354,17 @@ export default function MasterSublocationsPage() {
                 }
                 getKey={(r) => r.id}
                 onOpen={openEdit}
+                onMove={(r, column) => {
+                  const is_active = activeValue(r.is_active, column === "Active");
+                  moveRow({
+                    setRows: setSublocations,
+                    row: r,
+                    same: (a, b) => a.id === b.id,
+                    patch: { is_active },
+                    request: { path: `/master/sublocations/${r.id}`, method: "PATCH", body: { city_id: Number(r.city_id), locality_name: r.locality_name, postal_code: r.postal_code || undefined, description: r.description || undefined, is_active } },
+                    success: `Marked ${column.toLowerCase()}`,
+                  });
+                }}
                 card={(r) => ({ title: r.locality_name, avatar: false, id: r.id, subtitle: [r.city_name, r.postal_code].filter(Boolean).join(" · ") })}
               />
             )}

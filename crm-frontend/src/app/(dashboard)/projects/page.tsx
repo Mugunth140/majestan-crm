@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/tables/data-table";
 import { IdCell, NameCell, StatusCell, statusDot } from "@/components/tables/cells";
 import { BOARD_PAGE, ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { moveRow } from "@/lib/move-row";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -66,7 +67,7 @@ export default function ProjectsPage() {
   const [localityOptions, setLocalityOptions] = useState<{ value: string; label: string }[]>([]);
 
   const views = useModuleView("projects", PROJECT_FIELDS);
-  const { projects, totalCount, isLoading, fetchProjects, deleteBulk } = useProjectsList();
+  const { projects, setProjects, totalCount, isLoading, fetchProjects, deleteBulk } = useProjectsList();
   useClampedPage(pagination, setPagination, totalCount, isLoading);
 
   useEffect(() => {
@@ -379,6 +380,9 @@ export default function ProjectsPage() {
             list={<DataTable {...tableProps} variant="list" />}
             getKey={(p) => p.id}
             onOpen={(p) => router.push(`/projects/${p.id}`)}
+            onMove={(p, status) =>
+              moveRow({ setRows: setProjects, row: p, same: (a, b) => a.id === b.id, patch: { status }, request: { path: `/projects/${p.id}/status`, method: "PATCH", body: { status } }, success: `Moved to ${status.charAt(0).toUpperCase()}${status.slice(1)}` })
+            }
             card={(p) => ({
               title: p.name,
               id: p.projectCode || p.id,

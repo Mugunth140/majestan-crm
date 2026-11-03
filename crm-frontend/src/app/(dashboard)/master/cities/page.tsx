@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { DataTable } from "@/components/tables/data-table";
 import { ActiveCell, IdCell, statusDot } from "@/components/tables/cells";
 import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { activeValue, moveRow } from "@/lib/move-row";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -312,6 +313,17 @@ export default function MasterCitiesPage() {
               }
               getKey={(r) => r.id}
               onOpen={openEdit}
+              onMove={(r, column) => {
+                const is_active = activeValue(r.is_active, column === "Active");
+                moveRow({
+                  setRows: setCities,
+                  row: r,
+                  same: (a, b) => a.id === b.id,
+                  patch: { is_active },
+                  request: { path: `/master/cities/${r.id}`, method: "PATCH", body: { city_name: r.city_name, state_name: r.state_name, country_name: r.country_name ?? "India", country_code: r.country_code ?? "IN", is_active } },
+                  success: `Marked ${column.toLowerCase()}`,
+                });
+              }}
               card={(r) => ({ title: r.city_name, avatar: false, id: r.id, subtitle: r.state_name })}
             />
           )}

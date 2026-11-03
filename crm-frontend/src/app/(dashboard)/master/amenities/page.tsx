@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { DataTable } from "@/components/tables/data-table";
 import { ActiveCell, IdCell, statusDot } from "@/components/tables/cells";
 import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { activeValue, moveRow } from "@/lib/move-row";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -354,6 +355,17 @@ export default function AmenitiesMasterPage() {
                 }
                 getKey={(r) => r.id}
                 onOpen={openEdit}
+                onMove={(r, column) => {
+                  const is_active = activeValue(r.is_active, column === "Active");
+                  moveRow({
+                    setRows: setAmenities,
+                    row: r,
+                    same: (a, b) => a.id === b.id,
+                    patch: { is_active },
+                    request: { path: `/master/amenities/${r.id}`, method: "PATCH", body: { name: r.name, category: r.category ?? "other", icon_key: r.icon_key || null, is_active } },
+                    success: `Marked ${column.toLowerCase()}`,
+                  });
+                }}
                 card={(r) => ({ title: r.name, avatar: false, id: r.id, subtitle: categoryLabel(r.category) })}
               />
             )}

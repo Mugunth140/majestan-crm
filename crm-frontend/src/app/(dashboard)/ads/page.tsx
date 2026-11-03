@@ -53,7 +53,7 @@ export default function AdsPage() {
       : []),
     { id: "status", label: "Status", get: (ad) => (ad.isActive ? "Active" : "Inactive"), order: ["Active", "Inactive"], dot: (v) => statusDot(v) },
   ];
-  const views = useModuleView("ads", adFields);
+  const views = useModuleView("ads", adFields, "status");
   const [ads, setAds] = useState<AdItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -477,6 +477,7 @@ export default function AdsPage() {
           list={<DataTable key={displayedAds.map((ad) => ad.id).join(",")} {...tableProps} variant="list" />}
           getKey={(ad) => ad.id}
           onOpen={(ad) => router.push(`/ads/new?edit=${ad.id}`)}
+          onMove={(ad, column) => handleToggleStatus(ad, column === "Active")}
           card={(ad) => ({ title: ad.title || "Advertisement", avatar: false, id: ad.id, href: `/ads/new?edit=${ad.id}`, subtitle: ad.updatedAt ? `Updated ${formatTableDate(ad.updatedAt)}` : undefined, tag: ad.isActive ? undefined : "Inactive" })}
           noun="ads"
         />

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/tables/data-table";
 import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { moveRow } from "@/lib/move-row";
 import { IdCell, NameCell, StatusCell, statusDot, type StatusTone } from "@/components/tables/cells";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
@@ -481,6 +482,9 @@ export default function AgentsPage() {
             }
             getKey={(a) => a.id}
             onOpen={(a) => router.push(`/agent-network/${a.id}`)}
+            onMove={(a, status) =>
+              moveRow({ setRows: setAgents, row: a, same: (x, y) => x.id === y.id, patch: { status }, request: { path: `/agents/${a.id}/status`, method: "PUT", body: { status_name: status } }, success: `Moved to ${status}` })
+            }
             card={(a) => ({ title: a.name, id: `A${String(a.id).padStart(5, "0")}`, href: `/agent-network/${a.id}`, subtitle: a.mobile, footer: a.company_name, tag: a.partner_type?.replace(/_/g, " ") })}
             noun="agents"
           />

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DataTable } from "@/components/tables/data-table";
 import { BOARD_PAGE, ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { moveRow } from "@/lib/move-row";
 import { ActiveCell, DateCell, IdCell, NameCell, statusDot } from "@/components/tables/cells";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -374,6 +375,9 @@ export default function BuildersPage() {
           }
           getKey={(b) => b.id}
           onOpen={(b) => router.push(`/builders/new?edit=${b.id}`)}
+          onMove={(b, column) =>
+            moveRow({ setRows: setBuilders, row: b, same: (x, y) => x.id === y.id, patch: { isActive: column === "Active" }, request: { path: `/builders/${b.id}`, method: "PUT", body: { isActive: column === "Active" } }, success: `Marked ${column.toLowerCase()}` })
+          }
           card={(b) => ({ title: b.name, id: b.id, href: `/builders/new?edit=${b.id}`, subtitle: b.phone || b.email || undefined })}
           totalCount={totalCount}
           noun="builders"

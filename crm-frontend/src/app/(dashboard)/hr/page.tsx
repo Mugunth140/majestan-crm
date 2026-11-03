@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { DataTable } from "@/components/tables/data-table";
 import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { moveRow } from "@/lib/move-row";
 import { IdCell, NameCell, StatusCell, statusDot, type StatusTone } from "@/components/tables/cells";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -477,6 +478,9 @@ export default function HrPage() {
             }
             getKey={(c) => c.id}
             onOpen={(c) => router.push(`/hr/${c.id}`)}
+            onMove={(c, status) =>
+              moveRow({ setRows: setCandidates, row: c, same: (a, b) => a.id === b.id, patch: { status }, request: { path: `/hr/${c.id}`, method: "PATCH", body: { status } }, success: `Moved to ${status}` })
+            }
             card={(c) => ({ title: c.name, id: c.formattedId, href: `/hr/${c.id}`, subtitle: c.mobile, footer: c.assignedStaff?.name ?? <span className="text-muted-foreground">Unassigned</span>, tag: c.position })}
             noun="candidates"
           />

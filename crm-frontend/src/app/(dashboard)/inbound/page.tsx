@@ -9,6 +9,7 @@ import { apiFetch, apiJson } from "@/lib/api-fetch";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { DataTable } from "@/components/tables/data-table";
 import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { moveRow } from "@/lib/move-row";
 import { DateCell, IdCell, StatusCell, statusDot, type StatusTone } from "@/components/tables/cells";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
@@ -615,6 +616,9 @@ export default function InboundPage() {
           }
           getKey={(i) => i.rawId || i.id}
           onOpen={(i) => router.push(`/inbound/${i.rawId || i.id}`)}
+          onMove={(i, status) =>
+            moveRow({ setRows: setInbounds, row: i, same: (a, b) => (a.rawId || a.id) === (b.rawId || b.id), patch: { status }, request: { path: `/inbounds/${i.rawId || i.id}`, method: "PATCH", body: { status } }, success: `Moved to ${status}` })
+          }
           card={(i) => ({ title: [i.property_category || i.propertyCategory, (i.property_type || i.propertyType || "").replace(/_/g, " ")].filter(Boolean).join(" - ") || "Inbound", avatar: false, id: i.propertyId || i.property_id, href: `/inbound/${i.rawId || i.id}`, subtitle: i.address || i.location, footer: i.assigned?.name ?? <span className="text-muted-foreground">Unassigned</span> })}
           noun="inbounds"
         />}
