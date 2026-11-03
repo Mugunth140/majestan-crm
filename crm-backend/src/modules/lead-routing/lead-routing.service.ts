@@ -89,7 +89,8 @@ export class LeadRoutingService {
   // One row per OPEN website_enquiry_event, newest first. With hold-everything
   // intake, new activity lands as events, so the queue reads open events —
   // not acknowledged inquiry rows.
-  // Type rule: per-event — matched_lead_id IS NULL ? 'New' : 'Repeat'.
+  // Type rule: Repeat when linked to a lead OR the same mobile has an
+  // earlier enquiry. Pending enquiries do not create leads until Convert.
   // repeat_count answers "how many pending items for this person": the number
   // of OPEN events sharing this event's mobile_number (the queue's working
   // set — not an all-time lead counter).
@@ -154,7 +155,11 @@ export class LeadRoutingService {
               s.name AS assigned_staff_name,
               -- Open events for this person: the queue's pending working set.
               (SELECT COUNT(*) FROM website_enquiry_events siblings
-               WHERE siblings.mobile_number = e.mobile_number AND siblings.status = 'open') AS repeat_count
+               WHERE siblings.mobile_number = e.mobile_number AND siblings.status = 'open') AS repeat_count,
+              -- Check history before pagination/filters, including handled events.
+              EXISTS (SELECT 1 FROM website_enquiry_events earlier
+                      WHERE earlier.mobile_number = e.mobile_number
+                        AND earlier.id < e.id) AS has_earlier_enquiry
        FROM website_enquiry_events e
        LEFT JOIN leads l ON l.id = e.matched_lead_id
        LEFT JOIN users s ON s.id = l.assigned_staff_id
@@ -229,8 +234,9 @@ export class LeadRoutingService {
         created_at: r.enquiry_at,
         assigned_staff_id: r.assigned_staff_id ?? null,
         assigned_staff_name: r.assigned_staff_name ?? null,
-        // Per-event typing: unmatched => New, matched => Repeat.
-        type: matched ? 'Repeat' : 'New',
+        // Repeat describes enquiry history, not whether Convert has run yet.
+        // Keep id/actions tied to the actual lead match independently.
+        type: matched || Number(r.has_earlier_enquiry) > 0 ? 'Repeat' : 'New',
         repeat_count: repeatCount,
         property_code: r.property_code ?? context.projectCode ?? null,
         property_title: prop?.title ?? projectsById[context.projectId]?.title ?? null,

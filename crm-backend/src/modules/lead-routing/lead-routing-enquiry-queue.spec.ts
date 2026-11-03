@@ -116,6 +116,31 @@ describe('LeadRoutingService enquiry queue (event-sourced)', () => {
     expect(byEnquiry[31].id).toBe(8);
   });
 
+  it('marks a later pending enquiry as Repeat before either event is converted', async () => {
+    queryMock.mockResolvedValueOnce([{ total: 2 }]).mockResolvedValueOnce([
+      { enquiry_id: 50, mobile_number: '9999999999', matched_lead_id: null, repeat_count: '2', has_earlier_enquiry: '1' },
+      { enquiry_id: 49, mobile_number: '9999999999', matched_lead_id: null, repeat_count: '2', has_earlier_enquiry: '0' },
+    ]);
+    const result = await service.getEnquiryQueue(1, 10);
+    expect(result.items).toMatchObject([
+      { enquiry_id: 50, display_id: 'EQ00050', type: 'Repeat', repeat_count: 2, id: null },
+      { enquiry_id: 49, display_id: 'EQ00049', type: 'New', repeat_count: 2, id: null },
+    ]);
+  });
+
+  it('keeps Repeat classification when an earlier enquiry is handled or outside the filtered page', async () => {
+    queryMock.mockResolvedValueOnce([{ total: 11 }]).mockResolvedValueOnce([
+      { enquiry_id: 50, mobile_number: '9999999999', matched_lead_id: null, repeat_count: '1', has_earlier_enquiry: 1 },
+    ]);
+    const result = await service.getEnquiryQueue(2, 10, { intent: 'site_visit' });
+    expect(result.items[0]).toMatchObject({ type: 'Repeat', repeat_count: 1, id: null });
+    const [sql] = queryMock.mock.calls[1];
+    const history = sql.match(/EXISTS \(SELECT 1 FROM website_enquiry_events earlier[\s\S]*?AS has_earlier_enquiry/)?.[0];
+    expect(history).toContain('earlier.mobile_number = e.mobile_number');
+    expect(history).toContain('earlier.id < e.id');
+    expect(history).not.toMatch(/earlier\.(status|intent)/);
+  });
+
   it('uses EQ display ids for unmatched events and L display ids for matched ones', async () => {
     queryMock
       .mockResolvedValueOnce([{ total: 2 }])
