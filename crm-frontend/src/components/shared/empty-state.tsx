@@ -20,8 +20,8 @@ export function EmptyState({
   compact?: boolean;
 }) {
   return (
-    <div className={cn("empty-in flex flex-col items-center justify-center px-6 text-center", compact ? "py-6" : "py-14", className)}>
-      <div className={cn("empty-ill empty-ill-float", compact ? "w-28" : "w-44")}>
+    <div className={cn("flex flex-col items-center justify-center px-6 text-center", compact ? "py-6" : "py-14", className)}>
+      <div className={cn("empty-ill", compact ? "w-28" : "w-44")}>
         <EmptyIllustration kind={kind} className="h-auto w-full overflow-visible" />
       </div>
       <p className={cn("font-medium text-foreground", compact ? "mt-3 text-[13px]" : "mt-5 text-[15px]")}>{title}</p>
