@@ -857,7 +857,7 @@ function LeadDetail() {
 
   // ── Follow-up composer ──
   const composer = canEdit && (
-    <div className="rounded-xl border bg-card">
+    <div>
       <Textarea
         value={fuForm.notes}
         onChange={e => setFuForm(f => ({ ...f, notes: e.target.value }))}
@@ -1078,6 +1078,8 @@ function LeadDetail() {
                 <LeadConversation
                   leadId={lead.id}
                   email={lead.email}
+                  mobile={lead.mobile_number}
+                  whatsapp={lead.whatsapp_number}
                   followUps={followUps}
                   contactLogs={contactLogs}
                   composer={composer}

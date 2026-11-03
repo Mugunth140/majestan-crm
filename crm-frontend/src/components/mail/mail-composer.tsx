@@ -17,6 +17,7 @@ import { mailTemplatesApi, type MailTemplateCatalog } from "@/lib/mail-templates
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormSelect } from "@/components/shared/form-select";
+import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EmailEditor } from "./email-editor";
 import { VariablePicker } from "./variable-picker";
@@ -37,6 +38,8 @@ type Props = {
   recipients?: string[];
   /** Mailboxes this user may write from (own first). Omit to allow all of the record's. */
   senders?: { key: string; from: string }[];
+  /** Render in place (e.g. a page's composer dock) instead of as a dialog. */
+  inline?: boolean;
   onClose: () => void;
   onSent: () => void;
 };
@@ -48,7 +51,7 @@ export function MailComposer(props: Props) {
 const startValue = (start: ComposerStart) =>
   start.kind === "saved" ? `saved:${start.id}` : start.kind === "system" ? `system:${start.key}` : start.kind === "draft" ? `draft:${start.id}` : "blank";
 
-function OpenComposer({ entityType, entityId, start, recipients = [], senders, onClose, onSent }: Props & { start: ComposerStart }) {
+function OpenComposer({ entityType, entityId, start, recipients = [], senders, inline, onClose, onSent }: Props & { start: ComposerStart }) {
   const [catalog, setCatalog] = useState<MailTemplateCatalog | null>(null);
   const [source, setSource] = useState(startValue(start));
   const [sender, setSender] = useState<string | null>(null);
@@ -211,19 +214,19 @@ function OpenComposer({ entityType, entityId, start, recipients = [], senders, o
   // A choice only for new hand-written emails; drafts and standard emails keep their mailbox.
   const canPickSender = !draft && !source.startsWith("system:") && allowed.length > 1;
 
-  return (
-    <Dialog open onOpenChange={(open) => { if (!open && !busy && (!touched || window.confirm("Discard this email?"))) onClose(); }}>
-      <DialogContent className="sm:max-w-4xl max-h-[94vh] flex flex-col gap-0 p-0 overflow-hidden" showCloseButton={!busy}>
-        <DialogHeader className="px-6 pt-5 pb-4 border-b shrink-0">
-          <DialogTitle>{draft ? `Edit before sending: ${draftLabel ?? "draft"}` : "New email"}</DialogTitle>
-          <DialogDescription>
-            {catalog ? <>From <span className="font-medium text-foreground">{fromOf(sender)}</span></> : "Loading…"}
-            {recipients.length > 0 && <> to <span className="font-medium text-foreground">{recipients.join(", ")}</span></>}
-          </DialogDescription>
-        </DialogHeader>
+  const title = draft ? `Edit before sending: ${draftLabel ?? "draft"}` : "New email";
+  const route = (
+    <>
+      {catalog ? <>From <span className="font-medium text-foreground">{fromOf(sender)}</span></> : "Loading…"}
+      {recipients.length > 0 && <> to <span className="font-medium text-foreground">{recipients.join(", ")}</span></>}
+    </>
+  );
+  const pad = inline ? "px-4" : "px-6";
 
+  const content = (
+    <>
         {stage === "write" ? (
-          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+          <div className={cn("flex-1 overflow-y-auto py-5 space-y-4", pad)}>
             {canPickSender && (
               <div className="grid gap-1.5 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">From</label>
@@ -286,7 +289,7 @@ function OpenComposer({ entityType, entityId, start, recipients = [], senders, o
             </div>
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-3">
+          <div className={cn("flex-1 overflow-y-auto py-5 space-y-3", pad)}>
             {preview && (
               <>
                 <dl className="grid grid-cols-[72px_1fr] gap-x-3 gap-y-1 text-sm">
@@ -313,14 +316,14 @@ function OpenComposer({ entityType, entityId, start, recipients = [], senders, o
                 )}
                 <div className="overflow-hidden rounded-xl border bg-white">
                   {/* sandbox="" blocks scripts, forms and navigation inside the preview */}
-                  <iframe title="Email preview" sandbox="" srcDoc={preview.html} className="block h-[480px] w-full" />
+                  <iframe title="Email preview" sandbox="" srcDoc={preview.html} className={cn("block w-full", inline ? "h-[320px]" : "h-[480px]")} />
                 </div>
               </>
             )}
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t px-6 py-3.5 shrink-0">
+        <div className={cn("flex flex-wrap items-center justify-between gap-2 border-t py-3.5 shrink-0", pad)}>
           {stage === "write" ? (
             <>
               <Button variant="outline" onClick={() => { if (!touched || window.confirm("Discard this email?")) onClose(); }} disabled={busy !== null} className="rounded-xl">Cancel</Button>
@@ -339,6 +342,29 @@ function OpenComposer({ entityType, entityId, start, recipients = [], senders, o
             </>
           )}
         </div>
+    </>
+  );
+
+  if (inline) {
+    return (
+      <div className="flex max-h-[min(70vh,680px)] flex-col">
+        <div className="shrink-0 border-b px-4 py-2.5 text-[13px]">
+          <span className="font-semibold text-foreground">{title}</span>
+          <span className="ml-2 text-muted-foreground">{route}</span>
+        </div>
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open && !busy && (!touched || window.confirm("Discard this email?"))) onClose(); }}>
+      <DialogContent className="sm:max-w-4xl max-h-[94vh] flex flex-col gap-0 p-0 overflow-hidden" showCloseButton={!busy}>
+        <DialogHeader className="px-6 pt-5 pb-4 border-b shrink-0">
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{route}</DialogDescription>
+        </DialogHeader>
+        {content}
       </DialogContent>
     </Dialog>
   );

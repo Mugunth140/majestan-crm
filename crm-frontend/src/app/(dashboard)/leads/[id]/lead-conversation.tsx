@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { Loader2, Mail, MessageCircle, MoreHorizontal, PenLine, Phone, RotateCcw, Smartphone, StickyNote } from "lucide-react";
+import { Loader2, Mail, MessageCircle, MoreHorizontal, NotebookPen, Phone, RotateCcw, Send, Smartphone, StickyNote, X } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
 import { mailApi, MAIL_STATUS, newDraftIds, type MailCatalog, type MailSummary, type MailTarget } from "@/lib/mail-api";
 import { CONTACT_TYPE_STYLES, contactLogAuthor, contactLogIcon, formatDuration } from "@/lib/contact-log-utils";
@@ -16,7 +16,7 @@ import { DateTimePicker } from "@/components/shared/datetime-picker";
 import { MailComposer, type ComposerStart } from "@/components/mail/mail-composer";
 import { MailPreviewDialog } from "@/components/mail/mail-preview-dialog";
 import { cn } from "@/lib/utils";
-import { Feed, Who, sortNewestFirst, type FeedItem } from "./lead-feed";
+import { Feed, Who, sortOldestFirst, type FeedItem } from "./lead-feed";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -81,15 +81,33 @@ const dateTime = (d?: string | null, t?: string | null) => {
   return date;
 };
 
+type Mode = "followup" | "email" | "whatsapp" | "sms";
+
+const MODES: { key: Mode; label: string; icon: typeof Phone }[] = [
+  { key: "followup", label: "Follow-up", icon: NotebookPen },
+  { key: "email", label: "Email", icon: Mail },
+  { key: "whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { key: "sms", label: "SMS", icon: Smartphone },
+];
+
+/** Digits for wa.me / sms: links; bare 10-digit numbers are taken as Indian (+91). */
+const dialable = (n?: string | null) => {
+  const digits = (n ?? "").replace(/\D/g, "");
+  return digits.length === 10 ? `91${digits}` : digits;
+};
+
 /**
- * Everything said to and from the lead in one place: follow-ups, calls,
- * WhatsApp, SMS and email (drafts waiting first), newest first.
+ * Everything said to and from the lead in one place, read like a chat:
+ * follow-ups, calls, WhatsApp, SMS and email, oldest first, with a composer
+ * docked at the bottom that switches between follow-up, email and messages.
  */
 export function LeadConversation({
-  leadId, email, followUps, contactLogs, composer, canEdit, isAdmin, refreshKey, onRefresh,
+  leadId, email, mobile, whatsapp, followUps, contactLogs, composer, canEdit, isAdmin, refreshKey, onRefresh,
 }: {
   leadId: number;
   email?: string | null;
+  mobile?: string | null;
+  whatsapp?: string | null;
   followUps: FollowUp[];
   contactLogs: ContactLog[];
   composer: ReactNode;
@@ -102,6 +120,8 @@ export function LeadConversation({
   const [mails, setMails] = useState<MailSummary[]>([]);
   const [target, setTarget] = useState<MailTarget | null>(null);
   const [mailComposer, setMailComposer] = useState<ComposerStart | null>(null);
+  const [mode, setMode] = useState<Mode | null>(null);
+  const end = useRef<HTMLDivElement>(null);
   const [retrying, setRetrying] = useState<number | null>(null);
   const [editing, setEditing] = useState<FollowUp | null>(null);
   const seen = useRef<Set<number> | null>(null);
@@ -229,31 +249,37 @@ export function LeadConversation({
       });
     }
 
-    return sortNewestFirst(list);
+    return sortOldestFirst(list);
     // retry/deleteFollowUp only read state through setters and props already listed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [followUps, contactLogs, mails, isAdmin, canSendMail, retrying]);
 
+  // Like a chat: open at the latest message, and follow new ones as they arrive.
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: "end" });
+  }, [items.length, drafts.length]);
+
+  const openMode = (next: Mode) => {
+    setMode((current) => (current === next ? null : next));
+    if (next === "email" && !mailComposer) setMailComposer({ kind: "blank" });
+  };
+
+  const closeEmail = () => {
+    setMailComposer(null);
+    setMode(null);
+  };
+
+  const modes = MODES.filter((m) => m.key !== "email" || writable.length > 0);
+
   return (
     <div className="space-y-6">
-      {composer}
-
-      {(writable.length > 0 || catalog?.redirectTo) && (
-        <div className="flex flex-wrap items-center gap-2">
-          {catalog?.redirectTo && (
-            <p className="flex-1 rounded-md bg-violet-50 px-2.5 py-1.5 text-[12px] text-violet-900 dark:bg-violet-950/40 dark:text-violet-200">
-              Test mode: emails go to {catalog.redirectTo}.
-            </p>
-          )}
-          {writable.length > 0 && canEdit && (
-            <button
-              type="button"
-              onClick={() => setMailComposer({ kind: "blank" })}
-              className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-md border bg-background px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-muted"
-            >
-              <PenLine className="h-3.5 w-3.5 text-muted-foreground" /> Write email
-            </button>
-          )}
+      {items.length ? (
+        <Feed items={items} days />
+      ) : (
+        <div className="flex flex-col items-center py-14 text-center">
+          <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-foreground/[0.05] text-muted-foreground"><MessageCircle className="h-5 w-5" /></span>
+          <p className="text-[14px] font-medium text-foreground">No conversation yet</p>
+          <p className="mt-1 text-[13px] text-muted-foreground">Follow-ups, calls, messages and emails will show up here.</p>
         </div>
       )}
 
@@ -263,7 +289,12 @@ export function LeadConversation({
           <p className="mt-0.5 truncate text-[12px] text-amber-900/70 dark:text-amber-300/70">To {draft.to.join(", ")}</p>
           {canSendMail && (
             <div className="mt-3 flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => setMailComposer({ kind: "draft", id: draft.id, eventKey: draft.event })} className="h-8 bg-background">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => { setMailComposer({ kind: "draft", id: draft.id, eventKey: draft.event }); setMode("email"); }}
+                className="h-8 bg-background"
+              >
                 Edit
               </Button>
               <Button size="sm" onClick={() => setTarget({ kind: "draft", id: draft.id })} className="h-8 bg-foreground text-background hover:bg-foreground/85">
@@ -274,27 +305,145 @@ export function LeadConversation({
         </div>
       ))}
 
-      {items.length ? (
-        <Feed items={items} />
-      ) : (
-        <div className="flex flex-col items-center py-14 text-center">
-          <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-foreground/[0.05] text-muted-foreground"><MessageCircle className="h-5 w-5" /></span>
-          <p className="text-[14px] font-medium text-foreground">No conversation yet</p>
-          <p className="mt-1 text-[13px] text-muted-foreground">Follow-ups, calls, messages and emails will show up here.</p>
+      {canEdit && (
+        <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] z-10 -mx-1 md:bottom-0 md:pb-4">
+          <div className="overflow-hidden rounded-xl border bg-card shadow-[0_-6px_24px_-12px_rgba(0,0,0,0.18)] dark:shadow-[0_-6px_24px_-12px_rgba(0,0,0,0.6)]">
+            {/* Panels stay mounted once opened, so switching keeps what was typed. */}
+            <div hidden={mode !== "followup"} className="border-b">{composer}</div>
+            {mailComposer && (
+              <div hidden={mode !== "email"} className="border-b">
+                {catalog?.redirectTo && (
+                  <p className="border-b bg-violet-50 px-4 py-1.5 text-[12px] text-violet-900 dark:bg-violet-950/40 dark:text-violet-200">
+                    Test mode: emails go to {catalog.redirectTo}.
+                  </p>
+                )}
+                <MailComposer
+                  inline
+                  entityType="lead"
+                  entityId={leadId}
+                  start={mailComposer}
+                  recipients={email ? [email] : []}
+                  senders={writable}
+                  onClose={closeEmail}
+                  onSent={() => { closeEmail(); void loadMail(); }}
+                />
+              </div>
+            )}
+            {(mode === "whatsapp" || mode === "sms") && (
+              <div className="border-b">
+                <QuickMessage key={mode} kind={mode} leadId={leadId} number={mode === "whatsapp" ? whatsapp || mobile : mobile} onSent={() => { setMode(null); onRefresh(); }} />
+              </div>
+            )}
+
+            <div role="tablist" aria-label="Compose" className="flex items-center gap-0.5 overflow-x-auto px-1.5 py-1.5 scrollbar-hide sm:px-2">
+              {modes.map(({ key, label, icon: Icon }) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === key}
+                  onClick={() => openMode(key)}
+                  className={cn(
+                    "inline-flex h-8 shrink-0 items-center gap-1 rounded-md px-2 text-[13px] font-medium transition-colors sm:gap-1.5 sm:px-2.5 sm:text-[13.5px]",
+                    mode === key ? "bg-foreground/[0.07] text-foreground" : "text-foreground/70 hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </button>
+              ))}
+              {mode && (
+                <button
+                  type="button"
+                  aria-label="Close composer"
+                  onClick={() => setMode(null)}
+                  className="ml-auto hidden h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground sm:flex transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
+      {/* The dock is sticky, so scroll to this instead: the real end of the list. */}
+      <div ref={end} aria-hidden className="-mt-6 scroll-mb-28 md:scroll-mb-0" />
+
       <MailPreviewDialog target={target} entityId={leadId} onClose={() => setTarget(null)} onDone={() => { setTarget(null); void loadMail(); }} />
-      <MailComposer
-        entityType="lead"
-        entityId={leadId}
-        start={mailComposer}
-        recipients={email ? [email] : []}
-        senders={writable}
-        onClose={() => setMailComposer(null)}
-        onSent={() => { setMailComposer(null); void loadMail(); }}
-      />
       <EditFollowUpDialog leadId={leadId} followUp={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); onRefresh(); }} />
+    </div>
+  );
+}
+
+/**
+ * WhatsApp / SMS from the dock. There is no messaging API yet, so the message
+ * opens in WhatsApp (or the phone's Messages app) and is logged on the lead.
+ */
+function QuickMessage({ kind, leadId, number, onSent }: {
+  kind: "whatsapp" | "sms";
+  leadId: number;
+  number?: string | null;
+  onSent: () => void;
+}) {
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const to = dialable(number);
+  const label = kind === "whatsapp" ? "WhatsApp" : "SMS";
+
+  const send = async () => {
+    if (!message.trim()) return;
+    if (kind === "whatsapp") window.open(`https://wa.me/${to}?text=${encodeURIComponent(message)}`, "_blank", "noopener");
+    setSending(true);
+    try {
+      const res = await apiFetch(`${API_URL}/leads/${leadId}/contact-log`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contact_type: kind, message }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success(`${label} logged on the lead.`);
+      setMessage("");
+      onSent();
+    } catch {
+      toast.error(`Could not log the ${label} message`);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (!to) {
+    return <p className="px-4 py-4 text-[13px] text-muted-foreground">Add a {kind === "whatsapp" ? "WhatsApp or mobile" : "mobile"} number to this lead to message them.</p>;
+  }
+
+  return (
+    <div>
+      <Textarea
+        autoFocus
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void send(); }}
+        placeholder={`${label} message to +${to}`}
+        aria-label={`${label} message`}
+        className="min-h-[88px] resize-none rounded-none border-0 bg-transparent px-4 py-3 text-[14px] shadow-none focus-visible:ring-0 dark:bg-transparent"
+      />
+      <div className="flex items-center gap-2 border-t px-3 py-2.5">
+        <p className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground max-sm:invisible">
+          {kind === "whatsapp" ? "Opens WhatsApp with this message and logs it here." : "Logged here as a sent SMS."}
+        </p>
+        {kind === "sms" && (
+          <a
+            href={`sms:+${to}?body=${encodeURIComponent(message)}`}
+            className="inline-flex h-8 items-center rounded-md border bg-background px-2.5 text-[13px] font-medium text-foreground/80 hover:bg-muted md:hidden"
+          >
+            Open Messages
+          </a>
+        )}
+        <Button size="sm" onClick={send} disabled={sending || !message.trim()} className="h-8 gap-1.5 bg-foreground text-background hover:bg-foreground/85">
+          {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+          {kind === "whatsapp" ? "Send on WhatsApp" : "Log SMS"}
+        </Button>
+      </div>
     </div>
   );
 }
