@@ -19,9 +19,13 @@ interface DateTimePickerProps {
   onChange?: (date: Date | undefined) => void;
   placeholder?: string;
   className?: string;
+  /** date-fns format for the chosen value. */
+  displayFormat?: string;
+  /** Size to the trigger instead of filling the row. */
+  inline?: boolean;
 }
 
-export function DateTimePicker({ value, onChange, placeholder = "Pick date & time", className }: DateTimePickerProps) {
+export function DateTimePicker({ value, onChange, placeholder = "Pick date & time", className, displayFormat = "MMM do, yyyy - hh:mm a", inline = false }: DateTimePickerProps) {
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = React.useState(false);
   const [internalDate, setInternalDate] = React.useState<Date | undefined>(value);
@@ -154,7 +158,7 @@ export function DateTimePicker({ value, onChange, placeholder = "Pick date & tim
   };
 
   if (isMobile) {
-    return       <div className="relative w-full">
+    return       <div className={cn("relative", inline ? "inline-flex" : "w-full")}>
         <Button
           type="button"
           variant="outline"
@@ -165,7 +169,7 @@ export function DateTimePicker({ value, onChange, placeholder = "Pick date & tim
           )}
         >
           <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground shrink-0" />
-          {value ? format(value, "MMM do, yyyy - hh:mm a") : <span>{placeholder}</span>}
+          {value ? format(value, displayFormat) : <span>{placeholder}</span>}
         </Button>
         <input 
           type="datetime-local" 
@@ -195,7 +199,7 @@ export function DateTimePicker({ value, onChange, placeholder = "Pick date & tim
           )}
         >
           <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground shrink-0" />
-          {value ? format(value, "MMM do, yyyy - hh:mm a") : <span>{placeholder}</span>}
+          {value ? format(value, displayFormat) : <span>{placeholder}</span>}
         </Button>
       } />
       <PopoverContent 

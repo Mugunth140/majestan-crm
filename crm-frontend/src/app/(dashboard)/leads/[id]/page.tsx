@@ -27,7 +27,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FormSelect } from "@/components/shared/form-select";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
 import { PageActions } from "@/components/layout/page-actions";
 import { useIsMobile } from "@/hooks/use-device";
@@ -57,7 +56,7 @@ import { LeadConversation } from "./lead-conversation";
 import {
   Loader2, Phone, Mail, MessageCircle, MessageSquare, ArrowUpRight,
   RefreshCw, History, TrendingUp, Sparkles, ChevronDown,
-  UserPlus, Activity, MessagesSquare, Paperclip, Building2, Smartphone, Pencil, Info,
+  UserPlus, Activity, MessagesSquare, Paperclip, Building2, Smartphone, Pencil, Info, Flag, PhoneMissed,
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -106,6 +105,14 @@ function avatarTone(name: string) {
   for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return AVATAR_TONES[h % AVATAR_TONES.length];
 }
+
+const PRIORITY_FLAG: Record<string, string> = {
+  low: "text-sky-500", medium: "text-amber-500", high: "text-orange-500", urgent: "text-red-500",
+};
+
+// Small text buttons in the follow-up composer's toolbar.
+const COMPOSER_CHIP =
+  "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
 
 const leadCode = (id: number | string) => `L${String(id).padStart(5, "0")}`;
 
@@ -855,91 +862,93 @@ function LeadDetail() {
     </Badge>
   );
 
-  // ── Follow-up composer ──
+  // ── Follow-up composer (lives in the Conversation tab's bottom bar) ──
+  const rnrOn = fuForm.rnr === nextRnrValue;
   const composer = canEdit && (
     <div>
       <Textarea
         value={fuForm.notes}
         onChange={e => setFuForm(f => ({ ...f, notes: e.target.value }))}
+        onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void handleSaveFollowUp(); }}
         placeholder="What was discussed? Log a follow-up…"
         disabled={!!fuForm.rnr}
         aria-label="Follow-up notes"
-        className="min-h-[88px] resize-none rounded-b-none rounded-t-xl border-0 bg-transparent px-4 py-3 text-[14px] shadow-none focus-visible:ring-0 disabled:opacity-70 dark:bg-transparent"
+        className="max-h-[40vh] min-h-[76px] resize-none rounded-none border-0 bg-transparent px-4 pb-1 pt-3 text-[14px] shadow-none focus-visible:ring-0 disabled:opacity-70 md:px-6 dark:bg-transparent"
       />
-      <div className="space-y-2 border-t px-3 py-2.5">
-        <div className="flex flex-wrap items-center gap-1">
+      <div className="flex flex-wrap items-center gap-1 px-3 pb-2.5 md:px-5">
+        <div role="radiogroup" aria-label="Contacted via" className="flex items-center gap-0.5 rounded-lg bg-foreground/[0.05] p-0.5">
           {CONTACTED_VIA.map(({ label, value, icon: Icon }) => {
             const on = fuForm.contactedVia === value;
             return (
               <button
                 key={value}
                 type="button"
-                aria-pressed={on}
+                role="radio"
+                aria-checked={on}
+                aria-label={label}
+                title={label}
                 onClick={() => setFuForm(f => ({ ...f, contactedVia: on ? "" : value }))}
                 className={cn(
-                  "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[13px] font-medium transition-colors",
-                  on
-                    ? "border-[#017D58] bg-[#017D58] text-white dark:border-[#2FB585] dark:bg-[#2FB585] dark:text-black"
-                    : "bg-background text-foreground/80 hover:bg-muted",
+                  "inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium transition-colors",
+                  on ? "bg-background text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.08)] dark:bg-foreground/15" : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                <Icon className="hidden h-3.5 w-3.5 sm:block" />
-                {label}
+                <Icon className="h-4 w-4" />
+                {on && label}
               </button>
             );
           })}
-          <button
-            type="button"
-            disabled={isRnrMaxed}
-            aria-pressed={fuForm.rnr === nextRnrValue}
-            title="Mark this attempt as Ringing, No Response"
-            onClick={() => {
-              const isApplying = fuForm.rnr !== nextRnrValue;
-              setFuForm(f => ({
-                ...f,
-                rnr: isApplying ? nextRnrValue : "",
-                notes: isApplying ? `RNR ${nextRnrNumber} for this lead` : (f.notes === `RNR ${nextRnrNumber} for this lead` ? "" : f.notes)
-              }));
-            }}
-            className={cn(
-              "ml-auto inline-flex h-8 items-center rounded-md border px-2.5 text-[13px] font-medium transition-colors disabled:opacity-50",
-              fuForm.rnr === nextRnrValue
-                ? "border-orange-500 bg-orange-500 text-white"
-                : "bg-background text-foreground/80 hover:bg-muted",
-            )}
-          >
-            {isRnrMaxed ? "Max RNR" : fuForm.rnr === nextRnrValue ? `RNR ${nextRnrNumber} ✓` : `RNR ${nextRnrNumber}`}
-          </button>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="min-w-[160px] flex-1 sm:w-[200px] sm:flex-none">
-            <DateTimePicker
-              value={getFuDateObj(fuForm.nextFollowUpDate, fuForm.nextFollowUpTime)}
-              onChange={handleFuDateTimeChange}
-              placeholder="Next follow-up"
-              className="h-8! rounded-md! text-[13px]!"
-            />
-          </div>
-          <div className="w-[130px]">
-            <FormSelect
-              name="priority"
-              placeholder="Priority"
-              options={PRIORITIES}
-              value={fuForm.priority}
-              onValueChange={v => setFuForm(f => ({ ...f, priority: v || "" }))}
-              className="h-8! rounded-md! bg-background! text-[13px]!"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={handleSaveFollowUp}
-            disabled={isSavingFu}
-            className={cn(HEADER_PRIMARY, "ml-auto disabled:opacity-60")}
-          >
-            {isSavingFu ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpRight className="h-4 w-4" />}
-            Log follow-up
-          </button>
-        </div>
+        <span aria-hidden className="mx-1 hidden h-5 w-px bg-border sm:block" />
+        <DateTimePicker
+          inline
+          value={getFuDateObj(fuForm.nextFollowUpDate, fuForm.nextFollowUpTime)}
+          onChange={handleFuDateTimeChange}
+          placeholder="Next follow-up"
+          displayFormat="d MMM, h:mm a"
+          className={cn(COMPOSER_CHIP, "w-auto! border-0! bg-transparent! shadow-none! [&_svg]:mr-0!", fuForm.nextFollowUpDate && "text-foreground!")}
+        />
+        <DropdownMenu>
+          <DropdownMenuTrigger render={<button type="button" className={cn(COMPOSER_CHIP, fuForm.priority && "text-foreground")} />}>
+            <Flag className={cn("h-4 w-4", PRIORITY_FLAG[fuForm.priority])} />
+            {PRIORITIES.find(p => p.value === fuForm.priority)?.label ?? "Priority"}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-36">
+            {PRIORITIES.map(p => (
+              <DropdownMenuItem key={p.value} onClick={() => setFuForm(f => ({ ...f, priority: p.value }))}>
+                <Flag className={cn("h-4 w-4", PRIORITY_FLAG[p.value])} /> {p.label}
+              </DropdownMenuItem>
+            ))}
+            {fuForm.priority && <DropdownMenuItem onClick={() => setFuForm(f => ({ ...f, priority: "" }))} className="text-muted-foreground">Clear</DropdownMenuItem>}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <button
+          type="button"
+          disabled={isRnrMaxed}
+          aria-pressed={rnrOn}
+          title="Mark this attempt as Ringing, No Response"
+          onClick={() => {
+            setFuForm(f => ({
+              ...f,
+              rnr: rnrOn ? "" : nextRnrValue,
+              notes: !rnrOn ? `RNR ${nextRnrNumber} for this lead` : (f.notes === `RNR ${nextRnrNumber} for this lead` ? "" : f.notes)
+            }));
+          }}
+          className={cn(COMPOSER_CHIP, "disabled:opacity-50", rnrOn && "bg-orange-500/10 text-orange-600 hover:bg-orange-500/15 hover:text-orange-600 dark:text-orange-400")}
+        >
+          <PhoneMissed className="h-4 w-4" />
+          {isRnrMaxed ? "Max RNR" : `RNR ${nextRnrNumber}`}
+        </button>
+        <button
+          type="button"
+          onClick={handleSaveFollowUp}
+          disabled={isSavingFu || !fuForm.contactedVia}
+          title={fuForm.contactedVia ? "Log follow-up (Ctrl+Enter)" : "Pick how you contacted the lead"}
+          className={cn(HEADER_PRIMARY, "ml-auto h-8 px-3 text-[13px] disabled:opacity-50")}
+        >
+          {isSavingFu && <Loader2 className="h-4 w-4 animate-spin" />}
+          Log follow-up
+        </button>
       </div>
     </div>
   );
@@ -1062,7 +1071,7 @@ function LeadDetail() {
             ))}
           </div>
 
-          <div className="md:min-h-0 md:flex-1 md:overflow-y-auto">
+          <div className={cn("md:min-h-0 md:flex-1", shownTab === "conversation" ? "md:flex md:flex-col" : "md:overflow-y-auto")}>
             {shownTab === "details" && (
               <div className="mx-4 mt-2 overflow-hidden rounded-xl border bg-card">{fields}</div>
             )}
@@ -1074,7 +1083,6 @@ function LeadDetail() {
             )}
 
             {shownTab === "conversation" && (
-              <div className="mx-auto max-w-3xl px-4 py-4 md:px-6 md:py-6">
                 <LeadConversation
                   leadId={lead.id}
                   email={lead.email}
@@ -1088,7 +1096,6 @@ function LeadDetail() {
                   refreshKey={mailRefresh}
                   onRefresh={() => fetchLead(true)}
                 />
-              </div>
             )}
 
             {shownTab === "requirements" && (

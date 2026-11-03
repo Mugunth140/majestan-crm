@@ -272,103 +272,103 @@ export function LeadConversation({
   const modes = MODES.filter((m) => m.key !== "email" || writable.length > 0);
 
   return (
-    <div className="space-y-6">
-      {items.length ? (
-        <Feed items={items} days />
-      ) : (
-        <div className="flex flex-col items-center py-14 text-center">
-          <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-foreground/[0.05] text-muted-foreground"><MessageCircle className="h-5 w-5" /></span>
-          <p className="text-[14px] font-medium text-foreground">No conversation yet</p>
-          <p className="mt-1 text-[13px] text-muted-foreground">Follow-ups, calls, messages and emails will show up here.</p>
-        </div>
-      )}
-
-      {drafts.map((draft) => (
-        <div key={draft.id} className="rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 dark:border-amber-900/60 dark:bg-amber-950/20">
-          <p className="text-[13px] font-semibold text-amber-900 dark:text-amber-300">Email ready to send: {draft.label}</p>
-          <p className="mt-0.5 truncate text-[12px] text-amber-900/70 dark:text-amber-300/70">To {draft.to.join(", ")}</p>
-          {canSendMail && (
-            <div className="mt-3 flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => { setMailComposer({ kind: "draft", id: draft.id, eventKey: draft.event }); setMode("email"); }}
-                className="h-8 bg-background"
-              >
-                Edit
-              </Button>
-              <Button size="sm" onClick={() => setTarget({ kind: "draft", id: draft.id })} className="h-8 bg-foreground text-background hover:bg-foreground/85">
-                Preview &amp; send
-              </Button>
+    <div className="flex flex-col md:min-h-0 md:flex-1">
+      <div className="md:min-h-0 md:flex-1 md:overflow-y-auto">
+        <div className={cn("mx-auto max-w-3xl space-y-6 px-4 py-4 md:px-6 md:py-6", canEdit && "max-md:pb-20")}>
+          {items.length ? (
+            <Feed items={items} days />
+          ) : (
+            <div className="flex flex-col items-center py-14 text-center">
+              <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-foreground/[0.05] text-muted-foreground"><MessageCircle className="h-5 w-5" /></span>
+              <p className="text-[14px] font-medium text-foreground">No conversation yet</p>
+              <p className="mt-1 text-[13px] text-muted-foreground">Follow-ups, calls, messages and emails will show up here.</p>
             </div>
           )}
-        </div>
-      ))}
 
-      {canEdit && (
-        <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] z-10 -mx-1 md:bottom-0 md:pb-4">
-          <div className="overflow-hidden rounded-xl border bg-card shadow-[0_-6px_24px_-12px_rgba(0,0,0,0.18)] dark:shadow-[0_-6px_24px_-12px_rgba(0,0,0,0.6)]">
-            {/* Panels stay mounted once opened, so switching keeps what was typed. */}
-            <div hidden={mode !== "followup"} className="border-b">{composer}</div>
-            {mailComposer && (
-              <div hidden={mode !== "email"} className="border-b">
-                {catalog?.redirectTo && (
-                  <p className="border-b bg-violet-50 px-4 py-1.5 text-[12px] text-violet-900 dark:bg-violet-950/40 dark:text-violet-200">
-                    Test mode: emails go to {catalog.redirectTo}.
-                  </p>
-                )}
-                <MailComposer
-                  inline
-                  entityType="lead"
-                  entityId={leadId}
-                  start={mailComposer}
-                  recipients={email ? [email] : []}
-                  senders={writable}
-                  onClose={closeEmail}
-                  onSent={() => { closeEmail(); void loadMail(); }}
-                />
-              </div>
-            )}
-            {(mode === "whatsapp" || mode === "sms") && (
-              <div className="border-b">
-                <QuickMessage key={mode} kind={mode} leadId={leadId} number={mode === "whatsapp" ? whatsapp || mobile : mobile} onSent={() => { setMode(null); onRefresh(); }} />
-              </div>
-            )}
-
-            <div role="tablist" aria-label="Compose" className="flex items-center gap-0.5 overflow-x-auto px-1.5 py-1.5 scrollbar-hide sm:px-2">
-              {modes.map(({ key, label, icon: Icon }) => (
-                <button
-                  key={key}
-                  type="button"
-                  role="tab"
-                  aria-selected={mode === key}
-                  onClick={() => openMode(key)}
-                  className={cn(
-                    "inline-flex h-8 shrink-0 items-center gap-1 rounded-md px-2 text-[13px] font-medium transition-colors sm:gap-1.5 sm:px-2.5 sm:text-[13.5px]",
-                    mode === key ? "bg-foreground/[0.07] text-foreground" : "text-foreground/70 hover:bg-muted hover:text-foreground",
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  {label}
-                </button>
-              ))}
-              {mode && (
-                <button
-                  type="button"
-                  aria-label="Close composer"
-                  onClick={() => setMode(null)}
-                  className="ml-auto hidden h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground sm:flex transition-colors hover:bg-muted hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+          {drafts.map((draft) => (
+            <div key={draft.id} className="rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 dark:border-amber-900/60 dark:bg-amber-950/20">
+              <p className="text-[13px] font-semibold text-amber-900 dark:text-amber-300">Email ready to send: {draft.label}</p>
+              <p className="mt-0.5 truncate text-[12px] text-amber-900/70 dark:text-amber-300/70">To {draft.to.join(", ")}</p>
+              {canSendMail && (
+                <div className="mt-3 flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setMailComposer({ kind: "draft", id: draft.id, eventKey: draft.event }); setMode("email"); }}
+                    className="h-8 bg-background"
+                  >
+                    Edit
+                  </Button>
+                  <Button size="sm" onClick={() => setTarget({ kind: "draft", id: draft.id })} className="h-8 bg-foreground text-background hover:bg-foreground/85">
+                    Preview &amp; send
+                  </Button>
+                </div>
               )}
             </div>
+          ))}
+
+          <div ref={end} aria-hidden className="-mt-6 scroll-mb-32 md:scroll-mb-0" />
+        </div>
+      </div>
+
+      {/* Frappe-style bottom bar: pinned under the feed; the chosen composer opens above it. */}
+      {canEdit && (
+        <div className="z-40 shrink-0 border-t bg-background max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:pb-[calc(env(safe-area-inset-bottom)+80px)] max-md:shadow-[0_-8px_24px_-16px_rgba(0,0,0,0.25)]">
+          {/* Panels stay mounted once opened, so switching keeps what was typed. */}
+          <div hidden={mode !== "followup"} className="max-h-[60dvh] overflow-y-auto">{composer}</div>
+          {mailComposer && (
+            <div hidden={mode !== "email"}>
+              {catalog?.redirectTo && (
+                <p className="border-b bg-violet-50 px-4 py-1.5 text-[12px] text-violet-900 md:px-6 dark:bg-violet-950/40 dark:text-violet-200">
+                  Test mode: emails go to {catalog.redirectTo}.
+                </p>
+              )}
+              <MailComposer
+                inline
+                entityType="lead"
+                entityId={leadId}
+                start={mailComposer}
+                recipients={email ? [email] : []}
+                senders={writable}
+                onClose={closeEmail}
+                onSent={() => { closeEmail(); void loadMail(); }}
+              />
+            </div>
+          )}
+          {(mode === "whatsapp" || mode === "sms") && (
+            <QuickMessage key={mode} kind={mode} leadId={leadId} number={mode === "whatsapp" ? whatsapp || mobile : mobile} onSent={() => { setMode(null); onRefresh(); }} />
+          )}
+
+          <div role="tablist" aria-label="Compose" className={cn("flex h-12 items-center gap-1 overflow-x-auto px-3 scrollbar-hide md:gap-2 md:px-5", mode && "border-t")}>
+            {modes.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={mode === key}
+                onClick={() => openMode(key)}
+                className={cn(
+                  "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-[14px] transition-colors sm:px-2.5",
+                  mode === key ? "bg-foreground/[0.07] font-medium text-foreground" : "text-foreground/70 hover:bg-muted hover:text-foreground",
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            ))}
+            {mode && (
+              <button
+                type="button"
+                aria-label="Close composer"
+                onClick={() => setMode(null)}
+                className="ml-auto hidden h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:flex"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
       )}
-
-      {/* The dock is sticky, so scroll to this instead: the real end of the list. */}
-      <div ref={end} aria-hidden className="-mt-6 scroll-mb-28 md:scroll-mb-0" />
 
       <MailPreviewDialog target={target} entityId={leadId} onClose={() => setTarget(null)} onDone={() => { setTarget(null); void loadMail(); }} />
       <EditFollowUpDialog leadId={leadId} followUp={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); onRefresh(); }} />
@@ -413,7 +413,7 @@ function QuickMessage({ kind, leadId, number, onSent }: {
   };
 
   if (!to) {
-    return <p className="px-4 py-4 text-[13px] text-muted-foreground">Add a {kind === "whatsapp" ? "WhatsApp or mobile" : "mobile"} number to this lead to message them.</p>;
+    return <p className="px-4 py-4 text-[13px] text-muted-foreground md:px-6">Add a {kind === "whatsapp" ? "WhatsApp or mobile" : "mobile"} number to this lead to message them.</p>;
   }
 
   return (
@@ -425,9 +425,9 @@ function QuickMessage({ kind, leadId, number, onSent }: {
         onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void send(); }}
         placeholder={`${label} message to +${to}`}
         aria-label={`${label} message`}
-        className="min-h-[88px] resize-none rounded-none border-0 bg-transparent px-4 py-3 text-[14px] shadow-none focus-visible:ring-0 dark:bg-transparent"
+        className="min-h-[76px] resize-none rounded-none border-0 bg-transparent px-4 pb-1 pt-3 text-[14px] shadow-none focus-visible:ring-0 md:px-6 dark:bg-transparent"
       />
-      <div className="flex items-center gap-2 border-t px-3 py-2.5">
+      <div className="flex items-center gap-2 px-3 pb-2.5 md:px-5">
         <p className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground max-sm:invisible">
           {kind === "whatsapp" ? "Opens WhatsApp with this message and logs it here." : "Logged here as a sent SMS."}
         </p>

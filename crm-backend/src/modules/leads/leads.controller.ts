@@ -139,8 +139,8 @@ export class LeadsController {
 
   // ── Follow-Up CRUD ─────────────────────────────────────────────────────────
   @Post(':id/follow-ups')
-  async addFollowUp(@Param('id') id: string, @Body() body: CreateLeadFollowUpDto) {
-    const data = await this.leadsService.addFollowUp(Number(id), body);
+  async addFollowUp(@Param('id') id: string, @Body() body: CreateLeadFollowUpDto, @Request() req: any) {
+    const data = await this.leadsService.addFollowUp(Number(id), body, req.user?.id ?? null);
     return { success: true, data };
   }
 

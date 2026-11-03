@@ -187,7 +187,7 @@ export class LeadsService {
   }
 
   // ── Follow-Up CRUD ────────────────────────────────────────────────────────
-  async addFollowUp(leadId: number, body: any) {
+  async addFollowUp(leadId: number, body: any, actorId: number | null = null) {
     const leadRepo = this.dataSource.getRepository(Lead);
     const lead = await leadRepo.findOne({ where: { id: leadId } });
     if (!lead) throw new NotFoundException('Lead not found');
@@ -206,7 +206,7 @@ export class LeadsService {
     followUp.outcome = body.outcome || null;
     followUp.is_completed = body.isCompleted ?? false;
     followUp.notes = body.notes || null;
-    followUp.created_by_id = body.createdById || null;
+    followUp.created_by_id = actorId ?? (body.createdById || null);
     const saved = await repo.save(followUp);
 
     // Update rnr_consecutive_count on the lead based on the rnr field (e.g. 'rnr3' → count 3)
@@ -248,8 +248,9 @@ export class LeadsService {
     followUp.follow_up_date = body.followUpDate ?? followUp.follow_up_date;
     followUp.follow_up_time = body.followUpTime ?? followUp.follow_up_time;
     followUp.contacted_via = body.contactedVia ?? followUp.contacted_via;
-    followUp.next_follow_up_date = body.nextFollowUpDate ?? followUp.next_follow_up_date;
-    followUp.next_follow_up_time = body.nextFollowUpTime ?? followUp.next_follow_up_time;
+    // "" clears the next follow-up (the edit dialog's way of removing it).
+    if (body.nextFollowUpDate !== undefined) followUp.next_follow_up_date = body.nextFollowUpDate || null;
+    if (body.nextFollowUpTime !== undefined) followUp.next_follow_up_time = body.nextFollowUpTime || null;
     followUp.purpose = body.purpose ?? followUp.purpose;
     followUp.priority = body.priority ?? followUp.priority;
     followUp.rnr = body.rnr ?? followUp.rnr;
