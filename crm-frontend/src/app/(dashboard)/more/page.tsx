@@ -24,7 +24,7 @@ export default function MorePage() {
   const router = useRouter();
   const [user] = useState(readUser);
   const { theme, setTheme } = useTheme();
-  const groups = moduleGroups(user, ["/leads", "/tasks"]);
+  const groups = moduleGroups(user, ["/tasks"]);
 
   const logout = () => {
     localStorage.removeItem("crm_token");

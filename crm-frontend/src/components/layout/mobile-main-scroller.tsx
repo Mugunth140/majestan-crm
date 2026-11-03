@@ -40,8 +40,8 @@ export function MainScrollArea({ children }: { children: ReactNode }) {
         <h1 className="truncate text-[32px] font-bold leading-[1.15] tracking-[-0.02em] text-foreground">{resolvedTitle}</h1>
       </div>
       {children}
-      {/* Room for the tab bar, so the last row scrolls clear of it */}
-      <div className={cn("md:hidden w-full shrink-0", hidesTabBar(pathname) ? "h-[env(safe-area-inset-bottom)]" : "h-[calc(env(safe-area-inset-bottom)+5rem)]")} />
+      {/* Room for the dock, so the last row scrolls clear of it */}
+      <div className={cn("md:hidden w-full shrink-0", hidesTabBar(pathname) ? "h-[env(safe-area-inset-bottom)]" : "h-[calc(env(safe-area-inset-bottom)+6.5rem)]")} />
     </main>
   );
 }
