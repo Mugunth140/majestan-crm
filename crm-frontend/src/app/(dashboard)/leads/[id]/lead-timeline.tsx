@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { LEAD_STATUS_DOTS } from "@/lib/lead-constants";
 import { cn } from "@/lib/utils";
-import { Chip, Feed, Who, sortNewestFirst, type FeedItem } from "./lead-feed";
+import { Chip, Feed, Who, sortNewestFirst, type FeedItem } from "@/components/record/feed";
 
 /** One entry from GET /leads/:id/timeline. */
 export type TimelineEntry = {

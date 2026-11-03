@@ -16,7 +16,7 @@ import { DateTimePicker } from "@/components/shared/datetime-picker";
 import { MailComposer, type ComposerStart } from "@/components/mail/mail-composer";
 import { MailPreviewDialog } from "@/components/mail/mail-preview-dialog";
 import { cn } from "@/lib/utils";
-import { Avatar, CARD, Chip, Feed, TabHeader, Who, ago, sortOldestFirst, type FeedItem } from "./lead-feed";
+import { Avatar, CARD, Chip, Feed, TabHeader, Who, ago, sortOldestFirst, type FeedItem } from "./feed";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -85,6 +85,11 @@ const dateTime = (d?: string | null, t?: string | null) => {
   return date;
 };
 
+/** Which record the conversation belongs to: its API path and mail entity. */
+export type ConversationEntity = { api: "leads" | "inbounds"; mail: "lead" | "inbound"; noun: string; editMethod: "PUT" | "PATCH" };
+export const LEAD_ENTITY: ConversationEntity = { api: "leads", mail: "lead", noun: "lead", editMethod: "PUT" };
+export const INBOUND_ENTITY: ConversationEntity = { api: "inbounds", mail: "inbound", noun: "inbound", editMethod: "PATCH" };
+
 export type ComposeMode = "followup" | "email" | "whatsapp" | "sms";
 type Mode = ComposeMode;
 
@@ -107,10 +112,12 @@ const dialable = (n?: string | null) => {
  * docked at the bottom that switches between follow-up, email and messages.
  */
 export function LeadConversation({
-  leadId, leadName, email, mobile, whatsapp, followUps, contactLogs, composer, canEdit, isAdmin, refreshKey, onRefresh, request,
+  leadId, leadName, entity = LEAD_ENTITY, email, mobile, whatsapp, followUps, contactLogs, composer, canEdit, isAdmin, refreshKey, onRefresh, request,
 }: {
   leadId: number;
   leadName?: string | null;
+  /** Defaults to a lead. */
+  entity?: ConversationEntity;
   email?: string | null;
   mobile?: string | null;
   whatsapp?: string | null;
@@ -142,8 +149,8 @@ export function LeadConversation({
   const seen = useRef<Set<number> | null>(null);
 
   const fetchMail = useCallback(
-    () => Promise.all([mailApi.catalog("lead"), mailApi.history("lead", leadId)]),
-    [leadId],
+    () => Promise.all([mailApi.catalog(entity.mail), mailApi.history(entity.mail, leadId)]),
+    [leadId, entity.mail],
   );
 
   const apply = useCallback(([nextCatalog, history]: [MailCatalog, MailSummary[]]) => {
@@ -184,7 +191,7 @@ export function LeadConversation({
   const deleteFollowUp = async (id: number) => {
     if (!confirm("Delete this follow-up?")) return;
     try {
-      const res = await apiFetch(`${API_URL}/leads/${leadId}/follow-ups/${id}`, { method: "DELETE" });
+      const res = await apiFetch(`${API_URL}/${entity.api}/${leadId}/follow-ups/${id}`, { method: "DELETE" });
       const data = await res.json();
       if (!data.success) throw new Error(data.message);
       toast.success("Follow-up deleted.");
@@ -464,7 +471,7 @@ export function LeadConversation({
               )}
               <MailComposer
                 inline
-                entityType="lead"
+                entityType={entity.mail}
                 entityId={leadId}
                 start={mailComposer}
                 recipients={email ? [email] : []}
@@ -475,7 +482,7 @@ export function LeadConversation({
             </div>
           )}
           {(mode === "whatsapp" || mode === "sms") && (
-            <QuickMessage key={mode} kind={mode} leadId={leadId} number={mode === "whatsapp" ? whatsapp || mobile : mobile} onSent={() => { setMode(null); onRefresh(); }} />
+            <QuickMessage key={mode} kind={mode} leadId={leadId} entity={entity} number={mode === "whatsapp" ? whatsapp || mobile : mobile} onSent={() => { setMode(null); onRefresh(); }} />
           )}
 
           <div role="tablist" aria-label="Compose" className={cn("flex h-12 items-center gap-1 overflow-x-auto px-3 scrollbar-hide md:gap-2 md:px-5", mode && "border-t")}>
@@ -510,7 +517,7 @@ export function LeadConversation({
       )}
 
       <MailPreviewDialog target={target} entityId={leadId} onClose={() => setTarget(null)} onDone={() => { setTarget(null); void loadMail(); }} />
-      <EditFollowUpDialog leadId={leadId} followUp={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); onRefresh(); }} />
+      <EditFollowUpDialog leadId={leadId} entity={entity} followUp={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); onRefresh(); }} />
     </div>
   );
 }
@@ -519,7 +526,8 @@ export function LeadConversation({
  * WhatsApp / SMS from the dock. There is no messaging API yet, so the message
  * opens in WhatsApp (or the phone's Messages app) and is logged on the lead.
  */
-function QuickMessage({ kind, leadId, number, onSent }: {
+function QuickMessage({ kind, leadId, entity, number, onSent }: {
+  entity: ConversationEntity;
   kind: "whatsapp" | "sms";
   leadId: number;
   number?: string | null;
@@ -535,13 +543,13 @@ function QuickMessage({ kind, leadId, number, onSent }: {
     if (kind === "whatsapp") window.open(`https://wa.me/${to}?text=${encodeURIComponent(message)}`, "_blank", "noopener");
     setSending(true);
     try {
-      const res = await apiFetch(`${API_URL}/leads/${leadId}/contact-log`, {
+      const res = await apiFetch(`${API_URL}/${entity.api}/${leadId}/contact-log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contact_type: kind, message }),
       });
       if (!res.ok) throw new Error();
-      toast.success(`${label} logged on the lead.`);
+      toast.success(`${label} logged on the ${entity.noun}.`);
       setMessage("");
       onSent();
     } catch {
@@ -552,7 +560,7 @@ function QuickMessage({ kind, leadId, number, onSent }: {
   };
 
   if (!to) {
-    return <p className="px-4 py-4 text-[13px] text-muted-foreground md:px-6">Add a {kind === "whatsapp" ? "WhatsApp or mobile" : "mobile"} number to this lead to message them.</p>;
+    return <p className="px-4 py-4 text-[13px] text-muted-foreground md:px-6">Add a {kind === "whatsapp" ? "WhatsApp or mobile" : "mobile"} number to this {entity.noun} to message them.</p>;
   }
 
   return (
@@ -587,7 +595,8 @@ function QuickMessage({ kind, leadId, number, onSent }: {
   );
 }
 
-function EditFollowUpDialog({ leadId, followUp, onClose, onSaved }: {
+function EditFollowUpDialog({ leadId, entity, followUp, onClose, onSaved }: {
+  entity: ConversationEntity;
   leadId: number;
   followUp: FollowUp | null;
   onClose: () => void;
@@ -612,8 +621,8 @@ function EditFollowUpDialog({ leadId, followUp, onClose, onSaved }: {
     if (!followUp) return;
     setSaving(true);
     try {
-      const res = await apiFetch(`${API_URL}/leads/${leadId}/follow-ups/${followUp.id}`, {
-        method: "PUT",
+      const res = await apiFetch(`${API_URL}/${entity.api}/${leadId}/follow-ups/${followUp.id}`, {
+        method: entity.editMethod,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           followUpDate: followUp.follow_up_date ?? "",

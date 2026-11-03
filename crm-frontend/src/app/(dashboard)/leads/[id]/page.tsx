@@ -27,7 +27,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { DateTimePicker } from "@/components/shared/datetime-picker";
 import { PageActions } from "@/components/layout/page-actions";
 import { useIsMobile } from "@/hooks/use-device";
 import dynamic from "next/dynamic";
@@ -43,35 +42,21 @@ import {
 } from "@/lib/lead-constants";
 import { cn } from "@/lib/utils";
 import { shouldAutoOpenFollowUps, wantsFollowUps } from "@/lib/follow-up-deep-link";
-import { InlineAction, InlineSelect, InlineText, Section, FieldRow, type Option } from "./inline-field";
+import { InlineAction, InlineSelect, InlineText, Section, FieldRow, type Option } from "@/components/record/inline-field";
 import { Feed, timelineItems, type TimelineEntry } from "./lead-timeline";
-import { TabHeader } from "./lead-feed";
-import { LeadConversation } from "./lead-conversation";
-import { AttachmentsArt, EmptyState, RequirementsArt } from "./lead-empty";
+import { TabHeader } from "@/components/record/feed";
+import { LeadConversation } from "@/components/record/conversation";
+import { FollowUpComposer } from "@/components/record/follow-up-composer";
+import { AttachmentsArt, EmptyState, RequirementsArt } from "@/components/record/empty-state";
 import { RequirementFields } from "./lead-requirement";
 import {
-  Loader2, Phone, Mail, MessageCircle, ArrowUpRight,
-  History, TrendingUp, Sparkles, ChevronDown,
-  Plus, Activity, MessagesSquare, Paperclip, Building2, Smartphone, Info, Flag, PhoneMissed,
+  Loader2, ArrowUpRight, History, TrendingUp, Sparkles, ChevronDown,
+  Plus, Activity, MessagesSquare, Paperclip, Building2, Info,
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 const STATUS_OPTIONS: Option[] = LEAD_STATUS_ORDER.map((s) => ({ label: s, value: s, dot: leadStatusDot(s) }));
-
-const PRIORITIES = [
-  { label: "Low", value: "low" },
-  { label: "Medium", value: "medium" },
-  { label: "High", value: "high" },
-  { label: "Urgent", value: "urgent" },
-];
-
-const CONTACTED_VIA = [
-  { label: "Call", value: "call", icon: Phone },
-  { label: "WhatsApp", value: "whatsapp", icon: MessageCircle },
-  { label: "SMS", value: "sms", icon: Smartphone },
-  { label: "Email", value: "email", icon: Mail },
-];
 
 const PREDEFINED_DROP_REASONS = [
   "Location mismatch",
@@ -101,14 +86,6 @@ function avatarTone(name: string) {
   for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return AVATAR_TONES[h % AVATAR_TONES.length];
 }
-
-const PRIORITY_FLAG: Record<string, string> = {
-  low: "text-sky-500", medium: "text-amber-500", high: "text-orange-500", urgent: "text-red-500",
-};
-
-// Small text buttons in the follow-up composer's toolbar.
-const COMPOSER_CHIP =
-  "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
 
 const leadCode = (id: number | string) => `L${String(id).padStart(5, "0")}`;
 
@@ -360,16 +337,6 @@ function LeadDetail() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Log New Follow-up Form
-  const [fuForm, setFuForm] = useState({
-    contactedVia: "",
-    nextFollowUpDate: "",
-    nextFollowUpTime: "",
-    priority: "",
-    rnr: "",
-    notes: "",
-  });
-  const [isSavingFu, setIsSavingFu] = useState(false);
 
   const fetchLead = useCallback(async (silent = false) => {
     if (!id) return;
@@ -587,66 +554,6 @@ function LeadDetail() {
     // dependency, so a fresh object identity can't re-run this effect.
   }, [tab, isLoading, lead, autoOpenedFollowUps]);
 
-  const getFuDateObj = (d: string, t: string) => {
-    if (!d) return undefined;
-    const date = new Date(d);
-    if (t) {
-      const [hh, mm] = t.split(":");
-      date.setHours(parseInt(hh, 10), parseInt(mm, 10), 0, 0);
-    }
-    return date;
-  };
-
-  const handleFuDateTimeChange = (dateObj: Date | undefined) => {
-    if (!dateObj) {
-      setFuForm(f => ({ ...f, nextFollowUpDate: "", nextFollowUpTime: "" }));
-      return;
-    }
-    setFuForm(f => ({
-      ...f,
-      nextFollowUpDate: format(dateObj, "yyyy-MM-dd"),
-      nextFollowUpTime: format(dateObj, "HH:mm"),
-    }));
-  };
-
-  const handleSaveFollowUp = async () => {
-    if (!fuForm.contactedVia) return toast.error("Please select how you contacted the lead.");
-
-    if (fuForm.nextFollowUpDate) {
-      const followUpDateObj = getFuDateObj(fuForm.nextFollowUpDate, fuForm.nextFollowUpTime);
-      if (followUpDateObj) {
-        const diffTime = Math.abs(followUpDateObj.getTime() - new Date().getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        if (diffDays > 45) {
-          toast.error("Follow-up date cannot be more than 45 days in the future.");
-          return;
-        }
-      }
-    }
-
-    setIsSavingFu(true);
-    const now = new Date();
-    const payload = {
-      ...fuForm,
-      followUpDate: format(now, "yyyy-MM-dd"),
-      followUpTime: format(now, "HH:mm"),
-    };
-    try {
-      const res = await apiFetch(`${API_URL}/leads/${id}/follow-ups`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (data.success) {
-        toast.success("Follow-up logged successfully.");
-        setFuForm({ contactedVia: "", nextFollowUpDate: "", nextFollowUpTime: "", priority: "", rnr: "", notes: "" });
-        fetchLead(true);
-      } else toast.error(data.message || "Failed to save follow-up");
-    } catch { toast.error("Failed to save follow-up"); }
-    finally { setIsSavingFu(false); }
-  };
-
   const followUps: any[] = useMemo(() => lead?.follow_ups || [], [lead]);
   // Defensive newest-first sort (created_at, id tiebreak) — backend orders
   // the same way, but bulk device syncs share second precision.
@@ -663,27 +570,6 @@ function LeadDetail() {
 
   const statusName = lead.status || "New Lead";
 
-  // RNR Calculation
-  let highestRnr = 0;
-  if (followUps.length > 0) {
-    // Sort follow-ups by date descending locally to ensure we check the most recent one
-    const sortedFollowUps = [...followUps].sort((a, b) => {
-      const dateA = new Date(`${a.follow_up_date}T${a.follow_up_time || '00:00:00'}`).getTime();
-      const dateB = new Date(`${b.follow_up_date}T${b.follow_up_time || '00:00:00'}`).getTime();
-      return dateB - dateA;
-    });
-
-    const latestFu = sortedFollowUps[0];
-    if (latestFu.rnr && typeof latestFu.rnr === 'string' && latestFu.rnr.startsWith("rnr")) {
-      const num = parseInt(latestFu.rnr.replace("rnr", ""), 10);
-      if (!isNaN(num)) {
-        highestRnr = num;
-      }
-    }
-  }
-  const nextRnrNumber = highestRnr + 1;
-  const nextRnrValue = `rnr${nextRnrNumber}`;
-  const isRnrMaxed = highestRnr >= 5;
 
   // Department purview for Manager / Team Lead: unassigned leads, or leads in
   // the user's own pipeline. The owner's department is not used: a lead moved
@@ -875,94 +761,8 @@ function LeadDetail() {
   );
 
   // ── Follow-up composer (lives in the Conversation tab's bottom bar) ──
-  const rnrOn = fuForm.rnr === nextRnrValue;
   const composer = canEdit && (
-    <div>
-      <Textarea
-        value={fuForm.notes}
-        onChange={e => setFuForm(f => ({ ...f, notes: e.target.value }))}
-        onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void handleSaveFollowUp(); }}
-        placeholder="What was discussed? Log a follow-up…"
-        disabled={!!fuForm.rnr}
-        aria-label="Follow-up notes"
-        className="max-h-[40vh] min-h-[76px] resize-none rounded-none border-0 bg-transparent px-4 pb-1 pt-3 text-[14px] shadow-none focus-visible:ring-0 disabled:opacity-70 md:px-6 dark:bg-transparent"
-      />
-      <div className="flex flex-wrap items-center gap-1 px-3 pb-2.5 md:px-5">
-        <div role="radiogroup" aria-label="Contacted via" className="flex items-center gap-0.5 rounded-lg bg-foreground/[0.05] p-0.5">
-          {CONTACTED_VIA.map(({ label, value, icon: Icon }) => {
-            const on = fuForm.contactedVia === value;
-            return (
-              <button
-                key={value}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                aria-label={label}
-                title={label}
-                onClick={() => setFuForm(f => ({ ...f, contactedVia: on ? "" : value }))}
-                className={cn(
-                  "inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium transition-colors",
-                  on ? "bg-background text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.08)] dark:bg-foreground/15" : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {on && label}
-              </button>
-            );
-          })}
-        </div>
-        <span aria-hidden className="mx-1 hidden h-5 w-px bg-border sm:block" />
-        <DateTimePicker
-          inline
-          value={getFuDateObj(fuForm.nextFollowUpDate, fuForm.nextFollowUpTime)}
-          onChange={handleFuDateTimeChange}
-          placeholder="Next follow-up"
-          displayFormat="d MMM, h:mm a"
-          className={cn(COMPOSER_CHIP, "w-auto! border-0! bg-transparent! shadow-none! [&_svg]:mr-0!", fuForm.nextFollowUpDate && "text-foreground!")}
-        />
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<button type="button" className={cn(COMPOSER_CHIP, fuForm.priority && "text-foreground")} />}>
-            <Flag className={cn("h-4 w-4", PRIORITY_FLAG[fuForm.priority])} />
-            {PRIORITIES.find(p => p.value === fuForm.priority)?.label ?? "Priority"}
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-36">
-            {PRIORITIES.map(p => (
-              <DropdownMenuItem key={p.value} onClick={() => setFuForm(f => ({ ...f, priority: p.value }))}>
-                <Flag className={cn("h-4 w-4", PRIORITY_FLAG[p.value])} /> {p.label}
-              </DropdownMenuItem>
-            ))}
-            {fuForm.priority && <DropdownMenuItem onClick={() => setFuForm(f => ({ ...f, priority: "" }))} className="text-muted-foreground">Clear</DropdownMenuItem>}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <button
-          type="button"
-          disabled={isRnrMaxed}
-          aria-pressed={rnrOn}
-          title="Mark this attempt as Ringing, No Response"
-          onClick={() => {
-            setFuForm(f => ({
-              ...f,
-              rnr: rnrOn ? "" : nextRnrValue,
-              notes: !rnrOn ? `RNR ${nextRnrNumber} for this lead` : (f.notes === `RNR ${nextRnrNumber} for this lead` ? "" : f.notes)
-            }));
-          }}
-          className={cn(COMPOSER_CHIP, "disabled:opacity-50", rnrOn && "bg-orange-500/10 text-orange-600 hover:bg-orange-500/15 hover:text-orange-600 dark:text-orange-400")}
-        >
-          <PhoneMissed className="h-4 w-4" />
-          {isRnrMaxed ? "Max RNR" : `RNR ${nextRnrNumber}`}
-        </button>
-        <button
-          type="button"
-          onClick={handleSaveFollowUp}
-          disabled={isSavingFu || !fuForm.contactedVia}
-          title={fuForm.contactedVia ? "Log follow-up (Ctrl+Enter)" : "Pick how you contacted the lead"}
-          className={cn(HEADER_PRIMARY, "ml-auto h-8 px-3 text-[13px] disabled:opacity-50")}
-        >
-          {isSavingFu && <Loader2 className="h-4 w-4 animate-spin" />}
-          Log follow-up
-        </button>
-      </div>
-    </div>
+    <FollowUpComposer api="leads" entityId={id as string} noun="lead" followUps={followUps} onSaved={() => fetchLead(true)} />
   );
 
   const empty = (icon: ReactNode, title: string, hint: string) => (

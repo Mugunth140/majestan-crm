@@ -3,6 +3,8 @@
 import { matchesInboundActionFilter } from "@/lib/inbound-action-required";
 import { inboundStatusLabel } from "@/lib/inbound-status";
 import { InboundAssignmentDialog } from "@/components/inbound/inbound-assignment-dialog";
+import { NewInboundModal, showQueueNext } from "@/components/inbound/new-inbound-modal";
+import { useIsMobile } from "@/hooks/use-device";
 import { formatInboundCreated, matchesInboundSearch } from "@/lib/inbound-queue";
 import { apiFetch, apiJson } from "@/lib/api-fetch";
 
@@ -14,7 +16,7 @@ import { DateCell, IdCell, StatusCell, statusDot, type StatusTone } from "@/comp
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Edit, Plus, Eye, Search, Filter, X, Lock } from "lucide-react";
+import { Plus, Eye, Search, Filter, X, Lock } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -23,7 +25,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { FormSelect } from "@/components/shared/form-select";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -58,6 +59,8 @@ const INBOUND_FIELDS: ViewField[] = [
 
 export default function InboundPage() {
   const router = useRouter();
+  const isPhone = useIsMobile();
+  const [creating, setCreating] = useState(false);
   const views = useModuleView("inbound", INBOUND_FIELDS);
   const [activeTab, setActiveTab] = usePersistedState<string>("inbound:tab", "All Inbound", { allowed: ["All Inbound", "Queue", "Action Required", "Closed"] });
   const [actionFilter, setActionFilter] = usePersistedState<string>("inbound:actionFilter", "Today", { allowed: ACTION_FILTERS });
@@ -378,9 +381,6 @@ export default function InboundPage() {
           {canAssign && <Button variant="outline" size="sm" onClick={() => setAssignmentIds(selectedRows.map(row => row.id))}>Assign Selected</Button>}
           {selectedRows.length === 1 && <><Button variant="outline" size="sm" onClick={() => router.push("/inbound/" + id)}>
             <Eye size={15} className="mr-1.5" /> View
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => router.push("/inbound/new?edit=" + id)}>
-            <Edit size={15} className="mr-1.5" /> Edit
           </Button></>}
         </>
       );
@@ -638,11 +638,20 @@ export default function InboundPage() {
       {views.switcher}
       <div className="w-full flex flex-col space-y-6 pt-4 md:space-y-0 md:pt-0 md:h-full">
         <PageActions>
-          <Link href="/inbound/new" className={headerPrimaryClass}>
+          <button type="button" onClick={() => setCreating(true)} className={headerPrimaryClass}>
             <Plus className="size-4" />
             Add Inbound
-          </Link>
+          </button>
         </PageActions>
+        <NewInboundModal
+          open={creating}
+          quick={isPhone}
+          onOpenChange={setCreating}
+          onCreated={(id) => {
+            if (isPhone) { showQueueNext(); setActiveTab("Queue"); void fetchInbounds(); }
+            else router.push(id ? `/inbound/${id}` : "/inbound");
+          }}
+        />
         
         <Device mobile={mobileFilters} desktop={desktopFilters} />
 

@@ -1,1053 +1,634 @@
 "use client";
 
-import { apiFetch } from "@/lib/api-fetch";
-
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { format } from "date-fns";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { FormSelect } from "@/components/shared/form-select";
-import { DateTimePicker } from "@/components/shared/datetime-picker";
-import dynamic from "next/dynamic";
-
-const FollowUpPanel = dynamic(() => import("@/components/shared/follow-up-panel").then(mod => mod.FollowUpPanel), { ssr: false });
-const ContactModal = dynamic(() => import("@/components/shared/contact-modal").then(mod => mod.ContactModal), { ssr: false });
-
-import { MobileHeader } from "@/components/layout/mobile-header";
-import { cn } from "@/lib/utils";
-import { formatIndianCurrencyWords } from "@/lib/indian-currency";
-import { canViewInboundContacts } from "@/lib/permissions";
-import { MailPanel } from "@/components/mail/mail-panel";
 import {
-  ArrowLeft, Loader2, User, Phone, MapPin, Building2,
-  Briefcase, Mail, MessageSquare, Plus, ArrowUpRight,
-  Clock, Send, RefreshCw, History, Edit, Shield, CheckCircle, Image as ImageIcon, ChevronLeft, PhoneIncoming, Lock
+  Building2, ChevronDown, ExternalLink, ImageIcon, Info, Loader2, Lock, MapPin, MessagesSquare, Plus, Upload, Wallet, X,
 } from "lucide-react";
+import { apiFetch, apiJson } from "@/lib/api-fetch";
+import { useIsMobile } from "@/hooks/use-device";
+import { canViewInboundContacts } from "@/lib/permissions";
+import { sortContactLogs } from "@/lib/contact-log-utils";
+import { formatIndianCurrencyShort, parseIndianCurrency } from "@/lib/indian-currency";
+import { INBOUND_STATUS_OPTIONS } from "@/lib/inbound-status";
 import {
-  CONTACT_TYPE_STYLES,
-  CONTACT_TYPE_ICONS,
-  formatTimestamp,
-  formatDuration,
-  sortContactLogs,
-  countByType,
-  countCallDirections,
-  contactLogIcon,
-  contactLogAuthor,
-} from "@/lib/contact-log-utils";
+  ADVANCE_MONTHS, BHK_CHOICES, BROKERAGE_ACCEPTED, BROKERAGE_PAYERS, BROKERAGE_TYPES, INBOUND_CATEGORIES, INBOUND_PURPOSES,
+  INBOUND_STATUSES, INBOUND_STATUS_TONES, INBOUND_TYPES, KEY_HOLDERS, PRIMARY_CONTACTS, SPECIAL_PURPOSES,
+  hasBhk, hasFloor, hasFloorPricing, inboundErrorMessage, normalizeCategoryAndType, typeLabel,
+} from "@/lib/inbound-form";
+import { statusDot, statusPillClass } from "@/components/tables/cells";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { MobileHeader } from "@/components/layout/mobile-header";
+import { PageActions } from "@/components/layout/page-actions";
+import { InboundAssignmentDialog } from "@/components/inbound/inbound-assignment-dialog";
+import { FieldRow, InlineAction, InlineMulti, InlineSelect, InlineText, Section, type Option } from "@/components/record/inline-field";
+import { TabHeader } from "@/components/record/feed";
+import { INBOUND_ENTITY, LeadConversation } from "@/components/record/conversation";
+import { FollowUpComposer } from "@/components/record/follow-up-composer";
+import { AttachmentsArt, EmptyState } from "@/components/record/empty-state";
+import { cn } from "@/lib/utils";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
-const STATUS_OPTIONS = [
-  "New Inbound",
-  "Contacting Owner",
-  "Terms not Accepted",
-  "On Hold",
-  "Pending Verification",
-  "Approved",
-  "Rejected",
-  "Closed"
-];
+type Tab = "conversation" | "details" | "pricing" | "photo";
+type Inbound = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+type Patch = Record<string, unknown>;
 
-const STATUS_STYLES: Record<string, string> = {
-  "New Inbound": "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300",
-  "Contacting Owner": "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400",
-  "Terms not Accepted": "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400",
-  "On Hold": "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400",
-  "Pending Verification": "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
-  "Approved": "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400",
-  "Rejected": "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400",
-  "Closed": "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
-};
+const YES_NO: Option[] = [{ label: "Yes", value: "yes" }, { label: "No", value: "no" }];
+const yesNo = (v: unknown) => (v ? "yes" : "no");
 
-const PRIORITIES = [
-  { label: "Low", value: "low" },
-  { label: "Medium", value: "medium" },
-  { label: "High", value: "high" },
-  { label: "Urgent", value: "urgent" },
-];
+const HEADER_BUTTON =
+  "inline-flex h-8 items-center gap-1.5 rounded-md border bg-background px-3 text-[14px] font-medium text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors hover:bg-muted disabled:opacity-50";
 
-const CONTACTED_VIA = [
-  { label: "Call", value: "call" },
-  { label: "WhatsApp", value: "whatsapp" },
-  { label: "SMS", value: "sms" },
-  { label: "Email", value: "email" },
-];
+const inboundCode = (i: Inbound) => i.property_id || `IN${String(i.id).padStart(5, "0")}`;
+const rupees = (v: unknown) => (v == null || v === "" ? "" : formatIndianCurrencyShort(Number(v)));
 
-// ── Loading Skeleton ─────────────────────────────────────────────────────────
 function PageSkeleton() {
   return (
-    <div className="animate-in fade-in duration-500 md:h-full flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-9 w-9 rounded-full shrink-0" />
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <Skeleton className="h-8 w-48" />
-              <Skeleton className="h-6 w-24 rounded-md" />
-              <Skeleton className="h-5 w-20" />
-            </div>
-            <Skeleton className="h-4 w-40" />
-          </div>
+    <div className="flex flex-col md:h-full md:flex-row lg:-mx-6 lg:-mb-8 lg:-mt-6 lg:h-[calc(100%+3.5rem)]">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="hidden h-11 items-center gap-5 border-b px-5 md:flex">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-4 w-20" />)}
         </div>
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-9 w-9 rounded-full" />
-          <Skeleton className="h-10 w-28 rounded-lg" />
+        <div className="space-y-6 p-4 md:p-10">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="flex gap-3">
+              <Skeleton className="h-7 w-7 shrink-0 rounded-full" />
+              <div className="flex-1 space-y-2 pt-1">
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-10 w-full max-w-lg rounded-lg" />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
-
-      <div className="flex-1 space-y-6 md:overflow-y-auto min-h-0 pb-6 pr-0 sm:pr-2">
-        {/* Top Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="col-span-1 lg:col-span-2 bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
-            <Skeleton className="h-5 w-48 mb-6" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-6 gap-x-6">
-              {[...Array(6)].map((_, i) => (
-                <div key={i}>
-                  <Skeleton className="h-3 w-20 mb-2" />
-                  <Skeleton className="h-4 w-32" />
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="col-span-1 bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
-            <Skeleton className="h-5 w-32 mb-6" />
-            <div className="space-y-6">
-              {[...Array(3)].map((_, i) => (
-                <div key={i}>
-                  <Skeleton className="h-3 w-24 mb-2" />
-                  <Skeleton className="h-11 w-full rounded-xl" />
-                </div>
-              ))}
-            </div>
-          </div>
+      <div className="hidden w-[340px] shrink-0 border-l md:block xl:w-[360px]">
+        <div className="flex items-center gap-3 border-b p-4">
+          <Skeleton className="h-12 w-12 rounded-xl" />
+          <div className="space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-24" /></div>
         </div>
-
-        {/* Row 2 */}
-        <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
-          <Skeleton className="h-5 w-40 mb-6" />
-          <Skeleton className="h-40 w-full rounded-xl" />
-        </div>
-
-        {/* Row 3 */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="col-span-1 lg:col-span-2 bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
-            <Skeleton className="h-5 w-32 mb-6" />
-            <div className="space-y-6">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="flex gap-4">
-                  <Skeleton className="h-10 w-10 rounded-full shrink-0" />
-                  <div className="space-y-2 flex-1 pt-1">
-                    <Skeleton className="h-4 w-1/3" />
-                    <Skeleton className="h-12 w-full max-w-md rounded-lg" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="col-span-1 space-y-6">
-            <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
-              <Skeleton className="h-5 w-32 mb-4" />
-              <div className="space-y-4">
-                {[...Array(4)].map((_, i) => (
-                  <Skeleton key={i} className="h-4 w-full" />
-                ))}
-              </div>
-            </div>
-            <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
-              <Skeleton className="h-5 w-32 mb-4" />
-              <div className="space-y-4">
-                {[...Array(4)].map((_, i) => (
-                  <Skeleton key={i} className="h-4 w-full" />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <div className="space-y-3 p-4">{[...Array(9)].map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}</div>
       </div>
     </div>
   );
 }
 
-export default function InboundViewPage() {
+function TabButton({ active, onClick, icon: Icon, label, count, className }: {
+  active: boolean; onClick: () => void; icon: typeof Info; label: string; count?: number; className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={cn(
+        "relative flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[14px] font-medium transition-colors md:h-11 md:rounded-none md:px-0.5",
+        active
+          ? "bg-[#017D58] text-white dark:bg-[#2FB585] dark:text-black md:bg-transparent md:text-foreground md:dark:bg-transparent md:dark:text-foreground"
+          : "bg-foreground/[0.06] text-foreground/80 md:bg-transparent md:text-muted-foreground md:hover:text-foreground",
+        className,
+      )}
+    >
+      <Icon className="hidden h-4 w-4 md:block" />
+      {label}
+      {count ? (
+        <span className={cn("rounded-full px-1.5 text-[11px] leading-[18px] tabular-nums", active ? "bg-white/20 md:bg-foreground/[0.08]" : "bg-foreground/[0.08]")}>{count}</span>
+      ) : null}
+      {active && <span aria-hidden className="absolute inset-x-0 -bottom-px hidden h-0.5 rounded-full bg-foreground md:block" />}
+    </button>
+  );
+}
+
+/** A value the viewer isn't allowed to see. */
+function Restricted({ label }: { label: string }) {
+  return (
+    <FieldRow label={label}>
+      <span className="flex h-8 items-center gap-1.5 px-2 text-[13px] text-muted-foreground"><Lock className="h-3.5 w-3.5" /> Restricted</span>
+    </FieldRow>
+  );
+}
+
+/** How good the listing is (0–100): the same bands the inbound team uses. */
+function QualityScore({ score }: { score: number }) {
+  const band = score >= 90 ? ["Premium", "bg-emerald-500"] : score >= 75 ? ["Featured", "bg-blue-500"] : score >= 60 ? ["Standard", "bg-amber-500"] : ["Needs work", "bg-rose-500"];
+  return (
+    <div title={`Quality score ${score}/100`} className="flex items-center gap-2 text-[12px] text-muted-foreground">
+      <span className="h-1.5 w-16 overflow-hidden rounded-full bg-foreground/[0.08]">
+        <span className={cn("block h-full rounded-full", band[1])} style={{ width: `${Math.min(100, Math.max(0, score))}%` }} />
+      </span>
+      {band[0]} · {score}
+    </div>
+  );
+}
+
+function InboundDetail() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
+  const isMobile = useIsMobile();
 
-  const [inbound, setInbound] = useState<any>(null);
-  const [mailRefresh, setMailRefresh] = useState(0);
+  const [inbound, setInbound] = useState<Inbound | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  
-  // Status Update Modal
-  const [statusModalOpen, setStatusModalOpen] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState("");
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-
-  // Modals / Sliders
-  const [contactModal, setContactModal] = useState<{ open: boolean; type: string; to: string }>({ open: false, type: "", to: "" });
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [isContactLogsOpen, setIsContactLogsOpen] = useState(false);
-  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
-
-  // Keyboard shortcut for history slider
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (
-        e.key.toLowerCase() === 'a' && 
-        document.activeElement?.tagName !== 'INPUT' && 
-        document.activeElement?.tagName !== 'TEXTAREA'
-      ) {
-        e.preventDefault();
-        setIsHistoryOpen(prev => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // Log New Follow-up Form
-  const [fuForm, setFuForm] = useState({
-    contactedVia: "",
-    nextFollowUpDate: "",
-    nextFollowUpTime: "",
-    priority: "",
-    rnr: "",
-    notes: "",
+  const [activeTab, setActiveTab] = useState<Tab>("conversation");
+  const [mailRefresh, setMailRefresh] = useState(0);
+  const [cities, setCities] = useState<Option[]>([]);
+  const [localities, setLocalities] = useState<{ city: string; options: Option[] } | null>(null);
+  const [staff, setStaff] = useState<{ canAssign: boolean; people: { id: number; name: string }[] }>({ canAssign: false, people: [] });
+  const [assigning, setAssigning] = useState<"open" | "busy" | null>(null);
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const photoInput = useRef<HTMLInputElement>(null);
+  const canSeeContacts = canViewInboundContacts();
+  // Editing or deleting someone's follow-up is for admins, as on the lead page.
+  const [isAdmin] = useState(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem("crm_user") || "{}");
+      return ["Admin", "Super Admin"].includes(u?.role?.name || u?.role);
+    } catch { return false; }
   });
-  const [isSavingFu, setIsSavingFu] = useState(false);
 
-  const fetchInbound = useCallback(async (silent = false) => {
-    if (!id) return;
-    if (!silent) setIsLoading(true);
-    else setIsRefreshing(true);
+  // Loads (and later reloads) the inbound; the skeleton shows only the first time.
+  const loadInbound = useCallback(async (): Promise<Inbound | null> => {
     try {
       const res = await apiFetch(`${API_URL}/inbounds/${id}`);
       const result = await res.json();
-      if (result && (result.id || result.property_id)) {
-        setInbound(result.data || result);
-        setSelectedStatus(result.status || result.data?.status || "Hold");
-      } else { 
-        toast.error("Inbound property not found"); 
-        router.push("/inbound"); 
-      }
+      const data = result?.data ?? result;
+      if (res.ok && data?.id) return data;
+      toast.error("Inbound not found");
+      router.push("/inbound");
     } catch {
-      toast.error("Failed to load inbound details");
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      toast.error("Failed to load the inbound");
     }
+    return null;
   }, [id, router]);
+  const fetchInbound = useCallback(() => loadInbound().then((data) => { if (data) setInbound(data); }), [loadInbound]);
 
-  useEffect(() => { fetchInbound(); }, [fetchInbound]);
+  useEffect(() => {
+    let live = true;
+    loadInbound().then((data) => {
+      if (!live) return;
+      if (data) setInbound(data);
+      setIsLoading(false);
+    });
+    return () => { live = false; };
+  }, [loadInbound]);
 
-  const handleDirectStatusUpdate = async (newStatus: string) => {
-    if (!newStatus || newStatus === inbound.status) return;
-    setIsUpdatingStatus(true);
+  useEffect(() => {
+    let live = true;
+    apiFetch(`${API_URL}/master/cities`).then((r) => r.json()).then((d) => { if (live && d.success) setCities(d.data); }).catch(() => {});
+    apiJson<{ canAssign?: boolean; data?: { id: number; name: string }[] }>(`${API_URL}/inbounds/staff-list`)
+      .then((r) => { if (live) setStaff({ canAssign: !!r.canAssign, people: r.data ?? [] }); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, []);
+
+  const city: string | undefined = inbound?.city;
+  useEffect(() => {
+    if (!city) return;
+    let live = true;
+    apiFetch(`${API_URL}/master/sublocations?city_name=${encodeURIComponent(city)}`)
+      .then((r) => r.json())
+      .then((d) => { if (live && d.success) setLocalities({ city, options: d.data }); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [city]);
+
+  // A for the conversation, as on the lead page.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = document.activeElement as HTMLElement | null;
+      if (e.key.toLowerCase() === "a" && !e.metaKey && !e.ctrlKey && !e.altKey && el?.tagName !== "INPUT" && el?.tagName !== "TEXTAREA" && !el?.isContentEditable) {
+        e.preventDefault();
+        setActiveTab("conversation");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  /** Saves some fields in place. Only the changed fields are taken from the reply, so masked contacts stay masked. */
+  const save = async (patch: Patch) => {
     try {
       const res = await apiFetch(`${API_URL}/inbounds/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify(patch),
       });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success("Status updated to " + newStatus);
-        fetchInbound(true);
-        setMailRefresh((n) => n + 1); // "Listing approved" draft
-      } else {
-        toast.error(data.message || "Failed to update status");
-      }
-    } catch {
-      toast.error("Failed to update status");
-    } finally {
-      setIsUpdatingStatus(false);
-    }
-  };
-
-  const openContact = (type: string, to: string) => setContactModal({ open: true, type, to });
-
-  const getFuDateObj = (d: string, t: string) => {
-    if (!d) return undefined;
-    const date = new Date(d);
-    if (t) {
-      const [hh, mm] = t.split(":");
-      date.setHours(parseInt(hh, 10), parseInt(mm, 10), 0, 0);
-    }
-    return date;
-  };
-
-  const handleFuDateTimeChange = (dateObj: Date | undefined) => {
-    if (!dateObj) {
-      setFuForm(f => ({ ...f, nextFollowUpDate: "", nextFollowUpTime: "" }));
-      return;
-    }
-    setFuForm(f => ({
-      ...f,
-      nextFollowUpDate: format(dateObj, "yyyy-MM-dd"),
-      nextFollowUpTime: format(dateObj, "HH:mm"),
-    }));
-  };
-
-  const handleSaveFollowUp = async () => {
-    if (!fuForm.contactedVia) return toast.error("Please select how you contacted the owner.");
-    setIsSavingFu(true);
-    const now = new Date();
-    const payload = {
-      ...fuForm,
-      followUpDate: format(now, "yyyy-MM-dd"),
-      followUpTime: format(now, "HH:mm"),
-    };
-    try {
-      const res = await apiFetch(`${API_URL}/inbounds/${id}/follow-ups`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+      const result = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(inboundErrorMessage(result) || "Couldn't save the change");
+      const saved = result?.data ?? result ?? {};
+      setInbound((prev) => prev && {
+        ...prev,
+        ...Object.fromEntries(Object.keys(patch).map((k) => [k, k in saved ? saved[k] : patch[k]])),
+        quality_score: saved.quality_score ?? prev.quality_score,
+        updated_at: saved.updated_at ?? prev.updated_at,
       });
-      const data = await res.json();
-      if (data.success) {
-        toast.success("Follow-up logged successfully.");
-        setFuForm({ contactedVia: "", nextFollowUpDate: "", nextFollowUpTime: "", priority: "", rnr: "", notes: "" });
-        fetchInbound(true);
-      } else toast.error(data.message || "Failed to save follow-up");
-    } catch { toast.error("Failed to save follow-up"); }
-    finally { setIsSavingFu(false); }
-  };
-
-  const renderQualityScore = (score: number) => {
-    let label = "Needs Improvement";
-    let bgCls = "bg-red-500";
-    let textCls = "text-red-700 dark:text-red-400";
-    
-    if (score >= 90) {
-      label = "Premium";
-      bgCls = "bg-green-500";
-      textCls = "text-green-700 dark:text-green-400";
-    } else if (score >= 75) {
-      label = "Featured";
-      bgCls = "bg-blue-500";
-      textCls = "text-blue-700 dark:text-blue-400";
-    } else if (score >= 60) {
-      label = "Standard";
-      bgCls = "bg-yellow-500";
-      textCls = "text-yellow-700 dark:text-yellow-400";
+      toast.success("Saved");
+      if ("status" in patch) setMailRefresh((n) => n + 1); // an approval can draft an email
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : "Couldn't save the change");
+      throw reason;
     }
-
-    return (
-      <div className="flex flex-col gap-2.5">
-        <div className="flex items-center justify-between">
-          <span className={`text-[15px] font-bold ${textCls}`}>{label}</span>
-          <span className="text-sm font-bold text-foreground">{score}/100</span>
-        </div>
-        <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden border border-border/50 shadow-inner">
-          <div 
-            className={`h-full ${bgCls} transition-all duration-1000 ease-out`} 
-            style={{ width: `${score}%` }} 
-          />
-        </div>
-      </div>
-    );
   };
+  const saveText = (key: string, number = false) => (v: string) =>
+    save({ [key]: v.trim() === "" ? null : number ? Number(v) : v.trim() });
+
+  const followUps = useMemo(() => inbound?.follow_ups ?? [], [inbound]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- API rows, as on the lead page
+  const contactLogs: any[] = useMemo(() => sortContactLogs(inbound?.contact_logs ?? []), [inbound]);
 
   if (isLoading) return <PageSkeleton />;
   if (!inbound) return null;
 
-  const statusName = inbound.status || "Hold";
-  const badgeCls = STATUS_STYLES[statusName] ?? STATUS_STYLES["Hold"];
-  const followUps: any[] = inbound.follow_ups || [];
-  const contactLogs: any[] = sortContactLogs(inbound?.contact_logs || []);
-  const contactCounts = countByType(contactLogs);
-  const callDirectionCounts = countCallDirections(contactLogs);
-  // Inbound contact access: Admin/Manager by default, Team Lead/Staff via
-  // the inbound-tracking toggle. Without it, phone/email values are masked
-  // (backend strips them too) and the log buttons are hidden.
-  const canSeeContacts = canViewInboundContacts();
-  
-  // RNR Calculation
-  let highestRnr = 0;
-  if (followUps.length > 0) {
-    const sortedFollowUps = [...followUps].sort((a, b) => {
-      const dateA = new Date(`${a.follow_up_date}T${a.follow_up_time || '00:00:00'}`).getTime();
-      const dateB = new Date(`${b.follow_up_date}T${b.follow_up_time || '00:00:00'}`).getTime();
-      return dateB - dateA;
-    });
-    
-    const latestFu = sortedFollowUps[0];
-    if (latestFu.rnr && typeof latestFu.rnr === 'string' && latestFu.rnr.startsWith("rnr")) {
-      const num = parseInt(latestFu.rnr.replace("rnr", ""), 10);
-      if (!isNaN(num)) {
-        highestRnr = num;
-      }
+  const { category, type } = normalizeCategoryAndType(inbound.property_category ?? null, inbound.property_type ?? null);
+  const status: string = inbound.status || "New Inbound";
+  const statusOptions: Option[] = [...(INBOUND_STATUSES.includes(status) ? [] : [status]), ...INBOUND_STATUSES]
+    .map((s) => ({ label: s, value: s, dot: statusDot(s, INBOUND_STATUS_TONES[s]) }));
+  const pill = cn("inline-flex items-center gap-1 whitespace-nowrap rounded-full font-medium", statusPillClass(status, INBOUND_STATUS_TONES[status]));
+  const assignee = staff.people.find((p) => p.id === inbound.assigned_staff_id)?.name;
+  const title: string = inbound.property_title || [typeLabel(type), inbound.locality || inbound.area, inbound.city].filter(Boolean).join(", ") || `Inbound ${inboundCode(inbound)}`;
+  const rent = inbound.purpose === "Rent";
+  const brokered = inbound.brokerage_accepted === "Yes" || inbound.brokerage_accepted === "Negotiable";
+  const special: string[] = inbound.special_purpose ? String(inbound.special_purpose).split(",").map((s) => s.trim()).filter(Boolean) : [];
+  const paidBy: string[] = Array.isArray(inbound.brokerage_paid_by) ? inbound.brokerage_paid_by : (() => {
+    try { return JSON.parse(inbound.brokerage_paid_by || "[]"); } catch { return []; }
+  })();
+  const localityOptions = localities && localities.city === inbound.city ? localities.options : [];
+  const hasMap = inbound.latitude != null && inbound.longitude != null;
+  const units: { floor_label: string; area?: string | null; price?: number | null; notes?: string | null }[] = inbound.units ?? [];
+  const saveUnits = (next: typeof units) => save({ units: next.map((u) => ({ floor_label: u.floor_label, area: u.area || null, price: u.price ?? null, notes: u.notes || null })) });
+
+  const statusMenu = (size: "h-7" | "h-8") => (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<button type="button" className={cn(pill, size, "pl-3 pr-2 text-[13px] transition-[filter] hover:brightness-[0.97] dark:hover:brightness-110")} aria-label={`Status: ${status}. Change status`} />}>
+        {status}
+        <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        {statusOptions.map((o) => (
+          <DropdownMenuItem key={o.value} onClick={() => { if (o.value !== status) void save({ status: o.value }).catch(() => {}); }} className="gap-2 text-[14px]">
+            <span className={cn("h-2 w-2 rounded-full", o.dot)} />
+            <span className="flex-1">{o.label}</span>
+            {o.value === status && <span className="text-[12px] text-muted-foreground">Current</span>}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  const assigneeLabel = (
+    <>
+      <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold", assignee ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" : "bg-foreground/[0.08] text-muted-foreground")}>
+        {assignee ? assignee.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase() : "?"}
+      </span>
+      <span className="truncate">{assignee ?? (inbound.is_queued ? "In the queue" : "Unassigned")}</span>
+    </>
+  );
+  const assign = async (staffId: number | null) => {
+    setAssigning("busy");
+    try {
+      await apiJson(`${API_URL}/inbounds/assign`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ inboundIds: [inbound.id], staffId }) });
+      toast.success(staffId === null ? "Returned to the queue." : "Assigned.");
+      setAssigning(null);
+      void fetchInbound();
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : "Assignment failed");
+      setAssigning("open");
     }
-  }
-  const nextRnrNumber = highestRnr + 1;
-  const nextRnrValue = `rnr${nextRnrNumber}`;
-  const isRnrMaxed = highestRnr >= 5;
+  };
 
-  return (
-    <div className="flex flex-col md:h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-      
-      {/* ── Mobile Header ── */}
-      <MobileHeader title={inbound.property_id || `Inbound #${inbound.id}`} showBack />
+  const uploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) return void toast.error("Photos must be 10 MB or smaller.");
+    setUploading(true);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await apiFetch(`${API_URL}/inbounds/${id}/image`, { method: "POST", body });
+      if (!res.ok) throw new Error();
+      toast.success("Photo uploaded.");
+      void fetchInbound();
+    } catch {
+      toast.error("The photo didn't upload.");
+    } finally {
+      setUploading(false);
+    }
+  };
 
-      {/* ── Header (desktop only) ── */}
-      <div className="hidden md:flex items-center justify-between pr-4 sm:pr-[150px] min-h-[48px] mb-6 shrink-0">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shrink-0" onClick={() => router.push("/inbound")}>
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </Button>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-              {inbound.property_id || inbound.propertyId || `Inbound #${inbound.id}`}
-            </h1>
-            <Badge className={`font-medium px-2.5 py-0.5 shadow-sm border ${badgeCls}`}>{statusName}</Badge>
-            <span className="hidden sm:inline text-muted-foreground/40 text-xs">&bull;</span>
-            <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5">
-              Created on {new Date(inbound.created_at || inbound.createdAt || inbound.date || Date.now()).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shrink-0" onClick={() => fetchInbound(true)} title="Refresh">
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-          </Button>
-          <Button onClick={() => router.push(`/inbound/new?edit=${inbound.id}`)} className="rounded-full px-4 sm:px-8 py-5 bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md flex items-center gap-2 text-sm sm:text-base">
-            <Edit className="h-4 w-4" /> <span className="hidden sm:inline">Edit Details</span><span className="sm:hidden">Edit</span>
-          </Button>
-        </div>
-      </div>
+  // ── Record fields (desktop side panel, phone "Details" tab) ──
+  const contact = (label: string, key: string, kind: "tel" | "email" | "text" = "tel", placeholder?: string) =>
+    canSeeContacts
+      ? <InlineText label={label} type={kind === "text" ? "text" : kind} value={inbound[key]} placeholder={placeholder} onSave={saveText(key)} />
+      : <Restricted label={label} />;
 
-      {/* ── Mobile Summary Strip ── */}
-      <div className="md:hidden flex flex-col gap-3 px-4 pb-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge className={`font-medium px-2.5 py-0.5 shadow-sm border ${badgeCls}`}>{statusName}</Badge>
-          <span className="text-sm font-semibold text-muted-foreground">{inbound.property_id || `#${inbound.id}`}</span>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Button variant="outline" onClick={() => router.push(`/inbound/new?edit=${inbound.id}`)} className="h-11 rounded-xl text-foreground font-semibold border-border/60">
-            <Edit className="w-4 h-4 mr-2 text-muted-foreground" /> Edit
-          </Button>
-          <Button variant="outline" onClick={() => fetchInbound(true)} className="h-11 rounded-xl border-border/60 font-semibold text-foreground">
-            <RefreshCw className={`w-4 h-4 mr-2 text-muted-foreground ${isRefreshing ? "animate-spin" : ""}`} /> Refresh
-          </Button>
-        </div>
-      </div>
-
-      {/* ── Main Layout ── */}
-      <div className="flex-1 md:overflow-y-auto min-h-0 pb-6 space-y-6 px-4 lg:px-0 lg:pr-2">
-
-        {/* ── Row 1: Basic Info (2/3) + Quick Actions (1/3) ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="col-span-1 lg:col-span-2 bg-card border rounded-2xl p-4 sm:p-6 shadow-sm h-full">
-            <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-muted-foreground" /> Basic Information
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-6 gap-x-6">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Property Category</p>
-                <p className="text-[14px] font-medium text-foreground">{inbound.property_category || inbound.propertyCategory || "\u2014"}</p>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Property Type</p>
-                <p className="text-[14px] font-medium text-foreground capitalize">{(inbound.property_type || inbound.propertyType || "").replace(/_/g, " ") || "\u2014"}</p>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">City</p>
-                <p className="flex items-center gap-1.5 text-[14px] font-medium text-foreground">
-                  <MapPin className="h-3.5 w-3.5 text-muted-foreground" /> {inbound.city || "\u2014"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Locality</p>
-                <p className="text-[14px] font-medium text-foreground">
-                  {inbound.locality || "\u2014"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Area</p>
-                <p className="text-[14px] font-medium text-foreground">{inbound.area || "\u2014"}</p>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Purpose</p>
-                <p className="text-[14px] font-medium text-foreground">{inbound.purpose || "\u2014"}</p>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Special Purpose</p>
-                <p className="text-[14px] font-medium text-foreground">{inbound.special_purpose || "\u2014"}</p>
-              </div>
-              {inbound.purpose === "Rent" && (
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Total Rent</p>
-                  <p className="text-[14px] font-medium text-foreground">{inbound.total_rent ? `₹${Number(inbound.total_rent).toLocaleString()}` : "—"}</p>
-                </div>
-              )}
-              {inbound.sale_price != null && (
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Sale Price</p>
-                  <p className="text-[14px] font-medium text-foreground">₹{Number(inbound.sale_price).toLocaleString()}</p>
-                  <p className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 mt-0.5">{formatIndianCurrencyWords(Number(inbound.sale_price))}</p>
-                </div>
-              )}
-              {inbound.advance && (
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Advance {inbound.purpose === "Rent" ? "(Months)" : ""}</p>
-                  <p className="text-[14px] font-medium text-foreground">{inbound.advance} {inbound.purpose === "Rent" ? "Months" : ""}</p>
-                </div>
-              )}
-              {inbound.purpose === "Rent" && (
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Rent per Sq Ft</p>
-                  <p className="text-[14px] font-medium text-foreground">{inbound.rent_per_sqft ? `₹${inbound.rent_per_sqft}` : "\u2014"}</p>
-                </div>
-              )}
-              {inbound.floor_number && (
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Floor Number</p>
-                  <p className="text-[14px] font-medium text-foreground">{inbound.floor_number}</p>
-                </div>
-              )}
-              <div className="col-span-1 sm:col-span-2 lg:col-span-3">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Full Address / Location</p>
-                  {inbound.image_url && (
-                    <Button variant="outline" size="sm" className="h-8 text-xs flex items-center gap-1.5 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800" onClick={() => setIsImageModalOpen(true)}>
-                      <ImageIcon className="h-3.5 w-3.5" /> <span className="hidden sm:inline">View Inbound Image</span><span className="sm:hidden">View Image</span>
-                    </Button>
-                  )}
-                </div>
-                <p className="text-[14px] font-medium text-foreground/80">{inbound.address || inbound.location || "\u2014"}</p>
-                {(inbound.latitude != null || inbound.longitude != null) && (
-                  <div className="mt-3 space-y-2 text-sm">
-                    <p>Latitude: {inbound.latitude ?? "—"}</p>
-                    <p>Longitude: {inbound.longitude ?? "—"}</p>
-                    {inbound.latitude != null && inbound.longitude != null && (
-                      <a href={`https://www.google.com/maps?q=${encodeURIComponent(`${inbound.latitude},${inbound.longitude}`)}`}
-                        target="_blank" rel="noopener noreferrer" className="text-primary underline">
-                        Open location in Maps
-                      </a>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="col-span-1 flex flex-col gap-6">
-            <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-sm flex flex-col">
-              <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-                <Shield className="h-4 w-4 text-muted-foreground" /> Actions & Score
-              </h3>
-              
-              <div className="mb-6">
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Quality Score</p>
-                {renderQualityScore(Number(inbound.quality_score || inbound.qualityScore || 0))}
-              </div>
-              
-              <div className="flex-1 flex flex-col gap-4">
-                 <div>
-                    <div className="flex items-center justify-between mb-2">
-                       <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Current Status</p>
-                       {isUpdatingStatus && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-                    </div>
-                    <div className="flex flex-col sm:flex-row gap-2">
-        
-                       <div className="flex-1">
-                         <FormSelect 
-                           name="inboundStatus" 
-                           options={STATUS_OPTIONS.map(s => ({label: s, value: s}))}
-                           value={selectedStatus}
-                           onValueChange={(v) => {
-                             setSelectedStatus(v || "");
-                             handleDirectStatusUpdate(v || "");
-                           }}
-                           placeholder="Select Status"
-                         />
-                       </div>
-                       <Button 
-                        variant="outline" 
-                        onClick={() => {
-                          setSelectedStatus("Closed");
-                          handleDirectStatusUpdate("Closed");
-                        }}
-                        disabled={isUpdatingStatus || selectedStatus === "Closed"}
-                        className="border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700 h-11 px-6 rounded-xl font-bold transition-all w-full sm:w-auto"
-                     >
-                        Close
-                     </Button>
-                    </div>
-                 </div>
-
-                 {inbound.assigned_to && (
-                   <div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 mt-2">Assigned To</p>
-                      <p className="text-[14px] font-medium">{inbound.assigned_to.name || "Staff Member"}</p>
-                   </div>
-                 )}
-                 
-                 {/* Trigger the Right Slider */}
-                 <div className="mt-auto pt-2">
-                   <Button 
-                     onClick={() => setIsHistoryOpen(true)} 
-                     className="w-full h-12 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 font-semibold shadow-sm border border-blue-200 dark:border-blue-800 rounded-xl flex items-center justify-between px-4"
-                   >
-                     <span className="flex items-center">
-                       <History className="mr-2 h-4 w-4" /> View Follow-up History
-                     </span>
-                     <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border border-blue-200 dark:border-blue-800 bg-background/50 px-1.5 font-mono text-[10px] font-medium text-blue-700 dark:text-blue-400 opacity-100">
-                       A
-                     </kbd>
-                   </Button>
-                 </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-        {/* ── Floors & Pricing (commercial, per-floor rows) ── */}
-        {Array.isArray(inbound.units) && inbound.units.length > 0 && (
-          <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
-            <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-muted-foreground" /> Floors & Pricing
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs font-bold uppercase tracking-wider text-muted-foreground border-b border-border/60">
-                    <th className="py-2 pr-4 font-bold">Floor</th>
-                    <th className="py-2 pr-4 font-bold">Area</th>
-                    <th className="py-2 pr-4 font-bold text-right">{inbound.purpose === "Rent" ? "Rent" : "Price"}</th>
-                    <th className="py-2 font-bold">Notes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {inbound.units.map((u: any) => (
-                    <tr key={u.id ?? u.floor_label} className="border-b border-border/30 last:border-0">
-                      <td className="py-2.5 pr-4 font-semibold text-foreground">{u.floor_label || "—"}</td>
-                      <td className="py-2.5 pr-4 text-foreground">{u.area || "—"}</td>
-                      <td className="py-2.5 pr-4 text-right font-semibold text-foreground">
-                        {u.price != null && u.price !== "" ? `₹${Number(u.price).toLocaleString("en-IN")}` : "—"}
-                      </td>
-                      <td className="py-2.5 text-muted-foreground">{u.notes || "—"}</td>
-                    </tr>
-                  ))}
-                  {inbound.units.some((u: any) => u.price != null && u.price !== "") && (
-                    <tr>
-                      <td colSpan={2} className="py-2.5 pr-4 text-right text-xs font-bold uppercase tracking-wider text-muted-foreground">Total</td>
-                      <td className="py-2.5 pr-4 text-right font-bold text-foreground">
-                        ₹{inbound.units.reduce((s: number, u: any) => s + (Number(u.price) || 0), 0).toLocaleString("en-IN")}
-                      </td>
-                      <td />
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+  const fields = (
+    <>
+      <Section title="Details">
+        <InlineSelect label="Status" value={status} options={statusOptions} onSave={(v) => save({ status: v })} />
+        <InlineSelect label="Availability" value={inbound.inbound_status} options={INBOUND_STATUS_OPTIONS} onSave={(v) => save({ inbound_status: v })} />
+        <InlineText label="Title" value={inbound.property_title} placeholder={title} onSave={saveText("property_title")} />
+        <InlineSelect label="Category" value={category} options={INBOUND_CATEGORIES} onSave={(v) => save({ property_category: v, property_type: null, bhk: null })} />
+        <InlineSelect label="Type" value={type} options={(category && INBOUND_TYPES[category]) || []} placeholder={category ? "Select…" : "Pick a category first"} disabled={!category} onSave={(v) => save({ property_type: v })} />
+        {hasBhk(category, type) && <InlineSelect label="BHK" value={inbound.bhk} options={BHK_CHOICES} onSave={(v) => save({ bhk: v })} />}
+        <InlineSelect label="Purpose" value={inbound.purpose} options={INBOUND_PURPOSES} onSave={(v) => save({ purpose: v })} />
+        {category === "commercial" && (
+          <InlineMulti label="Suits" values={special} options={SPECIAL_PURPOSES.map((s) => ({ label: s, value: s }))} onSave={(v) => save({ special_purpose: v.length ? v.join(", ") : null })} />
         )}
+        {staff.canAssign ? (
+          <InlineAction label="Assigned to" onClick={() => setAssigning("open")}>{assigneeLabel}</InlineAction>
+        ) : (
+          <InlineAction label="Assigned to">{assigneeLabel}</InlineAction>
+        )}
+        <FieldRow label="Added">
+          <span className="px-2 text-[14px] text-foreground">
+            {new Date(inbound.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}
+          </span>
+        </FieldRow>
+      </Section>
 
-        {/* ── Row 2: Log New Follow Up Form ── */}
-        <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
-          <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-            <Plus className="h-4 w-4 text-[#0052FF]" /> Log New Follow Up
-          </h3>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contacted Via *</label>
-                  <FormSelect name="contactedVia" placeholder="Select..." options={CONTACTED_VIA} value={fuForm.contactedVia} onValueChange={v => setFuForm(f => ({ ...f, contactedVia: v || "" }))} />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Follow-Up</label>
-                  <DateTimePicker
-                    value={getFuDateObj(fuForm.nextFollowUpDate, fuForm.nextFollowUpTime)}
-                    onChange={handleFuDateTimeChange}
-                    placeholder="Pick date..."
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Priority</label>
-                  <FormSelect name="priority" placeholder="Select..." options={PRIORITIES} value={fuForm.priority} onValueChange={v => setFuForm(f => ({ ...f, priority: v || "" }))} />
-                </div>
-                <div className="space-y-1.5 flex flex-col justify-end">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">RNR Status</label>
-                  <Button
-                    type="button"
-                    variant={fuForm.rnr === nextRnrValue ? "default" : "outline"}
-                    className={cn(
-                      "w-full h-12 rounded-xl transition-all font-semibold",
-                      fuForm.rnr === nextRnrValue 
-                        ? "bg-orange-500 hover:bg-orange-600 text-white border-orange-500" 
-                        : "border-border/60 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 text-foreground/80"
-                    )}
-                    disabled={isRnrMaxed}
-                    onClick={() => {
-                      const isApplying = fuForm.rnr !== nextRnrValue;
-                      setFuForm(f => ({
-                        ...f,
-                        rnr: isApplying ? nextRnrValue : "",
-                        notes: isApplying ? `RNR ${nextRnrNumber} for this inbound property` : (f.notes === `RNR ${nextRnrNumber} for this inbound property` ? "" : f.notes)
-                      }));
-                    }}
-                  >
-                    {isRnrMaxed ? "Max RNR (5) Reached" : (fuForm.rnr === nextRnrValue ? `RNR ${nextRnrNumber} Applied` : `Apply RNR ${nextRnrNumber}`)}
-                  </Button>
-                </div>
-              </div>
-            </div>
+      <Section title="Location">
+        <InlineSelect label="City" value={inbound.city} options={cities.some((c) => c.value === inbound.city) || !inbound.city ? cities : [{ label: inbound.city, value: inbound.city }, ...cities]}
+          onSave={(v) => save({ city: v, locality: null })} />
+        <InlineSelect label="Locality" value={inbound.locality} options={localityOptions.some((l) => l.value === inbound.locality) || !inbound.locality ? localityOptions : [{ label: inbound.locality, value: inbound.locality }, ...localityOptions]}
+          placeholder={inbound.city ? "Select…" : "Pick a city first"} disabled={!inbound.city} onSave={(v) => save({ locality: v })} />
+        <InlineText label="Area" value={inbound.area} placeholder="1500 sq ft" onSave={saveText("area")} />
+        <InlineText label="Landmark" value={inbound.landmark} onSave={saveText("landmark")} />
+        <InlineText label="State" value={inbound.state} onSave={saveText("state")} />
+        {hasMap && (
+          <FieldRow label="Map">
+            <a href={`https://www.google.com/maps?q=${encodeURIComponent(`${inbound.latitude},${inbound.longitude}`)}`} target="_blank" rel="noopener noreferrer"
+              className="flex h-8 items-center gap-1.5 px-2 text-[14px] font-medium text-[#017D58] hover:underline dark:text-[#2FB585]">
+              Open in Maps <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </FieldRow>
+        )}
+      </Section>
 
-            <div className="flex flex-col gap-4">
-              <div className="space-y-1.5 flex-1 flex flex-col">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Notes</label>
-                <Textarea
-                  value={fuForm.notes}
-                  onChange={e => setFuForm(f => ({ ...f, notes: e.target.value }))}
-                  placeholder="What was discussed?..."
-                  disabled={!!fuForm.rnr}
-                  className={cn("bg-muted/20 rounded-xl resize-none text-sm flex-1 min-h-[100px]", fuForm.rnr ? "opacity-70 cursor-not-allowed bg-muted" : "")}
-                />
-              </div>
-              <Button
-                onClick={handleSaveFollowUp}
-                disabled={isSavingFu}
-                className="w-full h-11 bg-[#0052FF] text-white hover:bg-[#0040CC] rounded-xl shadow font-semibold text-sm gap-2 shrink-0"
-              >
-                {isSavingFu ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpRight className="h-4 w-4" />}
-                Save Follow Up
-              </Button>
-            </div>
-          </div>
-        </div>
+      <Section title="Owner">
+        <InlineText label="Name" value={inbound.owner_name} onSave={saveText("owner_name")} />
+        {contact("Mobile", "mobile_number")}
+        {contact("WhatsApp", "whatsapp_number")}
+        {contact("Email", "email", "email")}
+        {contact("Alternate no.", "alternate_contact")}
+        {contact("Other contact", "alternative_contact", "text", "Name or details")}
+        <InlineText label="Best time" value={inbound.preferred_contact_time} placeholder="e.g. 10:00" onSave={saveText("preferred_contact_time")} />
+        {canSeeContacts ? <InlineText label="Address" multiline value={inbound.address} onSave={saveText("address")} /> : <Restricted label="Address" />}
+        <InlineSelect label="PAN" value={yesNo(inbound.pan_available)} options={YES_NO} onSave={(v) => save({ pan_available: v === "yes" })} />
+        <InlineSelect label="GST" value={yesNo(inbound.gst_applicable)} options={YES_NO} onSave={(v) => save({ gst_applicable: v === "yes" })} />
+      </Section>
 
-        {/* ── Row 3: Contact Summary (2/3) + Owner/Brokerage (1/3) ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-card border rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center justify-between border-b pb-3 mb-5">
-              <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" /> Contact activity
-              </h3>
-              <button 
-                onClick={() => setIsContactLogsOpen(true)}
-                className="text-[13px] font-bold tracking-wide text-blue-400 flex items-center gap-2 bg-[#0052FF]/10 px-3 py-2 rounded-lg transition-colors hover:bg-[#0052FF]/20 outline-blue-600 outline-[1px]"
-              >
-                <History className="h-3.5 w-3.5" /> View logs
-              </button>
-            </div>
+      <Section title="Access" defaultOpen={!isMobile}>
+        <InlineSelect label="Visits via" value={inbound.primary_contact} options={PRIMARY_CONTACTS} onSave={(v) => save({ primary_contact: v })} />
+        {inbound.primary_contact && inbound.primary_contact !== "Owner" && (
+          <>
+            <InlineText label={`${inbound.primary_contact}'s name`} value={inbound.primary_contact_name} onSave={saveText("primary_contact_name")} />
+            {contact(`${inbound.primary_contact}'s no.`, "primary_contact_number")}
+          </>
+        )}
+        <InlineSelect label="Keys with" value={inbound.key_available_with} options={KEY_HOLDERS} onSave={(v) => save({ key_available_with: v })} />
+        {inbound.key_available_with && inbound.key_available_with !== "Owner" && inbound.key_available_with !== inbound.primary_contact && (
+          <>
+            <InlineText label="Key holder" value={inbound.key_contact_name} onSave={saveText("key_contact_name")} />
+            {contact("Key holder no.", "key_contact_number")}
+          </>
+        )}
+        <InlineSelect label="Appointment" value={yesNo(inbound.prior_appointment_required)} options={YES_NO} onSave={(v) => save({ prior_appointment_required: v === "yes" })} />
+      </Section>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-y-6 lg:gap-0 lg:divide-x divide-border/60">
-              
-              {/* Calls Primary Stat */}
-              <div className="flex flex-col gap-1.5 lg:pr-6">
-                <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                  <PhoneIncoming className="h-3 w-3" /> Calls
-                </div>
-                <div className="flex items-baseline gap-3">
-                  <span className="text-3xl font-medium text-foreground tracking-tighter leading-none">{contactCounts.call || 0}</span>
-                  {contactCounts.call > 0 && (
-                    <div className="flex gap-2 text-[10px] font-medium text-muted-foreground/80 uppercase tracking-wide">
-                      <span><strong className="text-yellow-300">{callDirectionCounts.incoming || 0}</strong> IN</span>
-                      <span><strong className="text-green-400">{callDirectionCounts.outgoing || 0}</strong> OUT</span>
-                      <span><strong className="text-red-400">{callDirectionCounts.missed || 0}</strong> MISS</span>
-                    </div>
-                  )}
-                </div>
-              </div>
+      <Section title="Brokerage" defaultOpen={!isMobile}>
+        <InlineSelect label="Accepted" value={inbound.brokerage_accepted} options={BROKERAGE_ACCEPTED} onSave={(v) => save({ brokerage_accepted: v })} />
+        {brokered && (
+          <>
+            <InlineSelect label="Type" value={inbound.brokerage_type} options={BROKERAGE_TYPES} onSave={(v) => save({ brokerage_type: v })} />
+            {inbound.brokerage_type === "Percentage" && <InlineText label="Percentage" type="number" value={inbound.percentage} placeholder="2" onSave={saveText("percentage", true)} />}
+            {inbound.brokerage_type === "Fixed" && <InlineText label="Amount" type="number" value={inbound.fixed_amount} placeholder="50000" onSave={saveText("fixed_amount", true)} />}
+            {inbound.brokerage_type === "Days" && <InlineText label="Days of rent" type="number" value={inbound.brokerage_days} placeholder="15" onSave={saveText("brokerage_days", true)} />}
+            <InlineMulti label="Paid by" values={paidBy} options={BROKERAGE_PAYERS.map((p) => ({ label: p, value: p }))} onSave={(v) => save({ brokerage_paid_by: v })} />
+            <InlineText label="Remarks" multiline value={inbound.brokerage_remarks} onSave={saveText("brokerage_remarks")} />
+          </>
+        )}
+      </Section>
 
-              {/* Secondary Stats */}
-              {(["whatsapp", "sms", "email"] as const).map((type) => (
-                <div key={type} className="flex flex-col gap-1.5 lg:pl-6">
-                  <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                    {CONTACT_TYPE_ICONS[type]} {type}
-                  </div>
-                  <span className="text-3xl font-medium text-foreground tracking-tighter leading-none">{contactCounts[type] || 0}</span>
-                </div>
-              ))}
-            </div>
+      <Section title="Listing" defaultOpen={!isMobile}>
+        <InlineSelect label="Exclusive" value={yesNo(inbound.is_exclusive)} options={YES_NO} onSave={(v) => save({ is_exclusive: v === "yes" })} />
+        <InlineSelect label="Prime location" value={yesNo(inbound.is_prime_location)} options={YES_NO} onSave={(v) => save({ is_prime_location: v === "yes" })} />
+        <InlineSelect label="Documents" value={yesNo(inbound.documents_collected)} options={[{ label: "Collected", value: "yes" }, { label: "Not yet", value: "no" }]} onSave={(v) => save({ documents_collected: v === "yes" })} />
+      </Section>
+    </>
+  );
 
-            {contactLogs.length === 0 && (
-              <p className="mt-5 text-center text-xs text-muted-foreground">No contact attempts recorded yet.</p>
+  const tabs: { key: Tab; label: string; icon: typeof Info; count?: number; mobileOnly?: boolean }[] = [
+    { key: "conversation", label: "Conversation", icon: MessagesSquare, count: followUps.length + contactLogs.length },
+    { key: "details", label: "Details", icon: Info, mobileOnly: true },
+    { key: "pricing", label: "Pricing", icon: Wallet },
+    { key: "photo", label: "Photo", icon: ImageIcon, count: inbound.image_url ? 1 : undefined },
+  ];
+  const shownTab: Tab = activeTab === "details" && !isMobile ? "conversation" : activeTab;
+
+  const pricing: ReactNode = (
+    <div className="pb-6">
+      <TabHeader title="Pricing" />
+      <div className="space-y-5 px-3 sm:px-10">
+        <section className="overflow-hidden rounded-xl border bg-card">
+          <div className="grid gap-x-8 px-3 py-2 md:grid-cols-2 md:px-4">
+            <InlineSelect label="Purpose" value={inbound.purpose} options={INBOUND_PURPOSES} onSave={(v) => save({ purpose: v })} />
+            {rent && <InlineText label="Monthly rent" value={rupees(inbound.total_rent)} placeholder="15000" onSave={(v) => save({ total_rent: v.trim() ? parseIndianCurrency(v) || null : null })} />}
+            {rent && <InlineText label="Rent / sq ft" type="number" value={inbound.rent_per_sqft} placeholder="25.5" onSave={saveText("rent_per_sqft", true)} />}
+            {inbound.purpose === "Sale" && category === "residential" && (
+              <InlineText label="Sale price" value={rupees(inbound.sale_price)} placeholder="85L" onSave={(v) => save({ sale_price: v.trim() ? parseIndianCurrency(v) || null : null })} />
             )}
+            {rent ? (
+              <InlineSelect label="Advance" value={inbound.advance} options={ADVANCE_MONTHS} onSave={(v) => save({ advance: v })} />
+            ) : inbound.purpose ? (
+              <InlineText label="Advance" value={inbound.advance && /^\d+$/.test(String(inbound.advance)) ? rupees(inbound.advance) : inbound.advance} placeholder="5L"
+                onSave={(v) => save({ advance: v.trim() ? String(parseIndianCurrency(v) || v.trim()) : null })} />
+            ) : null}
+            {hasFloor(type) && <InlineText label="Floor" value={inbound.floor_number} placeholder="Ground, 1st…" onSave={saveText("floor_number")} />}
           </div>
+        </section>
 
-          <div className="col-span-1 space-y-6">
-            <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
-             <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" /> Owner & Contact Info
-             </h3>
-             <div className="space-y-4">
-                <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
-                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Owner Name</span>
-                  <span className="font-medium text-[14px] text-right ml-2">{inbound.owner_name || inbound.ownerName || "\u2014"}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
-                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide shrink-0">Mobile</span>
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium text-[14px] truncate text-right">
-                      {canSeeContacts ? (inbound.owner_mobile || inbound.mobile_number || "\u2014") : (
-                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                          <Lock className="h-3 w-3" /> Restricted
-                        </span>
-                      )}
-                    </span>
-                    {canSeeContacts && (inbound.owner_mobile || inbound.mobile_number) && (
-                      <div className="flex gap-1 shrink-0">
-                        <Button variant="outline" size="icon" className="h-7 w-7 rounded-full bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700" onClick={() => openContact("call", inbound.owner_mobile || inbound.mobile_number)}>
-                          <Phone className="h-3 w-3" />
-                        </Button>
-                        <Button variant="outline" size="icon" className="h-7 w-7 rounded-full bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700" onClick={() => openContact("whatsapp", inbound.owner_mobile || inbound.mobile_number)}>
-                          <Phone className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex justify-between items-start gap-4 py-2 border-b border-border/30 last:border-0">
-                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide shrink-0">Alternative Contact</span>
-                  <span className="font-medium text-sm text-right min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-                    {canSeeContacts ? (inbound.alternative_contact || "\u2014") : (
-                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Lock className="h-3 w-3" /> Restricted</span>
-                    )}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
-                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide shrink-0">Email</span>
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="font-medium text-[14px] truncate max-w-[150px] sm:max-w-[200px] text-right">
-                      {canSeeContacts ? (inbound.owner_email || inbound.email || "\u2014") : (
-                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                          <Lock className="h-3 w-3" /> Restricted
-                        </span>
-                      )}
-                    </span>
-                    {canSeeContacts && (inbound.owner_email || inbound.email) && (
-                      <Button variant="outline" size="icon" className="h-7 w-7 rounded-full bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700 shrink-0" onClick={() => openContact("email", inbound.owner_email || inbound.email)}>
-                        <Mail className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
-                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Primary Contact</span>
-                  <span className="font-medium text-[14px] text-right ml-2">{inbound.primary_contact || "\u2014"}</span>
-                </div>
-
-                {inbound.primary_contact && inbound.primary_contact !== "Owner" && (
-                  <>
-                    <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
-                      <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Primary Name</span>
-                      <span className="font-medium text-[14px] text-right ml-2">{inbound.primary_contact_name || "\u2014"}</span>
-                    </div>
-                    <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
-                      <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide shrink-0">Primary Number</span>
-                      <div className="flex items-center gap-3">
-                        <span className="font-medium text-[14px] text-right">
-                          {canSeeContacts ? (inbound.primary_contact_number || "\u2014") : (
-                            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                              <Lock className="h-3 w-3" /> Restricted
-                            </span>
-                          )}
-                        </span>
-                        {canSeeContacts && inbound.primary_contact_number && (
-                          <Button variant="outline" size="icon" className="h-7 w-7 rounded-full bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700 shrink-0" onClick={() => openContact("call", inbound.primary_contact_number)}>
-                            <Phone className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
-                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide text-left">Key Available With</span>
-                  <span className="font-medium text-[14px] text-right ml-2">{inbound.key_available_with || "\u2014"}</span>
-                </div>
-
-                {inbound.key_available_with && inbound.key_available_with !== "Owner" && inbound.key_available_with !== inbound.primary_contact && (
-                  <>
-                    <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
-                      <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Key Name</span>
-                      <span className="font-medium text-[14px] text-right ml-2">{inbound.key_contact_name || "\u2014"}</span>
-                    </div>
-                    <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
-                      <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide shrink-0">Key Number</span>
-                      <div className="flex items-center gap-3">
-                        <span className="font-medium text-[14px] text-right">
-                          {canSeeContacts ? (inbound.key_contact_number || "\u2014") : (
-                            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                              <Lock className="h-3 w-3" /> Restricted
-                            </span>
-                          )}
-                        </span>
-                        {canSeeContacts && inbound.key_contact_number && (
-                          <Button variant="outline" size="icon" className="h-7 w-7 rounded-full bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700 shrink-0" onClick={() => openContact("call", inbound.key_contact_number)}>
-                            <Phone className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )}
-
-             </div>
-            </div>
-
-            <MailPanel entityType="inbound" entityId={inbound.id} refreshKey={mailRefresh}
-              recipients={canSeeContacts && inbound.email ? [inbound.email] : []} />
-
-            <div className="bg-card border rounded-2xl p-4 sm:p-6 shadow-sm">
-             <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-                <Briefcase className="h-4 w-4 text-muted-foreground" /> Brokerage Details
-             </h3>
-             <div className="space-y-4">
-                <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
-                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Accepted</span>
-                  <span className="font-medium text-[14px] text-right ml-2">{inbound.brokerage_accepted || "\u2014"}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
-                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Type</span>
-                  <span className="font-medium text-[14px] text-right ml-2">{inbound.brokerage_type || "\u2014"}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
-                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Brokerage</span>
-                  <span className="font-medium text-[14px] text-right ml-2">
-                    {inbound.brokerage_type === 'Days' 
-                      ? (inbound.brokerage_days ? `${inbound.brokerage_days} Days` : "\u2014") 
-                      : (inbound.percentage ? `${inbound.percentage}%` : (inbound.fixed_amount ? `₹${inbound.fixed_amount}` : "\u2014"))
-                    }
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-border/30 last:border-0">
-                  <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Remarks</span>
-                  <span className="font-medium text-[14px] truncate max-w-[150px] sm:max-w-[200px] text-right ml-2" title={inbound.brokerage_remarks || ""}>{inbound.brokerage_remarks || "\u2014"}</span>
-                </div>
-             </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Contact Logs Slider (Sheet) ── */}
-      <Sheet open={isContactLogsOpen} onOpenChange={setIsContactLogsOpen}>
-        <SheetContent side="right" className="!w-full sm:!w-[450px] sm:!max-w-[450px] p-0 flex flex-col border-l [&>button[data-slot='sheet-close']]:hidden sm:[&>button[data-slot='sheet-close']]:flex">
-          <div className="md:hidden flex flex-col shrink-0 bg-background/90 backdrop-blur-xl border-b z-10">
-            <div className="h-[env(safe-area-inset-top)] w-full" />
-            <div className="flex items-center justify-between px-4 h-14">
-              <button
-                onClick={() => setIsContactLogsOpen(false)}
-                className="flex items-center text-[#007AFF] dark:text-[#0A84FF] active:opacity-70 -ml-2 shrink-0"
-              >
-                <ChevronLeft className="w-[28px] h-[28px]" strokeWidth={2.5} />
-                <span className="text-[17px] font-medium tracking-tight">Back</span>
+        {(hasFloorPricing(category, type) || units.length > 0) && (
+          <section className="overflow-hidden rounded-xl border bg-card">
+            <div className="flex min-h-11 items-center gap-2 border-b px-4">
+              <h3 className="min-w-0 flex-1 truncate text-[14px] font-semibold text-foreground">Floors</h3>
+              <button type="button" onClick={() => saveUnits([...units, { floor_label: `Floor ${units.length + 1}` }]).catch(() => {})} className={cn(HEADER_BUTTON, "h-7 text-[13px]")}>
+                <Plus className="h-3.5 w-3.5 text-muted-foreground" /> Add floor
               </button>
-              <span className="absolute inset-x-0 text-center pointer-events-none text-[17px] font-semibold tracking-tight text-foreground truncate px-20">Contact logs</span>
-              <div className="w-10 shrink-0" />
             </div>
-          </div>
-
-          <SheetHeader className="hidden md:block p-6 border-b shrink-0">
-            <SheetTitle className="text-lg">Contact logs {contactLogs.length > 0 && `(${contactLogs.length})`}</SheetTitle>
-            <SheetDescription>Calls, messages, and emails recorded for this inbound.</SheetDescription>
-          </SheetHeader>
-
-          <div className="flex-1 overflow-y-auto p-5">
-            {contactLogs.length === 0 ? (
-              <div className="py-16 text-center">
-                <Clock className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
-                <p className="text-sm font-medium text-foreground">No contact logs yet</p>
-                <p className="mt-1 text-xs text-muted-foreground">New calls and communication will appear here.</p>
-              </div>
+            {units.length === 0 ? (
+              <p className="px-4 py-4 text-[13px] text-muted-foreground">One price for the whole property. Add floors when each has its own price.</p>
             ) : (
-              <div className="relative space-y-0">
-                <div className="absolute left-[19px] top-2 bottom-2 w-px bg-border" />
-                {contactLogs.map((log: any) => (
-                  <div key={log.id} className="relative flex gap-4 pb-5 last:pb-0">
-                    <div className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-background ${CONTACT_TYPE_STYLES[log.contact_type] || "bg-muted text-muted-foreground"}`}>
-                      {contactLogIcon(log)}
-                    </div>
-                    <div className="min-w-0 flex-1 rounded-xl border bg-card px-3.5 py-3 shadow-sm">
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="text-[13px] font-semibold text-foreground">
-                          <span className="text-[#0052FF]">{contactLogAuthor(log)}</span>
-                          <span className="mx-1.5 text-muted-foreground/60">•</span>
-                          {log.contact_type === "call" ? (
-                            <>{log.call_direction || "Voice"} call <span className="font-normal text-muted-foreground whitespace-nowrap">({formatDuration(log.call_duration)})</span></>
-                          ) : (
-                            <span className="capitalize">{log.contact_type}</span>
-                          )}
-                        </p>
-                        <span className="shrink-0 text-[10px] leading-4 text-muted-foreground">{formatTimestamp(log.created_at)}</span>
+              <ul className="divide-y">
+                {units.map((u, i) => {
+                  const update = (patch: Partial<(typeof units)[number]>) => saveUnits(units.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+                  return (
+                    <li key={i} className="group grid gap-x-6 px-3 py-1.5 md:grid-cols-[1fr_1fr_1fr_auto] md:items-center md:px-4">
+                      <InlineText label="Floor" value={u.floor_label} onSave={(v) => (v.trim() ? update({ floor_label: v.trim() }) : undefined)} />
+                      <InlineText label="Area" value={u.area} placeholder="1200 sq ft" onSave={(v) => update({ area: v.trim() || null })} />
+                      <InlineText label={rent ? "Rent" : "Price"} value={rupees(u.price)} placeholder="50000" onSave={(v) => update({ price: v.trim() ? parseIndianCurrency(v) || null : null })} />
+                      <button type="button" aria-label={`Remove ${u.floor_label}`} onClick={() => { if (confirm(`Remove ${u.floor_label}?`)) void saveUnits(units.filter((_, j) => j !== i)).catch(() => {}); }}
+                        className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground md:opacity-0 md:group-hover:opacity-100">
+                        <X className="h-4 w-4" />
+                      </button>
+                      <div className="md:col-span-4">
+                        <InlineText label="Notes" value={u.notes} placeholder="Lift access, separate entrance…" onSave={(v) => update({ notes: v.trim() || null })} />
                       </div>
-                      {log.subject && <p className="mt-2 text-xs font-medium text-muted-foreground">Subject: {log.subject}</p>}
-                      {log.message && <p className="mt-2 rounded-lg bg-muted/50 px-2.5 py-2 text-[12px] leading-relaxed text-foreground/75">{log.message}</p>}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    </li>
+                  );
+                })}
+                {units.some((u) => u.price) && (
+                  <li className="flex items-center justify-end gap-3 px-4 py-2.5 text-[13px] text-muted-foreground">
+                    Total <span className="text-[14px] font-semibold text-foreground">{rupees(units.reduce((s, u) => s + (Number(u.price) || 0), 0))}</span>
+                  </li>
+                )}
+              </ul>
             )}
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      {/* ── Follow-Up History Slider (Sheet) ── */}
-      <Sheet open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-        <SheetContent side="right" className="!w-full sm:!w-[450px] sm:!max-w-[450px] p-0 flex flex-col border-l [&>button[data-slot='sheet-close']]:hidden sm:[&>button[data-slot='sheet-close']]:flex">
-          {/* Mobile back header */}
-          <div className="md:hidden flex flex-col shrink-0 bg-background/90 backdrop-blur-xl border-b z-10">
-            <div className="h-[env(safe-area-inset-top)] w-full" />
-            <div className="flex items-center justify-between px-4 h-14">
-              <button onClick={() => setIsHistoryOpen(false)} className="flex items-center text-[#007AFF] dark:text-[#0A84FF] active:opacity-70 -ml-2 shrink-0">
-                <ChevronLeft className="w-[28px] h-[28px]" strokeWidth={2.5} />
-                <span className="text-[17px] font-medium tracking-tight">Back</span>
-              </button>
-              <span className="absolute inset-x-0 text-center pointer-events-none text-[17px] font-semibold tracking-tight text-foreground truncate px-20">Timeline</span>
-              <div className="w-10 shrink-0" />
-            </div>
-          </div>
-          <SheetHeader className="hidden md:block p-6 border-b shrink-0">
-            <SheetTitle className="text-lg">Follow Up Timeline {followUps.length > 0 && `(${followUps.length})`}</SheetTitle>
-          </SheetHeader>
-          <div className="flex-1 overflow-hidden relative">
-            <FollowUpPanel
-              entityId={Number(id)}
-              entityType="inbounds"
-              followUps={followUps}
-              onRefresh={() => fetchInbound(true)}
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      {/* ── Contact Modal ── */}
-      <ContactModal
-        open={contactModal.open}
-        type={contactModal.type}
-        to={contactModal.to}
-        entityId={Number(id)}
-        entityType="inbounds"
-        onClose={() => setContactModal({ open: false, type: "", to: "" })}
-        onSent={() => fetchInbound(true)}
-      />
-
-      <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
-        <DialogContent className="max-w-[95vw] w-full h-[95vh] p-0 overflow-hidden bg-black/95 border-none shadow-2xl">
-          <div className="relative flex items-center justify-center w-full h-full p-4">
-            <img src={inbound?.image_url} alt="Inbound Full View" className="w-full h-full object-contain" />
-          </div>
-        </DialogContent>
-      </Dialog>
-
+          </section>
+        )}
+      </div>
     </div>
   );
+
+  const uploadButton = (
+    <button type="button" onClick={() => photoInput.current?.click()} disabled={uploading} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-foreground px-3 text-[13px] font-medium text-background transition-colors hover:bg-foreground/85 disabled:opacity-60">
+      {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+      {inbound.image_url ? "Replace photo" : "Upload photo"}
+    </button>
+  );
+  const photo: ReactNode = (
+    <div className="pb-6">
+      <input ref={photoInput} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" onChange={uploadPhoto} className="hidden" />
+      <TabHeader title="Photo" action={uploadButton} />
+      <div className="px-3 sm:px-10">
+        {inbound.image_url ? (
+          <button type="button" onClick={() => setPhotoOpen(true)} className="block overflow-hidden rounded-xl border">
+            {/* eslint-disable-next-line @next/next/no-img-element -- photos live on the CDN, not the Next image loader */}
+            <img src={inbound.image_url} alt={title} className="max-h-[420px] w-auto object-contain" />
+          </button>
+        ) : (
+          <EmptyState art={<AttachmentsArt />} title="No photo yet" hint="A clear photo of the front helps the team and buyers recognise the place. Its GPS position fills in the location." />
+        )}
+        {hasMap && (
+          <p className="mt-3 flex items-center gap-1.5 text-[13px] text-muted-foreground">
+            <MapPin className="h-3.5 w-3.5" /> {Number(inbound.latitude).toFixed(5)}, {Number(inbound.longitude).toFixed(5)}
+            <a href={`https://www.google.com/maps?q=${encodeURIComponent(`${inbound.latitude},${inbound.longitude}`)}`} target="_blank" rel="noopener noreferrer" className="ml-1 font-medium text-[#017D58] hover:underline dark:text-[#2FB585]">
+              Open in Maps
+            </a>
+          </p>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col md:h-full lg:-mx-6 lg:-mb-8 lg:-mt-6 lg:h-[calc(100%+3.5rem)]">
+      <MobileHeader title={title} showBack />
+
+      <PageActions>
+        <div className="flex items-center gap-2">
+          {statusMenu("h-8")}
+          {staff.canAssign ? (
+            <button type="button" onClick={() => setAssigning("open")} aria-label={`Assigned to ${assignee ?? "nobody"}. Reassign`} className={cn(HEADER_BUTTON, "pl-1.5 pr-2")}>
+              {assigneeLabel}
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+          ) : (
+            <span className={cn(HEADER_BUTTON, "pl-1.5 hover:bg-background")}>{assigneeLabel}</span>
+          )}
+        </div>
+      </PageActions>
+
+      {/* ── Phone summary ── */}
+      <div className="space-y-3 px-4 pb-4 pt-1 md:hidden">
+        <div className="flex flex-wrap items-center gap-2 text-[14px] text-muted-foreground">
+          {statusMenu("h-7")}
+          <span>{inboundCode(inbound)}</span>
+          <QualityScore score={Number(inbound.quality_score) || 0} />
+        </div>
+        <button type="button" disabled={!staff.canAssign} onClick={() => setAssigning("open")}
+          className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-foreground/[0.06] px-3 text-[15px] font-medium text-foreground disabled:bg-foreground/[0.04]">
+          {assigneeLabel}
+          {staff.canAssign && <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />}
+        </button>
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        <div className="flex min-w-0 flex-1 flex-col md:min-h-0">
+          <div role="tablist" aria-label="Inbound sections"
+            className="sticky top-[calc(env(safe-area-inset-top)+2.75rem)] z-20 flex shrink-0 gap-1.5 overflow-x-auto bg-background px-4 py-2 scrollbar-hide md:static md:gap-5 md:border-b md:px-5 md:py-0">
+            {tabs.map((t) => (
+              <TabButton key={t.key} active={shownTab === t.key} onClick={() => setActiveTab(t.key)} icon={t.icon} label={t.label} count={t.count} className={t.mobileOnly ? "md:hidden" : undefined} />
+            ))}
+          </div>
+
+          <div className={cn("md:min-h-0 md:flex-1", shownTab === "conversation" ? "md:flex md:flex-col" : "md:overflow-y-auto")}>
+            {shownTab === "details" && <div className="mx-4 mt-2 overflow-hidden rounded-xl border bg-card">{fields}</div>}
+            {shownTab === "conversation" && (
+              <LeadConversation
+                leadId={inbound.id}
+                leadName={inbound.owner_name}
+                entity={INBOUND_ENTITY}
+                email={canSeeContacts ? inbound.email : null}
+                mobile={canSeeContacts ? inbound.mobile_number : null}
+                whatsapp={canSeeContacts ? inbound.whatsapp_number : null}
+                followUps={followUps}
+                contactLogs={contactLogs}
+                composer={<FollowUpComposer api="inbounds" entityId={inbound.id} noun="owner" followUps={followUps} onSaved={() => fetchInbound()} />}
+                canEdit
+                isAdmin={isAdmin}
+                refreshKey={mailRefresh}
+                onRefresh={() => fetchInbound()}
+              />
+            )}
+            {shownTab === "pricing" && pricing}
+            {shownTab === "photo" && photo}
+          </div>
+        </div>
+
+        <aside className="hidden w-[340px] shrink-0 flex-col overflow-y-auto border-l md:flex xl:w-[360px]">
+          <div className="space-y-2 border-b p-4">
+            <div className="flex items-center gap-3">
+              {inbound.image_url ? (
+                <button type="button" onClick={() => setPhotoOpen(true)} className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- CDN photo thumbnail */}
+                  <img src={inbound.image_url} alt="" className="h-full w-full object-cover" />
+                </button>
+              ) : (
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-foreground/[0.06] text-muted-foreground"><Building2 className="h-5 w-5" /></span>
+              )}
+              <div className="min-w-0">
+                <p className="truncate text-[17px] font-semibold leading-6 text-foreground" title={title}>{title}</p>
+                <p className="text-[13px] text-muted-foreground">{inboundCode(inbound)}</p>
+              </div>
+            </div>
+            <QualityScore score={Number(inbound.quality_score) || 0} />
+          </div>
+          {fields}
+          <p className="mt-auto hidden items-center gap-1.5 px-4 py-3 text-[12px] text-muted-foreground md:flex">
+            Press <kbd className="rounded border px-1 font-mono text-[11px]">A</kbd> to open the conversation.
+          </p>
+        </aside>
+      </div>
+
+      <InboundAssignmentDialog open={assigning !== null} count={1} busy={assigning === "busy"} onClose={() => setAssigning(null)} onConfirm={assign} />
+
+      <Dialog open={photoOpen} onOpenChange={setPhotoOpen}>
+        <DialogContent className="h-[90vh] w-full max-w-[95vw] overflow-hidden border-none bg-black/95 p-0 sm:max-w-[95vw]">
+          <DialogTitle className="sr-only">{title}</DialogTitle>
+          {/* eslint-disable-next-line @next/next/no-img-element -- full-size CDN photo */}
+          <img src={inbound.image_url} alt={title} className="h-full w-full object-contain p-4" />
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+export default function InboundViewPage() {
+  return <InboundDetail />;
 }

@@ -62,6 +62,11 @@ const TONE_DOTS: Record<StatusTone, string> = {
   gray: "bg-gray-400",
 };
 
+/** The tinted pill classes (bg + text) for a status, as the tables show it. */
+export function statusPillClass(status?: string, tone?: StatusTone) {
+  return TONES[tone ?? statusTone(status)];
+}
+
 /** Solid dot for a status, for group and kanban column headers. */
 export function statusDot(status?: string, tone?: StatusTone) {
   return TONE_DOTS[tone ?? statusTone(status)];

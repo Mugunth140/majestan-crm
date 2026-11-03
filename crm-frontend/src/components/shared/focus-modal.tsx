@@ -102,7 +102,7 @@ export function FocusModal({
                       aria-selected={current}
                       onClick={() => onStepChange?.(step.key)}
                       className={cn(
-                        "flex h-full w-auto shrink-0 items-center gap-2 border-r px-4 text-[14px] transition-colors md:w-[200px] lg:w-[240px]",
+                        "flex h-full w-auto shrink-0 items-center gap-2 border-r px-4 text-[14px] transition-colors md:w-auto md:min-w-[140px] md:max-w-[240px] md:flex-1 md:shrink",
                         current
                           ? "bg-background font-medium text-foreground"
                           : "bg-muted/50 text-muted-foreground hover:text-foreground dark:bg-black/20",

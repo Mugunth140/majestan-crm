@@ -7,7 +7,7 @@ import {
 } from "@/lib/lead-constants";
 import { formatIndianCurrencyShort, parseIndianCurrency } from "@/lib/indian-currency";
 import { searchProjects } from "@/lib/project-search";
-import { InlineMulti, InlineSearch, InlineSelect, InlineText, type Option } from "./inline-field";
+import { InlineMulti, InlineSearch, InlineSelect, InlineText, type Option } from "@/components/record/inline-field";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
