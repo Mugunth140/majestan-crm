@@ -9,7 +9,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { DataTable } from "@/components/tables/data-table";
 import { DateCell, IdCell, NameCell, StatusCell, type StatusTone } from "@/components/tables/cells";
-import { LEAD_STATUS_DOTS } from "@/lib/lead-constants";
+import { LEAD_STATUS_STYLES } from "@/lib/lead-constants";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { ColumnDef, PaginationState } from "@tanstack/react-table";
@@ -707,7 +707,7 @@ export default function LeadRoutingPage() {
       accessorKey: "status",
       header: "Last Status",
       cell: ({ row }) => (
-        <StatusCell status={row.original.status} dotClass={LEAD_STATUS_DOTS[row.original.status ?? ""] ?? "bg-gray-400"} />
+        <StatusCell status={row.original.status} pillClass={LEAD_STATUS_STYLES[row.original.status ?? ""]} />
       ),
     },
     {

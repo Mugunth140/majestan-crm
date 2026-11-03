@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { NameAvatar } from "@/components/shared/name-avatar";
 
 // Shared cell renderers so every module's list table reads the same way as
-// Leads: muted record ID first, a bold primary name, status as a coloured dot,
+// Leads: muted record ID first, a bold primary name, status as a tinted pill,
 // and dates in one format at the end.
 
 /** Record ID, muted; links to the record when `href` is given. */
@@ -32,13 +32,15 @@ export function NameCell({ name, avatar = false, sub, className }: { name?: Reac
   );
 }
 
+// Soft tinted pill per tone: pale fill with strong text in light mode, a deep
+// tint with bright text in dark mode.
 const TONES = {
-  green: "bg-emerald-500",
-  blue: "bg-blue-500",
-  amber: "bg-amber-500",
-  red: "bg-rose-500",
-  violet: "bg-violet-500",
-  gray: "bg-gray-400",
+  green: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400",
+  blue: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400",
+  amber: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-400",
+  red: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400",
+  violet: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-400",
+  gray: "bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-300",
 } as const;
 export type StatusTone = keyof typeof TONES;
 
@@ -55,12 +57,16 @@ export function statusTone(status?: string): StatusTone {
   return TONE_BY_WORD[status?.trim().toLowerCase() ?? ""] ?? "gray";
 }
 
-/** Status as a coloured dot and its label. Pass `tone` or `dotClass` to override the guess. */
-export function StatusCell({ status, tone, dotClass }: { status?: string; tone?: StatusTone; dotClass?: string }) {
+/** Status as a tinted pill. Pass `tone` or `pillClass` (bg + text classes) to override the guess. */
+export function StatusCell({ status, tone, pillClass }: { status?: string; tone?: StatusTone; pillClass?: string }) {
   if (!status) return <span className="text-muted-foreground">—</span>;
   return (
-    <span className="inline-flex items-center gap-2 whitespace-nowrap">
-      <span className={cn("size-2 shrink-0 rounded-full", dotClass ?? TONES[tone ?? statusTone(status)])} />
+    <span
+      className={cn(
+        "inline-flex h-6 items-center whitespace-nowrap rounded-full px-2.5 text-[13px] font-medium leading-none",
+        pillClass ?? TONES[tone ?? statusTone(status)],
+      )}
+    >
       {status}
     </span>
   );
