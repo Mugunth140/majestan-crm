@@ -33,7 +33,6 @@ import { useIsMobile } from "@/hooks/use-device";
 import dynamic from "next/dynamic";
 
 const LeadAttachments = dynamic(() => import("@/components/shared/lead-attachments").then(mod => mod.LeadAttachments), { ssr: false });
-const EditRequirementModal = dynamic(() => import("@/components/shared/edit-requirement-modal").then(mod => mod.EditRequirementModal), { ssr: false });
 import { AssignLeadModal } from "@/components/shared/assign-lead-modal";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { sortContactLogs } from "@/lib/contact-log-utils";
@@ -41,12 +40,6 @@ import {
   leadStatusDot,
   leadStatusPill,
   LEAD_STATUS_ORDER,
-  PURCHASE_TYPES,
-  PURCHASE_TIMELINES,
-  QUALIFICATION_PURPOSES,
-  PROPERTY_CATEGORIES,
-  PROPERTY_TYPES_MAP,
-  FUNDERS,
 } from "@/lib/lead-constants";
 import { cn } from "@/lib/utils";
 import { shouldAutoOpenFollowUps, wantsFollowUps } from "@/lib/follow-up-deep-link";
@@ -54,10 +47,11 @@ import { InlineAction, InlineSelect, InlineText, Section, FieldRow, type Option 
 import { Feed, timelineItems, type TimelineEntry } from "./lead-timeline";
 import { LeadConversation, type ComposeMode } from "./lead-conversation";
 import { AttachmentsArt, EmptyState, RequirementsArt } from "./lead-empty";
+import { RequirementFields } from "./lead-requirement";
 import {
   Loader2, Phone, Mail, MessageCircle, MessageSquare, ArrowUpRight,
   History, TrendingUp, Sparkles, ChevronDown,
-  Plus, Activity, MessagesSquare, Paperclip, Building2, Smartphone, Pencil, Info, Flag, PhoneMissed,
+  Plus, Activity, MessagesSquare, Paperclip, Building2, Smartphone, Info, Flag, PhoneMissed,
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -117,7 +111,6 @@ const COMPOSER_CHIP =
 
 const leadCode = (id: number | string) => `L${String(id).padStart(5, "0")}`;
 
-const humanize = (v?: string | null) => (v ? v.replace(/_/g, " ") : "");
 
 // The header actions share the leads list's toolbar buttons.
 const HEADER_BUTTON =
@@ -220,14 +213,14 @@ function QuickAction({ icon: Icon, label, onClick, disabled }: {
   );
 }
 
-function Panel({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+function Panel({ title, action, children, flush }: { title: string; action?: ReactNode; children: ReactNode; flush?: boolean }) {
   return (
     <section className="overflow-hidden rounded-xl border bg-card">
       <div className="flex min-h-11 items-center gap-2 border-b px-4">
         <h3 className="min-w-0 flex-1 truncate text-[14px] font-semibold text-foreground">{title}</h3>
         {action}
       </div>
-      <div className="p-4">{children}</div>
+      <div className={flush ? undefined : "p-4"}>{children}</div>
     </section>
   );
 }
@@ -282,7 +275,6 @@ function LeadDetail() {
   const [isNotInterestedOpen, setIsNotInterestedOpen] = useState(false);
 
   // Edit Requirement
-  const [editInquiry, setEditInquiry] = useState<any>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -1203,66 +1195,21 @@ function LeadDetail() {
                   />
                 )}
 
-                {inquiries.map((inq: any, idx: number) => {
-                  const typeOptions = PROPERTY_TYPES_MAP[inq.property_category] ?? Object.values(PROPERTY_TYPES_MAP).flat();
-                  const prefs = Object.entries(inq.preferences ?? {}).filter(([, v]) => v !== "" && v != null);
-                  return (
-                    <Panel
-                      key={inq.id || idx}
-                      title={inquiries.length > 1 ? `Requirement #${idx + 1}` : "Requirement"}
-                      action={canEdit && (
-                        <div className="flex items-center gap-2">
-                          <button type="button" onClick={() => setEditInquiry(inq)} className={HEADER_BUTTON}>
-                            <Pencil className="h-3.5 w-3.5 text-muted-foreground" /> <span className="sm:hidden">Edit</span><span className="hidden sm:inline">Location & preferences</span>
-                          </button>
-                          {idx === 0 && (
-                            <button type="button" onClick={fetchAutoMatch} disabled={isMatching} className={cn(HEADER_PRIMARY, "disabled:opacity-60")}>
-                              {isMatching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                              <span className="sm:hidden">Match</span><span className="hidden sm:inline">Auto match</span>
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    >
-                      <div className="grid gap-x-8 gap-y-0 md:grid-cols-2">
-                        <div>
-                          <InlineSelect label="Purchase type" value={inq.purchase_type} options={PURCHASE_TYPES} onSave={(v) => saveInquiry(inq.id, { purchaseType: v })} disabled={!canEdit} />
-                          <InlineSelect label="Category" value={inq.property_category} options={PROPERTY_CATEGORIES} onSave={(v) => saveInquiry(inq.id, { propertyCategory: v, propertyType: null })} disabled={!canEdit} />
-                          <InlineSelect label="Property type" value={inq.property_type} options={typeOptions} onSave={(v) => saveInquiry(inq.id, { propertyType: v })} disabled={!canEdit} />
-                          <InlineSelect label="Funding" value={inq.funder} options={FUNDERS} onSave={(v) => saveInquiry(inq.id, { funder: v })} disabled={!canEdit} />
-                        </div>
-                        <div>
-                          <InlineText label="Project" value={inq.project_list} onSave={(v) => saveInquiry(inq.id, { project: v || null })} disabled={!canEdit} />
-                          <InlineSelect label="Timeline" value={inq.purchase_timeline} options={PURCHASE_TIMELINES} onSave={(v) => saveInquiry(inq.id, { purchaseTimeline: v })} disabled={!canEdit} />
-                          <InlineSelect label="Purpose" value={inq.qualification_purpose} options={QUALIFICATION_PURPOSES} onSave={(v) => saveInquiry(inq.id, { qualificationPurpose: v })} disabled={!canEdit} />
-                          <InlineText label="Decision maker" value={inq.decision_maker} placeholder="e.g. Self, Spouse" onSave={(v) => saveInquiry(inq.id, { decisionMaker: v || null })} disabled={!canEdit} />
-                        </div>
-                      </div>
-                      {(inq.sub_locations?.length > 0 || prefs.length > 0) && (
-                        <div className="mt-3 space-y-3 border-t pt-3">
-                          {inq.sub_locations?.length > 0 && (
-                            <FieldRow label="Locations">
-                              <div className="flex flex-wrap gap-1.5 px-2 py-1">
-                                {inq.sub_locations.map((loc: string) => (
-                                  <span key={loc} className="rounded-md bg-foreground/[0.06] px-2 py-0.5 text-[13px] text-foreground/85">{loc}</span>
-                                ))}
-                              </div>
-                            </FieldRow>
-                          )}
-                          {prefs.length > 0 && (
-                            <div className="grid gap-x-8 md:grid-cols-2">
-                              {prefs.map(([key, val]) => (
-                                <FieldRow key={key} label={key === "bhk" ? "BHK" : humanize(key.replace(/([A-Z])/g, " $1")).trim().replace(/^./, (c) => c.toUpperCase())}>
-                                  <span className="truncate px-2 text-[14px] text-foreground">{String(val)}</span>
-                                </FieldRow>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </Panel>
-                  );
-                })}
+                {inquiries.map((inq: any, idx: number) => (
+                  <Panel
+                    key={inq.id || idx}
+                    flush
+                    title={inquiries.length > 1 ? `Requirement #${idx + 1}` : "Requirement"}
+                    action={canEdit && idx === 0 && (
+                      <button type="button" onClick={fetchAutoMatch} disabled={isMatching} className={cn(HEADER_BUTTON, "h-7 text-[13px] disabled:opacity-60")}>
+                        {isMatching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />}
+                        Find matches
+                      </button>
+                    )}
+                  >
+                    <RequirementFields inquiry={inq} canEdit={canEdit} save={(patch) => saveInquiry(inq.id, patch)} />
+                  </Panel>
+                ))}
               </div>
             )}
 
@@ -1505,15 +1452,6 @@ function LeadDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* ── Edit Requirement Modal ── */}
-      <EditRequirementModal
-        open={!!editInquiry}
-        onClose={() => setEditInquiry(null)}
-        inquiry={editInquiry}
-        leadId={Number(id)}
-        onSuccess={() => fetchLead(true)}
-      />
 
       {/* ── Assign Lead Modal ── */}
       <AssignLeadModal

@@ -12,7 +12,16 @@ type LocationDependencies = {
   complete?: () => void;
 };
 
-/** Outbox lives outside the form so GPS and network retries survive route changes. */
+// A location still missing after this long is given up on, so an old denied
+// request does not keep retrying for ever.
+const STALE_MS = 2 * 24 * 60 * 60 * 1000;
+const capturedAt = (capture: string) => Number(capture.split('-')[0]) || 0;
+
+/**
+ * Outbox lives outside the form so GPS and network retries survive route changes.
+ * Only requests the user started (creating an inbound, pressing Retry) report
+ * failures; background retries stay quiet so other pages are not interrupted.
+ */
 export class InboundLocationQueue {
   private scope: string | null = null;
   private jobs: PendingLocation[] = [];
@@ -27,7 +36,11 @@ export class InboundLocationQueue {
     if (scope === this.scope) return;
     this.scope = scope;
     this.captures.clear();
-    this.jobs = scope ? this.dependencies.load(scope).map(job => ({ ...job, ready: true })) : [];
+    const fresh = Date.now() - STALE_MS;
+    this.jobs = scope
+      ? this.dependencies.load(scope).filter(job => job.coordinates || capturedAt(job.capture) > fresh).map(job => ({ ...job, ready: true }))
+      : [];
+    if (scope) this.persist();
   }
   private persist() {
     if (this.scope) this.dependencies.store(this.scope, this.jobs);
@@ -65,15 +78,16 @@ export class InboundLocationQueue {
     void this.flush();
   }
 
-  retry() {
+  /** `quiet` retries (timers, focus, coming online) never show a message. */
+  retry(quiet = false) {
     this.restore();
     const captures = new Set(this.jobs.filter(job => !job.coordinates).map(job => job.capture));
     for (const [key, state] of this.captures) if (state.active && !state.coordinates) captures.add(key);
-    for (const key of captures) void this.request(key);
-    void this.flush();
+    for (const key of captures) void this.request(key, quiet);
+    void this.flush(quiet);
   }
 
-  private async request(key: string) {
+  private async request(key: string, quiet = false) {
     if (!this.scope) return;
     let state = this.captures.get(key);
     if (!state) {
@@ -92,7 +106,7 @@ export class InboundLocationQueue {
       this.persist();
       void this.flush();
     } catch {
-      if (state.scope === this.dependencies.identity() && (state.active || this.jobs.some(job => job.capture === key))) {
+      if (!quiet && state.scope === this.dependencies.identity() && (state.active || this.jobs.some(job => job.capture === key))) {
         this.dependencies.notify('Location is needed. Allow Location in this app’s settings, then retry. Inbound creation can continue.', () => this.retry());
       }
     } finally {
@@ -100,7 +114,7 @@ export class InboundLocationQueue {
     }
   }
 
-  private async flush() {
+  private async flush(quiet = false) {
     if (this.syncing) return;
     this.syncing = true;
     try {
@@ -111,7 +125,7 @@ export class InboundLocationQueue {
           this.jobs = this.jobs.filter(item => item !== job);
           this.persist();
         } catch {
-          this.dependencies.notify('Inbound saved. Its location is pending and will retry when the connection returns.', () => this.retry());
+          if (!quiet) this.dependencies.notify('Inbound saved. Its location is pending and will retry when the connection returns.', () => this.retry());
         }
       }
       if (!this.jobs.length && ![...this.captures.values()].some(state => state.active && !state.coordinates)) this.dependencies.complete?.();

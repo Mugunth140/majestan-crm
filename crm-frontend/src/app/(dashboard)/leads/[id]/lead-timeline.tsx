@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { LEAD_STATUS_DOTS } from "@/lib/lead-constants";
 import { cn } from "@/lib/utils";
-import { Feed, Who, sortNewestFirst, type FeedItem } from "./lead-feed";
+import { Chip, Feed, Who, sortNewestFirst, type FeedItem } from "./lead-feed";
 
 /** One entry from GET /leads/:id/timeline. */
 export type TimelineEntry = {
@@ -29,14 +29,6 @@ const FIELD_LABELS: Record<string, string> = {
   qualification_purpose: "purpose", decision_maker: "decision maker", preferences: "preferences",
 };
 
-const TONE = {
-  neutral: "bg-foreground/[0.07] text-foreground/70",
-  green: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-  blue: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  amber: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  red: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  violet: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
-};
 
 const pretty = (v: string | null) => {
   if (v === null || v === "") return null;
@@ -74,45 +66,45 @@ function toItem(e: TimelineEntry): FeedItem {
   switch (e.kind) {
     case "created":
       return {
-        ...base, icon: <Sparkles />, tone: TONE.neutral,
+        ...base, icon: <Sparkles />,
         title: e.actor
           ? <>{actor} created this lead{meta.source ? <> from <Value>{String(meta.source)}</Value></> : null}</>
           : <>Lead created{meta.source ? <> from <Value>{String(meta.source)}</Value></> : null}</>,
       };
     case "status_changed":
       return {
-        ...base, icon: <ArrowRightLeft />, tone: TONE.blue,
+        ...base, icon: <ArrowRightLeft />,
         title: <>{actor} changed status from <Status name={e.from} /> to <Status name={e.to} /></>,
         body: meta.reason ? `Reason: ${String(meta.reason)}` : null,
       };
     case "field_changed":
-      return { ...base, icon: <PencilLine />, tone: TONE.neutral, title: change(actor, FIELD_LABELS[e.field ?? ""] ?? pretty(e.field) ?? "a field", e.from, e.to) };
+      return { ...base, icon: <PencilLine />, title: change(actor, FIELD_LABELS[e.field ?? ""] ?? pretty(e.field) ?? "a field", e.from, e.to) };
     case "requirement_changed":
       return {
-        ...base, icon: <PencilLine />, tone: TONE.violet,
+        ...base, icon: <PencilLine />,
         title: change(actor, `requirement ${FIELD_LABELS[e.field ?? ""] ?? pretty(e.field) ?? "details"}`, e.field === "preferences" ? null : e.from, e.field === "preferences" ? "updated" : e.to),
       };
     case "requirement_added":
-      return { ...base, icon: <ClipboardPlus />, tone: TONE.violet, title: <>{actor} added a requirement</> };
+      return { ...base, icon: <ClipboardPlus />, title: <>{actor} added a requirement</> };
     case "qualification_changed":
       return {
-        ...base, icon: <ShieldAlert />, tone: e.to === "Unqualified" ? TONE.red : TONE.green,
+        ...base, icon: <ShieldAlert />, iconClass: e.to === "Unqualified" ? "text-red-600 dark:text-red-400" : undefined,
         title: <>{actor} marked the lead <Value>{e.to}</Value></>,
       };
     case "visit_scheduled":
       return {
-        ...base, icon: <CalendarCheck />, tone: TONE.amber,
+        ...base, icon: <CalendarCheck />,
         title: <>{actor} scheduled a site visit{e.to ? <> for <Value>{e.to}</Value></> : null}</>,
-        chips: [meta.project, meta.location && `at ${meta.location}`].filter(Boolean).map(String),
+        chips: [meta.project, meta.location && `at ${meta.location}`].filter(Boolean).map((c) => <Chip key={String(c)}>{String(c)}</Chip>),
       };
     case "document_added":
-      return { ...base, icon: <FilePlus2 />, tone: TONE.neutral, title: <>{actor} attached <Value>{e.to}</Value></> };
+      return { ...base, icon: <FilePlus2 />, title: <>{actor} attached <Value>{e.to}</Value></> };
     case "document_removed":
-      return { ...base, icon: <FileX2 />, tone: TONE.neutral, title: <>{actor} removed <Value>{e.from}</Value></> };
+      return { ...base, icon: <FileX2 />, title: <>{actor} removed <Value>{e.from}</Value></> };
     case "routing":
       return routingItem(e, actor, base);
     default:
-      return { ...base, icon: <PencilLine />, tone: TONE.neutral, title: <>{actor} updated the lead</> };
+      return { ...base, icon: <PencilLine />, title: <>{actor} updated the lead</> };
   }
 }
 
@@ -124,27 +116,27 @@ function routingItem(e: TimelineEntry, actor: ReactNode, base: Pick<FeedItem, "k
   switch (e.field) {
     case "Assigned":
       return {
-        ...base, icon: <UserPlus />, tone: TONE.green, body: feedback,
+        ...base, icon: <UserPlus />, body: feedback,
         title: from && e.from !== e.to ? <>{actor} reassigned the lead from {from} to {to}</> : <>{actor} assigned the lead to {to}</>,
       };
     case "Claimed":
-      return { ...base, icon: <UserCheck />, tone: TONE.green, title: <>{to ?? actor} picked up the lead</> };
+      return { ...base, icon: <UserCheck />, title: <>{to ?? actor} picked up the lead</> };
     case "Auto-transferred":
-      return { ...base, icon: <TrendingUp />, tone: TONE.amber, title: <>Moved to the <Value>Sales</Value> pipeline</>, body: feedback };
+      return { ...base, icon: <TrendingUp />, title: <>Moved to the <Value>Sales</Value> pipeline</>, body: feedback };
     case "Auto-unassigned":
-      return { ...base, icon: <UserMinus />, tone: TONE.red, title: <>Unassigned from {from ?? "its owner"} automatically</>, body: feedback };
+      return { ...base, icon: <UserMinus />, title: <>Unassigned from {from ?? "its owner"} automatically</>, body: feedback };
     case "Returned to Queue":
-      return { ...base, icon: <UserMinus />, tone: TONE.red, title: <>{actor} returned the lead to the queue</>, body: feedback };
+      return { ...base, icon: <UserMinus />, title: <>{actor} returned the lead to the queue</>, body: feedback };
     case "Converted":
-      return { ...base, icon: <TrendingUp />, tone: TONE.green, title: <>{actor} converted the lead</>, body: feedback };
+      return { ...base, icon: <TrendingUp />, title: <>{actor} converted the lead</>, body: feedback };
     case "Queued":
-      return { ...base, icon: <Inbox />, tone: TONE.neutral, title: <>Lead queued for assignment</> };
+      return { ...base, icon: <Inbox />, title: <>Lead queued for assignment</> };
     case "Enquiry Attached":
-      return { ...base, icon: <Inbox />, tone: TONE.blue, title: <>A new website enquiry was added to this lead</>, body: feedback };
+      return { ...base, icon: <Inbox />, title: <>A new website enquiry was added to this lead</>, body: feedback };
     case "Enquiry Acknowledged":
-      return { ...base, icon: <Inbox />, tone: TONE.neutral, title: <>{actor} saw the website enquiry</> };
+      return { ...base, icon: <Inbox />, title: <>{actor} saw the website enquiry</> };
     default:
-      return { ...base, icon: <ArrowRightLeft />, tone: TONE.neutral, title: <>{e.field ?? "Routing"}{to ? <> · {to}</> : null}</>, body: feedback };
+      return { ...base, icon: <ArrowRightLeft />, title: <>{e.field ?? "Routing"}{to ? <> · {to}</> : null}</>, body: feedback };
   }
 }
 

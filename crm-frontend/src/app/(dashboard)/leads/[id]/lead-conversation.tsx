@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { Loader2, Mail, MessageCircle, MoreHorizontal, NotebookPen, Phone, RotateCcw, Send, Smartphone, StickyNote, X } from "lucide-react";
+import { CalendarClock, CalendarDays, Flag, Loader2, Mail, MessageCircle, MoreHorizontal, NotebookPen, Phone, PhoneIncoming, PhoneMissed, PhoneOutgoing, RotateCcw, Send, Smartphone, StickyNote, Timer, X } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
 import { mailApi, MAIL_STATUS, newDraftIds, type MailCatalog, type MailSummary, type MailTarget } from "@/lib/mail-api";
-import { CONTACT_TYPE_STYLES, contactLogAuthor, contactLogIcon, formatDuration } from "@/lib/contact-log-utils";
+import { contactLogAuthor, formatDuration } from "@/lib/contact-log-utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -16,7 +16,7 @@ import { DateTimePicker } from "@/components/shared/datetime-picker";
 import { MailComposer, type ComposerStart } from "@/components/mail/mail-composer";
 import { MailPreviewDialog } from "@/components/mail/mail-preview-dialog";
 import { cn } from "@/lib/utils";
-import { Feed, Who, sortOldestFirst, type FeedItem } from "./lead-feed";
+import { Chip, Feed, Who, ago, sortOldestFirst, type FeedItem } from "./lead-feed";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -47,11 +47,15 @@ type ContactLog = {
   source_call_id?: string | null;
 };
 
-const VIA: Record<string, { label: string; icon: typeof Phone; tone: string }> = {
-  call: { label: "call", icon: Phone, tone: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
-  whatsapp: { label: "WhatsApp", icon: MessageCircle, tone: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" },
-  sms: { label: "SMS", icon: Smartphone, tone: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400" },
-  email: { label: "email", icon: Mail, tone: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400" },
+const VIA: Record<string, { label: string; icon: typeof Phone }> = {
+  call: { label: "call", icon: Phone },
+  whatsapp: { label: "WhatsApp", icon: MessageCircle },
+  sms: { label: "SMS", icon: Smartphone },
+  email: { label: "email", icon: Mail },
+};
+
+const PRIORITY_FLAG: Record<string, string> = {
+  low: "text-sky-500", medium: "text-amber-500", high: "text-orange-500", urgent: "text-red-500",
 };
 
 const PRIORITIES = [
@@ -194,23 +198,25 @@ export function LeadConversation({
     for (const fu of followUps) {
       const via = (fu.contacted_via && VIA[fu.contacted_via]) || null;
       const Icon = via?.icon ?? StickyNote;
+      const who = fu.created_by?.name || "Staff";
+      const next = nextFollowUp(fu);
       list.push({
         key: `fu-${fu.id}`,
         at: followUpTime(fu),
         icon: <Icon />,
-        tone: via?.tone ?? "bg-muted text-muted-foreground",
-        title: <><Who>{fu.created_by?.name || "Staff"}</Who> logged a {via ? `${via.label} ` : ""}follow-up</>,
+        who,
+        title: <><Who>{who}</Who> logged a {via ? `${via.label} ` : ""}follow-up</>,
         body: fu.notes,
         chips: [
-          fu.outcome,
-          fu.priority && `${fu.priority[0].toUpperCase()}${fu.priority.slice(1)} priority`,
-          fu.rnr && fu.rnr.toUpperCase().replace("RNR", "RNR "),
-          nextFollowUp(fu),
-        ].filter(Boolean) as string[],
+          fu.outcome && <Chip key="o">{fu.outcome}</Chip>,
+          fu.priority && <Chip key="p"><Flag className={PRIORITY_FLAG[fu.priority]} />{fu.priority[0].toUpperCase() + fu.priority.slice(1)}</Chip>,
+          fu.rnr && <Chip key="r"><PhoneMissed />{fu.rnr.toUpperCase().replace("RNR", "RNR ")}</Chip>,
+          next && <Chip key="n"><CalendarClock />{next}</Chip>,
+        ].filter(Boolean),
         actions: isAdmin ? (
           <DropdownMenu>
             <DropdownMenuTrigger
-              render={<button type="button" aria-label="Follow-up actions" className="-my-1 flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-muted focus-visible:opacity-100 group-hover/item:opacity-100 data-[popup-open]:opacity-100" />}
+              render={<button type="button" aria-label="Follow-up actions" className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-muted focus-visible:opacity-100 group-hover/item:opacity-100 data-[popup-open]:opacity-100" />}
             >
               <MoreHorizontal className="h-4 w-4" />
             </DropdownMenuTrigger>
@@ -224,37 +230,86 @@ export function LeadConversation({
     }
 
     for (const log of contactLogs) {
-      const isCall = log.contact_type === "call";
+      const at = new Date(log.created_at);
+      const who = contactLogAuthor(log);
+      if (log.contact_type === "call") {
+        const direction = (log.call_direction || "").toLowerCase();
+        const missed = direction === "missed" || direction === "rejected";
+        const incoming = direction === "incoming";
+        list.push({
+          key: `log-${log.id}`,
+          at,
+          icon: missed ? <PhoneMissed /> : incoming ? <PhoneIncoming /> : <PhoneOutgoing />,
+          iconClass: missed ? "text-red-600 dark:text-red-400" : undefined,
+          who,
+          title: <><Who>{who}</Who> {missed ? "missed a call" : incoming ? "received a call" : "made a call"}</>,
+          extra: (
+            <div className="rounded-lg border bg-card px-3 py-2.5">
+              <p className="text-[14px] font-medium text-foreground">{missed ? "Missed call" : incoming ? "Inbound call" : "Outbound call"}</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <Chip><CalendarDays />{format(at, "MMM d, EEEE")}</Chip>
+                {!missed && <Chip><Timer />{formatDuration(log.call_duration)}</Chip>}
+                <Chip>{format(at, "h:mm a")}</Chip>
+              </div>
+              {log.message && <p className="mt-2 whitespace-pre-wrap text-[14px] leading-6 text-foreground/85">{log.message}</p>}
+            </div>
+          ),
+        });
+        continue;
+      }
       const kind = log.contact_type === "sms" ? "an SMS" : log.contact_type === "email" ? "an email" : "a WhatsApp message";
       list.push({
         key: `log-${log.id}`,
-        at: new Date(log.created_at),
-        icon: contactLogIcon(log),
-        tone: CONTACT_TYPE_STYLES[log.contact_type] || "bg-muted text-muted-foreground",
-        title: isCall
-          ? <><Who>{contactLogAuthor(log)}</Who> · {(log.call_direction || "voice").toLowerCase()} call, {formatDuration(log.call_duration)}</>
-          : <><Who>{contactLogAuthor(log)}</Who> sent {kind}</>,
-        body: [log.subject && `Subject: ${log.subject}`, log.message].filter(Boolean).join("\n") || null,
+        at,
+        icon: log.contact_type === "sms" ? <Smartphone /> : log.contact_type === "email" ? <Mail /> : <MessageCircle />,
+        who,
+        title: <><Who>{who}</Who> sent {kind}</>,
+        extra: (log.message || log.subject) ? (
+          <div
+            className={cn(
+              "w-fit max-w-[90%] rounded-xl rounded-tl-sm px-3 py-2 text-[14px] leading-6 text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.06)]",
+              log.contact_type === "whatsapp" ? "bg-emerald-50 dark:bg-emerald-950/40" : "bg-foreground/[0.05]",
+            )}
+          >
+            {log.subject && <p className="font-medium">{log.subject}</p>}
+            {log.message && <span className="whitespace-pre-wrap">{log.message}</span>}
+            <span className="float-right ml-3 mt-1.5 text-[11px] leading-4 text-muted-foreground">{format(at, "h:mm a")}</span>
+          </div>
+        ) : undefined,
       });
     }
 
     for (const mail of mails) {
       if (mail.status === "draft") continue;
+      const at = new Date(mail.sentAt ?? mail.confirmedAt ?? mail.createdAt);
       const status = MAIL_STATUS[mail.status];
+      const problem = mail.lastError && ["failed", "pending", "suppressed"].includes(mail.status) ? mail.lastError : null;
       list.push({
         key: `mail-${mail.id}`,
-        at: new Date(mail.sentAt ?? mail.confirmedAt ?? mail.createdAt),
+        at,
         icon: <Mail />,
-        tone: VIA.email.tone,
-        title: <><Who>{mail.label}</Who> email to {mail.to.join(", ")}</>,
-        body: [mail.subject, mail.lastError && ["failed", "pending", "suppressed"].includes(mail.status) ? `⚠ ${mail.lastError}` : null].filter(Boolean).join("\n"),
-        chips: [status.label + (mail.status === "pending" && mail.attempts > 0 ? ` · attempt ${mail.attempts + 1}` : "")],
-        extra: mail.status === "failed" && canSendMail ? (
-          <Button variant="outline" size="sm" disabled={retrying === mail.id} onClick={() => retry(mail.id)} className="mt-2 h-7 gap-1.5 text-[12px]">
-            {retrying === mail.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
-            Retry
-          </Button>
-        ) : undefined,
+        extra: (
+          <div className="rounded-lg border bg-card px-3 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+            <div className="flex items-center gap-2">
+              <span className="min-w-0 truncate text-[14px] font-medium text-foreground">{mail.label}</span>
+              <span className={cn("shrink-0 rounded px-1.5 py-px text-[11px] font-medium", status.className)}>
+                {status.label}{mail.status === "pending" && mail.attempts > 0 ? ` · attempt ${mail.attempts + 1}` : ""}
+              </span>
+              <time dateTime={at.toISOString()} title={format(at, "EEE, d MMM yyyy, h:mm a")} className="ml-auto shrink-0 text-[13px] text-muted-foreground">{ago(at)}</time>
+            </div>
+            <div className="mt-1 text-[14px] leading-6 text-foreground/90">
+              <p>{mail.subject}</p>
+              <p className="truncate"><span className="text-muted-foreground">To: </span>{mail.to.join(", ")}{mail.cc.length > 0 && <><span className="text-muted-foreground">, Cc: </span>{mail.cc.join(", ")}</>}</p>
+            </div>
+            {problem && <p className="mt-2 border-t pt-2 text-[13px] text-red-600 dark:text-red-400">{problem}</p>}
+            {mail.status === "failed" && canSendMail && (
+              <Button variant="outline" size="sm" disabled={retrying === mail.id} onClick={() => retry(mail.id)} className="mt-2 h-7 gap-1.5 text-[12px]">
+                {retrying === mail.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+                Retry
+              </Button>
+            )}
+          </div>
+        ),
       });
     }
 
@@ -285,7 +340,7 @@ export function LeadConversation({
       <div className="md:min-h-0 md:flex-1 md:overflow-y-auto">
         <div className={cn("mx-auto max-w-3xl space-y-6 px-4 py-4 md:px-6 md:py-6", canEdit && "max-md:pb-20")}>
           {items.length ? (
-            <Feed items={items} days />
+            <Feed items={items} />
           ) : (
             <div className="flex flex-col items-center py-14 text-center">
               <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-foreground/[0.05] text-muted-foreground"><MessageCircle className="h-5 w-5" /></span>

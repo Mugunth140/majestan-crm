@@ -4,7 +4,8 @@ import { inboundLocation } from '@/lib/inbound-location';
 
 export function InboundLocationSync() {
   useEffect(() => {
-    const retry = () => inboundLocation.retry();
+    // Background retries: quiet, so a denied permission doesn't interrupt every page.
+    const retry = () => inboundLocation.retry(true);
     const visible = () => { if (document.visibilityState === 'visible') retry(); };
     retry();
     window.addEventListener('online', retry);
