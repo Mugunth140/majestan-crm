@@ -30,6 +30,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { ContactLogsModule } from './modules/contact-logs/contact-logs.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { PropertiesModule } from './modules/properties/properties.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { BuildersModule } from './modules/builders/builders.module';
@@ -56,6 +57,7 @@ import { LeadInquiry } from './database/entities/lead-inquiry.entity';
 import { WebsiteEnquiryEvent } from './database/entities/website-enquiry-event.entity';
 import { LeadFollowUp } from './database/entities/lead-follow-up.entity';
 import { LeadDocument } from './database/entities/lead-document.entity';
+import { LeadEvent } from './database/entities/lead-event.entity';
 import { ContactLog } from './database/entities/contact-log.entity';
 import { Agent } from './database/entities/agent.entity';
 import { AgentFollowUp } from './database/entities/agent-follow-up.entity';
@@ -115,7 +117,7 @@ import { CommunicationsModule } from './modules/communications/communications.mo
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('CRM_DB_NAME', 'majestan_crm'),
-        entities: [User, Role, Permission, RolePermission, UserPermission, Department, ActivityLog, LeadSource, HrSource, RoadName, RegistrationCharge, RoomName, RoomDimension, Specification, PropertyType, Lead, LeadInquiry, WebsiteEnquiryEvent, LeadFollowUp, LeadDocument, ContactLog, Agent, AgentFollowUp, AgentContactLog, Inbound, InboundFollowUp, InboundContactLog, InboundUnit, HrCandidate, HrFollowUp, HrContactLog, AssetLayout, Asset, AssetLocation, AssetFinancials, AssetFeature, AssetDocument, AssetContactLog, RoutingHistory, Notification, TaskTemplate, TaskMetricTarget, TaskMetricProgress, TaskActivityLog, TaskReceipt, MailOutbox, MailSuppression, MailTemplate, MailAttachment],
+        entities: [User, Role, Permission, RolePermission, UserPermission, Department, ActivityLog, LeadSource, HrSource, RoadName, RegistrationCharge, RoomName, RoomDimension, Specification, PropertyType, Lead, LeadInquiry, WebsiteEnquiryEvent, LeadFollowUp, LeadDocument, LeadEvent, ContactLog, Agent, AgentFollowUp, AgentContactLog, Inbound, InboundFollowUp, InboundContactLog, InboundUnit, HrCandidate, HrFollowUp, HrContactLog, AssetLayout, Asset, AssetLocation, AssetFinancials, AssetFeature, AssetDocument, AssetContactLog, RoutingHistory, Notification, TaskTemplate, TaskMetricTarget, TaskMetricProgress, TaskActivityLog, TaskReceipt, MailOutbox, MailSuppression, MailTemplate, MailAttachment],
         synchronize: false, // Migrations are used instead
         extra: {
           connectionLimit: configService.get<number>('DB_CONNECTION_LIMIT', 25),
@@ -166,6 +168,7 @@ import { CommunicationsModule } from './modules/communications/communications.mo
     NotificationsModule,
     ContactLogsModule,
     TasksModule,
+    AnalyticsModule,
     MetricsModule,
     PropertiesModule,
     ProjectsModule,

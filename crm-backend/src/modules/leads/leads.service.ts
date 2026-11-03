@@ -15,6 +15,7 @@ import { NON_QUEUEABLE_LEAD_STATUSES, SALES_PIPELINE_STATUSES } from './lead-sta
 import { transferLeadToSales } from '../lead-routing/transfer-to-sales';
 import { NotificationsService } from '../notifications/notifications.service';
 import { TasksService } from '../tasks/tasks.service';
+import { LeadEventsService } from './lead-events.service';
 import { S3Client } from 'bun';
 import { extname } from 'path';
 import { fetchWatermarkedImage, isImageMimetype } from '../../common/imgproxy-watermark';
@@ -40,6 +41,16 @@ export function pickPropertyLink(inquiries?: Array<{ id: number; property_id?: n
   return linked.sort((a, b) => b.id - a.id)[0];
 }
 
+// Edits to these show on the lead Timeline (entity column names).
+const LEAD_TRACKED_FIELDS = [
+  'name', 'mobile_number', 'whatsapp_number', 'email', 'city', 'address', 'lead_source',
+  'commission', 'is_referral', 'referred_by_name', 'referred_by_contact',
+];
+const INQUIRY_TRACKED_FIELDS = [
+  'purchase_type', 'property_category', 'property_type', 'funder', 'project_list', 'city_id',
+  'sub_locations', 'purchase_timeline', 'qualification_purpose', 'decision_maker', 'preferences',
+];
+
 @Injectable()
 export class LeadsService {
   private _s3Client: S3Client | null = null;
@@ -51,6 +62,8 @@ export class LeadsService {
     private readonly tasksService: TasksService,
     // Domain events for the central mail service (docs/mail-composer-plan.md).
     @Optional() private readonly events?: EventEmitter2,
+    // Lead history for the Timeline tab and analytics.
+    @Optional() private readonly leadEvents?: LeadEventsService,
   ) {}
 
   private get s3Client(): S3Client {
@@ -281,6 +294,7 @@ export class LeadsService {
     const existingLead = await leadRepo.findOne({ where: { id } });
     if (!existingLead) throw new NotFoundException('Lead not found');
     const previousStatus = existingLead.status;
+    const wasUnqualified = !!existingLead.is_unqualified;
 
     if (body.status_name) {
       existingLead.status = body.status_name;
@@ -325,6 +339,14 @@ export class LeadsService {
     if (body.status_name && body.status_name !== previousStatus) {
       await this.events?.emitAsync('leads.lead.status_changed', {
         entityId: id, actorId: actionedById, from: previousStatus, to: body.status_name,
+        reason: body.drop_reason || null,
+      });
+    }
+
+    if (body.is_unqualified !== undefined && body.is_unqualified !== wasUnqualified) {
+      await this.leadEvents?.record({
+        leadId: id, actorId: actionedById, type: 'qualification_changed', field: 'is_unqualified',
+        from: wasUnqualified ? 'Unqualified' : 'Qualified', to: body.is_unqualified ? 'Unqualified' : 'Qualified',
       });
     }
 
@@ -367,11 +389,12 @@ export class LeadsService {
     return saved;
   }
 
-  async updateLead(id: number, body: any) {
-    return this.dataSource.transaction(async (manager) => {
+  async updateLead(id: number, body: any, actorId: number | null = null) {
+    const saved = await this.dataSource.transaction(async (manager) => {
       const leadRepo = manager.getRepository(Lead);
       const existingLead = await leadRepo.findOne({ where: { id } });
       if (!existingLead) throw new NotFoundException('Lead not found');
+      const before = { ...existingLead };
 
       // Normalize like create/bulk so a "+91 …" edit matches stored numbers
       // instead of false-conflicting or storing a second unnormalized form.
@@ -413,14 +436,17 @@ export class LeadsService {
         await manager.save(LeadInquiry, inquiry);
       }
 
-      return existingLead;
+      return { lead: existingLead, before };
     });
+    await this.leadEvents?.recordChanges(id, actorId, 'field_changed', saved.before as any, saved.lead as any, LEAD_TRACKED_FIELDS);
+    return saved.lead;
   }
 
-  async updateInquiry(leadId: number, inquiryId: number, body: any) {
+  async updateInquiry(leadId: number, inquiryId: number, body: any, actorId: number | null = null) {
     const inquiryRepo = this.dataSource.getRepository(LeadInquiry);
     const inquiry = await inquiryRepo.findOne({ where: { id: inquiryId, lead_id: leadId } });
     if (!inquiry) throw new NotFoundException('Inquiry not found');
+    const before = { ...inquiry };
 
     if (body.project !== undefined) inquiry.project_list = body.project;
     if (body.purchaseType !== undefined) inquiry.purchase_type = body.purchaseType;
@@ -434,7 +460,9 @@ export class LeadsService {
     if (body.qualificationPurpose !== undefined) inquiry.qualification_purpose = body.qualificationPurpose;
     if (body.decisionMaker !== undefined) inquiry.decision_maker = body.decisionMaker;
 
-    return inquiryRepo.save(inquiry);
+    const saved = await inquiryRepo.save(inquiry);
+    await this.leadEvents?.recordChanges(leadId, actorId, 'requirement_changed', before as any, saved as any, INQUIRY_TRACKED_FIELDS, { inquiryId });
+    return saved;
   }
 
   async bulkCreateLeads(leads: any[], actionedBy?: any) {
@@ -1273,7 +1301,7 @@ export class LeadsService {
     return this.siteDataSource.query(query, params);
   }
 
-  async uploadDocument(leadId: number, file: Express.Multer.File) {
+  async uploadDocument(leadId: number, file: Express.Multer.File, actorId: number | null = null) {
     const lead = await this.dataSource.getRepository(Lead).findOne({ where: { id: leadId }, relations: { documents: true } });
     if (!lead) throw new NotFoundException('Lead not found');
     if (lead.documents.length >= 2) {
@@ -1331,10 +1359,12 @@ export class LeadsService {
       file_url: fileUrl,
       file_key: finalKey,
     });
-    return repo.save(doc);
+    const saved = await repo.save(doc);
+    await this.leadEvents?.record({ leadId, actorId, type: 'document_added', to: finalName, meta: { url: fileUrl } });
+    return saved;
   }
 
-  async deleteDocument(leadId: number, docId: number) {
+  async deleteDocument(leadId: number, docId: number, actorId: number | null = null) {
     const repo = this.dataSource.getRepository(LeadDocument);
     const doc = await repo.findOne({ where: { id: docId, lead_id: leadId } });
     if (!doc) throw new NotFoundException('Document not found');
@@ -1346,6 +1376,7 @@ export class LeadsService {
     }
 
     await repo.remove(doc);
+    await this.leadEvents?.record({ leadId, actorId, type: 'document_removed', from: doc.file_name });
     return { id: docId };
   }
 }

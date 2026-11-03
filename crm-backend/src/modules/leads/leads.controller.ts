@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post, Put, Delete, Param, Query, UseInterceptors, UploadedFile, BadRequestException, UseGuards, Request } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { LeadsService } from './leads.service';
+import { LeadEventsService } from './lead-events.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GetLeadsQueryDto } from './dto/get-leads-query.dto';
 import { CreateLeadDto } from './dto/create-lead.dto';
@@ -17,7 +18,10 @@ import { UpdateLeadFollowUpDto } from './dto/update-lead-follow-up.dto';
 @Controller('api/v1/leads')
 @UseGuards(JwtAuthGuard)
 export class LeadsController {
-  constructor(private readonly leadsService: LeadsService) {}
+  constructor(
+    private readonly leadsService: LeadsService,
+    private readonly leadEvents: LeadEventsService,
+  ) {}
 
   @Get('cities')
   async getCities() {
@@ -91,6 +95,12 @@ export class LeadsController {
     return { success: true, data: lead, transferredToSales };
   }
 
+  @Get(':id/timeline')
+  async getTimeline(@Param('id') id: string) {
+    const data = await this.leadEvents.timeline(Number(id));
+    return { success: true, data };
+  }
+
   @Get(':id/auto-match')
   async autoMatchProperties(@Param('id') id: string) {
     const data = await this.leadsService.autoMatchProperties(Number(id));
@@ -102,14 +112,15 @@ export class LeadsController {
     @Param('id') id: string,
     @Param('inquiryId') inquiryId: string,
     @Body() body: UpdateLeadInquiryDto,
+    @Request() req: any,
   ) {
-    const data = await this.leadsService.updateInquiry(Number(id), Number(inquiryId), body);
+    const data = await this.leadsService.updateInquiry(Number(id), Number(inquiryId), body, req.user?.id ?? null);
     return { success: true, data };
   }
 
   @Put(':id')
-  async updateLead(@Param('id') id: string, @Body() body: UpdateLeadDto) {
-    const data = await this.leadsService.updateLead(Number(id), body);
+  async updateLead(@Param('id') id: string, @Body() body: UpdateLeadDto, @Request() req: any) {
+    const data = await this.leadsService.updateLead(Number(id), body, req.user?.id ?? null);
     return { success: true, data };
   }
 
@@ -160,17 +171,17 @@ export class LeadsController {
 
   @Post(':id/documents')
   @UseInterceptors(FileInterceptor('file'))
-  async uploadDocument(@Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
+  async uploadDocument(@Param('id') id: string, @UploadedFile() file: Express.Multer.File, @Request() req: any) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
-    const data = await this.leadsService.uploadDocument(Number(id), file);
+    const data = await this.leadsService.uploadDocument(Number(id), file, req.user?.id ?? null);
     return { success: true, data };
   }
 
   @Delete(':id/documents/:docId')
-  async deleteDocument(@Param('id') id: string, @Param('docId') docId: string) {
-    const data = await this.leadsService.deleteDocument(Number(id), Number(docId));
+  async deleteDocument(@Param('id') id: string, @Param('docId') docId: string, @Request() req: any) {
+    const data = await this.leadsService.deleteDocument(Number(id), Number(docId), req.user?.id ?? null);
     return { success: true, data };
   }
 }

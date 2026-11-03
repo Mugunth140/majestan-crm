@@ -21,6 +21,33 @@ export class MetricsController {
     const data = await this.metricsService.getChartData(req.user, type || 'trends', from || defaultFrom, to || defaultTo);
     return { success: true, data };
   }
+  /** A metric over time, e.g. ?metric=calls&interval=week&by=staff. */
+  @Get('series')
+  async getSeries(
+    @Query('metric') metric: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Query('interval') interval: string,
+    @Query('by') by: string,
+    @Request() req: any,
+  ) {
+    const { from: f, to: t } = this.range(from, to, 90);
+    const data = await this.metricsService.getSeries(req.user, metric, f, t, interval || 'day', by || undefined);
+    return { success: true, data };
+  }
+  /** Lead counts by status, day by day. */
+  @Get('pipeline-history')
+  async getPipelineHistory(@Query('from') from: string, @Query('to') to: string, @Request() req: any) {
+    const { from: f, to: t } = this.range(from, to, 90);
+    const data = await this.metricsService.getPipelineHistory(req.user, f, t);
+    return { success: true, data };
+  }
+  private range(from: string | undefined, to: string | undefined, days: number) {
+    const today = new Date().toISOString().slice(0, 10);
+    const start = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+    const valid = (v?: string) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
+    return { from: valid(from) ?? start, to: valid(to) ?? today };
+  }
   @Delete('cache')
   async bustCache(@Request() req: any) {
     await this.metricsService.bustCache(req.user.id);

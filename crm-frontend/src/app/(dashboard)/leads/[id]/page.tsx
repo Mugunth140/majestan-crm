@@ -4,7 +4,6 @@ import { apiFetch } from "@/lib/api-fetch";
 import { normalizeDepartment, pipelineOf } from "@/lib/department";
 import { recordNotInterested } from "@/lib/not-interested";
 import { NotInterestedDialog } from "./not-interested-dialog";
-import { MailPanel } from "@/components/mail/mail-panel";
 import { ScheduleVisitDialog, type VisitDetails } from "@/components/leads/schedule-visit-dialog";
 
 const VISIT_STATUSES = ["Site Visit Scheduled", "Re Visit Scheduled"];
@@ -34,23 +33,12 @@ import { PageActions } from "@/components/layout/page-actions";
 import { useIsMobile } from "@/hooks/use-device";
 import dynamic from "next/dynamic";
 
-const FollowUpPanel = dynamic(() => import("@/components/shared/follow-up-panel").then(mod => mod.FollowUpPanel), { ssr: false });
 const ContactModal = dynamic(() => import("@/components/shared/contact-modal").then(mod => mod.ContactModal), { ssr: false });
 const LeadAttachments = dynamic(() => import("@/components/shared/lead-attachments").then(mod => mod.LeadAttachments), { ssr: false });
 const EditRequirementModal = dynamic(() => import("@/components/shared/edit-requirement-modal").then(mod => mod.EditRequirementModal), { ssr: false });
 import { AssignLeadModal } from "@/components/shared/assign-lead-modal";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import {
-  CONTACT_TYPE_STYLES,
-  CONTACT_TYPE_ICONS,
-  formatTimestamp,
-  formatDuration,
-  sortContactLogs,
-  countByType,
-  countCallDirections,
-  contactLogIcon,
-  contactLogAuthor,
-} from "@/lib/contact-log-utils";
+import { sortContactLogs } from "@/lib/contact-log-utils";
 import {
   LEAD_STATUS_DOTS,
   LEAD_STATUS_ORDER,
@@ -64,11 +52,12 @@ import {
 import { cn } from "@/lib/utils";
 import { shouldAutoOpenFollowUps, wantsFollowUps } from "@/lib/follow-up-deep-link";
 import { InlineAction, InlineSelect, InlineText, Section, FieldRow, type Option } from "./inline-field";
-import { ActivityFeed, buildActivity } from "./lead-activity";
+import { Feed, timelineItems, type TimelineEntry } from "./lead-timeline";
+import { LeadConversation } from "./lead-conversation";
 import {
   Loader2, Phone, Mail, MessageCircle, MessageSquare, ArrowUpRight,
-  Clock, RefreshCw, History, TrendingUp, Sparkles, ChevronDown, PhoneIncoming,
-  UserPlus, Activity, ListChecks, Paperclip, Building2, Smartphone, Pencil, Info,
+  RefreshCw, History, TrendingUp, Sparkles, ChevronDown,
+  UserPlus, Activity, MessagesSquare, Paperclip, Building2, Smartphone, Pencil, Info,
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -97,7 +86,7 @@ const PREDEFINED_DROP_REASONS = [
   "Floor mismatched"
 ];
 
-type Tab = "details" | "activity" | "followups" | "contact" | "emails" | "requirements" | "attachments";
+type Tab = "timeline" | "conversation" | "details" | "requirements" | "attachments";
 
 const AVATAR_TONES = [
   "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
@@ -252,7 +241,8 @@ function LeadDetail() {
   const [savingVisit, setSavingVisit] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>("activity");
+  const [activeTab, setActiveTab] = useState<Tab>("timeline");
+  const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [sources, setSources] = useState<Option[]>([]);
 
   // Modals / Sliders
@@ -371,7 +361,7 @@ function LeadDetail() {
     }
   };
 
-  // "A" jumps to the follow-up timeline, as the old history slider did.
+  // "A" jumps between the timeline and the conversation (follow-ups).
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const el = document.activeElement as HTMLElement | null;
@@ -383,7 +373,7 @@ function LeadDetail() {
         !el?.isContentEditable
       ) {
         e.preventDefault();
-        setActiveTab(prev => prev === "followups" ? "activity" : "followups");
+        setActiveTab(prev => prev === "conversation" ? "timeline" : "conversation");
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -406,8 +396,13 @@ function LeadDetail() {
     if (!silent) setIsLoading(true);
     else setIsRefreshing(true);
     try {
-      const res = await apiFetch(`${API_URL}/leads/${id}`);
+      const [res, history] = await Promise.all([
+        apiFetch(`${API_URL}/leads/${id}`),
+        // The timeline is extra: an older backend without it just shows none.
+        apiFetch(`${API_URL}/leads/${id}/timeline`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      ]);
       const result = await res.json();
+      if (history?.success) setTimeline(history.data);
       if (result.success) setLead(result.data);
       else { toast.error("Lead not found"); router.push("/leads"); }
     } catch {
@@ -587,7 +582,7 @@ function LeadDetail() {
   }, [id, lead, fetchLead]);
 
   // Deep link from the Leads table's "Last Followup" cell (?tab=followups):
-  // open the follow-up tab once the lead and its follow-ups are in hand. The
+  // open the conversation (follow-ups) once the lead and its follow-ups are in hand. The
   // latch means switching tabs afterwards is not undone by the next render.
   useEffect(() => {
     if (!shouldAutoOpenFollowUps({
@@ -596,7 +591,7 @@ function LeadDetail() {
       hasLead: !!lead,
       alreadyOpened: autoOpenedFollowUps,
     })) return;
-    setActiveTab("followups");
+    setActiveTab("conversation");
     setAutoOpenedFollowUps(true);
     // `tab` rather than `searchParams`: the param value is the actual
     // dependency, so a fresh object identity can't re-run this effect.
@@ -668,7 +663,7 @@ function LeadDetail() {
   // Defensive newest-first sort (created_at, id tiebreak) — backend orders
   // the same way, but bulk device syncs share second precision.
   const contactLogs: any[] = useMemo(() => sortContactLogs(lead?.contact_logs || []), [lead]);
-  const activity = useMemo(() => buildActivity(lead, followUps, contactLogs), [lead, followUps, contactLogs]);
+  const timelineFeed = useMemo(() => timelineItems(timeline), [timeline]);
   const sourceOptions = useMemo(() => {
     const current = lead?.lead_source;
     if (!current || sources.some((s) => s.value === current)) return sources;
@@ -678,8 +673,6 @@ function LeadDetail() {
   if (isLoading) return <PageSkeleton />;
   if (!lead) return null;
 
-  const contactCounts = countByType(contactLogs);
-  const callDirectionCounts = countCallDirections(contactLogs);
   const statusName = lead.status || "New Lead";
 
   // RNR Calculation
@@ -729,14 +722,12 @@ function LeadDetail() {
   const openConvert = () => { setConvertTo(""); setConvertFeedback(""); setIsConvertOpen(true); };
 
   const inquiries: any[] = lead.inquiries || [];
-  const shownTab: Tab = activeTab === "details" && !isMobile ? "activity" : activeTab;
+  const shownTab: Tab = activeTab === "details" && !isMobile ? "timeline" : activeTab;
 
   const tabs: { key: Tab; label: string; icon: typeof Activity; count?: number; mobileOnly?: boolean }[] = [
-    { key: "activity", label: "Activity", icon: Activity },
+    { key: "timeline", label: "Timeline", icon: History },
+    { key: "conversation", label: "Conversation", icon: MessagesSquare, count: followUps.length + contactLogs.length },
     { key: "details", label: "Details", icon: Info, mobileOnly: true },
-    { key: "followups", label: "Follow-ups", icon: ListChecks, count: followUps.length },
-    { key: "contact", label: "Calls", icon: PhoneIncoming, count: contactLogs.length },
-    { key: "emails", label: "Emails", icon: Mail },
     { key: "requirements", label: "Requirements", icon: Building2, count: inquiries.length },
     { key: "attachments", label: "Attachments", icon: Paperclip, count: lead.documents?.length },
   ];
@@ -1071,78 +1062,30 @@ function LeadDetail() {
             ))}
           </div>
 
-          <div className={cn("md:min-h-0 md:flex-1", shownTab === "followups" ? "md:overflow-hidden" : "md:overflow-y-auto")}>
+          <div className="md:min-h-0 md:flex-1 md:overflow-y-auto">
             {shownTab === "details" && (
               <div className="mx-4 mt-2 overflow-hidden rounded-xl border bg-card">{fields}</div>
             )}
 
-            {shownTab === "activity" && (
-              <div className="mx-auto max-w-3xl space-y-6 px-4 py-4 md:px-6 md:py-6">
-                {composer}
-                {activity.length ? <ActivityFeed items={activity} /> : empty(<Clock className="h-5 w-5" />, "No activity yet", "Follow-ups, calls and messages will show up here.")}
+            {shownTab === "timeline" && (
+              <div className="mx-auto max-w-3xl px-4 py-4 md:px-6 md:py-6">
+                {timelineFeed.length ? <Feed items={timelineFeed} /> : empty(<History className="h-5 w-5" />, "Nothing recorded yet", "Status changes, edits and assignments will show up here.")}
               </div>
             )}
 
-            {shownTab === "followups" && (
-              <div className="h-[70dvh] md:h-full">
-                <FollowUpPanel
-                  entityId={Number(id)}
-                  entityType="leads"
+            {shownTab === "conversation" && (
+              <div className="mx-auto max-w-3xl px-4 py-4 md:px-6 md:py-6">
+                <LeadConversation
+                  leadId={lead.id}
+                  email={lead.email}
                   followUps={followUps}
+                  contactLogs={contactLogs}
+                  composer={composer}
+                  canEdit={canEdit}
+                  isAdmin={role === "Admin" || role === "Super Admin"}
+                  refreshKey={mailRefresh}
                   onRefresh={() => fetchLead(true)}
                 />
-              </div>
-            )}
-
-            {shownTab === "contact" && (
-              <div className="mx-auto max-w-3xl space-y-6 px-4 py-4 md:px-6 md:py-6">
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <div className="rounded-xl border bg-card p-3.5">
-                    <p className="flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground"><PhoneIncoming className="h-3.5 w-3.5" /> Calls</p>
-                    <p className="mt-1 text-[24px] font-semibold tabular-nums leading-8 text-foreground">{contactCounts.call || 0}</p>
-                    <p className="text-[11.5px] text-muted-foreground">
-                      {callDirectionCounts.incoming || 0} in · {callDirectionCounts.outgoing || 0} out · {callDirectionCounts.missed || 0} missed
-                    </p>
-                  </div>
-                  {(["whatsapp", "sms", "email"] as const).map((type) => (
-                    <div key={type} className="rounded-xl border bg-card p-3.5">
-                      <p className="flex items-center gap-1.5 text-[12px] font-medium capitalize text-muted-foreground">{CONTACT_TYPE_ICONS[type]} {type === "sms" ? "SMS" : type}</p>
-                      <p className="mt-1 text-[24px] font-semibold tabular-nums leading-8 text-foreground">{contactCounts[type] || 0}</p>
-                    </div>
-                  ))}
-                </div>
-                {contactLogs.length === 0 ? (
-                  empty(<Clock className="h-5 w-5" />, "No contact logs yet", "Calls and messages will appear here.")
-                ) : (
-                  <ul className="divide-y rounded-xl border bg-card">
-                    {contactLogs.map((log: any) => (
-                      <li key={log.id} className="flex gap-3 px-4 py-3">
-                        <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full [&_svg]:h-4 [&_svg]:w-4", CONTACT_TYPE_STYLES[log.contact_type] || "bg-muted text-muted-foreground")}>
-                          {contactLogIcon(log)}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-baseline gap-3">
-                            <p className="min-w-0 flex-1 truncate text-[14px] font-medium text-foreground">
-                              {log.contact_type === "call"
-                                ? <>{log.call_direction || "Voice"} call <span className="font-normal text-muted-foreground">· {formatDuration(log.call_duration)}</span></>
-                                : <span className="capitalize">{log.contact_type === "sms" ? "SMS" : log.contact_type}</span>}
-                            </p>
-                            <span className="shrink-0 text-[12px] text-muted-foreground">{formatTimestamp(log.created_at)}</span>
-                          </div>
-                          <p className="text-[13px] text-muted-foreground">{contactLogAuthor(log)}</p>
-                          {log.subject && <p className="mt-1.5 text-[13px] font-medium text-foreground/80">Subject: {log.subject}</p>}
-                          {log.message && <p className="mt-1.5 whitespace-pre-wrap rounded-lg bg-muted/40 px-3 py-2 text-[13px] leading-relaxed text-foreground/80">{log.message}</p>}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-
-            {shownTab === "emails" && (
-              <div className="mx-auto max-w-3xl px-4 py-4 md:px-6 md:py-6">
-                <MailPanel entityType="lead" entityId={lead.id} refreshKey={mailRefresh} recipients={lead.email ? [lead.email] : []} />
               </div>
             )}
 
@@ -1281,7 +1224,7 @@ function LeadDetail() {
           {fields}
           {canEdit && (
             <p className="mt-auto flex items-center gap-1.5 px-4 py-3 text-[12px] text-muted-foreground">
-              <History className="h-3.5 w-3.5" /> Changes save as you go. Press <kbd className="rounded border px-1 font-mono text-[11px]">A</kbd> for follow-ups.
+              <History className="h-3.5 w-3.5" /> Changes save as you go. Press <kbd className="rounded border px-1 font-mono text-[11px]">A</kbd> for the conversation.
             </p>
           )}
         </aside>
