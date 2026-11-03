@@ -1265,8 +1265,8 @@ function LeadDetail() {
           </div>
           {fields}
           {canEdit && (
-            <p className="mt-auto flex items-center gap-1.5 px-4 py-3 text-[12px] text-muted-foreground">
-              <History className="h-3.5 w-3.5" /> Changes save as you go. Press <kbd className="rounded border px-1 font-mono text-[11px]">A</kbd> for the conversation.
+            <p className="mt-auto hidden items-center gap-1.5 px-4 py-3 text-[12px] text-muted-foreground md:flex">
+              Press <kbd className="rounded border px-1 font-mono text-[11px]">A</kbd> to open the conversation.
             </p>
           )}
         </aside>

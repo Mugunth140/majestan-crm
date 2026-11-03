@@ -3,23 +3,16 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import {
-  FUNDERS, PROPERTY_CATEGORIES, PROPERTY_TYPES_MAP, PURCHASE_TIMELINES, PURCHASE_TYPES, QUALIFICATION_PURPOSES,
+  AREA_CATEGORIES, BHK_OPTIONS as BHK, FACING_OPTIONS as FACING, FUNDERS, FURNISHING_OPTIONS as FURNISHING, PROPERTY_CATEGORIES, PROPERTY_TYPES_MAP, PURCHASE_TIMELINES, PURCHASE_TYPES, QUALIFICATION_PURPOSES,
 } from "@/lib/lead-constants";
 import { formatIndianCurrencyShort, parseIndianCurrency } from "@/lib/indian-currency";
+import { searchProjects } from "@/lib/project-search";
 import { InlineMulti, InlineSearch, InlineSelect, InlineText, type Option } from "./inline-field";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 // Every property type once, for requirements without a category yet.
 const ALL_TYPES: Option[] = [...new Map(Object.values(PROPERTY_TYPES_MAP).flat().map((o) => [o.value, o])).values()];
-
-const BHK: Option[] = [{ label: "1", value: "1" }, { label: "2", value: "2" }, { label: "3", value: "3" }, { label: "4+", value: "4" }];
-const FURNISHING: Option[] = [{ label: "Furnished", value: "1" }, { label: "Semi furnished", value: "2" }, { label: "Unfurnished", value: "0" }];
-const FACING: Option[] = [
-  { label: "North", value: "north" }, { label: "East", value: "east" }, { label: "South", value: "south" },
-  { label: "West", value: "west" }, { label: "North-East", value: "north_east" },
-];
-const AREA_CATEGORIES = ["commercial", "industrial", "agricultural", "institutional"];
 
 // Cities change rarely: one request per page load, shared by every requirement.
 let citiesRequest: Promise<Option[]> | null = null;
@@ -28,19 +21,6 @@ const loadCities = () =>
     .then((r) => r.json())
     .then((d) => (d.success ? d.data.map((c: { id: number; city_name: string }) => ({ label: c.city_name, value: String(c.id) })) : []))
     .catch(() => { citiesRequest = null; return []; }));
-
-/** Projects from the site (via the CRM backend), matched by name, builder or city. */
-const searchProjects = async (query: string): Promise<Option[]> => {
-  const params = new URLSearchParams({ limit: "20", status: "published" });
-  if (query) params.set("search", query);
-  const res = await apiFetch(`${API_URL}/projects?${params}`);
-  const data = await res.json();
-  return (data.data ?? []).map((p: { id: number; name: string; builderName?: string | null; city?: string | null }) => ({
-    label: p.name,
-    value: String(p.id),
-    hint: [p.builderName, p.city].filter(Boolean).join(" · ") || undefined,
-  }));
-};
 
 type Inquiry = {
   id: number;

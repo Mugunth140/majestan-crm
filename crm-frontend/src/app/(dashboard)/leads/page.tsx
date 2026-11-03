@@ -35,6 +35,7 @@ import { MobileRowsProvider, type MobileRowData } from "@/components/mobile/mobi
 import { NameAvatar } from "@/components/shared/name-avatar";
 import { EmptyState } from "@/components/shared/empty-state";
 import { GroupedList } from "@/components/tables/grouped-list";
+import { NewLeadModal } from "@/components/leads/new-lead-modal";
 import { GroupByPicker, LEAD_GROUP_FIELDS, type LeadGroupField } from "@/components/leads/group-by-picker";
 import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
 import { getBulkImportDestination, mapImportSheetRow, resolveLeadImportSource, normalizeIndianMobile, partitionPendingImports, resolveStaffAssignments } from "@/lib/lead-import";
@@ -105,6 +106,7 @@ const leadRow = (lead: KanbanLead): MobileRowData => ({
 
 export default function LeadsPage() {
   const router = useRouter();
+  const [creating, setCreating] = useState(false);
   const [activeTab, setActiveTab] = usePersistedState<string>("leads:tab", "All Leads", { allowed: RESTORABLE_LEADS_TABS });
   const [actionFilter, setActionFilter] = usePersistedState<string>("leads:actionFilter", "Today", { allowed: ACTION_FILTERS });
   const [leads, setLeads] = useState<any[]>([]);
@@ -1471,11 +1473,16 @@ export default function LeadsPage() {
               </div>
             </DialogContent>
           </Dialog>
-          <Link href="/leads/new" className="inline-flex h-8 items-center gap-1.5 rounded-md bg-foreground px-3 text-[14px] font-medium text-background transition-colors hover:bg-foreground/85">
+          <button type="button" onClick={() => setCreating(true)} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-foreground px-3 text-[14px] font-medium text-background transition-colors hover:bg-foreground/85">
             <Plus size={16} />
             Create
-          </Link>
+          </button>
         </PageActions>
+        <NewLeadModal
+          open={creating}
+          onOpenChange={setCreating}
+          onCreated={(id, toQueue) => router.push(toQueue ? "/lead-routing" : id ? `/leads/${id}` : "/leads")}
+        />
 
       <Device mobile={mobileFilters} desktop={desktopFilters} />
         <Device

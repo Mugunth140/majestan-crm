@@ -135,6 +135,25 @@ export const PROJECTS = [
 const LEGACY_STATUS: Record<string, string> = { "Follow Up": "Future Follow-up" };
 
 /** Pill classes for a status, the same on the leads table and the lead page. */
+// Requirement preferences, shared by the new-lead form and the lead page.
+export const BHK_OPTIONS = [
+  { label: "1", value: "1" }, { label: "2", value: "2" }, { label: "3", value: "3" }, { label: "4+", value: "4" },
+];
+export const FURNISHING_OPTIONS = [
+  { label: "Furnished", value: "1" }, { label: "Semi furnished", value: "2" }, { label: "Unfurnished", value: "0" },
+];
+export const FACING_OPTIONS = [
+  { label: "North", value: "North" }, { label: "East", value: "East" }, { label: "South", value: "South" }, { label: "West", value: "West" },
+  { label: "North-East", value: "North-East" }, { label: "North-West", value: "North-West" },
+  { label: "South-East", value: "South-East" }, { label: "South-West", value: "South-West" }, { label: "Any", value: "Any" },
+];
+export const DECISION_MAKERS = [
+  "Self", "Spouse", "Father", "Mother", "Son", "Daughter", "Brother", "Sister", "Father-in-law", "Mother-in-law",
+  "Business Partner", "Joint Family", "Other Relative",
+].map((v) => ({ label: v, value: v }));
+/** Categories whose preferences are an area range rather than BHK / facing. */
+export const AREA_CATEGORIES = ["commercial", "industrial", "agricultural", "institutional"];
+
 export const leadStatusPill = (status?: string | null) =>
   LEAD_STATUS_STYLES[status ?? ""] ?? LEAD_STATUS_STYLES[LEGACY_STATUS[status ?? ""]] ?? "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
 
