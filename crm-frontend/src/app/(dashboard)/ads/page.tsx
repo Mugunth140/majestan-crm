@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DataTable } from "@/components/tables/data-table";
-import { DateCell, IdCell, NameCell } from "@/components/tables/cells";
+import { DateCell, IdCell, NameCell, formatTableDate, statusDot } from "@/components/tables/cells";
+import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -46,6 +47,13 @@ export default function AdsPage() {
   const [activeTab, setActiveTab] = usePersistedState<string>("ads:tab", "Active", { allowed: ["Active", "Inactive"] });
   const [placement, setPlacement] = usePersistedState<string>("ads:placement", "hero", { allowed: ADS_PLACEMENTS.map((p) => p.value) });
   const placementSpec = getPlacement(placement);
+  const adFields: ViewField<AdItem>[] = [
+    ...(placementSpec.audiences.length
+      ? [{ id: "audience", label: "Shows on", get: (ad: AdItem) => placementSpec.audiences.find((x) => x.value === ad.audience)?.label ?? "All — fallback" }]
+      : []),
+    { id: "status", label: "Status", get: (ad) => (ad.isActive ? "Active" : "Inactive"), order: ["Active", "Inactive"], dot: (v) => statusDot(v) },
+  ];
+  const views = useModuleView("ads", adFields);
   const [ads, setAds] = useState<AdItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -461,7 +469,18 @@ export default function AdsPage() {
 
   const tableSection = (
     <div className="w-full max-w-full min-w-0 md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col" aria-busy={isLoading}>
-      {isLoading ? <TableSkeleton columns={8} rows={6} flush /> : loadError || !displayedAds.length ? emptyState : <Device mobile={mobileList} desktop={<DataTable key={displayedAds.map((ad) => ad.id).join(",")} {...tableProps} variant="list" />} />}
+      {isLoading ? <TableSkeleton columns={8} rows={6} flush /> : loadError || !displayedAds.length ? emptyState : <Device mobile={mobileList} desktop={
+        <ModuleViews
+          state={views}
+          data={displayedAds}
+          columns={columns}
+          list={<DataTable key={displayedAds.map((ad) => ad.id).join(",")} {...tableProps} variant="list" />}
+          getKey={(ad) => ad.id}
+          onOpen={(ad) => router.push(`/ads/new?edit=${ad.id}`)}
+          card={(ad) => ({ title: ad.title || "Advertisement", avatar: false, id: ad.id, href: `/ads/new?edit=${ad.id}`, subtitle: ad.updatedAt ? `Updated ${formatTableDate(ad.updatedAt)}` : undefined, tag: ad.isActive ? undefined : "Inactive" })}
+          noun="ads"
+        />
+      } />}
     </div>
   );
 
@@ -490,6 +509,7 @@ export default function AdsPage() {
           }))}
         />
         <ToolbarEnd>
+          {views.picker}
           <p className="hidden max-w-xs truncate text-xs text-muted-foreground xl:block" title={placementSpec.description}>{placementSpec.description}</p>
           <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search ads by title" />
           {searchQuery && <ToolbarClear onClick={() => setSearchQuery("")} title="Clear search" />}
@@ -517,6 +537,7 @@ export default function AdsPage() {
   return (
     <>
       <MobileHeader title="Advertisement" />
+      {views.switcher}
       <div className="w-full flex flex-col space-y-6 pt-4 md:space-y-0 md:pt-0 md:h-full">
         <PageActions>
           <Link href={`/ads/new?placement=${placement}`} className={headerPrimaryClass}>

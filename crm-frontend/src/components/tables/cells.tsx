@@ -53,6 +53,20 @@ const TONE_BY_WORD: Record<string, StatusTone> = {
   rejected: "red", dropped: "red", cancelled: "red", failed: "red", blocked: "red", "not interested": "red",
 };
 
+const TONE_DOTS: Record<StatusTone, string> = {
+  green: "bg-emerald-500",
+  blue: "bg-blue-500",
+  amber: "bg-amber-500",
+  red: "bg-rose-500",
+  violet: "bg-violet-500",
+  gray: "bg-gray-400",
+};
+
+/** Solid dot for a status, for group and kanban column headers. */
+export function statusDot(status?: string, tone?: StatusTone) {
+  return TONE_DOTS[tone ?? statusTone(status)];
+}
+
 export function statusTone(status?: string): StatusTone {
   return TONE_BY_WORD[status?.trim().toLowerCase() ?? ""] ?? "gray";
 }

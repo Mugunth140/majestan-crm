@@ -6,7 +6,8 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/tables/data-table";
-import { IdCell, NameCell, StatusCell, type StatusTone } from "@/components/tables/cells";
+import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { IdCell, NameCell, StatusCell, statusDot, type StatusTone } from "@/components/tables/cells";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -39,8 +40,15 @@ const STATUS_TONES: Record<string, StatusTone> = {
   "Rejected": "red",
 };
 
+const AGENT_FIELDS: ViewField[] = [
+  { id: "status", label: "Status", get: (a) => a.status, order: Object.keys(STATUS_TONES), dot: (v) => statusDot(v, STATUS_TONES[v]) },
+  { id: "partner_type", label: "Partner type", get: (a) => a.partner_type?.replace(/_/g, " "), capitalize: true },
+  { id: "company", label: "Company", get: (a) => a.company_name },
+];
+
 export default function AgentsPage() {
   const router = useRouter();
+  const views = useModuleView("agents", AGENT_FIELDS);
   const [activeTab, setActiveTab] = usePersistedState<string>("agents:tab", "All Agents", { allowed: ["All Agents", "Action Required"] });
   const [actionFilter, setActionFilter] = usePersistedState<string>("agents:actionFilter", "Today", { allowed: ACTION_FILTERS });
   const [agents, setAgents] = useState<any[]>([]);
@@ -388,6 +396,7 @@ export default function AgentsPage() {
       <ListToolbar>
         <SegmentTabs tabs={tabs} value={activeTab} onChange={setActiveTab} label="Views" />
         <ToolbarEnd>
+          {views.picker}
           <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search ID, Name, Phone, Company" />
           {renderFilterPopover(false)}
         </ToolbarEnd>
@@ -447,22 +456,33 @@ export default function AgentsPage() {
       {/* Table */}
       <div className="flex w-full min-w-0 flex-col md:min-h-0 md:flex-1 md:overflow-hidden">
         {isLoading ? <TableSkeleton columns={6} rows={5} flush /> : (
-          <DataTable
-            variant="list"
-            columns={columns}
+          <ModuleViews
+            state={views}
             data={displayedAgents}
-            showToolbar={true}
-            showDeleteAction={role === "Admin"}
-            onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
-            renderToolbarActions={(selectedRows) => {
-              if (selectedRows.length !== 1) return null;
-              const row = selectedRows[0];
-              return (
-                <Button variant="outline" size="sm" onClick={() => router.push(`/agent-network/${row.id}`)}>
-                  <Eye size={15} className="mr-1.5" /> View
-                </Button>
-              );
-            }}
+            columns={columns}
+            list={
+              <DataTable
+              variant="list"
+              columns={columns}
+              data={displayedAgents}
+              showToolbar={true}
+              showDeleteAction={role === "Admin"}
+              onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
+              renderToolbarActions={(selectedRows) => {
+                if (selectedRows.length !== 1) return null;
+                const row = selectedRows[0];
+                return (
+                  <Button variant="outline" size="sm" onClick={() => router.push(`/agent-network/${row.id}`)}>
+                    <Eye size={15} className="mr-1.5" /> View
+                  </Button>
+                );
+              }}
+            />
+            }
+            getKey={(a) => a.id}
+            onOpen={(a) => router.push(`/agent-network/${a.id}`)}
+            card={(a) => ({ title: a.name, id: `A${String(a.id).padStart(5, "0")}`, href: `/agent-network/${a.id}`, subtitle: a.mobile, footer: a.company_name, tag: a.partner_type?.replace(/_/g, " ") })}
+            noun="agents"
           />
         )}
       </div>
@@ -472,6 +492,7 @@ export default function AgentsPage() {
   return (
     <>
       <MobileHeader title="Agent Network" />
+      {views.switcher}
 
       <div className="flex flex-col space-y-4 md:space-y-0 md:h-full">
         {/* Desktop page header */}

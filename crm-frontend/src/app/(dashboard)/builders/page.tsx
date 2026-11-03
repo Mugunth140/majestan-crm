@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DataTable } from "@/components/tables/data-table";
-import { ActiveCell, DateCell, IdCell, NameCell } from "@/components/tables/cells";
+import { BOARD_PAGE, ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { ActiveCell, DateCell, IdCell, NameCell, statusDot } from "@/components/tables/cells";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -26,8 +27,13 @@ import { BuilderRecord } from "./_components/BuilderDialog";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
+const BUILDER_FIELDS: ViewField<BuilderRecord>[] = [
+  { id: "status", label: "Status", get: (b) => (b.isActive ? "Active" : "Inactive"), order: ["Active", "Inactive"], dot: (v) => statusDot(v) },
+];
+
 export default function BuildersPage() {
   const router = useRouter();
+  const views = useModuleView("builders", BUILDER_FIELDS);
   const [activeTab, setActiveTab] = usePersistedState<"Active" | "Inactive">("builders:tab", "Active", { allowed: ["Active", "Inactive"] });
   const [searchQuery, setSearchQuery] = usePersistedState("builders:search", "");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -50,8 +56,9 @@ export default function BuildersPage() {
     setIsLoading(true);
     try {
       const params = new URLSearchParams();
-      params.append("page", String(pagination.pageIndex + 1));
-      params.append("limit", String(pagination.pageSize));
+      const page = views.isBoard ? BOARD_PAGE : pagination;
+      params.append("page", String(page.pageIndex + 1));
+      params.append("limit", String(page.pageSize));
 
       if (debouncedSearchQuery.trim()) {
         params.append("search", debouncedSearchQuery.trim());
@@ -88,7 +95,7 @@ export default function BuildersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [pagination.pageIndex, pagination.pageSize, debouncedSearchQuery, activeTab, hasContactFilter]);
+  }, [pagination.pageIndex, pagination.pageSize, debouncedSearchQuery, activeTab, hasContactFilter, views.isBoard]);
 
   useEffect(() => {
     fetchBuilders();
@@ -351,13 +358,26 @@ export default function BuildersPage() {
       <ListToolbar>
         <SegmentTabs tabs={tabs} value={activeTab} onChange={(tab) => { setActiveTab(tab); resetPage(); }} label="Builders views" />
         <ToolbarEnd>
+          {views.picker}
           <ToolbarSearch value={searchQuery} onChange={(v) => { setSearchQuery(v); resetPage(); }} placeholder="Search name, email, phone" />
           {renderFilterPopover(false)}
           {(searchQuery || activeFiltersCount > 0) && <ToolbarClear onClick={() => { setSearchQuery(""); clearFilters(); }} />}
         </ToolbarEnd>
       </ListToolbar>
       <ListBody>
-        {isLoading ? <TableSkeleton columns={6} rows={10} flush /> : <DataTable {...tableProps} variant="list" />}
+        {isLoading ? <TableSkeleton columns={6} rows={10} flush /> : <ModuleViews
+          state={views}
+          data={builders}
+          columns={columns}
+          list={
+            <DataTable {...tableProps} variant="list" />
+          }
+          getKey={(b) => b.id}
+          onOpen={(b) => router.push(`/builders/new?edit=${b.id}`)}
+          card={(b) => ({ title: b.name, id: b.id, href: `/builders/new?edit=${b.id}`, subtitle: b.phone || b.email || undefined })}
+          totalCount={totalCount}
+          noun="builders"
+        />}
       </ListBody>
     </ListFrame>
   );
@@ -382,6 +402,7 @@ export default function BuildersPage() {
   return (
     <>
       <MobileHeader title="Builders" />
+      {views.switcher}
       <div className="w-full flex flex-col space-y-6 pt-4 md:space-y-0 md:pt-0 md:h-full">
         <PageActions>
           <button type="button" onClick={() => router.push("/builders/new")} className={headerPrimaryClass}>

@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { DataTable } from "@/components/tables/data-table";
-import { IdCell, NameCell, StatusCell, type StatusTone } from "@/components/tables/cells";
+import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { IdCell, NameCell, StatusCell, statusDot, type StatusTone } from "@/components/tables/cells";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -41,8 +42,16 @@ const STATUS_TONES: Record<string, StatusTone> = {
   "Hold": "amber",
 };
 
+const HR_FIELDS: ViewField[] = [
+  { id: "status", label: "Status", get: (c) => c.status, order: Object.keys(STATUS_TONES), dot: (v) => statusDot(v, STATUS_TONES[v]) },
+  { id: "assignee", label: "Assigned staff", get: (c) => c.assignedStaff?.name || "Unassigned" },
+  { id: "department", label: "Department", get: (c) => c.department },
+  { id: "position", label: "Position", get: (c) => c.position },
+];
+
 export default function HrPage() {
   const router = useRouter();
+  const views = useModuleView("hr", HR_FIELDS);
   const [candidates, setCandidates] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -381,6 +390,7 @@ export default function HrPage() {
       <ListToolbar>
         <SegmentTabs tabs={tabs} value={activeTab} onChange={setActiveTab} label="Views" />
         <ToolbarEnd>
+          {views.picker}
           <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search ID, Name, Phone" />
           {renderFilterPopover(false)}
         </ToolbarEnd>
@@ -440,24 +450,35 @@ export default function HrPage() {
       {/* Table */}
       <div className="flex w-full min-w-0 flex-col md:min-h-0 md:flex-1 md:overflow-hidden">
         {isLoading ? <TableSkeleton flush /> : (
-          <DataTable
-            variant="list"
-            columns={columns}
+          <ModuleViews
+            state={views}
             data={displayedCandidates}
-            showToolbar={true}
-            showDeleteAction={role === "Admin"}
-            onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
-            renderToolbarActions={(selectedRows) => {
-              if (!selectedRows.length) return null;
-              const row = selectedRows[0];
-              return <>
-                {canAssign && <Button variant="outline" size="sm" onClick={() => setAssignmentIds(selectedRows.map(item => item.id))}>Assign Selected</Button>}
-                {selectedRows.length === 1 && <>
-                  <Button variant="outline" size="sm" onClick={() => router.push("/hr/" + row.id)}><Eye size={15} className="mr-1.5" /> View</Button>
-                  <Button variant="outline" size="sm" onClick={() => router.push("/hr/new?edit=" + row.id)}><Edit size={15} className="mr-1.5" /> Edit</Button>
-                </>}
-              </>;
-            }}
+            columns={columns}
+            list={
+              <DataTable
+              variant="list"
+              columns={columns}
+              data={displayedCandidates}
+              showToolbar={true}
+              showDeleteAction={role === "Admin"}
+              onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
+              renderToolbarActions={(selectedRows) => {
+                if (!selectedRows.length) return null;
+                const row = selectedRows[0];
+                return <>
+                  {canAssign && <Button variant="outline" size="sm" onClick={() => setAssignmentIds(selectedRows.map(item => item.id))}>Assign Selected</Button>}
+                  {selectedRows.length === 1 && <>
+                    <Button variant="outline" size="sm" onClick={() => router.push("/hr/" + row.id)}><Eye size={15} className="mr-1.5" /> View</Button>
+                    <Button variant="outline" size="sm" onClick={() => router.push("/hr/new?edit=" + row.id)}><Edit size={15} className="mr-1.5" /> Edit</Button>
+                  </>}
+                </>;
+              }}
+            />
+            }
+            getKey={(c) => c.id}
+            onOpen={(c) => router.push(`/hr/${c.id}`)}
+            card={(c) => ({ title: c.name, id: c.formattedId, href: `/hr/${c.id}`, subtitle: c.mobile, footer: c.assignedStaff?.name ?? <span className="text-muted-foreground">Unassigned</span>, tag: c.position })}
+            noun="candidates"
           />
         )}
       </div>
@@ -467,6 +488,7 @@ export default function HrPage() {
   return (
     <>
       <MobileHeader title="HR Panel" />
+      {views.switcher}
 
       <div className="flex flex-col space-y-4 md:space-y-0 md:h-full">
         {/* Desktop page header */}

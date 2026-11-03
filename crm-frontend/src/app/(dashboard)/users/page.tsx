@@ -4,7 +4,8 @@ import { apiFetch } from "@/lib/api-fetch";
 
 import { useEffect, useState, Suspense } from "react";
 import { DataTable } from "@/components/tables/data-table";
-import { ActiveCell, IdCell, NameCell } from "@/components/tables/cells";
+import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { ActiveCell, IdCell, NameCell, statusDot } from "@/components/tables/cells";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ColumnDef } from "@tanstack/react-table";
 import { Edit, Plus, ShieldAlert } from "lucide-react";
@@ -20,6 +21,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 function UsersList() {
   const router = useRouter();
+  const views = useModuleView("users", USER_FIELDS);
   const searchParams = useSearchParams();
   const deptFilter = searchParams.get("dept");
 
@@ -153,6 +155,7 @@ function UsersList() {
 
   return (
     <div className="flex flex-col md:h-full">
+      {views.switcher}
       <PageActions>
         <button type="button" onClick={() => router.push("/users/new")} className={headerPrimaryClass}>
           <Plus className="size-4" />
@@ -167,27 +170,39 @@ function UsersList() {
             <ShieldAlert className="size-4" strokeWidth={1.75} /> Only administrators can manage users.
           </span>
           <ToolbarEnd>
+            {views.picker}
             <ToolbarSearch value={search} onChange={setSearch} placeholder="Search name or email" />
           </ToolbarEnd>
         </ListToolbar>
         <ListBody>
           {isLoading ? <TableSkeleton columns={7} rows={10} flush /> : (
-            <DataTable
-              variant="list"
-              columns={columns}
+            <ModuleViews
+              state={views}
               data={searchedUsers}
-              showToolbar={true}
-              showDeleteAction={role === "Admin"}
-              onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
-              renderToolbarActions={(selectedRows) => {
-                if (selectedRows.length !== 1) return null;
-                const row = selectedRows[0];
-                return (
-                  <Button variant="outline" size="sm" onClick={() => router.push("/users/new?edit=" + row.id)}>
-                    <Edit size={15} className="mr-1.5" /> Edit
-                  </Button>
-                );
-              }}
+              columns={columns}
+              list={
+                <DataTable
+                variant="list"
+                columns={columns}
+                data={searchedUsers}
+                showToolbar={true}
+                showDeleteAction={role === "Admin"}
+                onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
+                renderToolbarActions={(selectedRows) => {
+                  if (selectedRows.length !== 1) return null;
+                  const row = selectedRows[0];
+                  return (
+                    <Button variant="outline" size="sm" onClick={() => router.push("/users/new?edit=" + row.id)}>
+                      <Edit size={15} className="mr-1.5" /> Edit
+                    </Button>
+                  );
+                }}
+              />
+              }
+              getKey={(u) => u.id}
+              onOpen={(u) => router.push(`/users/new?edit=${u.id}`)}
+              card={(u) => ({ title: u.name, id: u.id, href: `/users/new?edit=${u.id}`, subtitle: u.email, footer: u.department?.name, tag: u.role?.name })}
+              noun="users"
             />
           )}
         </ListBody>
@@ -215,6 +230,12 @@ function UsersList() {
     </div>
   );
 }
+
+const USER_FIELDS: ViewField[] = [
+  { id: "role", label: "Role", get: (u) => u.role?.name || "No Role" },
+  { id: "department", label: "Department", get: (u) => u.department?.name },
+  { id: "status", label: "Status", get: (u) => (u.is_active ? "Active" : "Inactive"), order: ["Active", "Inactive"], dot: (v) => statusDot(v) },
+];
 
 export default function UsersPage() {
   return (

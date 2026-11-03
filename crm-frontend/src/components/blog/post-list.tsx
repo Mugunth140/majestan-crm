@@ -1,12 +1,20 @@
 "use client";
 import { DataTable } from "@/components/tables/data-table";
-import { DateCell, IdCell, NameCell, StatusCell } from "@/components/tables/cells";
+import { DateCell, IdCell, NameCell, StatusCell, formatTableDate, statusDot } from "@/components/tables/cells";
+import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Pencil } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { BlogPost } from "@/lib/blog-api";
+function postStatus(post: BlogPost, now: number) {
+  if (post.status === "draft") return "Draft";
+  return new Date(post.published_at!).getTime() > now ? "Scheduled" : "Published";
+}
+
+const STATUS_TONE = { Published: "green", Scheduled: "blue", Draft: "amber" } as const;
+
 export function BlogPostList({
   posts,
   loading,
@@ -28,6 +36,11 @@ export function BlogPostList({
   onEdit: (id?: number) => void;
   onDelete: (posts: BlogPost[]) => void;
 }) {
+  const fields: ViewField<BlogPost>[] = [
+    { id: "status", label: "Status", get: (p) => postStatus(p, now), order: ["Published", "Scheduled", "Draft"], dot: (v) => statusDot(v, STATUS_TONE[v as keyof typeof STATUS_TONE]) },
+    { id: "category", label: "Category", get: (p) => p.category },
+  ];
+  const views = useModuleView("blog", fields);
   const columns: ColumnDef<BlogPost>[] = [
     {
       id: "select",
@@ -87,13 +100,8 @@ export function BlogPostList({
       id: "status",
       header: "Status",
       cell: ({ row }) => {
-        const status =
-          row.original.status === "draft"
-            ? "Draft"
-            : new Date(row.original.published_at!).getTime() > now
-              ? "Scheduled"
-              : "Published";
-        return <StatusCell status={status} tone={status === "Published" ? "green" : status === "Scheduled" ? "blue" : "amber"} />;
+        const status = postStatus(row.original, now);
+        return <StatusCell status={status} tone={STATUS_TONE[status]} />;
       },
     },
     {
@@ -113,48 +121,62 @@ export function BlogPostList({
         <span className="text-[13px] tabular-nums text-muted-foreground">
           {total} {total === 1 ? "article" : "articles"}
         </span>
+        <span className="ml-auto">{views.picker}</span>
       </div>
+      {views.switcher}
       <div className="w-full max-w-full min-w-0 md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col">
         {loading ? (
           <TableSkeleton columns={5} rows={10} flush />
         ) : (
-          <DataTable
-            key={page}
-            columns={columns}
+          <ModuleViews
+            state={views}
             data={posts}
-            variant="list"
-            pageSizeOptions={[30]}
-            showToolbar
-            showDeleteAction
-            onDeleteSelected={onDelete}
-            renderToolbarActions={(selected, clear) =>
-              selected.length === 1 ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => {
-                    onEdit(selected[0].id);
-                    clear();
-                  }}
-                >
-                  <Pencil className="h-3.5 w-3.5 mr-1.5" />
-                  Edit
-                </Button>
-              ) : null
+            columns={columns}
+            list={
+              <DataTable
+                key={page}
+                columns={columns}
+                data={posts}
+                variant="list"
+                pageSizeOptions={[30]}
+                showToolbar
+                showDeleteAction
+                onDeleteSelected={onDelete}
+                renderToolbarActions={(selected, clear) =>
+                  selected.length === 1 ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => {
+                        onEdit(selected[0].id);
+                        clear();
+                      }}
+                    >
+                      <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                      Edit
+                    </Button>
+                  ) : null
+                }
+                manualPagination
+                pageCount={Math.max(1, Math.ceil(total / 30))}
+                totalCount={total}
+                pagination={{ pageIndex: page - 1, pageSize: 30 }}
+                onPaginationChange={(updater) => {
+                  const next =
+                    typeof updater === "function"
+                      ? updater({ pageIndex: page - 1, pageSize: 30 })
+                      : updater;
+                  onPage(next.pageIndex + 1);
+                }}
+                persistKey={false}
+              />
             }
-            manualPagination
-            pageCount={Math.max(1, Math.ceil(total / 30))}
+            getKey={(p) => p.id!}
+            onOpen={(p) => onEdit(p.id)}
+            card={(p) => ({ title: p.title, avatar: false, id: p.id, subtitle: p.category || undefined, tag: formatTableDate(p.published_at) || undefined })}
             totalCount={total}
-            pagination={{ pageIndex: page - 1, pageSize: 30 }}
-            onPaginationChange={(updater) => {
-              const next =
-                typeof updater === "function"
-                  ? updater({ pageIndex: page - 1, pageSize: 30 })
-                  : updater;
-              onPage(next.pageIndex + 1);
-            }}
-            persistKey={false}
+            noun="articles"
           />
         )}
       </div>

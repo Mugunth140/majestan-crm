@@ -8,8 +8,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
 import { DataTable } from "@/components/tables/data-table";
-import { DateCell, IdCell, NameCell, StatusCell, type StatusTone } from "@/components/tables/cells";
-import { LEAD_STATUS_STYLES } from "@/lib/lead-constants";
+import { DateCell, IdCell, NameCell, StatusCell, formatTableDate, statusDot, type StatusTone } from "@/components/tables/cells";
+import { BOARD_PAGE, ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { LEAD_STATUS_DOTS, LEAD_STATUS_ORDER, LEAD_STATUS_STYLES } from "@/lib/lead-constants";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { ColumnDef, PaginationState } from "@tanstack/react-table";
@@ -116,6 +117,27 @@ const EVENT_TYPE_OPTIONS = [
   { label: "Enquiry Acknowledged", value: "Enquiry Acknowledged" },
   { label: "Enquiry Attached", value: "Enquiry Attached" },
   { label: "Queued", value: "Queued" },
+];
+
+const EVENT_TONES: Record<string, StatusTone> = { assigned: "blue", claimed: "green", released: "amber", converted: "violet" };
+
+const QUEUE_FIELDS: ViewField<QueueLead>[] = [
+  { id: "status", label: "Last status", get: (l) => l.status, order: LEAD_STATUS_ORDER, dot: (v) => LEAD_STATUS_DOTS[v] ?? "bg-gray-400" },
+  { id: "held_by", label: "Previously held by", get: (l) => l.previously_held_by },
+  { id: "reason", label: "Release reason", get: (l) => l.release_reason },
+];
+
+const ENQUIRY_FIELDS: ViewField<EnquiryLead>[] = [
+  { id: "type", label: "Type", get: (e) => e.type, order: ["New", "Repeat"], dot: (v) => statusDot(v, v === "Repeat" ? "amber" : "blue") },
+  { id: "intent", label: "Purpose", get: (e) => (e.intent === "site_visit" ? "Site Visit" : "Enquiry"), dot: (v) => statusDot(v, v === "Site Visit" ? "violet" : "gray") },
+  { id: "assigned", label: "Assigned", get: (e) => e.assigned_staff_name || "Unassigned" },
+  { id: "source", label: "Source", get: (e) => sourceLabel(e.source) },
+];
+
+const HISTORY_FIELDS: ViewField<HistoryEntry>[] = [
+  { id: "event", label: "Event type", get: (h) => h.event_type, dot: (v) => statusDot(v, EVENT_TONES[v.toLowerCase()] ?? "gray"), capitalize: true },
+  { id: "to_staff", label: "To staff", get: (h) => h.to_staff?.name },
+  { id: "department", label: "Department", get: (h) => h.department?.name, capitalize: true },
 ];
 
 type PaginationUpdate = PaginationState | ((old: PaginationState) => PaginationState);
@@ -263,6 +285,10 @@ export default function LeadRoutingPage() {
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
   const [mainTab, setMainTab] = usePersistedState<MainTab>("routing:tab", "queue", { allowed: ["queue", "enquiry", "history"] });
+  const queueView = useModuleView("routing-queue", QUEUE_FIELDS);
+  const enquiryView = useModuleView("routing-enquiry", ENQUIRY_FIELDS);
+  const historyView = useModuleView("routing-history", HISTORY_FIELDS);
+  const activeView = mainTab === "queue" ? queueView : mainTab === "enquiry" ? enquiryView : historyView;
   const [deptTab, setDeptTab] = usePersistedState<DeptTab>("routing:dept", "telecalling", { allowed: ["telecalling", "sales"] });
 
   // Queue state
@@ -344,8 +370,8 @@ export default function LeadRoutingPage() {
     try {
       const params = new URLSearchParams({
         department: deptTab,
-        page: String(queuePage),
-        limit: String(LIMIT),
+        page: String(queueView.isBoard ? 1 : queuePage),
+        limit: String(queueView.isBoard ? BOARD_PAGE.pageSize : LIMIT),
       });
       const res = await apiFetch(`${API_URL}/lead-routing/queue?${params}`);
       const data = await res.json();
@@ -360,14 +386,14 @@ export default function LeadRoutingPage() {
     } finally {
       setQueueLoading(false);
     }
-  }, [deptTab, queuePage]);
+  }, [deptTab, queuePage, queueView.isBoard]);
 
   const fetchEnquiry = useCallback(async () => {
     setEnquiryLoading(true);
     try {
       const params = new URLSearchParams({
-        page: String(enquiryPage),
-        limit: String(LIMIT),
+        page: String(enquiryView.isBoard ? 1 : enquiryPage),
+        limit: String(enquiryView.isBoard ? BOARD_PAGE.pageSize : LIMIT),
       });
       if (enquiryTypeFilter) params.set("propertyType", enquiryTypeFilter);
       if (enquiryIntentFilter) params.set("intent", enquiryIntentFilter);
@@ -387,14 +413,14 @@ export default function LeadRoutingPage() {
     } finally {
       setEnquiryLoading(false);
     }
-  }, [enquiryPage, enquiryTypeFilter, enquiryIntentFilter, enquirySourceFilter, enquiryDateFrom, enquiryDateTo]);
+  }, [enquiryPage, enquiryTypeFilter, enquiryIntentFilter, enquirySourceFilter, enquiryDateFrom, enquiryDateTo, enquiryView.isBoard]);
 
   const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
       const params = new URLSearchParams({
-        page: String(historyPage),
-        limit: String(LIMIT),
+        page: String(historyView.isBoard ? 1 : historyPage),
+        limit: String(historyView.isBoard ? BOARD_PAGE.pageSize : LIMIT),
       });
       if (historyEventFilter) params.set("event_type", historyEventFilter);
       if (historyDateFrom) params.set("date_from", format(historyDateFrom, "yyyy-MM-dd"));
@@ -412,7 +438,7 @@ export default function LeadRoutingPage() {
     } finally {
       setHistoryLoading(false);
     }
-  }, [historyPage, historyEventFilter, historyDateFrom, historyDateTo]);
+  }, [historyPage, historyEventFilter, historyDateFrom, historyDateTo, historyView.isBoard]);
 
   useEffect(() => {
     if (mainTab === "queue") fetchQueue();
@@ -953,8 +979,7 @@ export default function LeadRoutingPage() {
       header: "Event Type",
       cell: ({ row }) => {
         const evt = row.original.event_type || "";
-        const tones: Record<string, StatusTone> = { assigned: "blue", claimed: "green", released: "amber", converted: "violet" };
-        return <span className="capitalize"><StatusCell status={evt} tone={tones[evt.toLowerCase()] ?? "gray"} /></span>;
+        return <span className="capitalize"><StatusCell status={evt} tone={EVENT_TONES[evt.toLowerCase()] ?? "gray"} /></span>;
       },
     },
     {
@@ -1006,6 +1031,7 @@ export default function LeadRoutingPage() {
   return (
     <>
       <MobileHeader title="Lead Routing" />
+      {activeView.switcher}
       <div className="w-full flex flex-col space-y-4 pt-4 md:space-y-0 md:pt-0 md:h-full">
         <div className="flex flex-col md:min-h-0 md:flex-1 lg:-mx-6 lg:-mb-8 lg:-mt-6">
         <div className="flex flex-wrap items-center gap-2 px-4 pb-2 pt-3 md:px-5">
@@ -1024,8 +1050,10 @@ export default function LeadRoutingPage() {
             <SegmentTabs label="Pipeline" value={deptTab} onChange={setDeptTab} tabs={visibleDeptTabs.map((d) => ({ value: d.value, label: d.label }))} />
           )}
 
+          {activeView.picker && <div className="ml-auto">{activeView.picker}</div>}
+
           {mainTab === "enquiry" && (
-            <div className="relative ml-auto">
+            <div className={activeView.picker ? "relative" : "relative ml-auto"}>
               <button
                 type="button"
                 className={toolbarButtonClass}
@@ -1146,66 +1174,78 @@ export default function LeadRoutingPage() {
             ) : (
               <>
                 <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col pt-2">
-                <DataTable
-                  variant="list"
-                  flush={true}
-manualPagination
-                  pageCount={totalQueuePages}
+                <ModuleViews
+                  state={queueView}
+                  data={queue}
+                  columns={queueColumns}
+                  list={
+                    <DataTable
+                    variant="list"
+                    flush={true}
+  manualPagination
+                    pageCount={totalQueuePages}
+                    totalCount={queueTotal}
+                    pagination={{ pageIndex: queuePage - 1, pageSize: LIMIT }}
+                    onPaginationChange={(u: PaginationUpdate) => setQueuePage((p) => (typeof u === "function" ? u({ pageIndex: p - 1, pageSize: LIMIT }) : u).pageIndex + 1)}
+                    pageSizeOptions={[LIMIT]}
+                    persistKey="queue"
+                    columns={queueColumns} 
+                    data={queue} 
+                    showToolbar={true}
+                    showDeleteAction={role === "Admin"}
+                    onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
+                    renderToolbarActions={(selectedRows, clearSelection) => {
+                      return (
+                        <>
+                          {canTakeLeadFromQueue(role) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+                              onClick={async () => {
+                                try {
+                                  const promises = selectedRows.map(r => 
+                                    apiFetch(`${API_URL}/lead-routing/claim/${r.id}`, { 
+                                      method: "POST", headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ actioned_by_id: null }) 
+                                    })
+                                  );
+                                  await Promise.all(promises);
+                                  toast.success(`${selectedRows.length} lead(s) claimed successfully`);
+                                  fetchQueue();
+                                  clearSelection();
+                                } catch {
+                                  toast.error("Failed to claim leads");
+                                }
+                              }}
+                            >
+                              Take Lead
+                            </Button>
+                          )}
+                          {role !== "Staff" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+                              onClick={() => {
+                                if (selectedRows.length > 0) {
+                                  setAssignLeadIds(selectedRows.map((r) => r.id));
+                                }
+                              }}
+                            >
+                              Assign Lead
+                            </Button>
+                          )}
+                        </>
+                      );
+                    }}
+                  />
+                  }
+                  getKey={(l) => l.id}
+                  onOpen={(l) => router.push(`/leads/${l.id}`)}
+                  card={(l) => ({ title: l.name, id: l.display_id || `L${String(l.id).padStart(5, "0")}`, href: `/leads/${l.id}`, subtitle: l.mobile_number, footer: l.previously_held_by ? `Held by ${l.previously_held_by}` : undefined, tag: `${l.days_in_queue ?? 0}d in queue` })}
                   totalCount={queueTotal}
-                  pagination={{ pageIndex: queuePage - 1, pageSize: LIMIT }}
-                  onPaginationChange={(u: PaginationUpdate) => setQueuePage((p) => (typeof u === "function" ? u({ pageIndex: p - 1, pageSize: LIMIT }) : u).pageIndex + 1)}
-                  pageSizeOptions={[LIMIT]}
-                  persistKey="queue"
-                  columns={queueColumns} 
-                  data={queue} 
-                  showToolbar={true}
-                  showDeleteAction={role === "Admin"}
-                  onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
-                  renderToolbarActions={(selectedRows, clearSelection) => {
-                    return (
-                      <>
-                        {canTakeLeadFromQueue(role) && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
-                            onClick={async () => {
-                              try {
-                                const promises = selectedRows.map(r => 
-                                  apiFetch(`${API_URL}/lead-routing/claim/${r.id}`, { 
-                                    method: "POST", headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ actioned_by_id: null }) 
-                                  })
-                                );
-                                await Promise.all(promises);
-                                toast.success(`${selectedRows.length} lead(s) claimed successfully`);
-                                fetchQueue();
-                                clearSelection();
-                              } catch {
-                                toast.error("Failed to claim leads");
-                              }
-                            }}
-                          >
-                            Take Lead
-                          </Button>
-                        )}
-                        {role !== "Staff" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
-                            onClick={() => {
-                              if (selectedRows.length > 0) {
-                                setAssignLeadIds(selectedRows.map((r) => r.id));
-                              }
-                            }}
-                          >
-                            Assign Lead
-                          </Button>
-                        )}
-                      </>
-                    );
-                  }}
+                  noun="leads"
                 />
               </div>
               </>
@@ -1224,63 +1264,75 @@ manualPagination
                 {groupedEnquiry.length === 0 ? (
                   <EmptyState kind="inbox" title="No open enquiries" description="New website and app enquiries will show up here." />
                 ) : (
-                <DataTable
-                  variant="list"
-                  flush={true}
-manualPagination
-                  pageCount={totalEnquiryPages}
-                  totalCount={enquiryTotal}
-                  pagination={{ pageIndex: enquiryPage - 1, pageSize: LIMIT }}
-                  onPaginationChange={(u: PaginationUpdate) => setEnquiryPage((p) => (typeof u === "function" ? u({ pageIndex: p - 1, pageSize: LIMIT }) : u).pageIndex + 1)}
-                  pageSizeOptions={[LIMIT]}
-                  persistKey="enquiry"
-                  columns={enquiryColumns}
+                <ModuleViews
+                  state={enquiryView}
                   data={groupedEnquiry}
-                  showToolbar={true}
-                  renderToolbarActions={(selectedRows, clearSelection) => {
-                    if (selectedRows.length === 0) return null;
-                    return (
-                      <>
-                        <span className="text-sm text-muted-foreground">{selectedRows.length} selected</span>
-                        {canConvertEnquiry(role) && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
-                            disabled={enquiryBulkBusy}
-                            onClick={() => handleBulkConvert(selectedRows, clearSelection)}
-                          >
-                            Convert Selected
+                  columns={enquiryColumns}
+                  list={
+                    <DataTable
+                    variant="list"
+                    flush={true}
+  manualPagination
+                    pageCount={totalEnquiryPages}
+                    totalCount={enquiryTotal}
+                    pagination={{ pageIndex: enquiryPage - 1, pageSize: LIMIT }}
+                    onPaginationChange={(u: PaginationUpdate) => setEnquiryPage((p) => (typeof u === "function" ? u({ pageIndex: p - 1, pageSize: LIMIT }) : u).pageIndex + 1)}
+                    pageSizeOptions={[LIMIT]}
+                    persistKey="enquiry"
+                    columns={enquiryColumns}
+                    data={groupedEnquiry}
+                    showToolbar={true}
+                    renderToolbarActions={(selectedRows, clearSelection) => {
+                      if (selectedRows.length === 0) return null;
+                      return (
+                        <>
+                          <span className="text-sm text-muted-foreground">{selectedRows.length} selected</span>
+                          {canConvertEnquiry(role) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+                              disabled={enquiryBulkBusy}
+                              onClick={() => handleBulkConvert(selectedRows, clearSelection)}
+                            >
+                              Convert Selected
+                            </Button>
+                          )}
+                          {role !== "Staff" && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-green-500/30 text-green-600 hover:bg-green-500/10"
+                                disabled={enquiryBulkBusy}
+                                onClick={() => handleBulkMatched("accept", selectedRows, clearSelection)}
+                              >
+                                Accept Selected
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-border/60"
+                                disabled={enquiryBulkBusy}
+                                onClick={() => handleBulkMatched("ack", selectedRows, clearSelection)}
+                              >
+                                Acknowledge Selected
+                              </Button>
+                            </>
+                          )}
+                          <Button variant="ghost" size="sm" onClick={clearSelection}>
+                            Clear
                           </Button>
-                        )}
-                        {role !== "Staff" && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="border-green-500/30 text-green-600 hover:bg-green-500/10"
-                              disabled={enquiryBulkBusy}
-                              onClick={() => handleBulkMatched("accept", selectedRows, clearSelection)}
-                            >
-                              Accept Selected
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="border-border/60"
-                              disabled={enquiryBulkBusy}
-                              onClick={() => handleBulkMatched("ack", selectedRows, clearSelection)}
-                            >
-                              Acknowledge Selected
-                            </Button>
-                          </>
-                        )}
-                        <Button variant="ghost" size="sm" onClick={clearSelection}>
-                          Clear
-                        </Button>
-                      </>
-                    );
-                  }}
+                        </>
+                      );
+                    }}
+                  />
+                  }
+                  getKey={(e) => e.enquiry_id}
+                  onOpen={(e) => { if (e.id != null) router.push(`/leads/${e.id}`); }}
+                  card={(e) => ({ title: e.name, id: e.display_id, href: e.id != null ? `/leads/${e.id}` : undefined, subtitle: e.property_title || sourceLabel(e.source), footer: e.assigned_staff_name ?? <span className="text-muted-foreground">Unassigned</span>, tag: timeAgo(e.enquiry_at) || undefined })}
+                  totalCount={enquiryTotal}
+                  noun="enquiries"
                 />
                 )}
               </div>
@@ -1343,18 +1395,30 @@ manualPagination
             ) : (
               <>
                 <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col pt-2">
-                  <DataTable
-                    variant="list"
-                    flush={true}
-                    manualPagination
-                    pageCount={totalHistoryPages}
-                    totalCount={historyTotal}
-                    pagination={{ pageIndex: historyPage - 1, pageSize: LIMIT }}
-                    onPaginationChange={(u: PaginationUpdate) => setHistoryPage((p) => (typeof u === "function" ? u({ pageIndex: p - 1, pageSize: LIMIT }) : u).pageIndex + 1)}
-                    pageSizeOptions={[LIMIT]}
-                    persistKey="history"
-                    columns={historyColumns}
+                  <ModuleViews
+                    state={historyView}
                     data={history}
+                    columns={historyColumns}
+                    list={
+                      <DataTable
+                      variant="list"
+                      flush={true}
+                      manualPagination
+                      pageCount={totalHistoryPages}
+                      totalCount={historyTotal}
+                      pagination={{ pageIndex: historyPage - 1, pageSize: LIMIT }}
+                      onPaginationChange={(u: PaginationUpdate) => setHistoryPage((p) => (typeof u === "function" ? u({ pageIndex: p - 1, pageSize: LIMIT }) : u).pageIndex + 1)}
+                      pageSizeOptions={[LIMIT]}
+                      persistKey="history"
+                      columns={historyColumns}
+                      data={history}
+                    />
+                    }
+                    getKey={(h) => h.id}
+                    onOpen={(h) => { if (h.lead?.id) router.push(`/leads/${h.lead.id}`); }}
+                    card={(h) => ({ title: h.lead?.name || "—", id: formatTableDate(h.created_at), href: h.lead?.id ? `/leads/${h.lead.id}` : undefined, subtitle: [h.from_staff?.name, h.to_staff?.name].filter(Boolean).join(" → ") || undefined, tag: h.event_type })}
+                    totalCount={historyTotal}
+                    noun="events"
                   />
               </div>
               </>

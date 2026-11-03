@@ -4,7 +4,8 @@ import { apiFetch } from "@/lib/api-fetch";
 
 import { useState, useEffect, useCallback } from "react";
 import { DataTable } from "@/components/tables/data-table";
-import { ActiveCell, IdCell } from "@/components/tables/cells";
+import { ActiveCell, IdCell, statusDot } from "@/components/tables/cells";
+import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -44,7 +45,13 @@ const categoryLabel = (value: string | null | undefined) =>
 
 const emptyForm = { name: "", category: "other", icon_key: "", is_active: true };
 
+const FIELDS: ViewField[] = [
+  { id: "status", label: "Status", get: (r) => (r.is_active ? "Active" : "Inactive"), order: ["Active", "Inactive"], dot: (v) => statusDot(v) },
+  { id: "category", label: "Category", get: (r) => categoryLabel(r.category), capitalize: true },
+];
+
 export default function AmenitiesMasterPage() {
+  const views = useModuleView("master-amenities", FIELDS);
   const [amenities, setAmenities] = useState<any[]>([]);
   const [search, setSearch] = usePersistedState("master-amenities:search", "");
   const [isLoading, setIsLoading] = useState(true);
@@ -310,6 +317,7 @@ export default function AmenitiesMasterPage() {
   return (
     <>
       <MobileHeader title="Master: Amenities" showBack />
+      {views.switcher}
       <div className="w-full flex flex-col md:h-full">
 
         <PageActions>
@@ -324,19 +332,30 @@ export default function AmenitiesMasterPage() {
             <button type="button" className={cn(headerPrimaryClass, "md:hidden")} onClick={() => { setFormData(emptyForm); setIsAddOpen(true); }}>
               <Plus className="size-4" /> Add Amenity
             </button>
+            {views.picker && <div className="ml-auto">{views.picker}</div>}
           </ListToolbar>
           <ListBody>
             {isLoading ? (
               <TableSkeleton columns={5} rows={8} flush />
             ) : (
-              <DataTable
-              variant="list"
-              columns={columns}
-              data={filteredAmenities}
-              showToolbar={true}
-              showDeleteAction={true}
-              onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
-            />
+              <ModuleViews
+                state={views}
+                data={filteredAmenities}
+                columns={columns}
+                list={
+                  <DataTable
+                variant="list"
+                columns={columns}
+                data={filteredAmenities}
+                showToolbar={true}
+                showDeleteAction={true}
+                onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
+              />
+                }
+                getKey={(r) => r.id}
+                onOpen={openEdit}
+                card={(r) => ({ title: r.name, avatar: false, id: r.id, subtitle: categoryLabel(r.category) })}
+              />
             )}
           </ListBody>
         </ListFrame>

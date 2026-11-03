@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/tables/data-table";
-import { IdCell, NameCell, StatusCell } from "@/components/tables/cells";
+import { IdCell, NameCell, StatusCell, statusDot } from "@/components/tables/cells";
+import { BOARD_PAGE, ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,12 @@ const UNITS_FILTER_OPTIONS = [
 
 const PROJECT_TABS = ["All", "Published", "Draft", "Booked", "Archived"];
 
+const PROJECT_FIELDS: ViewField[] = [
+  { id: "status", label: "Status", get: (p) => p.status, order: ["published", "draft", "booked", "archived"], dot: (v) => statusDot(v), capitalize: true },
+  { id: "projectType", label: "Type", get: (p) => p.projectType, capitalize: true },
+  { id: "city", label: "City", get: (p) => p.city },
+];
+
 export default function ProjectsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = usePersistedState<string>("projects:tab", "All", { allowed: PROJECT_TABS });
@@ -58,6 +65,7 @@ export default function ProjectsPage() {
   const [role, setRole] = useState("");
   const [localityOptions, setLocalityOptions] = useState<{ value: string; label: string }[]>([]);
 
+  const views = useModuleView("projects", PROJECT_FIELDS);
   const { projects, totalCount, isLoading, fetchProjects, deleteBulk } = useProjectsList();
   useClampedPage(pagination, setPagination, totalCount, isLoading);
 
@@ -89,8 +97,8 @@ export default function ProjectsPage() {
   const tabs = PROJECT_TABS;
 
   useEffect(() => {
-    fetchProjects({ pagination, debouncedSearchQuery, activeTab, filters });
-  }, [fetchProjects, pagination, debouncedSearchQuery, activeTab, filters]);
+    fetchProjects({ pagination: views.isBoard ? BOARD_PAGE : pagination, debouncedSearchQuery, activeTab, filters });
+  }, [fetchProjects, pagination, debouncedSearchQuery, activeTab, filters, views.isBoard]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -334,7 +342,7 @@ export default function ProjectsPage() {
             key={tab}
             onClick={() => { setActiveTab(tab); resetPage(); }}
             className={cn(
-              "px-5 h-10 rouTrusted and Reliable Liaisoningnded-full text-[14px] font-semibold whitespace-nowrap transition-all border active:scale-95",
+              "px-5 h-10 rounded-full text-[14px] font-semibold whitespace-nowrap transition-all border active:scale-95",
               isActive ? "bg-foreground text-background border-foreground shadow-sm" : "bg-card text-muted-foreground border-border hover:bg-muted"
             )}
           >
@@ -356,13 +364,32 @@ export default function ProjectsPage() {
       <ListToolbar>
         <SegmentTabs tabs={tabs} value={activeTab} onChange={(tab) => { setActiveTab(tab); resetPage(); }} label="Projects views" />
         <ToolbarEnd>
+          {views.picker}
           <ToolbarSearch value={searchQuery} onChange={(v) => { setSearchQuery(v); resetPage(); }} placeholder="Search name, builder, city" />
           {renderFilterPopover(false)}
           {(searchQuery || activeFiltersCount > 0) && <ToolbarClear onClick={() => { setSearchQuery(""); clearFilters(); }} />}
         </ToolbarEnd>
       </ListToolbar>
       <ListBody>
-        {isLoading ? <TableSkeleton columns={8} rows={10} flush /> : <DataTable {...tableProps} variant="list" />}
+        {isLoading ? <TableSkeleton columns={8} rows={10} flush /> : (
+          <ModuleViews
+            state={views}
+            data={projects}
+            columns={columns}
+            list={<DataTable {...tableProps} variant="list" />}
+            getKey={(p) => p.id}
+            onOpen={(p) => router.push(`/projects/${p.id}`)}
+            card={(p) => ({
+              title: p.name,
+              id: p.projectCode || p.id,
+              href: `/projects/${p.id}`,
+              subtitle: [p.city, formatPriceRange(computeProjectRanges(p.units).minPrice, computeProjectRanges(p.units).maxPrice)].filter((x) => x && x !== "—").join(" · "),
+              tag: p.projectType,
+            })}
+            totalCount={totalCount}
+            noun="projects"
+          />
+        )}
       </ListBody>
     </ListFrame>
   );
@@ -384,6 +411,7 @@ export default function ProjectsPage() {
   return (
     <>
       <MobileHeader title="Projects" />
+      {views.switcher}
       <div className="w-full flex flex-col space-y-6 pt-4 md:space-y-0 md:pt-0 md:h-full">
         <PageActions>
           <Link href="/projects/new" className={headerPrimaryClass}>

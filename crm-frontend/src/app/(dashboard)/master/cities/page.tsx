@@ -3,7 +3,8 @@
 import { apiFetch } from "@/lib/api-fetch";
 import { useState, useEffect, useCallback } from "react";
 import { DataTable } from "@/components/tables/data-table";
-import { ActiveCell, IdCell } from "@/components/tables/cells";
+import { ActiveCell, IdCell, statusDot } from "@/components/tables/cells";
+import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -42,7 +43,13 @@ const INDIA_STATES = [
 
 const emptyForm = { city_name: "", state_name: "", country_name: "India", country_code: "IN", is_active: 1 };
 
+const FIELDS: ViewField[] = [
+  { id: "status", label: "Status", get: (r) => (r.is_active ? "Active" : "Inactive"), order: ["Active", "Inactive"], dot: (v) => statusDot(v) },
+  { id: "state", label: "State", get: (r) => r.state_name },
+];
+
 export default function MasterCitiesPage() {
+  const views = useModuleView("master-cities", FIELDS);
   const [cities, setCities] = useState<any[]>([]);
   const [search, setSearch] = usePersistedState("master-cities:search", "");
   const [isLoading, setIsLoading] = useState(true);
@@ -269,6 +276,7 @@ export default function MasterCitiesPage() {
   return (
     <div className="w-full flex flex-col md:h-full">
       <MobileHeader title="Master: Cities" showBack />
+      {views.switcher}
 
       <PageActions>
         <button type="button" className={headerPrimaryClass} onClick={() => { setForm({ ...emptyForm }); setIsAddOpen(true); }}>
@@ -282,19 +290,30 @@ export default function MasterCitiesPage() {
           <button type="button" className={cn(headerPrimaryClass, "md:hidden")} onClick={() => { setForm({ ...emptyForm }); setIsAddOpen(true); }}>
             <Plus className="size-4" /> Add City
           </button>
+          {views.picker && <div className="ml-auto">{views.picker}</div>}
         </ListToolbar>
         <ListBody>
           {isLoading ? (
             <TableSkeleton columns={5} rows={8} flush />
           ) : (
-            <DataTable
-              variant="list" 
-            columns={columns} 
-            data={cities}
-            showToolbar={true}
-            showDeleteAction={true}
-            onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
-          />
+            <ModuleViews
+              state={views}
+              data={cities}
+              columns={columns}
+              list={
+                <DataTable
+                variant="list" 
+              columns={columns} 
+              data={cities}
+              showToolbar={true}
+              showDeleteAction={true}
+              onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
+            />
+              }
+              getKey={(r) => r.id}
+              onOpen={openEdit}
+              card={(r) => ({ title: r.city_name, avatar: false, id: r.id, subtitle: r.state_name })}
+            />
           )}
         </ListBody>
       </ListFrame>

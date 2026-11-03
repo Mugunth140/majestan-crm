@@ -8,7 +8,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DataTable } from "@/components/tables/data-table";
-import { DateCell, IdCell, NameCell, StatusCell, statusTone, type StatusTone } from "@/components/tables/cells";
+import { BOARD_PAGE, ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { DateCell, IdCell, NameCell, StatusCell, statusDot, statusTone, type StatusTone } from "@/components/tables/cells";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -59,8 +60,17 @@ function formatPrice(price: number): string {
   return `₹${price.toLocaleString("en-IN")}`;
 }
 
+const PROPERTY_FIELDS: ViewField[] = [
+  { id: "status", label: "Status", get: (p) => propertyStatusLabel(p.status, p.approvalStatus), order: ["available", "Pending review", "rented", "sold", "Archived"], dot: (v) => statusDot(v, PROPERTY_TONES[v.toLowerCase()]), capitalize: true },
+  { id: "propertyType", label: "Type", get: (p) => p.propertyType?.replace(/_/g, " "), capitalize: true },
+  { id: "listingType", label: "Listing", get: (p) => (p.listingType === "Rent" ? "Rent" : "Buy") },
+  { id: "locality", label: "Locality", get: (p) => p.localityName },
+  { id: "approval", label: "Approval", get: (p) => p.approvalStatus || "Pending", dot: (v) => statusDot(v), capitalize: true },
+];
+
 export default function PropertiesPage() {
   const router = useRouter();
+  const views = useModuleView("properties", PROPERTY_FIELDS);
   const [activeTab, setActiveTab] = usePersistedState<string>("properties:tab", "Available", { allowed: PROPERTY_TABS });
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
@@ -87,8 +97,8 @@ export default function PropertiesPage() {
   const canApprove = ["Admin", "Super Admin", "Manager"].includes(role);
 
   useEffect(() => {
-    fetchProperties({ pagination, debouncedSearchQuery, activeTab, filters });
-  }, [fetchProperties, pagination, debouncedSearchQuery, activeTab, filters]);
+    fetchProperties({ pagination: views.isBoard ? BOARD_PAGE : pagination, debouncedSearchQuery, activeTab, filters });
+  }, [fetchProperties, pagination, debouncedSearchQuery, activeTab, filters, views.isBoard]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -438,13 +448,26 @@ export default function PropertiesPage() {
       <ListToolbar>
         <SegmentTabs tabs={tabs} value={activeTab} onChange={(tab) => { setActiveTab(tab); resetPage(); }} label="Properties views" />
         <ToolbarEnd>
+          {views.picker}
           <ToolbarSearch value={searchQuery} onChange={(v) => { setSearchQuery(v); resetPage(); }} placeholder="Search title, code, owner, city" />
           {renderFilterPopover(false)}
           {(searchQuery || activeFiltersCount > 0) && <ToolbarClear onClick={() => { setSearchQuery(""); clearFilters(); }} />}
         </ToolbarEnd>
       </ListToolbar>
       <ListBody>
-        {isLoading ? <TableSkeleton columns={12} rows={10} flush /> : <DataTable key={activeTab} {...tableProps} variant="list" />}
+        {isLoading ? <TableSkeleton columns={12} rows={10} flush /> : <ModuleViews
+          state={views}
+          data={properties}
+          columns={columns}
+          list={
+            <DataTable key={activeTab} {...tableProps} variant="list" />
+          }
+          getKey={(p) => p.id}
+          onOpen={(p) => router.push(`/properties/${p.id}`)}
+          card={(p) => ({ title: p.title, id: p.propertyCode || p.id, href: `/properties/${p.id}`, subtitle: [p.localityName, Number(p.price) ? formatPrice(Number(p.price)) : ""].filter(Boolean).join(" · "), footer: propertyUploaderLabel(p), tag: p.propertyType?.replace(/_/g, " ") })}
+          totalCount={totalCount}
+          noun="properties"
+        />}
       </ListBody>
     </ListFrame>
   );
@@ -466,6 +489,7 @@ export default function PropertiesPage() {
   return (
     <>
       <MobileHeader title="Properties" />
+      {views.switcher}
       <div className="w-full flex flex-col space-y-6 pt-4 md:space-y-0 md:pt-0 md:h-full">
         <PageActions>
           <Link href="/properties/new" className={headerPrimaryClass}>

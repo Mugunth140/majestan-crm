@@ -3,7 +3,8 @@
 import { apiFetch } from "@/lib/api-fetch";
 import { useState, useEffect, useCallback } from "react";
 import { DataTable } from "@/components/tables/data-table";
-import { ActiveCell, IdCell } from "@/components/tables/cells";
+import { ActiveCell, IdCell, statusDot } from "@/components/tables/cells";
+import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -33,7 +34,13 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 const emptyForm = { city_id: "", locality_name: "", postal_code: "", description: "", is_active: 1 };
 
+const FIELDS: ViewField[] = [
+  { id: "status", label: "Status", get: (r) => (r.is_active ? "Active" : "Inactive"), order: ["Active", "Inactive"], dot: (v) => statusDot(v) },
+  { id: "city", label: "City", get: (r) => r.city_name, capitalize: true },
+];
+
 export default function MasterSublocationsPage() {
+  const views = useModuleView("master-sublocations", FIELDS);
   const [sublocations, setSublocations] = useState<any[]>([]);
   const [cities, setCities] = useState<any[]>([]);
   const [search, setSearch] = usePersistedState("master-sublocations:search", "");
@@ -309,6 +316,7 @@ export default function MasterSublocationsPage() {
   return (
     <>
       <MobileHeader title="Master: Sublocations" showBack />
+      {views.switcher}
       <div className="w-full flex flex-col md:h-full">
 
         <PageActions>
@@ -323,19 +331,30 @@ export default function MasterSublocationsPage() {
             <button type="button" className={cn(headerPrimaryClass, "md:hidden")} onClick={() => { setForm({ ...emptyForm }); setIsAddOpen(true); }}>
               <Plus className="size-4" /> Add Sublocation
             </button>
+            {views.picker && <div className="ml-auto">{views.picker}</div>}
           </ListToolbar>
           <ListBody>
             {isLoading ? (
               <TableSkeleton columns={5} rows={8} flush />
             ) : (
-              <DataTable
-              variant="list" 
-              columns={columns} 
-              data={sublocations} 
-              showToolbar={true}
-              showDeleteAction={true}
-              onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
-            />
+              <ModuleViews
+                state={views}
+                data={sublocations}
+                columns={columns}
+                list={
+                  <DataTable
+                variant="list" 
+                columns={columns} 
+                data={sublocations} 
+                showToolbar={true}
+                showDeleteAction={true}
+                onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
+              />
+                }
+                getKey={(r) => r.id}
+                onOpen={openEdit}
+                card={(r) => ({ title: r.locality_name, avatar: false, id: r.id, subtitle: [r.city_name, r.postal_code].filter(Boolean).join(" · ") })}
+              />
             )}
           </ListBody>
         </ListFrame>

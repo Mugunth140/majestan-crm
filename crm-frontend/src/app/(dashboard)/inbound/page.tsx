@@ -8,7 +8,8 @@ import { apiFetch, apiJson } from "@/lib/api-fetch";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { DataTable } from "@/components/tables/data-table";
-import { DateCell, IdCell, StatusCell, type StatusTone } from "@/components/tables/cells";
+import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { DateCell, IdCell, StatusCell, statusDot, type StatusTone } from "@/components/tables/cells";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -46,8 +47,17 @@ const STATUS_TONES: Record<string, StatusTone> = {
   "Closed": "green",
 };
 
+const INBOUND_FIELDS: ViewField[] = [
+  { id: "status", label: "Status", get: (i) => i.status || "New Inbound", order: Object.keys(STATUS_TONES), dot: (v) => statusDot(v, STATUS_TONES[v]) },
+  { id: "inbound_status", label: "Inbound status", get: (i) => (i.inbound_status ? inboundStatusLabel(i.inbound_status) : ""), dot: (v) => statusDot(v, v === "Available" ? "green" : v === "Not available" ? "red" : "amber") },
+  { id: "category", label: "Category", get: (i) => i.property_category || i.propertyCategory, capitalize: true },
+  { id: "assigned", label: "Assigned", get: (i) => i.assigned?.name || "Unassigned" },
+  { id: "uploaded_by", label: "Uploaded by", get: (i) => i.uploaded_by?.name },
+];
+
 export default function InboundPage() {
   const router = useRouter();
+  const views = useModuleView("inbound", INBOUND_FIELDS);
   const [activeTab, setActiveTab] = usePersistedState<string>("inbound:tab", "All Inbound", { allowed: ["All Inbound", "Queue", "Action Required", "Closed"] });
   const [actionFilter, setActionFilter] = usePersistedState<string>("inbound:actionFilter", "Today", { allowed: ACTION_FILTERS });
   const [inbounds, setInbounds] = useState<any[]>([]);
@@ -537,6 +547,7 @@ export default function InboundPage() {
       <ListToolbar>
         <SegmentTabs tabs={tabs} value={activeTab} onChange={setActiveTab} label="Views" />
         <ToolbarEnd>
+          {views.picker}
           <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search ID, Type, Phone" />
           {renderFilterPopover(false)}
         </ToolbarEnd>
@@ -595,7 +606,18 @@ export default function InboundPage() {
 
       {/* Table */}
       <div className="flex w-full min-w-0 flex-col md:min-h-0 md:flex-1 md:overflow-hidden">
-        {isLoading ? <TableSkeleton flush /> : <DataTable {...tableProps} variant="list" />}
+        {isLoading ? <TableSkeleton flush /> : <ModuleViews
+          state={views}
+          data={displayedInbounds}
+          columns={columns}
+          list={
+            <DataTable {...tableProps} variant="list" />
+          }
+          getKey={(i) => i.rawId || i.id}
+          onOpen={(i) => router.push(`/inbound/${i.rawId || i.id}`)}
+          card={(i) => ({ title: [i.property_category || i.propertyCategory, (i.property_type || i.propertyType || "").replace(/_/g, " ")].filter(Boolean).join(" - ") || "Inbound", avatar: false, id: i.propertyId || i.property_id, href: `/inbound/${i.rawId || i.id}`, subtitle: i.address || i.location, footer: i.assigned?.name ?? <span className="text-muted-foreground">Unassigned</span> })}
+          noun="inbounds"
+        />}
       </div>
     </ListFrame>
   );
@@ -605,6 +627,7 @@ export default function InboundPage() {
   return (
     <>
       <MobileHeader title="Inbound Dashboard" />
+      {views.switcher}
       <div className="w-full flex flex-col space-y-6 pt-4 md:space-y-0 md:pt-0 md:h-full">
         <PageActions>
           <Link href="/inbound/new" className={headerPrimaryClass}>

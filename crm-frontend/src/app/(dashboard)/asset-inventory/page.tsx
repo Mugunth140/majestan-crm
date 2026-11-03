@@ -4,7 +4,8 @@ import { apiFetch } from "@/lib/api-fetch";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { DataTable } from "@/components/tables/data-table";
-import { IdCell, StatusCell } from "@/components/tables/cells";
+import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { IdCell, StatusCell, statusDot } from "@/components/tables/cells";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -26,8 +27,15 @@ import { FormSelect } from "@/components/shared/form-select";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
+const ASSET_FIELDS: ViewField[] = [
+  { id: "status", label: "Status", get: (a) => a.status || "New", order: ["New", "Available", "Pending", "Sold"], dot: (v) => statusDot(v, v === "Sold" ? "violet" : undefined) },
+  { id: "district", label: "District", get: (a) => a.location?.district },
+  { id: "zone", label: "Zone", get: (a) => a.location?.zone },
+];
+
 export default function AssetInventoryPage() {
   const router = useRouter();
+  const views = useModuleView("assets", ASSET_FIELDS);
   const [assets, setAssets] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = usePersistedState("assets:search", "");
@@ -311,6 +319,7 @@ export default function AssetInventoryPage() {
     <ListFrame>
       <ListToolbar>
         <ToolbarEnd>
+          {views.picker}
           <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search ID, Owner, Address" />
           {renderFilterPopover(false)}
         </ToolbarEnd>
@@ -318,7 +327,18 @@ export default function AssetInventoryPage() {
 
       {/* Table */}
       <div className="flex w-full min-w-0 flex-col md:min-h-0 md:flex-1 md:overflow-hidden">
-        {isLoading ? <TableSkeleton flush /> : <DataTable {...tableProps} variant="list" />}
+        {isLoading ? <TableSkeleton flush /> : <ModuleViews
+          state={views}
+          data={filteredAssets}
+          columns={columns}
+          list={
+            <DataTable {...tableProps} variant="list" />
+          }
+          getKey={(a) => a.id}
+          onOpen={(a) => router.push(`/asset-inventory/${a.id}`)}
+          card={(a) => ({ title: [a.location?.district, a.location?.taluk, a.location?.village].filter(Boolean).join(", ") || "Asset", avatar: false, id: `AST${String(a.id).padStart(5, "0")}`, href: `/asset-inventory/${a.id}`, subtitle: a.feature?.extent != null ? `${a.feature.extent} Acres` : undefined, tag: a.location?.zone })}
+          noun="assets"
+        />}
       </div>
     </ListFrame>
   );
@@ -326,6 +346,7 @@ export default function AssetInventoryPage() {
   return (
     <>
       <MobileHeader title="Assets" />
+      {views.switcher}
 
       <div className="flex flex-col space-y-4 md:space-y-0 md:h-full">
         {/* Desktop page header */}
