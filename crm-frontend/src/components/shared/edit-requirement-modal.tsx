@@ -142,11 +142,11 @@ export function EditRequirementModal({ open, onClose, inquiry, leadId, onSuccess
               <h4 className="font-bold text-foreground">Core Details</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Purchase / Service Type</label>
+                  <label className="text-[13px] font-medium text-foreground/80">Purchase / Service Type</label>
                   <FormSelect name="purchaseType" defaultValue={inquiry.purchase_type} placeholder="Select Purchase Type" options={PURCHASE_TYPES} required />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Property Category</label>
+                  <label className="text-[13px] font-medium text-foreground/80">Property Category</label>
                   <FormSelect 
                     name="propertyCategory" 
                     value={selectedCategory}
@@ -160,7 +160,7 @@ export function EditRequirementModal({ open, onClose, inquiry, leadId, onSuccess
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Property Type</label>
+                  <label className="text-[13px] font-medium text-foreground/80">Property Type</label>
                   <FormSelect 
                     name="propertyType" 
                     value={selectedType}
@@ -172,11 +172,11 @@ export function EditRequirementModal({ open, onClose, inquiry, leadId, onSuccess
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Funding</label>
+                  <label className="text-[13px] font-medium text-foreground/80">Funding</label>
                   <FormSelect name="funder" defaultValue={inquiry.funder} placeholder="Select Funding" options={FUNDERS} required />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Project List</label>
+                  <label className="text-[13px] font-medium text-foreground/80">Project List</label>
                   <FormSelect name="project" defaultValue={inquiry.project_list} placeholder="Select Project" options={PROJECTS} />
                 </div>
               </div>
@@ -187,7 +187,7 @@ export function EditRequirementModal({ open, onClose, inquiry, leadId, onSuccess
               <h4 className="font-bold text-foreground">Buyer Qualification</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Target City</label>
+                  <label className="text-[13px] font-medium text-foreground/80">Target City</label>
                   <FormSelect
                     name="cityId"
                     placeholder="Select City"
@@ -200,7 +200,7 @@ export function EditRequirementModal({ open, onClose, inquiry, leadId, onSuccess
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Sub Locations (Multiple)</label>
+                  <label className="text-[13px] font-medium text-foreground/80">Sub Locations (Multiple)</label>
                   <div className="flex flex-wrap gap-2 p-3 min-h-[48px] rounded-xl bg-muted/30 border border-border/60 max-h-[150px] overflow-y-auto">
                     {!selectedCityId ? (
                       <span className="text-sm text-muted-foreground">Select a city first...</span>
@@ -222,7 +222,7 @@ export function EditRequirementModal({ open, onClose, inquiry, leadId, onSuccess
                             }}
                             className={`px-3 py-1 text-[13px] rounded-full border transition-colors ${
                               isSelected 
-                                ? "bg-[#0052FF] text-white border-[#0052FF] shadow-sm" 
+                                ? "bg-foreground text-background border-foreground" 
                                 : "bg-background text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground"
                             }`}
                           >
@@ -234,15 +234,15 @@ export function EditRequirementModal({ open, onClose, inquiry, leadId, onSuccess
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Purchase Timeline</label>
+                  <label className="text-[13px] font-medium text-foreground/80">Purchase Timeline</label>
                   <FormSelect name="purchaseTimeline" defaultValue={inquiry.purchase_timeline} placeholder="Select Timeline" options={PURCHASE_TIMELINES} />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Qualification Purpose</label>
+                  <label className="text-[13px] font-medium text-foreground/80">Qualification Purpose</label>
                   <FormSelect name="qualificationPurpose" defaultValue={inquiry.qualification_purpose} placeholder="Select Purpose" options={QUALIFICATION_PURPOSES} />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Decision Maker</label>
+                  <label className="text-[13px] font-medium text-foreground/80">Decision Maker</label>
                   <Input name="decisionMaker" defaultValue={inquiry.decision_maker} placeholder="e.g. Self, Spouse, Father" className="h-12 rounded-xl bg-muted/30" />
                 </div>
               </div>
@@ -258,30 +258,30 @@ export function EditRequirementModal({ open, onClose, inquiry, leadId, onSuccess
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Min Budget</label>
+                    <label className="text-[13px] font-medium text-foreground/80">Min Budget</label>
                     <PriceInput placeholder="e.g. 2.5Cr or 50L" value={preferences?.minBudget || ""} onChange={v => setPreferences({...preferences, minBudget: v})} />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Max Budget</label>
+                    <label className="text-[13px] font-medium text-foreground/80">Max Budget</label>
                     <PriceInput placeholder="e.g. 3Cr or 75L" value={preferences?.maxBudget || ""} onChange={v => setPreferences({...preferences, maxBudget: v})} />
                   </div>
 
                   {selectedCategory === "residential" && (
                     <>
                       <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">BHK</label>
+                        <label className="text-[13px] font-medium text-foreground/80">BHK</label>
                         <FormSelect name="_bhk" placeholder="Select BHK" options={[{label: "1", value: "1"}, {label: "2", value: "2"}, {label: "3", value: "3"}, {label: "4+", value: "4"}]} value={preferences?.bhk || null} onValueChange={v => setPreferences({...preferences, bhk: v})} />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Furnishing</label>
+                        <label className="text-[13px] font-medium text-foreground/80">Furnishing</label>
                         <FormSelect name="_furnishing" placeholder="Select" options={[{label: "Furnished", value: "1"}, {label: "Semi Furnished", value: "2"}, {label: "Unfurnished", value: "0"}]} value={preferences?.furnished || null} onValueChange={v => setPreferences({...preferences, furnished: v})} />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Floor Number</label>
+                        <label className="text-[13px] font-medium text-foreground/80">Floor Number</label>
                         <Input type="text" placeholder="e.g. Ground, 1st, High" value={preferences?.floorNumber || ""} onChange={e => setPreferences({...preferences, floorNumber: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Facing</label>
+                        <label className="text-[13px] font-medium text-foreground/80">Facing</label>
                         <FormSelect name="_facing" placeholder="Select Facing" options={[{label: "North", value: "north"}, {label: "East", value: "east"}, {label: "South", value: "south"}, {label: "West", value: "west"}, {label: "North-East", value: "north_east"}]} value={preferences?.facing || null} onValueChange={v => setPreferences({...preferences, facing: v})} />
                       </div>
                     </>
@@ -290,11 +290,11 @@ export function EditRequirementModal({ open, onClose, inquiry, leadId, onSuccess
                   {['commercial', 'industrial', 'agricultural', 'institutional'].includes(selectedCategory) && (
                     <>
                       <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Min Area</label>
+                        <label className="text-[13px] font-medium text-foreground/80">Min Area</label>
                         <Input type="number" placeholder="Min Area" value={preferences?.minArea || ""} onChange={e => setPreferences({...preferences, minArea: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Max Area</label>
+                        <label className="text-[13px] font-medium text-foreground/80">Max Area</label>
                         <Input type="number" placeholder="Max Area" value={preferences?.maxArea || ""} onChange={e => setPreferences({...preferences, maxArea: e.target.value})} className="h-12 rounded-xl bg-muted/30" />
                       </div>
                     </>
@@ -306,7 +306,7 @@ export function EditRequirementModal({ open, onClose, inquiry, leadId, onSuccess
 
           <DialogFooter className="p-6 pt-4 border-t sticky bottom-0 bg-background z-10">
             <Button variant="outline" type="button" onClick={onClose} disabled={isSubmitting}>Cancel</Button>
-            <Button type="submit" disabled={isSubmitting} className="bg-[#0052FF] text-white hover:bg-[#0040CC]">
+            <Button type="submit" disabled={isSubmitting} className="bg-foreground text-background hover:bg-foreground/85">
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Save Requirement
             </Button>

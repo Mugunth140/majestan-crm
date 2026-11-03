@@ -229,19 +229,19 @@ function OpenComposer({ entityType, entityId, start, recipients = [], senders, i
           <div className={cn("flex-1 overflow-y-auto py-5 space-y-4", pad)}>
             {canPickSender && (
               <div className="grid gap-1.5 sm:grid-cols-[120px_1fr] sm:items-center">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">From</label>
+                <label className="text-[13px] font-medium text-foreground/80">From</label>
                 <FormSelect name="mailSender" value={sender ?? ""} onValueChange={(v: string) => v && setSender(v)}
                   options={allowed.map((s) => ({ label: s.from, value: s.key }))} placeholder="Choose a mailbox" />
               </div>
             )}
             {!draft && (
               <div className="grid gap-1.5 sm:grid-cols-[120px_1fr] sm:items-center">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Start from</label>
+                <label className="text-[13px] font-medium text-foreground/80">Start from</label>
                 <FormSelect name="mailSource" value={source} onValueChange={(v: string) => chooseSource(v)} options={sourceOptions} placeholder="Blank email" />
               </div>
             )}
             <div className="grid gap-1.5 sm:grid-cols-[120px_1fr] sm:items-center">
-              <label htmlFor="mail-cc" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Cc</label>
+              <label htmlFor="mail-cc" className="text-[13px] font-medium text-foreground/80">Cc</label>
               <div>
                 <Input id="mail-cc" value={ccText} onChange={(e) => setCcText(e.target.value)} placeholder="Optional, e.g. manager@majestanrealty.com"
                   className={`h-10 rounded-xl ${cc.invalid.length ? "border-red-400 focus-visible:ring-red-200" : ""}`} />
@@ -249,7 +249,7 @@ function OpenComposer({ entityType, entityId, start, recipients = [], senders, i
               </div>
             </div>
             <div className="grid gap-1.5 sm:grid-cols-[120px_1fr] sm:items-center">
-              <label htmlFor="mail-subject" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Subject</label>
+              <label htmlFor="mail-subject" className="text-[13px] font-medium text-foreground/80">Subject</label>
               <div className="flex gap-2">
                 <Input id="mail-subject" ref={subjectRef} value={subject} maxLength={500} placeholder="Subject line"
                   onChange={(e) => { setSubject(e.target.value); setTouched(true); }} className="h-10 rounded-xl" />
@@ -327,7 +327,7 @@ function OpenComposer({ entityType, entityId, start, recipients = [], senders, i
           {stage === "write" ? (
             <>
               <Button variant="outline" onClick={() => { if (!touched || window.confirm("Discard this email?")) onClose(); }} disabled={busy !== null} className="rounded-xl">Cancel</Button>
-              <Button onClick={review} disabled={!canReview} className="rounded-xl px-6 bg-[#0052FF] text-white hover:bg-[#0040CC]">
+              <Button onClick={review} disabled={!canReview} className="px-5 bg-foreground text-background hover:bg-foreground/85">
                 {busy === "review" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Review email
               </Button>
             </>
@@ -336,7 +336,7 @@ function OpenComposer({ entityType, entityId, start, recipients = [], senders, i
               <Button variant="outline" onClick={() => setStage("write")} disabled={busy !== null} className="rounded-xl">
                 <ArrowLeft className="mr-2 h-4 w-4" /> Back to editing
               </Button>
-              <Button onClick={send} disabled={busy !== null || !preview || preview.issues.length > 0} className="rounded-xl px-6 bg-[#0052FF] text-white hover:bg-[#0040CC]">
+              <Button onClick={send} disabled={busy !== null || !preview || preview.issues.length > 0} className="px-5 bg-foreground text-background hover:bg-foreground/85">
                 {busy === "send" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />} Send email
               </Button>
             </>

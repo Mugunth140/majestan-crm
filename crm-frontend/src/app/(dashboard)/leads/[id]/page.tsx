@@ -32,14 +32,14 @@ import { PageActions } from "@/components/layout/page-actions";
 import { useIsMobile } from "@/hooks/use-device";
 import dynamic from "next/dynamic";
 
-const ContactModal = dynamic(() => import("@/components/shared/contact-modal").then(mod => mod.ContactModal), { ssr: false });
 const LeadAttachments = dynamic(() => import("@/components/shared/lead-attachments").then(mod => mod.LeadAttachments), { ssr: false });
 const EditRequirementModal = dynamic(() => import("@/components/shared/edit-requirement-modal").then(mod => mod.EditRequirementModal), { ssr: false });
 import { AssignLeadModal } from "@/components/shared/assign-lead-modal";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { sortContactLogs } from "@/lib/contact-log-utils";
 import {
-  LEAD_STATUS_DOTS,
+  leadStatusDot,
+  leadStatusPill,
   LEAD_STATUS_ORDER,
   PURCHASE_TYPES,
   PURCHASE_TIMELINES,
@@ -52,16 +52,17 @@ import { cn } from "@/lib/utils";
 import { shouldAutoOpenFollowUps, wantsFollowUps } from "@/lib/follow-up-deep-link";
 import { InlineAction, InlineSelect, InlineText, Section, FieldRow, type Option } from "./inline-field";
 import { Feed, timelineItems, type TimelineEntry } from "./lead-timeline";
-import { LeadConversation } from "./lead-conversation";
+import { LeadConversation, type ComposeMode } from "./lead-conversation";
+import { AttachmentsArt, EmptyState, RequirementsArt } from "./lead-empty";
 import {
   Loader2, Phone, Mail, MessageCircle, MessageSquare, ArrowUpRight,
-  RefreshCw, History, TrendingUp, Sparkles, ChevronDown,
-  UserPlus, Activity, MessagesSquare, Paperclip, Building2, Smartphone, Pencil, Info, Flag, PhoneMissed,
+  History, TrendingUp, Sparkles, ChevronDown,
+  Plus, Activity, MessagesSquare, Paperclip, Building2, Smartphone, Pencil, Info, Flag, PhoneMissed,
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
-const STATUS_OPTIONS: Option[] = LEAD_STATUS_ORDER.map((s) => ({ label: s, value: s, dot: LEAD_STATUS_DOTS[s] }));
+const STATUS_OPTIONS: Option[] = LEAD_STATUS_ORDER.map((s) => ({ label: s, value: s, dot: leadStatusDot(s) }));
 
 const PRIORITIES = [
   { label: "Low", value: "low" },
@@ -247,13 +248,13 @@ function LeadDetail() {
   const [visitDialog, setVisitDialog] = useState<{ status: string | null; initial: Partial<VisitDetails> } | null>(null);
   const [savingVisit, setSavingVisit] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("timeline");
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [sources, setSources] = useState<Option[]>([]);
 
   // Modals / Sliders
-  const [contactModal, setContactModal] = useState<{ open: boolean; type: string; to: string }>({ open: false, type: "", to: "" });
+  const [composeRequest, setComposeRequest] = useState<{ mode: ComposeMode; n: number } | null>(null);
+  const [addingInquiry, setAddingInquiry] = useState(false);
   const [autoOpenedFollowUps, setAutoOpenedFollowUps] = useState(false);
   const [isAutoMatchOpen, setIsAutoMatchOpen] = useState(false);
   const [autoMatchResults, setAutoMatchResults] = useState<any[]>([]);
@@ -401,7 +402,6 @@ function LeadDetail() {
   const fetchLead = useCallback(async (silent = false) => {
     if (!id) return;
     if (!silent) setIsLoading(true);
-    else setIsRefreshing(true);
     try {
       const [res, history] = await Promise.all([
         apiFetch(`${API_URL}/leads/${id}`),
@@ -416,7 +416,6 @@ function LeadDetail() {
       toast.error("Failed to load lead details");
     } finally {
       setIsLoading(false);
-      setIsRefreshing(false);
     }
   }, [id, router]);
 
@@ -604,7 +603,11 @@ function LeadDetail() {
     // dependency, so a fresh object identity can't re-run this effect.
   }, [tab, isLoading, lead, autoOpenedFollowUps]);
 
-  const openContact = (type: string, to: string) => setContactModal({ open: true, type, to });
+  // The quick actions open the matching composer in the Conversation tab's bottom bar.
+  const compose = (mode: ComposeMode) => {
+    setActiveTab("conversation");
+    setComposeRequest((r) => ({ mode, n: (r?.n ?? 0) + 1 }));
+  };
 
   const getFuDateObj = (d: string, t: string) => {
     if (!d) return undefined;
@@ -847,19 +850,69 @@ function LeadDetail() {
 
   const quickActions = (
     <>
-      <QuickAction icon={Phone} label="Call" onClick={() => openContact("call", lead.mobile_number)} disabled={!canEdit || !lead.mobile_number} />
-      <QuickAction icon={MessageCircle} label="WhatsApp" onClick={() => openContact("whatsapp", lead.whatsapp_number)} disabled={!canEdit || !lead.whatsapp_number} />
-      <QuickAction icon={MessageSquare} label="SMS" onClick={() => openContact("sms", lead.mobile_number)} disabled={!canEdit || !lead.mobile_number} />
-      <QuickAction icon={Mail} label="Email" onClick={() => openContact("email", lead.email)} disabled={!canEdit || !lead.email} />
+      <QuickAction
+        icon={Phone}
+        label="Call"
+        onClick={() => {
+          // Phones dial straight away; either way the follow-up opens ready to log the call.
+          if (window.matchMedia("(pointer: coarse)").matches) window.location.href = `tel:${lead.mobile_number}`;
+          setFuForm(f => ({ ...f, contactedVia: "call" }));
+          compose("followup");
+        }}
+        disabled={!canEdit || !lead.mobile_number}
+      />
+      <QuickAction icon={MessageCircle} label="WhatsApp" onClick={() => compose("whatsapp")} disabled={!canEdit || !(lead.whatsapp_number || lead.mobile_number)} />
+      <QuickAction icon={MessageSquare} label="SMS" onClick={() => compose("sms")} disabled={!canEdit || !lead.mobile_number} />
+      <QuickAction icon={Mail} label="Email" onClick={() => compose("email")} disabled={!canEdit || !lead.email} />
     </>
   );
 
-  const statusDot = <span className={cn("h-2 w-2 shrink-0 rounded-full", LEAD_STATUS_DOTS[statusName] ?? "bg-gray-400")} />;
+  // The status pill and the assignee, as the leads table shows them.
+  const statusPill = cn("inline-flex items-center gap-1 whitespace-nowrap rounded-full font-medium transition-[filter] hover:brightness-[0.97] dark:hover:brightness-110", leadStatusPill(statusName));
+  const assignee = lead.assigned_staff?.name as string | undefined;
+  const assigneeLabel = (
+    <>
+      {assignee ? (
+        <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold", avatarTone(assignee))}>{initials(assignee)}</span>
+      ) : (
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-dashed border-muted-foreground/50" />
+      )}
+      <span className="max-w-[160px] truncate">{assignee ?? "Unassigned"}</span>
+    </>
+  );
 
-  const repeatBadge = inquiries.length > 1 && (
+  // Requirements added by hand on this page are not repeat enquiries.
+  const enquiries = inquiries.filter((i) => i.source !== "manual").length;
+  const repeatBadge = enquiries > 1 && (
     <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-900/60 dark:bg-purple-950/40 dark:text-purple-300">
-      Repeat ({inquiries.length - 1})
+      Repeat ({enquiries - 1})
     </Badge>
+  );
+
+  const addRequirement = async () => {
+    setAddingInquiry(true);
+    try {
+      const res = await apiFetch(`${API_URL}/leads/${id}/inquiries`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      toast.success("Requirement added. Fill in the details below.");
+      fetchLead(true);
+    } catch (reason) {
+      toast.error(reason instanceof Error && reason.message ? reason.message : "Failed to add the requirement");
+    } finally {
+      setAddingInquiry(false);
+    }
+  };
+
+  const addRequirementButton = (primary: boolean) => canEdit && (
+    <button type="button" onClick={addRequirement} disabled={addingInquiry} className={cn(primary ? HEADER_PRIMARY : HEADER_BUTTON, "h-8 text-[13px] disabled:opacity-60")}>
+      {addingInquiry ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className={cn("h-4 w-4", !primary && "text-muted-foreground")} />}
+      Add requirement
+    </button>
   );
 
   // ── Follow-up composer (lives in the Conversation tab's bottom bar) ──
@@ -969,15 +1022,11 @@ function LeadDetail() {
       {/* ── Header actions (desktop page header) ── */}
       <PageActions>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => fetchLead(true)} title="Refresh" aria-label="Refresh" className={cn(HEADER_BUTTON, "w-8 justify-center px-0")}>
-            <RefreshCw className={cn("h-3.5 w-3.5 text-muted-foreground", isRefreshing && "animate-spin")} />
-          </button>
           {canEdit ? (
             <DropdownMenu>
-              <DropdownMenuTrigger render={<button type="button" className={HEADER_BUTTON} aria-label="Change status" />}>
-                {statusDot}
+              <DropdownMenuTrigger render={<button type="button" className={cn(statusPill, "h-8 pl-3 pr-2 text-[13px]")} aria-label={`Status: ${statusName}. Change status`} />}>
                 {statusName}
-                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                <ChevronDown className="h-3.5 w-3.5 opacity-60" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="max-h-[360px] w-56">
                 {STATUS_OPTIONS.map((opt) => (
@@ -990,13 +1039,15 @@ function LeadDetail() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <span className={cn(HEADER_BUTTON, "hover:bg-background")}>{statusDot}{statusName}</span>
+            <span className={cn(statusPill, "h-8 px-3 text-[13px] hover:brightness-100")}>{statusName}</span>
           )}
-          {showReassign && (
-            <button type="button" onClick={() => setIsAssignOpen(true)} className={HEADER_BUTTON}>
-              <UserPlus className="h-3.5 w-3.5 text-muted-foreground" />
-              Reassign
+          {showReassign ? (
+            <button type="button" onClick={() => setIsAssignOpen(true)} title="Reassign" aria-label={`Assigned to ${assignee ?? "nobody"}. Reassign`} className={cn(HEADER_BUTTON, "pl-1.5 pr-2")}>
+              {assigneeLabel}
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
+          ) : (
+            <span title="Assigned to" className={cn(HEADER_BUTTON, "pl-1.5 hover:bg-background")}>{assigneeLabel}</span>
           )}
           {showConvert && (
             <button type="button" onClick={openConvert} className={HEADER_PRIMARY}>
@@ -1012,10 +1063,9 @@ function LeadDetail() {
         <div className="flex flex-wrap items-center gap-2 text-[14px] text-muted-foreground">
           {canEdit ? (
             <DropdownMenu>
-              <DropdownMenuTrigger render={<button type="button" className="inline-flex h-7 items-center gap-1.5 rounded-full bg-foreground/[0.06] px-3 text-[13px] font-medium text-foreground" aria-label="Change status" />}>
-                {statusDot}
+              <DropdownMenuTrigger render={<button type="button" className={cn(statusPill, "h-7 pl-3 pr-2 text-[13px]")} aria-label={`Status: ${statusName}. Change status`} />}>
                 {statusName}
-                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                <ChevronDown className="h-3.5 w-3.5 opacity-60" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="max-h-[360px] w-56">
                 {STATUS_OPTIONS.map((opt) => (
@@ -1027,18 +1077,20 @@ function LeadDetail() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-foreground/[0.06] px-3 text-[13px] font-medium text-foreground">{statusDot}{statusName}</span>
+            <span className={cn(statusPill, "h-7 px-3 text-[13px] hover:brightness-100")}>{statusName}</span>
           )}
           {repeatBadge}
           <span>{leadCode(lead.id)}</span>
         </div>
         <div className="flex gap-2">{quickActions}</div>
-        {(showReassign || showConvert) && (
-          <div className="flex gap-2">
-            {showReassign && (
-              <button type="button" onClick={() => setIsAssignOpen(true)} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-foreground/[0.06] text-[15px] font-medium text-foreground">
-                <UserPlus className="h-4 w-4" /> Reassign
+        <div className="flex gap-2">
+            {showReassign ? (
+              <button type="button" onClick={() => setIsAssignOpen(true)} aria-label={`Assigned to ${assignee ?? "nobody"}. Reassign`} className="flex h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-foreground/[0.06] px-3 text-[15px] font-medium text-foreground">
+                {assigneeLabel}
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
               </button>
+            ) : (
+              <span className="flex h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-foreground/[0.04] px-3 text-[15px] font-medium text-foreground">{assigneeLabel}</span>
             )}
             {showConvert && (
               <button type="button" onClick={openConvert} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-[#017D58] text-[15px] font-semibold text-white dark:bg-[#2FB585] dark:text-black">
@@ -1046,7 +1098,6 @@ function LeadDetail() {
               </button>
             )}
           </div>
-        )}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
@@ -1095,11 +1146,18 @@ function LeadDetail() {
                   isAdmin={role === "Admin" || role === "Super Admin"}
                   refreshKey={mailRefresh}
                   onRefresh={() => fetchLead(true)}
+                  request={composeRequest}
                 />
             )}
 
             {shownTab === "requirements" && (
               <div className="mx-auto max-w-4xl space-y-5 px-4 py-4 md:px-6 md:py-6">
+                {inquiries.length > 0 && canEdit && (
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[13px] text-muted-foreground">{inquiries.length === 1 ? "1 requirement" : `${inquiries.length} requirements`} · changes save as you go</p>
+                    {addRequirementButton(false)}
+                  </div>
+                )}
                 {(lead.interestedProperty || lead.visit) && (
                   <Panel
                     title="Interested in"
@@ -1136,7 +1194,14 @@ function LeadDetail() {
                   </Panel>
                 )}
 
-                {inquiries.length === 0 && empty(<Building2 className="h-5 w-5" />, "No requirements yet", "Requirements captured for this lead will show up here.")}
+                {inquiries.length === 0 && (
+                  <EmptyState
+                    art={<RequirementsArt />}
+                    title="No requirements yet"
+                    hint="Note what the lead is looking for, like the property type, budget, location and timeline, so matching and follow-ups stay on track."
+                    action={addRequirementButton(true)}
+                  />
+                )}
 
                 {inquiries.map((inq: any, idx: number) => {
                   const typeOptions = PROPERTY_TYPES_MAP[inq.property_category] ?? Object.values(PROPERTY_TYPES_MAP).flat();
@@ -1207,6 +1272,14 @@ function LeadDetail() {
                   leadId={id as string}
                   documents={lead?.documents || []}
                   onRefresh={() => fetchLead(true)}
+                  empty={(upload) => (
+                    <EmptyState
+                      art={<AttachmentsArt />}
+                      title="No attachments yet"
+                      hint="Keep the lead's documents here, like ID proof, booking forms or floor plans. PDFs and images up to 10 MB."
+                      action={upload}
+                    />
+                  )}
                 />
               </div>
             )}
@@ -1242,23 +1315,23 @@ function LeadDetail() {
       {/* ── Auto Match Slider (Sheet) ── */}
       <Sheet open={isAutoMatchOpen} onOpenChange={setIsAutoMatchOpen}>
         <SheetContent side="right" className="w-[450px] !max-w-[450px] p-0 flex flex-col border-l">
-          <SheetHeader className="p-6 border-b shrink-0 bg-blue-50 dark:bg-blue-900/20">
-            <SheetTitle className="text-lg text-[#0052FF] dark:text-blue-400">Auto Match Results</SheetTitle>
+          <SheetHeader className="shrink-0 border-b px-5 py-4">
+            <SheetTitle className="text-[16px]">Matching properties</SheetTitle>
             <SheetDescription>
               Properties matching the customer preferences.
             </SheetDescription>
           </SheetHeader>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {autoMatchResults.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-10">No matching properties found.</p>
+              <p className="py-10 text-center text-[14px] text-muted-foreground">No properties match this requirement yet.</p>
             ) : (
               autoMatchResults.map((prop) => (
-                <div key={prop.id} className="border rounded-xl p-4 shadow-sm bg-card hover:border-blue-200 dark:hover:border-blue-800 transition-colors">
-                  <h4 className="font-bold text-[15px] mb-1">{prop.title}</h4>
+                <div key={prop.id} className="rounded-xl border bg-card p-4 transition-colors hover:bg-muted/40">
+                  <h4 className="mb-1.5 text-[15px] font-semibold">{prop.title}</h4>
                   <div className="flex gap-2 mb-3">
-                    <Badge variant="secondary" className="text-[10px] uppercase bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">{prop.property_type}</Badge>
-                    <Badge variant="outline" className="text-[10px]">{prop.listing_type}</Badge>
-                    <Badge variant="outline" className="text-[10px]">{prop.status}</Badge>
+                    <Badge variant="secondary" className="text-[11px]">{prop.property_type}</Badge>
+                    <Badge variant="outline" className="text-[11px]">{prop.listing_type}</Badge>
+                    <Badge variant="outline" className="text-[11px]">{prop.status}</Badge>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
                     <div><span className="font-semibold text-foreground">Price:</span> ₹{Number(prop.price).toLocaleString()}</div>
@@ -1277,14 +1350,14 @@ function LeadDetail() {
       <Dialog open={isDroppedOpen} onOpenChange={(o) => !o && setIsDroppedOpen(false)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Lead Dropped Reason</DialogTitle>
+            <DialogTitle>Why is this lead dropped?</DialogTitle>
             <DialogDescription>
               Please provide the reason for dropping this lead.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-3">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Reason *</label>
+              <label className="text-[13px] font-medium text-foreground/80">Reason</label>
               <div className="flex flex-wrap gap-2">
                 {PREDEFINED_DROP_REASONS.map(reason => (
                   <button
@@ -1375,29 +1448,18 @@ function LeadDetail() {
         }}
       />
 
-      {/* ── Contact Modal ── */}
-      <ContactModal
-        open={contactModal.open}
-        type={contactModal.type}
-        to={contactModal.to}
-        entityId={Number(id)}
-        entityType="leads"
-        onClose={() => setContactModal({ open: false, type: "", to: "" })}
-        onSent={() => fetchLead(true)}
-      />
-
       {/* ── Convert Lead Dialog ── */}
       <Dialog open={isConvertOpen} onOpenChange={(o) => !o && setIsConvertOpen(false)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Convert Lead</DialogTitle>
+            <DialogTitle>Convert lead</DialogTitle>
             <DialogDescription>
-              Select the conversion type and provide feedback to convert this lead.
+              Choose where this lead goes next and add a note for the team.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Conversion Type</label>
+              <label className="text-[13px] font-medium text-foreground/80">Convert to</label>
               <div className="flex gap-3">
                 {([
                   { label: "Inbound", value: "inbound" as const },
@@ -1407,10 +1469,10 @@ function LeadDetail() {
                     key={opt.value}
                     onClick={() => setConvertTo(opt.value)}
                     className={[
-                      "flex-1 h-11 rounded-xl border text-sm font-semibold transition-all",
+                      "h-10 flex-1 rounded-lg border text-[14px] font-medium transition-colors",
                       convertTo === opt.value
-                        ? "bg-emerald-600 text-white border-emerald-600"
-                        : "border-border hover:border-emerald-300 text-foreground",
+                        ? "border-foreground bg-foreground text-background"
+                        : "border-border text-foreground hover:bg-muted",
                     ].join(" ")}
                   >
                     {opt.label}
@@ -1419,7 +1481,7 @@ function LeadDetail() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Feedback *</label>
+              <label className="text-[13px] font-medium text-foreground/80">Note</label>
               <Textarea
                 value={convertFeedback}
                 onChange={(e) => setConvertFeedback(e.target.value)}
@@ -1435,10 +1497,10 @@ function LeadDetail() {
             <Button
               onClick={handleConvertLead}
               disabled={isConverting || !convertTo || !convertFeedback.trim()}
-              className="bg-emerald-600 text-white hover:bg-emerald-700"
+              className="bg-foreground text-background hover:bg-foreground/85"
             >
               {isConverting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Confirm Conversion
+              Convert
             </Button>
           </DialogFooter>
         </DialogContent>

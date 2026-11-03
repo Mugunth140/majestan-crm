@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import {
-  ArrowRightLeft, CalendarCheck, FilePlus2, FileX2, Inbox, PencilLine, ShieldAlert, Sparkles, TrendingUp, UserCheck, UserMinus, UserPlus,
+  ArrowRightLeft, CalendarCheck, ClipboardPlus, FilePlus2, FileX2, Inbox, PencilLine, ShieldAlert, Sparkles, TrendingUp, UserCheck, UserMinus, UserPlus,
 } from "lucide-react";
 import { LEAD_STATUS_DOTS } from "@/lib/lead-constants";
 import { cn } from "@/lib/utils";
@@ -92,6 +92,8 @@ function toItem(e: TimelineEntry): FeedItem {
         ...base, icon: <PencilLine />, tone: TONE.violet,
         title: change(actor, `requirement ${FIELD_LABELS[e.field ?? ""] ?? pretty(e.field) ?? "details"}`, e.field === "preferences" ? null : e.from, e.field === "preferences" ? "updated" : e.to),
       };
+    case "requirement_added":
+      return { ...base, icon: <ClipboardPlus />, tone: TONE.violet, title: <>{actor} added a requirement</> };
     case "qualification_changed":
       return {
         ...base, icon: <ShieldAlert />, tone: e.to === "Unqualified" ? TONE.red : TONE.green,

@@ -130,3 +130,13 @@ export const PROJECTS = [
   { label: "Majestan Enclave", value: "majestan_enclave" },
   { label: "Majestan Grand", value: "majestan_grand" },
 ];
+
+// Older statuses still on some leads, shown with the colours of their current name.
+const LEGACY_STATUS: Record<string, string> = { "Follow Up": "Future Follow-up" };
+
+/** Pill classes for a status, the same on the leads table and the lead page. */
+export const leadStatusPill = (status?: string | null) =>
+  LEAD_STATUS_STYLES[status ?? ""] ?? LEAD_STATUS_STYLES[LEGACY_STATUS[status ?? ""]] ?? "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
+
+export const leadStatusDot = (status?: string | null) =>
+  LEAD_STATUS_DOTS[status ?? ""] ?? LEAD_STATUS_DOTS[LEGACY_STATUS[status ?? ""]] ?? "bg-gray-400";

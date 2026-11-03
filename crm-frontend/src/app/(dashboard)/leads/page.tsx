@@ -27,7 +27,7 @@ import { PageActions } from "@/components/layout/page-actions";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { LastFollowupCell } from "./last-followup-column";
 import { Device } from "@/components/shared/device";
-import { LEAD_STATUS_DOTS, LEAD_STATUS_ORDER, LEAD_STATUS_STYLES } from "@/lib/lead-constants";
+import { LEAD_STATUS_DOTS, LEAD_STATUS_ORDER, leadStatusPill } from "@/lib/lead-constants";
 import { StatusCell } from "@/components/tables/cells";
 import { ViewSwitcher, type ViewType } from "@/components/views/view-switcher";
 import { LeadsKanban, leadCard, type KanbanLead } from "@/components/leads/leads-kanban";
@@ -571,7 +571,7 @@ export default function LeadsPage() {
       header: "Status",
       cell: ({ row }) => {
         const s = row.original.status as string;
-        return <StatusCell status={s} pillClass={LEAD_STATUS_STYLES[s]} />;
+        return <StatusCell status={s} pillClass={leadStatusPill(s)} />;
       },
     },
     {

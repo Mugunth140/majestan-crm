@@ -3,7 +3,7 @@
 import { Phone, MessageSquare, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LEAD_STATUS_STYLES } from "@/lib/lead-constants";
+import { leadStatusPill } from "@/lib/lead-constants";
 import { cn } from "@/lib/utils";
 import type { DuplicateLeadInfo } from "@/lib/lead-import";
 
@@ -55,7 +55,7 @@ export function MobileLeadList({ leads, isLoading, onCardClick, onCall, onWhatsA
     <div className="space-y-4 pb-6">
       {leads.map((lead) => {
         const isPending = lead.isPendingImport === true;
-        const statusCls = LEAD_STATUS_STYLES[lead.status] ?? "bg-gray-100 text-gray-800 border-gray-200";
+        const statusCls = leadStatusPill(lead.status);
         const initial = (lead.name || "?").charAt(0).toUpperCase();
         const canContact = !isPending && !!lead.mobile;
         const pendingDupe = isPending ? existingByMobile?.[lead.mobile] : undefined;

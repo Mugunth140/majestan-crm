@@ -107,6 +107,12 @@ export class LeadsController {
     return { success: true, data };
   }
 
+  @Post(':id/inquiries')
+  async addInquiry(@Param('id') id: string, @Body() body: UpdateLeadInquiryDto, @Request() req: any) {
+    const data = await this.leadsService.addInquiry(Number(id), body, req.user?.id ?? null);
+    return { success: true, data };
+  }
+
   @Put(':id/inquiries/:inquiryId')
   async updateInquiry(
     @Param('id') id: string,

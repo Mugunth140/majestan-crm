@@ -81,7 +81,8 @@ const dateTime = (d?: string | null, t?: string | null) => {
   return date;
 };
 
-type Mode = "followup" | "email" | "whatsapp" | "sms";
+export type ComposeMode = "followup" | "email" | "whatsapp" | "sms";
+type Mode = ComposeMode;
 
 const MODES: { key: Mode; label: string; icon: typeof Phone }[] = [
   { key: "followup", label: "Follow-up", icon: NotebookPen },
@@ -102,7 +103,7 @@ const dialable = (n?: string | null) => {
  * docked at the bottom that switches between follow-up, email and messages.
  */
 export function LeadConversation({
-  leadId, email, mobile, whatsapp, followUps, contactLogs, composer, canEdit, isAdmin, refreshKey, onRefresh,
+  leadId, email, mobile, whatsapp, followUps, contactLogs, composer, canEdit, isAdmin, refreshKey, onRefresh, request,
 }: {
   leadId: number;
   email?: string | null;
@@ -115,12 +116,20 @@ export function LeadConversation({
   isAdmin: boolean;
   refreshKey: number;
   onRefresh: () => void;
+  /** Opens a composer from outside (the page's Call / WhatsApp / SMS / Email buttons); `n` changes per click. */
+  request?: { mode: ComposeMode; n: number } | null;
 }) {
   const [catalog, setCatalog] = useState<MailCatalog | null>(null);
   const [mails, setMails] = useState<MailSummary[]>([]);
   const [target, setTarget] = useState<MailTarget | null>(null);
   const [mailComposer, setMailComposer] = useState<ComposerStart | null>(null);
   const [mode, setMode] = useState<Mode | null>(null);
+  const [handled, setHandled] = useState<number | null>(null);
+  if (request && request.n !== handled) {
+    setHandled(request.n);
+    setMode(request.mode);
+    if (request.mode === "email" && !mailComposer) setMailComposer({ kind: "blank" });
+  }
   const end = useRef<HTMLDivElement>(null);
   const [retrying, setRetrying] = useState<number | null>(null);
   const [editing, setEditing] = useState<FollowUp | null>(null);

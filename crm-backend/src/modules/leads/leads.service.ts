@@ -443,6 +443,27 @@ export class LeadsService {
     return saved.lead;
   }
 
+  /** A requirement added by hand on the lead page (not a new enquiry from the lead). */
+  async addInquiry(leadId: number, body: any, actorId: number | null = null) {
+    const lead = await this.dataSource.getRepository(Lead).findOne({ where: { id: leadId } });
+    if (!lead) throw new NotFoundException('Lead not found');
+    const inquiryRepo = this.dataSource.getRepository(LeadInquiry);
+    const saved = await inquiryRepo.save(inquiryRepo.create({
+      lead_id: leadId,
+      source: 'manual',
+      project_list: body.project ?? null,
+      purchase_type: body.purchaseType ?? null,
+      property_category: body.propertyCategory ?? null,
+      property_type: body.propertyType ?? null,
+      funder: body.funder ?? null,
+      purchase_timeline: body.purchaseTimeline ?? null,
+      qualification_purpose: body.qualificationPurpose ?? null,
+      decision_maker: body.decisionMaker ?? null,
+    } as Partial<LeadInquiry>));
+    await this.leadEvents?.record({ leadId, actorId, type: 'requirement_added', meta: { inquiryId: saved.id } });
+    return saved;
+  }
+
   async updateInquiry(leadId: number, inquiryId: number, body: any, actorId: number | null = null) {
     const inquiryRepo = this.dataSource.getRepository(LeadInquiry);
     const inquiry = await inquiryRepo.findOne({ where: { id: inquiryId, lead_id: leadId } });
