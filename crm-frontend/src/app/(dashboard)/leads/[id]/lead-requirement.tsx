@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import {
   FUNDERS, PROPERTY_CATEGORIES, PROPERTY_TYPES_MAP, PURCHASE_TIMELINES, PURCHASE_TYPES, QUALIFICATION_PURPOSES,
@@ -78,7 +78,7 @@ export function RequirementFields({ inquiry, canEdit, save }: {
   const [localities, setLocalities] = useState<{ city: number; options: Option[] } | null>(null);
   const cityId = inquiry.city_id ?? null;
   const category = inquiry.property_category ?? null;
-  const prefs = useMemo(() => inquiry.preferences ?? {}, [inquiry.preferences]);
+  const prefs = inquiry.preferences ?? {};
   const off = !canEdit;
 
   useEffect(() => {
@@ -100,12 +100,8 @@ export function RequirementFields({ inquiry, canEdit, save }: {
   }, [cityId]);
 
   const localityOptions = cityId && localities?.city === cityId ? localities.options : [];
-  const setPref = (key: string, value: unknown) => {
-    const next = { ...prefs };
-    if (value === "" || value == null) delete next[key];
-    else next[key] = value;
-    return save({ preferences: next });
-  };
+  // Only the changed key goes up; the server merges it into what's stored.
+  const setPref = (key: string, value: unknown) => save({ preferencesPatch: { [key]: value === "" ? null : value ?? null } });
   const budget = (key: "minBudget" | "maxBudget", label: string, placeholder: string) => (
     <InlineText label={label} value={money(prefs[key])} placeholder={placeholder} disabled={off}
       onSave={(v) => setPref(key, v ? parseIndianCurrency(v) || null : null)} />

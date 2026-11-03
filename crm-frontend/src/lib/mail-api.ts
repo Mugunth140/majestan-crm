@@ -47,6 +47,9 @@ export interface MailSummary {
   confirmedAt: string | null;
   sentAt: string | null;
   expiresAt: string | null;
+  /** History only: the sending mailbox and the message without its footer. */
+  from?: string | null;
+  body?: string | null;
 }
 
 export interface MailPreview {

@@ -25,6 +25,11 @@ export class UpdateLeadInquiryDto {
   @IsObject()
   preferences?: any;
 
+  /** Changes some preference keys and keeps the rest; a null value removes that key. */
+  @IsOptional()
+  @IsObject()
+  preferencesPatch?: Record<string, unknown>;
+
   @IsOptional()
   @IsInt()
   city_id?: number;

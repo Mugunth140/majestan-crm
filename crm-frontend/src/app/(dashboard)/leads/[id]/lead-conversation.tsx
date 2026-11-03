@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { CalendarClock, CalendarDays, Flag, Loader2, Mail, MessageCircle, MoreHorizontal, NotebookPen, Phone, PhoneIncoming, PhoneMissed, PhoneOutgoing, RotateCcw, Send, Smartphone, StickyNote, Timer, X } from "lucide-react";
+import { CalendarClock, CalendarDays, Flag, Loader2, Mail, MessageCircle, MoreHorizontal, NotebookPen, Phone, PhoneIncoming, PhoneMissed, PhoneOutgoing, Reply, ReplyAll, RotateCcw, Send, Smartphone, StickyNote, Timer, X } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
 import { mailApi, MAIL_STATUS, newDraftIds, type MailCatalog, type MailSummary, type MailTarget } from "@/lib/mail-api";
 import { contactLogAuthor, formatDuration } from "@/lib/contact-log-utils";
@@ -16,7 +16,7 @@ import { DateTimePicker } from "@/components/shared/datetime-picker";
 import { MailComposer, type ComposerStart } from "@/components/mail/mail-composer";
 import { MailPreviewDialog } from "@/components/mail/mail-preview-dialog";
 import { cn } from "@/lib/utils";
-import { Chip, Feed, Who, ago, sortOldestFirst, type FeedItem } from "./lead-feed";
+import { Avatar, CARD, Chip, Feed, Who, ago, sortOldestFirst, type FeedItem } from "./lead-feed";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -107,9 +107,10 @@ const dialable = (n?: string | null) => {
  * docked at the bottom that switches between follow-up, email and messages.
  */
 export function LeadConversation({
-  leadId, email, mobile, whatsapp, followUps, contactLogs, composer, canEdit, isAdmin, refreshKey, onRefresh, request,
+  leadId, leadName, email, mobile, whatsapp, followUps, contactLogs, composer, canEdit, isAdmin, refreshKey, onRefresh, request,
 }: {
   leadId: number;
+  leadName?: string | null;
   email?: string | null;
   mobile?: string | null;
   whatsapp?: string | null;
@@ -137,6 +138,7 @@ export function LeadConversation({
   const end = useRef<HTMLDivElement>(null);
   const [retrying, setRetrying] = useState<number | null>(null);
   const [editing, setEditing] = useState<FollowUp | null>(null);
+  const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
   const seen = useRef<Set<number> | null>(null);
 
   const fetchMail = useCallback(
@@ -234,24 +236,36 @@ export function LeadConversation({
       const who = contactLogAuthor(log);
       if (log.contact_type === "call") {
         const direction = (log.call_direction || "").toLowerCase();
-        const missed = direction === "missed" || direction === "rejected";
-        const incoming = direction === "incoming";
+        const incoming = direction === "incoming" || direction === "missed" || direction === "rejected";
+        const seconds = Number(log.call_duration) || 0;
+        const answered = seconds > 0 && direction !== "missed" && direction !== "rejected";
+        const outcome = answered
+          ? { label: "Completed", className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" }
+          : { label: incoming ? "Missed" : "No answer", className: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" };
         list.push({
           key: `log-${log.id}`,
           at,
-          icon: missed ? <PhoneMissed /> : incoming ? <PhoneIncoming /> : <PhoneOutgoing />,
-          iconClass: missed ? "text-red-600 dark:text-red-400" : undefined,
+          icon: !answered ? <PhoneMissed /> : incoming ? <PhoneIncoming /> : <PhoneOutgoing />,
+          iconClass: !answered ? "text-red-600 dark:text-red-400" : undefined,
           who,
-          title: <><Who>{who}</Who> {missed ? "missed a call" : incoming ? "received a call" : "made a call"}</>,
+          title: <><Who>{who}</Who> {incoming ? (answered ? "received a call" : "missed a call") : "made a call"}</>,
           extra: (
-            <div className="rounded-lg border bg-card px-3 py-2.5">
-              <p className="text-[14px] font-medium text-foreground">{missed ? "Missed call" : incoming ? "Inbound call" : "Outbound call"}</p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                <Chip><CalendarDays />{format(at, "MMM d, EEEE")}</Chip>
-                {!missed && <Chip><Timer />{formatDuration(log.call_duration)}</Chip>}
-                <Chip>{format(at, "h:mm a")}</Chip>
+            <div className={cn(CARD, "px-3.5 py-3")}>
+              <div className="flex items-center gap-2">
+                <p className="flex-1 text-[14px] font-medium text-foreground">{incoming ? "Inbound call" : "Outbound call"}</p>
+                {/* Who was on the call: the staff member, then the lead. */}
+                <span className="flex -space-x-1">
+                  <Avatar name={who} className="ring-2 ring-card" />
+                  {leadName && <Avatar name={leadName} className="ring-2 ring-card" />}
+                </span>
               </div>
-              {log.message && <p className="mt-2 whitespace-pre-wrap text-[14px] leading-6 text-foreground/85">{log.message}</p>}
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <Chip><CalendarDays />{format(at, "MMM d, EEEE")}</Chip>
+                {answered && <Chip><Timer />{formatDuration(log.call_duration)}</Chip>}
+                <Chip>{format(at, "h:mm a")}</Chip>
+                <span className={cn("inline-flex h-6 items-center rounded-md px-2 text-[12px] font-medium", outcome.className)}>{outcome.label}</span>
+              </div>
+              {log.message && <p className="mt-2.5 whitespace-pre-wrap text-[14px] leading-6 text-foreground/85">{log.message}</p>}
             </div>
           ),
         });
@@ -284,24 +298,62 @@ export function LeadConversation({
       const at = new Date(mail.sentAt ?? mail.confirmedAt ?? mail.createdAt);
       const status = MAIL_STATUS[mail.status];
       const problem = mail.lastError && ["failed", "pending", "suppressed"].includes(mail.status) ? mail.lastError : null;
+      const sender = mail.from || mail.label;
+      const open = expanded.has(mail.id);
+      const long = (mail.body?.length ?? 0) > 420 || (mail.body?.split("\n").length ?? 0) > 8;
+      const subject = /^re:/i.test(mail.subject) ? mail.subject : `Re: ${mail.subject}`;
+      const replyButton = (all: boolean) => (
+        <button
+          type="button"
+          aria-label={all ? "Reply all" : "Reply"}
+          title={all ? "Reply all" : "Reply"}
+          onClick={() => { setMailComposer({ kind: "blank", subject, cc: all ? mail.cc : undefined }); setMode("email"); }}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          {all ? <ReplyAll className="h-4 w-4" /> : <Reply className="h-4 w-4" />}
+        </button>
+      );
       list.push({
         key: `mail-${mail.id}`,
         at,
-        icon: <Mail />,
+        icon: <Avatar name={sender.replace(/@.*/, "")} className="h-7 w-7 text-[11px]" />,
         extra: (
-          <div className="rounded-lg border bg-card px-3 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-            <div className="flex items-center gap-2">
-              <span className="min-w-0 truncate text-[14px] font-medium text-foreground">{mail.label}</span>
-              <span className={cn("shrink-0 rounded px-1.5 py-px text-[11px] font-medium", status.className)}>
-                {status.label}{mail.status === "pending" && mail.attempts > 0 ? ` · attempt ${mail.attempts + 1}` : ""}
-              </span>
-              <time dateTime={at.toISOString()} title={format(at, "EEE, d MMM yyyy, h:mm a")} className="ml-auto shrink-0 text-[13px] text-muted-foreground">{ago(at)}</time>
+          <div className={cn(CARD, "px-3.5 py-3")}>
+            <div className="flex items-center gap-2 text-[14px] leading-6">
+              <p className="flex min-w-0 flex-1 items-center gap-2">
+                <span className="truncate font-medium text-foreground">{sender}</span>
+                {mail.from && <span className="hidden shrink-0 text-[13px] text-muted-foreground sm:inline">{mail.label}</span>}
+                {mail.status !== "sent" && (
+                  <span className={cn("shrink-0 rounded px-1.5 py-px text-[11px] font-medium", status.className)}>
+                    {status.label}{mail.status === "pending" && mail.attempts > 0 ? ` · attempt ${mail.attempts + 1}` : ""}
+                  </span>
+                )}
+              </p>
+              <time dateTime={at.toISOString()} title={format(at, "EEE, d MMM yyyy, h:mm a")} className="shrink-0 whitespace-nowrap text-[13px] text-muted-foreground">{ago(at)}</time>
+              {canSendMail && email && <span className="-mr-1.5 flex shrink-0">{replyButton(false)}{mail.cc.length > 0 && replyButton(true)}</span>}
             </div>
-            <div className="mt-1 text-[14px] leading-6 text-foreground/90">
+            <div className="text-[14px] leading-6 text-foreground/90">
               <p>{mail.subject}</p>
-              <p className="truncate"><span className="text-muted-foreground">To: </span>{mail.to.join(", ")}{mail.cc.length > 0 && <><span className="text-muted-foreground">, Cc: </span>{mail.cc.join(", ")}</>}</p>
+              <p className="truncate">
+                <span className="text-muted-foreground">To: </span>{mail.to.join(", ")}
+                {mail.cc.length > 0 && <><span className="text-muted-foreground"> · Cc: </span>{mail.cc.join(", ")}</>}
+              </p>
             </div>
-            {problem && <p className="mt-2 border-t pt-2 text-[13px] text-red-600 dark:text-red-400">{problem}</p>}
+            {mail.body && (
+              <div className="mt-3 border-t pt-3">
+                <p className={cn("whitespace-pre-wrap text-[14px] leading-6 text-foreground/90", long && !open && "line-clamp-6")}>{mail.body}</p>
+                {long && (
+                  <button
+                    type="button"
+                    onClick={() => setExpanded((prev) => { const next = new Set(prev); if (open) next.delete(mail.id); else next.add(mail.id); return next; })}
+                    className="mt-1 text-[13px] font-medium text-muted-foreground hover:text-foreground"
+                  >
+                    {open ? "Show less" : "Show more"}
+                  </button>
+                )}
+              </div>
+            )}
+            {problem && <p className="mt-3 border-t pt-2.5 text-[13px] text-red-600 dark:text-red-400">{problem}</p>}
             {mail.status === "failed" && canSendMail && (
               <Button variant="outline" size="sm" disabled={retrying === mail.id} onClick={() => retry(mail.id)} className="mt-2 h-7 gap-1.5 text-[12px]">
                 {retrying === mail.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
@@ -316,7 +368,7 @@ export function LeadConversation({
     return sortOldestFirst(list);
     // retry/deleteFollowUp only read state through setters and props already listed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [followUps, contactLogs, mails, isAdmin, canSendMail, retrying]);
+  }, [followUps, contactLogs, mails, isAdmin, canSendMail, retrying, expanded, leadName, email]);
 
   // Like a chat: open at the latest message, and follow new ones as they arrive.
   useEffect(() => {

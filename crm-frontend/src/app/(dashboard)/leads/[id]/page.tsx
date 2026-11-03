@@ -413,6 +413,12 @@ function LeadDetail() {
 
   useEffect(() => { fetchLead(); }, [fetchLead]);
 
+  const refreshTimeline = () =>
+    apiFetch(`${API_URL}/leads/${id}/timeline`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((history) => { if (history?.success) setTimeline(history.data); })
+      .catch(() => {});
+
   /** Saves one or more lead fields in place; throws so the field can revert. */
   const saveLead = async (patch: Record<string, unknown>) => {
     try {
@@ -444,7 +450,13 @@ function LeadDetail() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.success === false) throw new Error(data?.message || "Couldn't save the requirement");
       toast.success("Saved");
-      await fetchLead(true);
+      // Patch the one requirement in place; only the timeline needs a fresh copy.
+      if (data.data) {
+        setLead((prev: any) => prev && { ...prev, inquiries: prev.inquiries?.map((i: any) => (i.id === inquiryId ? { ...i, ...data.data } : i)) });
+        refreshTimeline();
+      } else {
+        await fetchLead(true);
+      }
     } catch (reason) {
       toast.error(reason instanceof Error ? reason.message : "Couldn't save the requirement");
       throw reason;
@@ -1128,6 +1140,7 @@ function LeadDetail() {
             {shownTab === "conversation" && (
                 <LeadConversation
                   leadId={lead.id}
+                  leadName={lead.name}
                   email={lead.email}
                   mobile={lead.mobile_number}
                   whatsapp={lead.whatsapp_number}

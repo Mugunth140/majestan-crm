@@ -292,7 +292,13 @@ export class MailService {
       order: { id: 'DESC' },
       take: 100,
     });
-    return rows.map((row) => this.summary(row));
+    // The conversation shows each email like a mail client: sender, then the
+    // message itself without the company footer.
+    return rows.map((row) => ({
+      ...this.summary(row),
+      from: MAIL_IDENTITIES[row.identity as MailIdentityKey]?.from ?? null,
+      body: row.text ? row.text.split('\n--\n')[0].trim().slice(0, 1500) : null,
+    }));
   }
 
   async findOne(outboxId: number, actor: MailActor) {

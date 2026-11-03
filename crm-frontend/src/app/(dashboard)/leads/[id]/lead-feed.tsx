@@ -29,23 +29,26 @@ export type FeedItem = {
 };
 
 const TONES = [
-  "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
-  "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-  "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-  "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
-  "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
-  "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300",
+  "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
+  "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+  "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+  "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
+  "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
+  "bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300",
 ];
 
 export function Avatar({ name, className }: { name: string; className?: string }) {
   const hash = [...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("") || "?";
   return (
-    <span className={cn("inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold", TONES[hash % TONES.length], className)}>
+    <span className={cn("inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold", TONES[hash % TONES.length], className)}>
       {initials}
     </span>
   );
 }
+
+/** A raised card for an email or a call, a step lighter than the page in dark mode. */
+export const CARD = "rounded-lg border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:bg-white/[0.03]";
 
 /** A small grey label under an entry (priority, next date, call length…). */
 export const Chip = ({ children }: { children: ReactNode }) => (
@@ -60,21 +63,21 @@ export function Feed({ items }: { items: FeedItem[] }) {
   return (
     <ol>
       {items.map((item, idx) => (
-        <li key={item.key} className="group/item grid grid-cols-[28px_minmax(0,1fr)] gap-x-3 sm:gap-x-4">
+        <li key={item.key} className="group/item grid grid-cols-[30px_minmax(0,1fr)] gap-x-3 sm:gap-x-4">
           <div
             className={cn(
               "relative z-0 flex justify-center before:absolute before:left-1/2 before:top-0 before:-z-[1] before:border-l before:border-border",
               idx === items.length - 1 ? "before:h-4" : "before:h-full",
             )}
           >
-            <span className={cn("flex h-8 w-7 items-center justify-center bg-background text-foreground/70 [&_svg]:h-4 [&_svg]:w-4", item.iconClass)}>
+            <span className={cn("flex h-9 w-[30px] items-center justify-center bg-background text-foreground/70 [&_svg]:h-4 [&_svg]:w-4", item.iconClass)}>
               {item.icon}
             </span>
           </div>
           <div className="min-w-0 pb-5">
-            {item.title !== undefined && <div className="flex items-start gap-2 py-1 text-[14px] leading-6">
+            {item.title !== undefined && <div className="flex items-center gap-2 py-1.5 text-[14px] leading-6">
               <p className="inline-flex min-w-0 flex-1 flex-wrap items-center gap-x-1 text-muted-foreground">
-                {item.who && <Avatar name={item.who} className="mr-1" />}
+                {item.who && <Avatar name={item.who} className="mr-1.5" />}
                 {item.title}
               </p>
               <div className="ml-auto flex shrink-0 items-center gap-1">
@@ -87,7 +90,7 @@ export function Feed({ items }: { items: FeedItem[] }) {
             {item.body && (
               <p className="mt-1 whitespace-pre-wrap rounded-lg bg-foreground/[0.045] px-3 py-2 text-[14px] leading-6 text-foreground/90">{item.body}</p>
             )}
-            {item.extra && <div className={item.title !== undefined ? "mt-1" : "pt-0.5"}>{item.extra}</div>}
+            {item.extra && <div className={item.title !== undefined ? "mt-1" : "pt-0"}>{item.extra}</div>}
             {item.chips && item.chips.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{item.chips}</div>}
           </div>
         </li>

@@ -476,6 +476,13 @@ export class LeadsService {
     if (body.propertyCategory !== undefined) inquiry.property_category = body.propertyCategory;
     if (body.funder !== undefined) inquiry.funder = body.funder;
     if (body.preferences !== undefined) inquiry.preferences = body.preferences;
+    // A patch is merged by MySQL in one statement after the save, so two
+    // preference fields saved at the same moment can't undo each other.
+    // Left undefined here so the save below doesn't write a stale copy.
+    const patch = body.preferencesPatch && body.preferences === undefined
+      ? Object.fromEntries(Object.entries(body.preferencesPatch).map(([k, v]) => [k, v === '' ? null : v ?? null]))
+      : null;
+    if (patch) inquiry.preferences = undefined;
     if (body.cityId !== undefined) inquiry.city_id = body.cityId;
     if (body.subLocations !== undefined) inquiry.sub_locations = body.subLocations;
     if (body.purchaseTimeline !== undefined) inquiry.purchase_timeline = body.purchaseTimeline;
@@ -483,6 +490,15 @@ export class LeadsService {
     if (body.decisionMaker !== undefined) inquiry.decision_maker = body.decisionMaker;
 
     const saved = await inquiryRepo.save(inquiry);
+    if (patch) {
+      await this.dataSource.query(
+        'UPDATE lead_inquiries SET preferences = JSON_MERGE_PATCH(COALESCE(preferences, JSON_OBJECT()), CAST(? AS JSON)) WHERE id = ?',
+        [JSON.stringify(patch), inquiryId],
+      );
+      const [row] = await this.dataSource.query('SELECT preferences FROM lead_inquiries WHERE id = ?', [inquiryId]);
+      const merged = row?.preferences ?? null;
+      saved.preferences = typeof merged === 'string' ? JSON.parse(merged) : merged;
+    }
     await this.leadEvents?.recordChanges(leadId, actorId, 'requirement_changed', before as any, saved as any, INQUIRY_TRACKED_FIELDS, { inquiryId });
     return saved;
   }

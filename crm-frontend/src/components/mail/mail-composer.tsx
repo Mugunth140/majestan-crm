@@ -24,7 +24,8 @@ import { VariablePicker } from "./variable-picker";
 
 /** Where the composer starts: a blank email, a saved template, a system email, or an existing draft. */
 export type ComposerStart =
-  | { kind: "blank" }
+  /** A reply carries the subject ("Re: …") and, for reply-all, the earlier Cc. */
+  | { kind: "blank"; subject?: string; cc?: string[] }
   | { kind: "saved"; id: number }
   | { kind: "system"; key: string }
   | { kind: "draft"; id: number; eventKey: string };
@@ -82,6 +83,10 @@ function OpenComposer({ entityType, entityId, start, recipients = [], senders, i
         setCatalog(next);
         const text = textFor(next, startValue(start), draft?.eventKey);
         if (text) { setSubject(text.subject); setBody(text.body); }
+        else if (start.kind === "blank") {
+          if (start.subject) setSubject(start.subject);
+          if (start.cc?.length) setCcText(start.cc.join(", "));
+        }
         setSender(startSender(next, start, senders));
       })
       .catch(() => toast.error("Could not load email templates"));
