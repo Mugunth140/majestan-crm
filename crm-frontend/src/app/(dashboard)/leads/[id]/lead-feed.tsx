@@ -50,48 +50,66 @@ export function Avatar({ name, className }: { name: string; className?: string }
 /** A raised card for an email or a call, a step lighter than the page in dark mode. */
 export const CARD = "rounded-lg border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:bg-white/[0.03]";
 
-/** A small grey label under an entry (priority, next date, call length…). */
+/** A small grey badge on an entry (priority, next date, call length…), like Frappe's subtle Badge. */
 export const Chip = ({ children }: { children: ReactNode }) => (
-  <span className="inline-flex h-6 items-center gap-1 rounded-md bg-foreground/[0.06] px-2 text-[12px] font-medium text-foreground/75 [&_svg]:h-3 [&_svg]:w-3">
+  <span className="inline-flex h-5 items-center gap-1 rounded-[5px] bg-foreground/[0.07] px-1.5 text-[12px] font-medium tracking-normal text-foreground/75 [&_svg]:h-3 [&_svg]:w-3">
     {children}
   </span>
 );
 
 export const ago = (d: Date) => formatDistanceToNowStrict(d, { addSuffix: true });
 
+/** The row above a tab's content: its name, and the action that adds to it. */
+export function TabHeader({ title, action }: { title: string; action?: ReactNode }) {
+  return (
+    <div className="mx-3 my-3 flex items-center justify-between gap-3 sm:mx-10 sm:mb-4 sm:mt-8">
+      <h2 className="flex h-8 items-center text-[18px] font-semibold tracking-[0.01em] text-foreground">{title}</h2>
+      {action}
+    </div>
+  );
+}
+
+// Measurements follow Frappe CRM's activity list: a 30px rail, 16px gap, 40px
+// side margins, 14px text with a touch of tracking, 13px grey timestamps.
 export function Feed({ items }: { items: FeedItem[] }) {
   return (
-    <ol>
+    <ol className="text-[14px] tracking-[0.02em]">
       {items.map((item, idx) => (
-        <li key={item.key} className="group/item grid grid-cols-[30px_minmax(0,1fr)] gap-x-3 sm:gap-x-4">
+        <li key={item.key} className="group/item grid grid-cols-[30px_minmax(0,1fr)] gap-2 px-3 sm:gap-4 sm:px-10">
           <div
             className={cn(
               "relative z-0 flex justify-center before:absolute before:left-1/2 before:top-0 before:-z-[1] before:border-l before:border-border",
               idx === items.length - 1 ? "before:h-4" : "before:h-full",
             )}
           >
-            <span className={cn("flex h-9 w-[30px] items-center justify-center bg-background text-foreground/70 [&_svg]:h-4 [&_svg]:w-4", item.iconClass)}>
+            <span className={cn("flex h-8 w-7 items-center justify-center bg-background text-foreground/85 [&_svg]:h-4 [&_svg]:w-4", item.iconClass)}>
               {item.icon}
             </span>
           </div>
-          <div className="min-w-0 pb-5">
-            {item.title !== undefined && <div className="flex items-center gap-2 py-1.5 text-[14px] leading-6">
-              <p className="inline-flex min-w-0 flex-1 flex-wrap items-center gap-x-1 text-muted-foreground">
-                {item.who && <Avatar name={item.who} className="mr-1.5" />}
-                {item.title}
-              </p>
-              <div className="ml-auto flex shrink-0 items-center gap-1">
-                {item.actions}
-                <time dateTime={item.at.toISOString()} title={format(item.at, "EEE, d MMM yyyy, h:mm a")} className="whitespace-nowrap text-[13px] text-muted-foreground">
-                  {ago(item.at)}
-                </time>
+          <div className="mb-4 min-w-0">
+            {item.title !== undefined && (
+              <div className="mb-1 flex items-center gap-2 py-1">
+                <div className="inline-flex min-w-0 flex-wrap items-center gap-1 text-muted-foreground">
+                  {item.who && <Avatar name={item.who} className="mr-1" />}
+                  {item.title}
+                </div>
+                <div className="ml-auto flex shrink-0 items-center gap-1 whitespace-nowrap">
+                  {item.actions}
+                  <time dateTime={item.at.toISOString()} title={format(item.at, "EEE, d MMM yyyy, h:mm a")} className="text-[13px] text-muted-foreground">
+                    {ago(item.at)}
+                  </time>
+                </div>
               </div>
-            </div>}
-            {item.body && (
-              <p className="mt-1 whitespace-pre-wrap rounded-lg bg-foreground/[0.045] px-3 py-2 text-[14px] leading-6 text-foreground/90">{item.body}</p>
             )}
-            {item.extra && <div className={item.title !== undefined ? "mt-1" : "pt-0"}>{item.extra}</div>}
-            {item.chips && item.chips.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{item.chips}</div>}
+            {item.body ? (
+              <div className="rounded-lg bg-foreground/[0.04] px-3 py-[7.5px] leading-6 text-foreground/90 dark:bg-white/[0.05]">
+                <p className="whitespace-pre-wrap">{item.body}</p>
+                {item.chips && item.chips.length > 0 && <div className="mt-1.5 mb-0.5 flex flex-wrap gap-1.5">{item.chips}</div>}
+              </div>
+            ) : item.chips && item.chips.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">{item.chips}</div>
+            ) : null}
+            {item.extra}
           </div>
         </li>
       ))}

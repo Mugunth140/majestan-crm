@@ -38,7 +38,6 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/shared/empty-state";
-import { MobileRecordList, useMobileRows } from "@/components/mobile/mobile-rows";
 import { useIsMobile } from "@/hooks/use-device";
 
 interface DataTableProps<TData, TValue> {
@@ -101,10 +100,10 @@ export function DataTable<TData, TValue>({
   emptyState,
   pageSizeOptions = [20, 50, 100],
 }: DataTableProps<TData, TValue>) {
-  const isList = variant === "list";
-  // Phones show rows as a native list when the page says what a row shows.
-  const mobileRows = useMobileRows();
+  // Phones always get the clean list look, whatever the page asked for on desktop.
   const isMobile = useIsMobile();
+  const isList = variant === "list" || isMobile;
+  // Phones show rows as a native list when the page says what a row shows.
   const pathname = usePathname();
   const stateKey = `table:${pathname}:${persistKey || "main"}`;
   const [savedSorting, setSavedSorting] = usePersistedState<SortingState>(`${stateKey}:sort`, []);
@@ -190,37 +189,7 @@ export function DataTable<TData, TValue>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectionKey]);
 
-  if (isMobile && mobileRows) {
-    const { pageIndex: pi, pageSize: ps } = table.getState().pagination;
-    const rows = table.getRowModel().rows;
-    const total = totalCount ?? table.getFilteredRowModel().rows.length;
-    const pager = !hidePagination && (table.getCanPreviousPage() || table.getCanNextPage());
-    return (
-      <div className="w-full">
-        {rows.length ? (
-          <MobileRecordList items={rows.map((r) => r.original)} config={mobileRows} />
-        ) : (
-          emptyState ?? <EmptyState kind="search" title="No results" description="Nothing to show here yet. Try a different search or filter." />
-        )}
-        {pager && (
-          <div className="flex items-center justify-between px-4 py-4">
-            <button type="button" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()} className={MOBILE_PAGE_BUTTON}>
-              <ChevronLeft className="size-4" />
-              Previous
-            </button>
-            <span className="text-[13px] tabular-nums text-muted-foreground">
-              {pi * ps + 1}–{Math.min((pi + 1) * ps, total)} of {total}
-            </span>
-            <button type="button" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()} className={MOBILE_PAGE_BUTTON}>
-              Next
-              <ChevronRight className="size-4" />
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  }
-
+  // Phones get the same table as desktop: it scrolls sideways with the first column pinned.
   return (
     <div className={cn("space-y-4 md:space-y-0 md:flex md:flex-col md:flex-1 md:h-full md:min-h-0 w-full min-w-0 max-w-full", isList ? "md:gap-0" : "md:gap-4")}>
       {/* Floating Toolbar for Selected Actions */}
@@ -454,8 +423,6 @@ export function DataTable<TData, TValue>({
   );
 }
 
-const MOBILE_PAGE_BUTTON =
-  "flex h-9 items-center gap-1 rounded-full bg-muted px-3.5 text-[14px] font-medium text-foreground transition-opacity active:opacity-60 disabled:pointer-events-none disabled:opacity-35";
 
 const ENTER_STAGGER_MS = 28;
 const ENTER_MAX_ROWS = 16;

@@ -20,6 +20,8 @@ interface LeadAttachmentsProps {
   onRefresh: () => void;
   /** Shown instead of the list when there are no files; receives the upload button. */
   empty?: (upload: ReactNode) => ReactNode;
+  /** Renders a header above everything that carries the upload button (the list then leaves it out). */
+  header?: (upload: ReactNode) => ReactNode;
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -33,7 +35,7 @@ const kind = (name: string) => {
   return { icon: FileIcon, tone: "bg-foreground/[0.07] text-foreground/70" };
 };
 
-export function LeadAttachments({ leadId, documents = [], onRefresh, empty }: LeadAttachmentsProps) {
+export function LeadAttachments({ leadId, documents = [], onRefresh, empty, header }: LeadAttachmentsProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -100,19 +102,20 @@ export function LeadAttachments({ leadId, documents = [], onRefresh, empty }: Le
   const input = <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} disabled={isUploading} />;
 
   if (!documents.length && empty) {
-    return <>{empty(upload)}{input}</>;
+    return <>{header?.(upload)}{empty(upload)}{input}</>;
   }
 
   return (
     <div>
-      <div className="mb-3 flex items-center gap-3">
+      {header?.(upload)}
+      <div className={cn("mb-3 flex items-center gap-3", header && "mx-3 sm:mx-10")}>
         <p className="flex-1 text-[13px] text-muted-foreground">
           {documents.length} of {MAX_FILES} files · up to 10 MB each
         </p>
-        {upload}
+        {!header && upload}
       </div>
       {input}
-      <ul className="divide-y overflow-hidden rounded-xl border">
+      <ul className={cn("divide-y overflow-hidden rounded-xl border", header && "mx-3 sm:mx-10")}>
         {documents.map((doc) => {
           const { icon: Icon, tone } = kind(doc.file_name);
           return (

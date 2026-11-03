@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { CalendarClock, CalendarDays, Flag, Loader2, Mail, MessageCircle, MoreHorizontal, NotebookPen, Phone, PhoneIncoming, PhoneMissed, PhoneOutgoing, Reply, ReplyAll, RotateCcw, Send, Smartphone, StickyNote, Timer, X } from "lucide-react";
+import { CalendarClock, CalendarDays, ChevronDown, Plus, Flag, Loader2, Mail, MessageCircle, MoreHorizontal, NotebookPen, Phone, PhoneIncoming, PhoneMissed, PhoneOutgoing, Reply, ReplyAll, RotateCcw, Send, Smartphone, StickyNote, Timer, X } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
 import { mailApi, MAIL_STATUS, newDraftIds, type MailCatalog, type MailSummary, type MailTarget } from "@/lib/mail-api";
 import { contactLogAuthor, formatDuration } from "@/lib/contact-log-utils";
@@ -16,7 +16,7 @@ import { DateTimePicker } from "@/components/shared/datetime-picker";
 import { MailComposer, type ComposerStart } from "@/components/mail/mail-composer";
 import { MailPreviewDialog } from "@/components/mail/mail-preview-dialog";
 import { cn } from "@/lib/utils";
-import { Avatar, CARD, Chip, Feed, Who, ago, sortOldestFirst, type FeedItem } from "./lead-feed";
+import { Avatar, CARD, Chip, Feed, TabHeader, Who, ago, sortOldestFirst, type FeedItem } from "./lead-feed";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -207,12 +207,12 @@ export function LeadConversation({
         at: followUpTime(fu),
         icon: <Icon />,
         who,
-        title: <><Who>{who}</Who> logged a {via ? `${via.label} ` : ""}follow-up</>,
+        title: <><Who>{who}</Who> logged {via ? (via.label === "SMS" ? "an SMS" : `a ${via.label}`) : "a"} follow-up</>,
         body: fu.notes,
         chips: [
           fu.outcome && <Chip key="o">{fu.outcome}</Chip>,
           fu.priority && <Chip key="p"><Flag className={PRIORITY_FLAG[fu.priority]} />{fu.priority[0].toUpperCase() + fu.priority.slice(1)}</Chip>,
-          fu.rnr && <Chip key="r"><PhoneMissed />{fu.rnr.toUpperCase().replace("RNR", "RNR ")}</Chip>,
+          fu.rnr && !/\brnr\b/i.test(fu.notes ?? "") && <Chip key="r"><PhoneMissed />{fu.rnr.toUpperCase().replace("RNR", "RNR ")}</Chip>,
           next && <Chip key="n"><CalendarClock />{next}</Chip>,
         ].filter(Boolean),
         actions: isAdmin ? (
@@ -316,7 +316,8 @@ export function LeadConversation({
       list.push({
         key: `mail-${mail.id}`,
         at,
-        icon: <Avatar name={sender.replace(/@.*/, "")} className="h-7 w-7 text-[11px]" />,
+        icon: <Avatar name={sender.replace(/@.*/, "")} />,
+        iconClass: "mt-2.5",
         extra: (
           <div className={cn(CARD, "px-3.5 py-3")}>
             <div className="flex items-center gap-2 text-[14px] leading-6">
@@ -390,7 +391,29 @@ export function LeadConversation({
   return (
     <div className="flex flex-col md:min-h-0 md:flex-1">
       <div className="md:min-h-0 md:flex-1 md:overflow-y-auto">
-        <div className={cn("mx-auto max-w-3xl space-y-6 px-4 py-4 md:px-6 md:py-6", canEdit && "max-md:pb-20")}>
+        <div className={cn("pb-4", canEdit && "max-md:pb-20")}>
+          <TabHeader
+            title="Conversation"
+            action={canEdit && (
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={<button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-md bg-foreground px-3 text-[13px] font-medium text-background transition-colors hover:bg-foreground/85" />}
+                >
+                  <Plus className="h-4 w-4" />
+                  New
+                  <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  {modes.map(({ key, label, icon: Icon }) => (
+                    <DropdownMenuItem key={key} onClick={() => { setMode(key); if (key === "email" && !mailComposer) setMailComposer({ kind: "blank" }); }}>
+                      <Icon className="h-4 w-4 text-muted-foreground" />
+                      {label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          />
           {items.length ? (
             <Feed items={items} />
           ) : (
@@ -402,7 +425,7 @@ export function LeadConversation({
           )}
 
           {drafts.map((draft) => (
-            <div key={draft.id} className="rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 dark:border-amber-900/60 dark:bg-amber-950/20">
+            <div key={draft.id} className="mx-3 mb-4 rounded-xl sm:ml-[86px] sm:mr-10 border border-amber-200 bg-amber-50/70 p-3.5 dark:border-amber-900/60 dark:bg-amber-950/20">
               <p className="text-[13px] font-semibold text-amber-900 dark:text-amber-300">Email ready to send: {draft.label}</p>
               <p className="mt-0.5 truncate text-[12px] text-amber-900/70 dark:text-amber-300/70">To {draft.to.join(", ")}</p>
               {canSendMail && (
@@ -423,7 +446,7 @@ export function LeadConversation({
             </div>
           ))}
 
-          <div ref={end} aria-hidden className="-mt-6 scroll-mb-32 md:scroll-mb-0" />
+          <div ref={end} aria-hidden className="scroll-mb-32 md:scroll-mb-0" />
         </div>
       </div>
 

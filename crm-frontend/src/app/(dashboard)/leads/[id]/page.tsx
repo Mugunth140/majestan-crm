@@ -45,11 +45,12 @@ import { cn } from "@/lib/utils";
 import { shouldAutoOpenFollowUps, wantsFollowUps } from "@/lib/follow-up-deep-link";
 import { InlineAction, InlineSelect, InlineText, Section, FieldRow, type Option } from "./inline-field";
 import { Feed, timelineItems, type TimelineEntry } from "./lead-timeline";
-import { LeadConversation, type ComposeMode } from "./lead-conversation";
+import { TabHeader } from "./lead-feed";
+import { LeadConversation } from "./lead-conversation";
 import { AttachmentsArt, EmptyState, RequirementsArt } from "./lead-empty";
 import { RequirementFields } from "./lead-requirement";
 import {
-  Loader2, Phone, Mail, MessageCircle, MessageSquare, ArrowUpRight,
+  Loader2, Phone, Mail, MessageCircle, ArrowUpRight,
   History, TrendingUp, Sparkles, ChevronDown,
   Plus, Activity, MessagesSquare, Paperclip, Building2, Smartphone, Info, Flag, PhoneMissed,
 } from "lucide-react";
@@ -193,26 +194,6 @@ function TabButton({ active, onClick, icon: Icon, label, count, className }: {
   );
 }
 
-function QuickAction({ icon: Icon, label, onClick, disabled }: {
-  icon: typeof Phone;
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      title={label}
-      className="flex flex-1 flex-col items-center gap-1 rounded-xl bg-foreground/[0.06] py-2.5 text-[12px] font-medium text-[#017D58] transition-colors hover:bg-foreground/[0.09] active:bg-foreground/[0.12] disabled:opacity-40 dark:text-[#2FB585] md:h-8 md:flex-none md:flex-row md:rounded-md md:border md:bg-background md:px-2.5 md:py-0 md:text-[13px] md:text-foreground md:hover:bg-muted md:dark:text-foreground"
-    >
-      <Icon className="h-5 w-5 md:h-3.5 md:w-3.5 md:text-muted-foreground" />
-      {label}
-    </button>
-  );
-}
-
 function Panel({ title, action, children, flush }: { title: string; action?: ReactNode; children: ReactNode; flush?: boolean }) {
   return (
     <section className="overflow-hidden rounded-xl border bg-card">
@@ -246,7 +227,6 @@ function LeadDetail() {
   const [sources, setSources] = useState<Option[]>([]);
 
   // Modals / Sliders
-  const [composeRequest, setComposeRequest] = useState<{ mode: ComposeMode; n: number } | null>(null);
   const [addingInquiry, setAddingInquiry] = useState(false);
   const [autoOpenedFollowUps, setAutoOpenedFollowUps] = useState(false);
   const [isAutoMatchOpen, setIsAutoMatchOpen] = useState(false);
@@ -607,12 +587,6 @@ function LeadDetail() {
     // dependency, so a fresh object identity can't re-run this effect.
   }, [tab, isLoading, lead, autoOpenedFollowUps]);
 
-  // The quick actions open the matching composer in the Conversation tab's bottom bar.
-  const compose = (mode: ComposeMode) => {
-    setActiveTab("conversation");
-    setComposeRequest((r) => ({ mode, n: (r?.n ?? 0) + 1 }));
-  };
-
   const getFuDateObj = (d: string, t: string) => {
     if (!d) return undefined;
     const date = new Date(d);
@@ -852,25 +826,6 @@ function LeadDetail() {
     </>
   );
 
-  const quickActions = (
-    <>
-      <QuickAction
-        icon={Phone}
-        label="Call"
-        onClick={() => {
-          // Phones dial straight away; either way the follow-up opens ready to log the call.
-          if (window.matchMedia("(pointer: coarse)").matches) window.location.href = `tel:${lead.mobile_number}`;
-          setFuForm(f => ({ ...f, contactedVia: "call" }));
-          compose("followup");
-        }}
-        disabled={!canEdit || !lead.mobile_number}
-      />
-      <QuickAction icon={MessageCircle} label="WhatsApp" onClick={() => compose("whatsapp")} disabled={!canEdit || !(lead.whatsapp_number || lead.mobile_number)} />
-      <QuickAction icon={MessageSquare} label="SMS" onClick={() => compose("sms")} disabled={!canEdit || !lead.mobile_number} />
-      <QuickAction icon={Mail} label="Email" onClick={() => compose("email")} disabled={!canEdit || !lead.email} />
-    </>
-  );
-
   // The status pill and the assignee, as the leads table shows them.
   const statusPill = cn("inline-flex items-center gap-1 whitespace-nowrap rounded-full font-medium transition-[filter] hover:brightness-[0.97] dark:hover:brightness-110", leadStatusPill(statusName));
   const assignee = lead.assigned_staff?.name as string | undefined;
@@ -1086,7 +1041,6 @@ function LeadDetail() {
           {repeatBadge}
           <span>{leadCode(lead.id)}</span>
         </div>
-        <div className="flex gap-2">{quickActions}</div>
         <div className="flex gap-2">
             {showReassign ? (
               <button type="button" onClick={() => setIsAssignOpen(true)} aria-label={`Assigned to ${assignee ?? "nobody"}. Reassign`} className="flex h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-foreground/[0.06] px-3 text-[15px] font-medium text-foreground">
@@ -1132,7 +1086,8 @@ function LeadDetail() {
             )}
 
             {shownTab === "timeline" && (
-              <div className="mx-auto max-w-3xl px-4 py-4 md:px-6 md:py-6">
+              <div className="pb-4">
+                <TabHeader title="Timeline" />
                 {timelineFeed.length ? <Feed items={timelineFeed} /> : empty(<History className="h-5 w-5" />, "Nothing recorded yet", "Status changes, edits and assignments will show up here.")}
               </div>
             )}
@@ -1151,18 +1106,13 @@ function LeadDetail() {
                   isAdmin={role === "Admin" || role === "Super Admin"}
                   refreshKey={mailRefresh}
                   onRefresh={() => fetchLead(true)}
-                  request={composeRequest}
                 />
             )}
 
             {shownTab === "requirements" && (
-              <div className="mx-auto max-w-4xl space-y-5 px-4 py-4 md:px-6 md:py-6">
-                {inquiries.length > 0 && canEdit && (
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-[13px] text-muted-foreground">{inquiries.length === 1 ? "1 requirement" : `${inquiries.length} requirements`} · changes save as you go</p>
-                    {addRequirementButton(false)}
-                  </div>
-                )}
+              <div className="pb-6">
+                <TabHeader title="Requirements" action={inquiries.length > 0 && addRequirementButton(true)} />
+                <div className="space-y-5 px-3 sm:px-10">
                 {(lead.interestedProperty || lead.visit) && (
                   <Panel
                     title="Interested in"
@@ -1223,21 +1173,22 @@ function LeadDetail() {
                     <RequirementFields inquiry={inq} canEdit={canEdit} save={(patch) => saveInquiry(inq.id, patch)} />
                   </Panel>
                 ))}
+                </div>
               </div>
             )}
 
             {shownTab === "attachments" && (
-              <div className="mx-auto max-w-3xl px-4 py-4 md:px-6 md:py-6">
+              <div className="pb-6">
                 <LeadAttachments
                   leadId={id as string}
                   documents={lead?.documents || []}
                   onRefresh={() => fetchLead(true)}
-                  empty={(upload) => (
+                  header={(upload) => <TabHeader title="Attachments" action={canEdit && upload} />}
+                  empty={() => (
                     <EmptyState
                       art={<AttachmentsArt />}
                       title="No attachments yet"
                       hint="Keep the lead's documents here, like ID proof, booking forms or floor plans. PDFs and images up to 10 MB."
-                      action={upload}
                     />
                   )}
                 />
@@ -1261,7 +1212,6 @@ function LeadDetail() {
                 </p>
               </div>
             </div>
-            <div className="flex flex-wrap gap-1.5">{quickActions}</div>
           </div>
           {fields}
           {canEdit && (
