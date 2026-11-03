@@ -11,19 +11,27 @@ const VISIT_STATUSES = ["Site Visit Scheduled", "Re Visit Scheduled"];
 
 type VisitInquiry = { id: number; visit_date?: string | null; visit_slot?: string | null; project_list?: string | null; visit_location?: string | null };
 
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useMemo, useState, useCallback, Suspense, type ReactNode } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { FormSelect } from "@/components/shared/form-select";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
+import { PageActions } from "@/components/layout/page-actions";
+import { useIsMobile } from "@/hooks/use-device";
 import dynamic from "next/dynamic";
 
 const FollowUpPanel = dynamic(() => import("@/components/shared/follow-up-panel").then(mod => mod.FollowUpPanel), { ssr: false });
@@ -43,36 +51,29 @@ import {
   contactLogIcon,
   contactLogAuthor,
 } from "@/lib/contact-log-utils";
+import {
+  LEAD_STATUS_DOTS,
+  LEAD_STATUS_ORDER,
+  PURCHASE_TYPES,
+  PURCHASE_TIMELINES,
+  QUALIFICATION_PURPOSES,
+  PROPERTY_CATEGORIES,
+  PROPERTY_TYPES_MAP,
+  FUNDERS,
+} from "@/lib/lead-constants";
 import { cn } from "@/lib/utils";
 import { shouldAutoOpenFollowUps, wantsFollowUps } from "@/lib/follow-up-deep-link";
+import { InlineAction, InlineSelect, InlineText, Section, FieldRow, type Option } from "./inline-field";
+import { ActivityFeed, buildActivity } from "./lead-activity";
 import {
-  ArrowLeft, Loader2, User, Phone, MapPin, Building2,
-  Briefcase, Mail, MessageSquare, Plus, ArrowUpRight,
-  Clock, Send, RefreshCw, History, TrendingUp, SlidersHorizontal, Sparkles, Edit, ChevronLeft, ChevronRight, PhoneIncoming, UserPlus
+  Loader2, Phone, Mail, MessageCircle, MessageSquare, ArrowUpRight,
+  Clock, RefreshCw, History, TrendingUp, Sparkles, ChevronDown, PhoneIncoming,
+  UserPlus, Activity, ListChecks, Paperclip, Building2, Smartphone, Pencil, Info,
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
-const STATUS_STYLES: Record<string, string> = {
-  "New Lead":             "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300",
-  "Contacted":            "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400",
-  "Qualified":            "bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400",
-  "Property Shared":      "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400",
-  "Other Location":       "bg-violet-100 text-violet-800 border-violet-200 dark:bg-violet-900/30 dark:text-violet-400",
-  "Interested":           "bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200 dark:bg-fuchsia-900/30 dark:text-fuchsia-400",
-  "Site Visit Scheduled": "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
-  "Site Visit Completed": "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400",
-  "Re Visit Scheduled":   "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400",
-  "Re Visit Completed":   "bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-900/30 dark:text-rose-400",
-  "Negotiation":          "bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-900/30 dark:text-pink-400",
-  "Booking Advance":      "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400",
-  "Agreement":            "bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/30 dark:text-teal-400",
-  "Closed Won":           "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
-  "Not Interested":       "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400",
-  "Dropped":              "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/40 dark:text-red-400",
-  "Lost":                 "bg-red-200 text-red-900 border-red-300 dark:bg-red-900/50 dark:text-red-300",
-  "Future Follow-up":     "bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-800 dark:text-slate-300",
-};
+const STATUS_OPTIONS: Option[] = LEAD_STATUS_ORDER.map((s) => ({ label: s, value: s, dot: LEAD_STATUS_DOTS[s] }));
 
 const PRIORITIES = [
   { label: "Low", value: "low" },
@@ -82,18 +83,10 @@ const PRIORITIES = [
 ];
 
 const CONTACTED_VIA = [
-  { label: "Call", value: "call" },
-  { label: "WhatsApp", value: "whatsapp" },
-  { label: "SMS", value: "sms" },
-  { label: "Email", value: "email" },
-];
-
-const RNR_OPTIONS = [
-  { label: "RNR 1", value: "rnr1" },
-  { label: "RNR 2", value: "rnr2" },
-  { label: "RNR 3", value: "rnr3" },
-  { label: "RNR 4", value: "rnr4" },
-  { label: "RNR 5", value: "rnr5" },
+  { label: "Call", value: "call", icon: Phone },
+  { label: "WhatsApp", value: "whatsapp", icon: MessageCircle },
+  { label: "SMS", value: "sms", icon: Smartphone },
+  { label: "Email", value: "email", icon: Mail },
 ];
 
 const PREDEFINED_DROP_REASONS = [
@@ -104,95 +97,141 @@ const PREDEFINED_DROP_REASONS = [
   "Floor mismatched"
 ];
 
+type Tab = "details" | "activity" | "followups" | "contact" | "emails" | "requirements" | "attachments";
+
+const AVATAR_TONES = [
+  "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+  "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+  "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
+  "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
+  "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300",
+];
+
+function initials(name: string) {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join("") || "?";
+}
+
+function avatarTone(name: string) {
+  let h = 0;
+  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return AVATAR_TONES[h % AVATAR_TONES.length];
+}
+
+const leadCode = (id: number | string) => `L${String(id).padStart(5, "0")}`;
+
+const humanize = (v?: string | null) => (v ? v.replace(/_/g, " ") : "");
+
+// The header actions share the leads list's toolbar buttons.
+const HEADER_BUTTON =
+  "inline-flex h-8 items-center gap-1.5 rounded-md border bg-background px-3 text-[14px] font-medium text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors hover:bg-muted disabled:opacity-50";
+const HEADER_PRIMARY =
+  "inline-flex h-8 items-center gap-1.5 rounded-md bg-foreground px-3 text-[14px] font-medium text-background transition-colors hover:bg-foreground/85";
+
 // ── Loading Skeleton ─────────────────────────────────────────────────────────
 function PageSkeleton() {
   return (
-    <div className="animate-in fade-in duration-500 md:h-full flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-9 w-9 rounded-full shrink-0" />
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <Skeleton className="h-8 w-48" />
-              <Skeleton className="h-6 w-24 rounded-md" />
-              <Skeleton className="h-5 w-20" />
-            </div>
-            <Skeleton className="h-4 w-40" />
-          </div>
+    <div className="flex flex-col md:h-full md:flex-row lg:-mx-6 lg:-mb-8 lg:-mt-6 lg:h-[calc(100%+3.5rem)]">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="hidden h-11 items-center gap-5 border-b px-5 md:flex">
+          {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-4 w-20" />)}
         </div>
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-9 w-9 rounded-full" />
-          <Skeleton className="h-10 w-28 rounded-lg" />
-        </div>
-      </div>
-
-      <div className="flex-1 space-y-6 md:overflow-y-auto min-h-0 pb-6 pr-2">
-        {/* Top Row */}
-        <div className="grid grid-cols-3 gap-6">
-          <div className="col-span-2 bg-card border rounded-2xl p-6 shadow-sm">
-            <Skeleton className="h-5 w-48 mb-6" />
-            <div className="grid grid-cols-3 gap-y-6 gap-x-6">
-              {[...Array(6)].map((_, i) => (
-                <div key={i}>
-                  <Skeleton className="h-3 w-20 mb-2" />
-                  <Skeleton className="h-4 w-32" />
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="col-span-1 bg-card border rounded-2xl p-6 shadow-sm">
-            <Skeleton className="h-5 w-32 mb-6" />
-            <div className="space-y-6">
-              {[...Array(3)].map((_, i) => (
-                <div key={i}>
-                  <Skeleton className="h-3 w-24 mb-2" />
-                  <Skeleton className="h-11 w-full rounded-xl" />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Row 2 */}
-        <div className="bg-card border rounded-2xl p-6 shadow-sm">
-          <Skeleton className="h-5 w-40 mb-6" />
-          <Skeleton className="h-40 w-full rounded-xl" />
-        </div>
-
-        {/* Row 3 */}
-        <div className="grid grid-cols-3 gap-6">
-          <div className="col-span-2 bg-card border rounded-2xl p-6 shadow-sm">
-            <Skeleton className="h-5 w-32 mb-6" />
-            <div className="space-y-6">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="flex gap-4">
-                  <Skeleton className="h-10 w-10 rounded-full shrink-0" />
-                  <div className="space-y-2 flex-1 pt-1">
-                    <Skeleton className="h-4 w-1/3" />
-                    <Skeleton className="h-12 w-full max-w-md rounded-lg" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="col-span-1 space-y-6">
-            <div className="bg-card border rounded-2xl p-6 shadow-sm">
-              <Skeleton className="h-5 w-32 mb-4" />
-              <Skeleton className="h-4 w-24" />
-            </div>
-            <div className="bg-card border rounded-2xl p-6 shadow-sm">
-              <Skeleton className="h-5 w-32 mb-4" />
-              <div className="space-y-3">
-                {[...Array(5)].map((_, i) => (
-                  <Skeleton key={i} className="h-4 w-full" />
-                ))}
+        <div className="space-y-6 p-4 md:p-6">
+          <Skeleton className="h-36 w-full rounded-xl" />
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="flex gap-3">
+              <Skeleton className="h-7 w-7 shrink-0 rounded-full" />
+              <div className="flex-1 space-y-2 pt-1">
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-10 w-full max-w-lg rounded-lg" />
               </div>
             </div>
+          ))}
+        </div>
+      </div>
+      <div className="hidden w-[340px] shrink-0 border-l md:block xl:w-[360px]">
+        <div className="flex items-center gap-3 border-b p-4">
+          <Skeleton className="h-12 w-12 rounded-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-3 w-24" />
           </div>
+        </div>
+        <div className="space-y-3 p-4">
+          {[...Array(9)].map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}
         </div>
       </div>
     </div>
+  );
+}
+
+function TabButton({ active, onClick, icon: Icon, label, count, className }: {
+  active: boolean;
+  onClick: () => void;
+  icon: typeof Activity;
+  label: string;
+  count?: number;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={cn(
+        // Phone: pill segments. Desktop: Frappe's underlined tab strip.
+        "relative flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[14px] font-medium transition-colors md:h-11 md:rounded-none md:px-0.5",
+        active
+          ? "bg-[#017D58] text-white dark:bg-[#2FB585] dark:text-black md:bg-transparent md:text-foreground md:dark:bg-transparent md:dark:text-foreground"
+          : "bg-foreground/[0.06] text-foreground/80 md:bg-transparent md:text-muted-foreground md:hover:text-foreground",
+        className,
+      )}
+    >
+      <Icon className="hidden h-4 w-4 md:block" />
+      {label}
+      {count ? (
+        <span className={cn(
+          "rounded-full px-1.5 text-[11px] leading-[18px] tabular-nums",
+          active ? "bg-white/20 md:bg-foreground/[0.08]" : "bg-foreground/[0.08]",
+        )}>
+          {count}
+        </span>
+      ) : null}
+      {active && <span aria-hidden className="absolute inset-x-0 -bottom-px hidden h-0.5 rounded-full bg-foreground md:block" />}
+    </button>
+  );
+}
+
+function QuickAction({ icon: Icon, label, onClick, disabled }: {
+  icon: typeof Phone;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={label}
+      className="flex flex-1 flex-col items-center gap-1 rounded-xl bg-foreground/[0.06] py-2.5 text-[12px] font-medium text-[#017D58] transition-colors hover:bg-foreground/[0.09] active:bg-foreground/[0.12] disabled:opacity-40 dark:text-[#2FB585] md:h-8 md:flex-none md:flex-row md:rounded-md md:border md:bg-background md:px-2.5 md:py-0 md:text-[13px] md:text-foreground md:hover:bg-muted md:dark:text-foreground"
+    >
+      <Icon className="h-5 w-5 md:h-3.5 md:w-3.5 md:text-muted-foreground" />
+      {label}
+    </button>
+  );
+}
+
+function Panel({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="overflow-hidden rounded-xl border bg-card">
+      <div className="flex min-h-11 items-center gap-2 border-b px-4">
+        <h3 className="min-w-0 flex-1 truncate text-[14px] font-semibold text-foreground">{title}</h3>
+        {action}
+      </div>
+      <div className="p-4">{children}</div>
+    </section>
   );
 }
 
@@ -204,6 +243,7 @@ function LeadDetail() {
   const searchParams = useSearchParams();
   const tab = searchParams.get("tab");
   const id = params.id as string;
+  const isMobile = useIsMobile();
 
   const [lead, setLead] = useState<any>(null);
   // Bumped after saves that may create an email draft (status changes, visits).
@@ -212,12 +252,12 @@ function LeadDetail() {
   const [savingVisit, setSavingVisit] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>("activity");
+  const [sources, setSources] = useState<Option[]>([]);
 
   // Modals / Sliders
   const [contactModal, setContactModal] = useState<{ open: boolean; type: string; to: string }>({ open: false, type: "", to: "" });
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [autoOpenedFollowUps, setAutoOpenedFollowUps] = useState(false);
-  const [isContactLogsOpen, setIsContactLogsOpen] = useState(false);
   const [isAutoMatchOpen, setIsAutoMatchOpen] = useState(false);
   const [autoMatchResults, setAutoMatchResults] = useState<any[]>([]);
   const [isMatching, setIsMatching] = useState(false);
@@ -259,6 +299,14 @@ function LeadDetail() {
         // ignore
       }
     }
+  }, []);
+
+  // Lead sources for the inline Source field.
+  useEffect(() => {
+    apiFetch(`${API_URL}/master/lead-sources`)
+      .then((res) => res.json())
+      .then((data) => { if (data?.success && Array.isArray(data.data)) setSources(data.data); })
+      .catch(() => {});
   }, []);
 
   const fetchAutoMatch = async () => {
@@ -316,24 +364,26 @@ function LeadDetail() {
       toast.success("Lead reassigned successfully");
       setIsAssignOpen(false);
       fetchLead(true);
-    } catch (err) {
+    } catch {
       toast.error("Failed to assign lead");
     } finally {
       setIsAssigning(false);
     }
   };
 
-  // Keyboard shortcut for history slider
+  // "A" jumps to the follow-up timeline, as the old history slider did.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Trigger on 'a' or 'A', but ignore if typing in an input/textarea
+      const el = document.activeElement as HTMLElement | null;
       if (
-        e.key.toLowerCase() === 'a' && 
-        document.activeElement?.tagName !== 'INPUT' && 
-        document.activeElement?.tagName !== 'TEXTAREA'
+        e.key.toLowerCase() === 'a' &&
+        !e.metaKey && !e.ctrlKey && !e.altKey &&
+        el?.tagName !== 'INPUT' &&
+        el?.tagName !== 'TEXTAREA' &&
+        !el?.isContentEditable
       ) {
         e.preventDefault();
-        setIsHistoryOpen(prev => !prev);
+        setActiveTab(prev => prev === "followups" ? "activity" : "followups");
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -370,6 +420,44 @@ function LeadDetail() {
 
   useEffect(() => { fetchLead(); }, [fetchLead]);
 
+  /** Saves one or more lead fields in place; throws so the field can revert. */
+  const saveLead = async (patch: Record<string, unknown>) => {
+    try {
+      const res = await apiFetch(`${API_URL}/leads/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) {
+        const message = Array.isArray(data?.message) ? data.message[0] : data?.message;
+        throw new Error(message || "Couldn't save the change");
+      }
+      toast.success("Saved");
+      await fetchLead(true);
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : "Couldn't save the change");
+      throw reason;
+    }
+  };
+
+  const saveInquiry = async (inquiryId: number, patch: Record<string, unknown>) => {
+    try {
+      const res = await apiFetch(`${API_URL}/leads/${id}/inquiries/${inquiryId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) throw new Error(data?.message || "Couldn't save the requirement");
+      toast.success("Saved");
+      await fetchLead(true);
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : "Couldn't save the requirement");
+      throw reason;
+    }
+  };
+
   const putStatus = async (status: string) => {
     const res = await apiFetch(`${API_URL}/leads/${id}/status`, {
       method: "PUT",
@@ -379,6 +467,43 @@ function LeadDetail() {
     const data = await res.json();
     if (!data.success) throw new Error("Failed to update status");
     return data as { transferredToSales?: boolean };
+  };
+
+  /** Status changes that need more input open their dialog first. */
+  const changeStatus = async (v: string) => {
+    if (!v || v === lead?.status) return;
+    if (v === "Dropped") return setIsDroppedOpen(true);
+    if (v === "Not Interested") return setIsNotInterestedOpen(true);
+    if (VISIT_STATUSES.includes(v)) return openVisitDialog(v);
+    try {
+      const data = await putStatus(v);
+      toast.success(data.transferredToSales ? "Lead moved to the Sales pipeline." : "Lead status updated.");
+      fetchLead(true);
+      setMailRefresh((n) => n + 1);
+    } catch {
+      toast.error("Failed to update status");
+    }
+  };
+
+  const toggleUnqualified = async () => {
+    const newVal = !lead.is_unqualified;
+    try {
+      const res = await apiFetch(`${API_URL}/leads/${id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          is_unqualified: newVal,
+          status_name: newVal ? 'Lost' : 'New Lead'
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(newVal ? "Lead marked as Unqualified (Lost)." : "Lead unmarked as Unqualified.");
+        fetchLead(true);
+      } else toast.error("Failed to update qualification status");
+    } catch {
+      toast.error("Failed to update qualification status");
+    }
   };
 
   /** Pre-fills the visit dialog from the latest enquiry that has a visit, else the latest one. */
@@ -462,10 +587,8 @@ function LeadDetail() {
   }, [id, lead, fetchLead]);
 
   // Deep link from the Leads table's "Last Followup" cell (?tab=followups):
-  // open the timeline once the lead and its follow-ups are in hand, otherwise
-  // the fetch above can win the race and the sheet opens empty. The param stays
-  // in the URL so a refresh keeps the sheet open, and the latch means closing
-  // it afterwards is not undone by the next render.
+  // open the follow-up tab once the lead and its follow-ups are in hand. The
+  // latch means switching tabs afterwards is not undone by the next render.
   useEffect(() => {
     if (!shouldAutoOpenFollowUps({
       wantsFollowUps: wantsFollowUps(tab),
@@ -473,7 +596,7 @@ function LeadDetail() {
       hasLead: !!lead,
       alreadyOpened: autoOpenedFollowUps,
     })) return;
-    setIsHistoryOpen(true);
+    setActiveTab("followups");
     setAutoOpenedFollowUps(true);
     // `tab` rather than `searchParams`: the param value is the actual
     // dependency, so a fresh object identity can't re-run this effect.
@@ -505,7 +628,7 @@ function LeadDetail() {
 
   const handleSaveFollowUp = async () => {
     if (!fuForm.contactedVia) return toast.error("Please select how you contacted the lead.");
-    
+
     if (fuForm.nextFollowUpDate) {
       const followUpDateObj = getFuDateObj(fuForm.nextFollowUpDate, fuForm.nextFollowUpTime);
       if (followUpDateObj) {
@@ -541,19 +664,23 @@ function LeadDetail() {
     finally { setIsSavingFu(false); }
   };
 
-  // Contact counts by type
-  const contactCounts = countByType(lead?.contact_logs ?? []);
+  const followUps: any[] = useMemo(() => lead?.follow_ups || [], [lead]);
+  // Defensive newest-first sort (created_at, id tiebreak) — backend orders
+  // the same way, but bulk device syncs share second precision.
+  const contactLogs: any[] = useMemo(() => sortContactLogs(lead?.contact_logs || []), [lead]);
+  const activity = useMemo(() => buildActivity(lead, followUps, contactLogs), [lead, followUps, contactLogs]);
+  const sourceOptions = useMemo(() => {
+    const current = lead?.lead_source;
+    if (!current || sources.some((s) => s.value === current)) return sources;
+    return [{ label: current, value: current }, ...sources];
+  }, [sources, lead]);
 
   if (isLoading) return <PageSkeleton />;
   if (!lead) return null;
 
-  const statusName = lead.status || "New Lead";
-  const badgeCls = STATUS_STYLES[statusName] ?? "bg-gray-100 text-gray-800 border-gray-200";
-  const followUps: any[] = lead.follow_ups || [];
-  // Defensive newest-first sort (created_at, id tiebreak) — backend orders
-  // the same way, but bulk device syncs share second precision.
-  const contactLogs: any[] = sortContactLogs(lead?.contact_logs || []);
+  const contactCounts = countByType(contactLogs);
   const callDirectionCounts = countCallDirections(contactLogs);
+  const statusName = lead.status || "New Lead";
 
   // RNR Calculation
   let highestRnr = 0;
@@ -564,7 +691,7 @@ function LeadDetail() {
       const dateB = new Date(`${b.follow_up_date}T${b.follow_up_time || '00:00:00'}`).getTime();
       return dateB - dateA;
     });
-    
+
     const latestFu = sortedFollowUps[0];
     if (latestFu.rnr && typeof latestFu.rnr === 'string' && latestFu.rnr.startsWith("rnr")) {
       const num = parseInt(latestFu.rnr.replace("rnr", ""), 10);
@@ -596,657 +723,569 @@ function LeadDetail() {
     (role === "Team Lead" && inDeptPurview);
   const canReassign =
     isManagerOrAdmin || (role === "Team Lead" && inDeptPurview);
+  const showReassign = canReassign && (role === "Admin" || role === "Manager" || role === "Team Lead") && !lead.is_converted;
+  const showConvert = canEdit && !lead.is_converted &&
+    (role === "Admin" || role === "Manager" || ((role === "Staff" || role === "Team Lead") && userDept === "telecalling"));
+  const openConvert = () => { setConvertTo(""); setConvertFeedback(""); setIsConvertOpen(true); };
 
-  return (
-    <div className="flex flex-col md:h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+  const inquiries: any[] = lead.inquiries || [];
+  const shownTab: Tab = activeTab === "details" && !isMobile ? "activity" : activeTab;
 
-      {/* ── Mobile Header ── */}
-      <MobileHeader title={lead.name || "Lead Details"} showBack />
+  const tabs: { key: Tab; label: string; icon: typeof Activity; count?: number; mobileOnly?: boolean }[] = [
+    { key: "activity", label: "Activity", icon: Activity },
+    { key: "details", label: "Details", icon: Info, mobileOnly: true },
+    { key: "followups", label: "Follow-ups", icon: ListChecks, count: followUps.length },
+    { key: "contact", label: "Calls", icon: PhoneIncoming, count: contactLogs.length },
+    { key: "emails", label: "Emails", icon: Mail },
+    { key: "requirements", label: "Requirements", icon: Building2, count: inquiries.length },
+    { key: "attachments", label: "Attachments", icon: Paperclip, count: lead.documents?.length },
+  ];
 
-      {/* ── Header ── */}
-      <div className="hidden md:flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shrink-0" onClick={() => router.push("/leads")}>
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </Button>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">{lead.name}</h1>
-            {(lead.inquiries && lead.inquiries.length > 1) && (
-              <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200">
-                Repeat ({lead.inquiries.length - 1})
-              </Badge>
-            )}
-            <Badge className={`font-medium px-2.5 py-0.5 shadow-sm border ${badgeCls}`}>{statusName}</Badge>
-            <span className="text-sm font-semibold text-muted-foreground ml-2">L{String(lead.id).padStart(5, "0")}</span>
-            <span className="text-muted-foreground/40 text-xs">&bull;</span>
-            <span className="text-sm text-muted-foreground flex items-center gap-1.5">
-              Created on {new Date(lead.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full" onClick={() => fetchLead(true)} title="Refresh">
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-          </Button>
-          {(canEdit || canReassign) && (
+  // ── Record fields (desktop sidebar, phone "Details" tab) ──
+  const fields = (
+    <>
+      <Section title="Details">
+        <InlineSelect label="Status" value={statusName} options={STATUS_OPTIONS} onSave={changeStatus} disabled={!canEdit} />
+        {VISIT_STATUSES.includes(lead.status) && canEdit && (
+          <FieldRow label="">
+            <button type="button" onClick={() => openVisitDialog(null)} className="px-2 text-[13px] font-medium text-[#017D58] hover:underline dark:text-[#2FB585]">
+              Reschedule site visit
+            </button>
+          </FieldRow>
+        )}
+        <InlineSelect
+          label="Source"
+          value={lead.lead_source}
+          options={sourceOptions}
+          onSave={(v) => saveLead({ source: v })}
+          disabled={!canEdit}
+        />
+        <InlineAction label="Assigned to" onClick={showReassign ? () => setIsAssignOpen(true) : undefined}>
+          {lead.assigned_staff?.name ? (
             <>
-              {canReassign && (role === "Admin" || role === "Manager" || role === "Team Lead") && !lead.is_converted && (
-                <Button
-                  onClick={() => setIsAssignOpen(true)}
-                  variant="outline"
-                  className="rounded-full px-6 py-5 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-900/50 dark:bg-blue-900/20 dark:text-blue-300 dark:hover:bg-blue-900/40 shadow-sm gap-2"
-                >
-                  <UserPlus className="h-4 w-4" />
-                  Reassign
-                </Button>
-              )}
-              {canEdit && (role === "Admin" || role === "Manager" || ((role === "Staff" || role === "Team Lead") && userDept === "telecalling")) && !lead.is_converted && (
-                <Button
-                  onClick={() => { setConvertTo(""); setConvertFeedback(""); setIsConvertOpen(true); }}
-                  className="rounded-full px-6 py-5 bg-emerald-600 text-white hover:bg-emerald-700 shadow-md gap-2"
-                >
-                  <TrendingUp className="h-4 w-4" />
-                  Convert Lead
-                </Button>
-              )}
-              <Button onClick={() => router.push(`/leads/new?edit=${lead.id}`)} className="rounded-full px-8 py-5 bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md">
-                Edit Lead
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* ── Mobile Summary & Actions ── */}
-      <div className="md:hidden flex flex-col gap-4 px-4 pb-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge className={`font-medium px-2.5 py-0.5 shadow-sm border ${badgeCls}`}>{statusName}</Badge>
-          {(lead.inquiries && lead.inquiries.length > 1) && (
-            <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-200">
-              Repeat ({lead.inquiries.length - 1})
-            </Badge>
-          )}
-          <span className="text-sm font-semibold text-muted-foreground ml-1">L{String(lead.id).padStart(5, "0")}</span>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-3">
-          {canEdit && (
-            <Button variant="outline" onClick={() => router.push(`/leads/new?edit=${lead.id}`)} className="h-11 rounded-xl text-foreground font-semibold border-border/60">
-              <Edit className="w-4 h-4 mr-2 text-muted-foreground" /> Edit
-            </Button>
-          )}
-          {canReassign && (role === "Admin" || role === "Manager" || role === "Team Lead") && !lead.is_converted && (
-            <Button onClick={() => setIsAssignOpen(true)} variant="outline" className="h-11 rounded-xl border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/50 dark:bg-blue-900/20 dark:text-blue-300">
-              <UserPlus className="w-4 h-4 mr-2" /> Reassign
-            </Button>
-          )}
-          {canEdit && (!lead.is_converted && (role === "Admin" || role === "Manager" || ((role === "Staff" || role === "Team Lead") && userDept === "telecalling"))) ? (
-            <Button
-              onClick={() => { setConvertTo(""); setConvertFeedback(""); setIsConvertOpen(true); }}
-              className="h-11 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm font-semibold"
-            >
-              <TrendingUp className="w-4 h-4 mr-2" /> Convert
-            </Button>
-          ) : (
-            <Button variant="outline" onClick={() => fetchLead(true)} className="h-11 rounded-xl border-border/60 font-semibold text-foreground">
-              <RefreshCw className={`w-4 h-4 mr-2 text-muted-foreground ${isRefreshing ? "animate-spin" : ""}`} /> Refresh
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* ── Main Layout ── */}
-      <div className="flex-1 md:overflow-y-auto md:min-h-0 pb-6 lg:pr-2 space-y-6 px-4 lg:px-0">
-
-        {/* ── Row 1: Customer Info (2/3) + Quick Actions (1/3) ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-card border rounded-2xl p-6 shadow-sm h-full">
-            <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-              <User className="h-4 w-4 text-muted-foreground" /> Customer Information
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-6 gap-x-6">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Mobile</p>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button disabled={!canEdit} onClick={() => openContact("call", lead.mobile_number)} className="flex items-center gap-1.5 text-[14px] font-medium text-foreground hover:text-[#0052FF] disabled:hover:text-foreground transition-colors group">
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground group-hover:text-[#0052FF]" /> {lead.mobile_number || "\u2014"}
-                  </button>
-                  {lead.mobile_number && (
-                    <button disabled={!canEdit} onClick={() => openContact("sms", lead.mobile_number)} className="text-[11px] px-2 py-0.5 rounded-full border bg-green-50 text-green-700 border-green-200 hover:bg-green-100 disabled:opacity-50 transition-colors">SMS</button>
-                  )}
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">WhatsApp</p>
-                <button disabled={!canEdit || !lead.whatsapp_number} onClick={() => openContact("whatsapp", lead.whatsapp_number)} className="flex items-center gap-1.5 text-[14px] font-medium text-foreground hover:text-emerald-600 transition-colors group disabled:opacity-40 disabled:hover:text-foreground disabled:cursor-default">
-                  <Phone className="h-3.5 w-3.5 text-emerald-600" /> {lead.whatsapp_number || "\u2014"}
-                </button>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Email</p>
-                <button disabled={!canEdit || !lead.email} onClick={() => openContact("email", lead.email)} className="flex items-center gap-1.5 text-[14px] font-medium text-foreground hover:text-[#0052FF] transition-colors group disabled:opacity-40 disabled:hover:text-foreground disabled:cursor-default">
-                  <Mail className="h-3.5 w-3.5 text-muted-foreground group-hover:text-[#0052FF]" />
-                  <span className="truncate max-w-[160px]">{lead.email || "\u2014"}</span>
-                </button>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">City</p>
-                <p className="flex items-center gap-1.5 text-[14px] font-medium">
-                  <MapPin className="h-3.5 w-3.5 text-muted-foreground" /> {lead.city || "\u2014"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Lead Source</p>
-                <Badge variant="outline" className="text-sm px-3 py-1 font-medium">{lead.lead_source || "Unknown"}</Badge>
-              </div>
-              <div className="col-span-2 lg:col-span-3">
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Address</p>
-                <p className="text-[14px] font-medium text-foreground/80">{lead.address || "\u2014"}</p>
-              </div>
-              
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Commission</p>
-                <p className="text-[14px] font-medium text-foreground">{lead.commission ? `${lead.commission}%` : "\u2014"}</p>
-              </div>
-
-              {lead.commission_remarks && (
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Commission Remarks</p>
-                  <p className="text-sm text-foreground whitespace-pre-wrap">{lead.commission_remarks}</p>
-                </div>
-              )}
-              
-              {lead.is_referral ? (
-                <div className="col-span-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Referred By</p>
-                  <p className="text-[14px] font-medium text-foreground/80">
-                    {lead.referred_by_name || "Unknown"} {lead.referred_by_contact ? `(${lead.referred_by_contact})` : ""}
-                  </p>
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="lg:col-span-1 bg-card border rounded-2xl p-6 shadow-sm h-full flex flex-col">
-            <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-              <RefreshCw className="h-4 w-4 text-muted-foreground" /> Quick Actions
-            </h3>
-            <div className="flex flex-col gap-6 flex-1">
-              {canEdit && (
-                <>
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Lead Status</p>
-                    <FormSelect
-                      name="quickLeadStatus"
-                      placeholder="Select Status"
-                      options={Object.keys(STATUS_STYLES).map(k => ({ label: k, value: k }))}
-                      value={lead.status || ""}
-                      onValueChange={async (v) => {
-                        if (!v) return;
-                        if (v === "Dropped") {
-                          setIsDroppedOpen(true);
-                          return;
-                        }
-                        if (v === "Not Interested") {
-                          setIsNotInterestedOpen(true);
-                          return;
-                        }
-                        if (VISIT_STATUSES.includes(v)) {
-                          openVisitDialog(v);
-                          return;
-                        }
-                        try {
-                          const data = await putStatus(v);
-                          toast.success(data.transferredToSales ? "Lead moved to the Sales pipeline." : "Lead status updated.");
-                          fetchLead(true);
-                          setMailRefresh((n) => n + 1);
-                        } catch {
-                          toast.error("Failed to update status");
-                        }
-                      }}
-                    />
-                    {VISIT_STATUSES.includes(lead.status) && (
-                      <button type="button" onClick={() => openVisitDialog(null)} className="mt-2 text-[12px] font-semibold text-[#0052FF] hover:underline">
-                        Reschedule site visit
-                      </button>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Lead Qualification</p>
-                    <div className="flex items-center justify-between h-12 px-4 rounded-xl border border-input bg-muted/20">
-                      <span className="text-[14px] font-medium text-foreground/80">Mark as Unqualified</span>
-                      <button
-                        role="switch"
-                        aria-checked={lead.is_unqualified || false}
-                        onClick={async () => {
-                      const newVal = !lead.is_unqualified;
-                      try {
-                        const res = await apiFetch(`${API_URL}/leads/${id}/status`, {
-                          method: "PUT",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ 
-                            is_unqualified: newVal,
-                            status_name: newVal ? 'Lost' : 'New Lead'
-                          }),
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                          toast.success(newVal ? "Lead marked as Unqualified (Lost)." : "Lead unmarked as Unqualified.");
-                          fetchLead(true);
-                        } else toast.error("Failed to update qualification status");
-                      } catch {
-                        toast.error("Failed to update qualification status");
-                      }
-                    }}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${lead.is_unqualified ? "bg-red-500" : "bg-muted"}`}
-                  >
-                    <span className={`pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform ${lead.is_unqualified ? "translate-x-5.5" : "translate-x-0.5"}`} />
-                  </button>
-                </div>
-              </div>
-              </>
-              )}
-              
-              {/* Trigger the Right Slider */}
-              <div className="mt-auto pt-2">
-                <Button 
-                  onClick={() => setIsHistoryOpen(true)} 
-                  className="w-full h-12 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 font-semibold shadow-sm border border-blue-200 dark:border-blue-800 rounded-xl flex items-center justify-between px-4"
-                >
-                  <span className="flex items-center">
-                    <History className="mr-2 h-4 w-4" /> View Follow-up History
-                  </span>
-                  <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border border-blue-200 dark:border-blue-800 bg-background/50 px-1.5 font-mono text-[10px] font-medium text-blue-700 dark:text-blue-400 opacity-100">
-                    A
-                  </kbd>
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Row 2: Log New Follow Up Form ── */}
-        {canEdit && (
-          <div className="bg-card border rounded-2xl p-6 shadow-sm">
-            <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-              <Plus className="h-4 w-4 text-[#0052FF]" /> Log New Follow Up
-          </h3>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contacted Via *</label>
-                  <FormSelect name="contactedVia" placeholder="Select..." options={CONTACTED_VIA} value={fuForm.contactedVia} onValueChange={v => setFuForm(f => ({ ...f, contactedVia: v || "" }))} />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Follow-Up</label>
-                  <DateTimePicker
-                    value={getFuDateObj(fuForm.nextFollowUpDate, fuForm.nextFollowUpTime)}
-                    onChange={handleFuDateTimeChange}
-                    placeholder="Pick date..."
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Priority</label>
-                  <FormSelect name="priority" placeholder="Select..." options={PRIORITIES} value={fuForm.priority} onValueChange={v => setFuForm(f => ({ ...f, priority: v || "" }))} />
-                </div>
-                <div className="space-y-1.5 flex flex-col justify-end">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">RNR Status</label>
-                  <Button
-                    type="button"
-                    variant={fuForm.rnr === nextRnrValue ? "default" : "outline"}
-                    className={cn(
-                      "w-full h-12 rounded-xl transition-all font-semibold",
-                      fuForm.rnr === nextRnrValue 
-                        ? "bg-orange-500 hover:bg-orange-600 text-white border-orange-500" 
-                        : "border-border/60 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 text-foreground/80"
-                    )}
-                    disabled={isRnrMaxed}
-                    onClick={() => {
-                      const isApplying = fuForm.rnr !== nextRnrValue;
-                      setFuForm(f => ({
-                        ...f,
-                        rnr: isApplying ? nextRnrValue : "",
-                        notes: isApplying ? `RNR ${nextRnrNumber} for this lead` : (f.notes === `RNR ${nextRnrNumber} for this lead` ? "" : f.notes)
-                      }));
-                    }}
-                  >
-                    {isRnrMaxed ? "Max RNR (5) Reached" : (fuForm.rnr === nextRnrValue ? `RNR ${nextRnrNumber} Applied` : `Apply RNR ${nextRnrNumber}`)}
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-4">
-              <div className="space-y-1.5 flex-1 flex flex-col">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Notes</label>
-                <Textarea
-                  value={fuForm.notes}
-                  onChange={e => setFuForm(f => ({ ...f, notes: e.target.value }))}
-                  placeholder="What was discussed?..."
-                  disabled={!!fuForm.rnr}
-                  className={cn("bg-muted/20 rounded-xl resize-none text-sm flex-1 min-h-[100px]", fuForm.rnr ? "opacity-70 cursor-not-allowed bg-muted" : "")}
-                />
-              </div>
-              <Button
-                onClick={handleSaveFollowUp}
-                disabled={isSavingFu}
-                className="w-full h-11 bg-[#0052FF] text-white hover:bg-[#0040CC] rounded-xl shadow font-semibold text-sm gap-2"
-              >
-                {isSavingFu ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpRight className="h-4 w-4" />}
-                Save Follow Up
-              </Button>
-            </div>
-          </div>
-        </div>
-        )}
-
-        {/* ── Row 3: Contact Summary (2/3) + Assignment/Requirement (1/3) ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-card border rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center justify-between border-b pb-3 mb-5">
-              <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" /> Contact activity
-              </h3>
-              <button 
-                onClick={() => setIsContactLogsOpen(true)}
-                className="text-[13px] font-bold tracking-wide text-blue-400 flex items-center gap-2 bg-[#0052FF]/10 px-3 py-2 rounded-lg transition-colors hover:bg-[#0052FF]/20 outline-blue-600 outline-[1px]"
-              >
-                <History className="h-3.5 w-3.5" /> View logs
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-y-6 lg:gap-0 lg:divide-x divide-border/60">
-              
-              {/* Calls Primary Stat */}
-              <div className="flex flex-col gap-1.5 lg:pr-6">
-                <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                  <PhoneIncoming className="h-3 w-3" /> Calls
-                </div>
-                <div className="flex items-baseline gap-3">
-                  <span className="text-3xl font-medium text-foreground tracking-tighter leading-none">{contactCounts.call || 0}</span>
-                  {contactCounts.call > 0 && (
-                    <div className="flex gap-2 text-[10px] font-medium text-muted-foreground/80 uppercase tracking-wide">
-                      <span><strong className="text-yellow-300">{callDirectionCounts.incoming || 0}</strong> IN</span>
-                      <span><strong className="text-green-400">{callDirectionCounts.outgoing || 0}</strong> OUT</span>
-                      <span><strong className="text-red-400">{callDirectionCounts.missed || 0}</strong> MISS</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Secondary Stats */}
-              {(["whatsapp", "sms", "email"] as const).map((type) => (
-                <div key={type} className="flex flex-col gap-1.5 lg:pl-6">
-                  <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                    {CONTACT_TYPE_ICONS[type]} {type}
-                  </div>
-                  <span className="text-3xl font-medium text-foreground tracking-tighter leading-none">{contactCounts[type] || 0}</span>
-                </div>
-              ))}
-            </div>
-
-            {contactLogs.length === 0 && (
-              <p className="mt-5 text-center text-xs text-muted-foreground">No contact attempts recorded yet.</p>
-            )}
-          </div>
-
-          <div className="lg:col-span-1 space-y-6">
-            {/* Assignment */}
-            <div className="bg-card border rounded-2xl p-6 shadow-sm">
-              <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-                <Briefcase className="h-4 w-4 text-muted-foreground" /> Lead Assignment
-              </h3>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Assigned Staff</p>
-                <p className="text-[15px] font-semibold">{lead.assigned_staff?.name || "Unassigned"}</p>
-              </div>
-            </div>
-            <MailPanel entityType="lead" entityId={lead.id} refreshKey={mailRefresh} recipients={lead.email ? [lead.email] : []} />
-          </div>
-        </div>
-
-        {/* ── Row 3.4: Interested In (property enquiry link) ── */}
-        {(lead.interestedProperty || lead.visit) && (
-          <div className="bg-card border rounded-2xl p-6 shadow-sm">
-            <h3 className="text-base font-bold text-foreground border-b pb-3 mb-4 flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-[#0052FF]" /> Interested in
-              {lead.visit && (
-                <span className="ml-auto text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Site visit{lead.visit.date ? ` · ${String(lead.visit.date).slice(0, 10)}` : ""}{lead.visit.slot ? ` ${String(lead.visit.slot).slice(0, 5)}` : ""}
-                </span>
-              )}
-            </h3>
-            {lead.interestedProperty ? (
-              <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
-                {/* TODO: move site URL to NEXT_PUBLIC_SITE_URL once added to .env */}
-                <a
-                  href={`${process.env.NEXT_PUBLIC_SITE_URL || "https://majestan.in"}/properties/${lead.interestedProperty.slug}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-semibold text-[#0052FF] hover:underline flex items-center gap-1"
-                >
-                  {lead.interestedProperty.title}
-                  <ArrowUpRight className="h-3.5 w-3.5 shrink-0" />
-                </a>
-                {lead.interestedProperty.code && (
-                  <span className="text-muted-foreground">ID: {lead.interestedProperty.code}</span>
-                )}
-                {lead.interestedProperty.propertyType && (
-                  <span className="text-muted-foreground">{lead.interestedProperty.propertyType}</span>
-                )}
-                {lead.interestedProperty.city && (
-                  <span className="text-muted-foreground">{lead.interestedProperty.city}</span>
-                )}
-                {lead.interestedProperty.price != null && (
-                  <span className="font-medium">
-                    {new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(Number(lead.interestedProperty.price))}
-                  </span>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground italic">Property details not available.</p>
-            )}
-          </div>
-        )}
-
-        {/* ── Row 3.5: Requirements & Preferences ── */}
-        <div className="space-y-6 mt-6">
-          {(!lead.inquiries || lead.inquiries.length === 0) ? (
-            <div className="bg-card border rounded-2xl p-6 shadow-sm">
-              <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-muted-foreground" /> Requirement
-              </h3>
-              <p className="text-sm text-muted-foreground italic text-center py-4">No requirements defined yet.</p>
-            </div>
-          ) : (
-            lead.inquiries.map((inq: any, idx: number) => (
-              <div key={inq.id || idx} className="bg-card border rounded-2xl p-6 shadow-sm">
-                
-                {/* Unified Card Header */}
-                <div className="flex items-center justify-between border-b pb-3 mb-5">
-                  <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-                    <Building2 className="h-4 w-4 text-muted-foreground" /> Requirement {lead.inquiries.length > 1 ? `#${idx + 1}` : ""}
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    {canEdit && (
-                      <Button size="sm" variant="outline" onClick={() => setEditInquiry(inq)} className="h-8 text-xs flex items-center gap-1.5 border-border/60 hover:bg-muted">
-                        <Edit className="h-3.5 w-3.5" /> Edit
-                      </Button>
-                    )}
-                    {canEdit && idx === 0 && (
-                      <Button size="sm" onClick={() => fetchAutoMatch()} disabled={isMatching} className="h-8 bg-[#0052FF] hover:bg-[#0040CC] text-white rounded-lg px-4 shadow-sm">
-                        {isMatching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Auto Match"}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Unified Card Body (Grid) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  
-                  {/* Left Column: Core Details */}
-                  <div>
-                    <h4 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                      <Briefcase className="h-4 w-4 text-muted-foreground" /> Core Details
-                    </h4>
-                    <div className="space-y-3 text-sm">
-                      {[
-                        { label: "Purchase Type", value: inq?.purchase_type?.replace(/_/g, " ") },
-                        { label: "Category", value: inq?.property_category?.replace(/_/g, " ") },
-                        { label: "Property Type", value: inq?.property_type?.replace(/_/g, " ") },
-                        { label: "Funding", value: inq?.funder?.replace(/_/g, " ") },
-                        { label: "Project", value: inq?.project_list?.replace(/_/g, " ") },
-                        { label: "Timeline", value: inq?.purchase_timeline?.replace(/_/g, " ") },
-                        { label: "Purpose", value: inq?.qualification_purpose?.replace(/_/g, " ") },
-                        { label: "Decision Maker", value: inq?.decision_maker },
-                        { label: "Sub Locations", value: inq?.sub_locations?.join(", ") },
-                      ].map(f => (
-                        <div key={f.label} className="flex justify-between items-center py-1.5 border-b border-border/30 last:border-0">
-                          <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{f.label}</span>
-                          <span className="font-medium capitalize text-[14px] text-right ml-4">{f.value || "\u2014"}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Right Column: Preferences */}
-                  <div>
-                    <h4 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground" /> Preferences
-                    </h4>
-                    {(!inq?.preferences || Object.keys(inq.preferences).length === 0) ? (
-                      <p className="text-sm text-muted-foreground italic text-center py-4">No preferences defined yet.</p>
-                    ) : (
-                      <div className="space-y-3 text-sm">
-                        {Object.entries(inq.preferences).map(([key, val]) => (
-                          <div key={key} className="flex justify-between items-center py-1.5 border-b border-border/30 last:border-0">
-                            <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                            <span className="font-medium text-[14px]">{String(val)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* ── Row 4: Attachments ── */}
-        <div className="grid grid-cols-1">
-          <LeadAttachments
-            leadId={id as string}
-            documents={lead?.documents || []}
-            onRefresh={() => fetchLead(true)}
-          />
-        </div>
-
-      </div>
-
-      {/* ── Follow-Up History Slider (Sheet) ── */}
-      <Sheet open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-        <SheetContent side="right" className="!w-full sm:!w-[450px] sm:!max-w-[450px] p-0 flex flex-col border-l [&>button[data-slot='sheet-close']]:hidden sm:[&>button[data-slot='sheet-close']]:flex">
-          
-          {/* ── Mobile Header for Sheet ── */}
-          <div className="md:hidden flex flex-col shrink-0 bg-background/90 backdrop-blur-xl border-b z-10">
-            <div className="h-[env(safe-area-inset-top)] w-full" />
-            <div className="flex items-center justify-between px-4 h-14">
-              <button 
-                onClick={() => setIsHistoryOpen(false)} 
-                className="flex items-center text-[#007AFF] dark:text-[#0A84FF] active:opacity-70 -ml-2 shrink-0"
-              >
-                <ChevronLeft className="w-[28px] h-[28px]" strokeWidth={2.5} />
-                <span className="text-[17px] font-medium tracking-tight">Back</span>
-              </button>
-              <span className="absolute inset-x-0 text-center pointer-events-none text-[17px] font-semibold tracking-tight text-foreground truncate px-20">
-                Timeline
+              <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold", avatarTone(lead.assigned_staff.name))}>
+                {initials(lead.assigned_staff.name)}
               </span>
-              <div className="w-10 shrink-0" />
-            </div>
-          </div>
-
-          <SheetHeader className="hidden md:block p-6 border-b shrink-0">
-            <SheetTitle className="text-lg">Follow Up Timeline {followUps.length > 0 && `(${followUps.length})`}</SheetTitle>
-          </SheetHeader>
-          
-          <div className="flex-1 overflow-hidden relative">
-            <FollowUpPanel
-              entityId={Number(id)}
-              entityType="leads"
-              followUps={followUps}
-              onRefresh={() => fetchLead(true)}
+              <span className="truncate">{lead.assigned_staff.name}</span>
+            </>
+          ) : (
+            <span className="text-muted-foreground">Unassigned</span>
+          )}
+        </InlineAction>
+        <FieldRow label="Unqualified">
+          <div className="flex h-8 items-center px-2">
+            <Switch
+              checked={!!lead.is_unqualified}
+              onCheckedChange={toggleUnqualified}
+              disabled={!canEdit}
+              aria-label="Mark as unqualified"
             />
           </div>
-        </SheetContent>
-      </Sheet>
+        </FieldRow>
+        <FieldRow label="Created">
+          <span className="px-2 text-[14px] text-foreground">
+            {format(new Date(lead.created_at), "d MMM yyyy, h:mm a")}
+          </span>
+        </FieldRow>
+      </Section>
 
-      {/* ── Contact Logs Slider (Sheet) ── */}
-      <Sheet open={isContactLogsOpen} onOpenChange={setIsContactLogsOpen}>
-        <SheetContent side="right" className="!w-full sm:!w-[450px] sm:!max-w-[450px] p-0 flex flex-col border-l [&>button[data-slot='sheet-close']]:hidden sm:[&>button[data-slot='sheet-close']]:flex">
-          <div className="md:hidden flex flex-col shrink-0 bg-background/90 backdrop-blur-xl border-b z-10">
-            <div className="h-[env(safe-area-inset-top)] w-full" />
-            <div className="flex items-center justify-between px-4 h-14">
+      <Section title="Contact">
+        <InlineText label="Name" value={lead.name} onSave={(v) => {
+          if (!v) { toast.error("Name can't be empty"); throw new Error("empty"); }
+          return saveLead({ name: v });
+        }} disabled={!canEdit} />
+        <InlineText label="Mobile" type="tel" value={lead.mobile_number} onSave={(v) => {
+          if (!v) { toast.error("Mobile number can't be empty"); throw new Error("empty"); }
+          return saveLead({ mobile: v });
+        }} disabled={!canEdit} />
+        <InlineText label="WhatsApp" type="tel" value={lead.whatsapp_number} onSave={(v) => saveLead({ whatsapp: v })} disabled={!canEdit} />
+        <InlineText label="Email" type="email" value={lead.email} onSave={(v) => saveLead({ email: v })} disabled={!canEdit} />
+        <InlineText label="City" value={lead.city} onSave={(v) => saveLead({ city: v })} disabled={!canEdit} />
+        <InlineText label="Address" value={lead.address} onSave={(v) => saveLead({ address: v })} disabled={!canEdit} multiline />
+      </Section>
+
+      <Section title="Commission" defaultOpen={!!(lead.commission || lead.commission_remarks)}>
+        <InlineText
+          label="Commission %"
+          type="number"
+          value={lead.commission}
+          onSave={(v) => {
+            const n = v === "" ? null : Number(v);
+            if (n !== null && (Number.isNaN(n) || n < 0 || n > 100)) {
+              toast.error("Enter a percentage between 0 and 100");
+              throw new Error("invalid");
+            }
+            return saveLead({ commission: n });
+          }}
+          disabled={!canEdit}
+        />
+        {lead.commission_remarks && (
+          <FieldRow label="Remarks">
+            <span className="whitespace-pre-wrap px-2 py-1.5 text-[14px] text-foreground">{lead.commission_remarks}</span>
+          </FieldRow>
+        )}
+      </Section>
+
+      <Section title="Referral" defaultOpen={!!lead.is_referral}>
+        <FieldRow label="Referred">
+          <div className="flex h-8 items-center px-2">
+            <Switch
+              checked={!!lead.is_referral}
+              onCheckedChange={(on) => saveLead({ isReferral: on }).catch(() => {})}
+              disabled={!canEdit}
+              aria-label="Referred lead"
+            />
+          </div>
+        </FieldRow>
+        {lead.is_referral ? (
+          <>
+            <InlineText label="Referred by" value={lead.referred_by_name} onSave={(v) => saveLead({ referredByName: v })} disabled={!canEdit} />
+            <InlineText label="Their contact" type="tel" value={lead.referred_by_contact} onSave={(v) => saveLead({ referredByContact: v })} disabled={!canEdit} />
+          </>
+        ) : null}
+      </Section>
+    </>
+  );
+
+  const quickActions = (
+    <>
+      <QuickAction icon={Phone} label="Call" onClick={() => openContact("call", lead.mobile_number)} disabled={!canEdit || !lead.mobile_number} />
+      <QuickAction icon={MessageCircle} label="WhatsApp" onClick={() => openContact("whatsapp", lead.whatsapp_number)} disabled={!canEdit || !lead.whatsapp_number} />
+      <QuickAction icon={MessageSquare} label="SMS" onClick={() => openContact("sms", lead.mobile_number)} disabled={!canEdit || !lead.mobile_number} />
+      <QuickAction icon={Mail} label="Email" onClick={() => openContact("email", lead.email)} disabled={!canEdit || !lead.email} />
+    </>
+  );
+
+  const statusDot = <span className={cn("h-2 w-2 shrink-0 rounded-full", LEAD_STATUS_DOTS[statusName] ?? "bg-gray-400")} />;
+
+  const repeatBadge = inquiries.length > 1 && (
+    <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-900/60 dark:bg-purple-950/40 dark:text-purple-300">
+      Repeat ({inquiries.length - 1})
+    </Badge>
+  );
+
+  // ── Follow-up composer ──
+  const composer = canEdit && (
+    <div className="rounded-xl border bg-card">
+      <Textarea
+        value={fuForm.notes}
+        onChange={e => setFuForm(f => ({ ...f, notes: e.target.value }))}
+        placeholder="What was discussed? Log a follow-up…"
+        disabled={!!fuForm.rnr}
+        aria-label="Follow-up notes"
+        className="min-h-[88px] resize-none rounded-b-none rounded-t-xl border-0 bg-transparent px-4 py-3 text-[14px] shadow-none focus-visible:ring-0 disabled:opacity-70 dark:bg-transparent"
+      />
+      <div className="space-y-2 border-t px-3 py-2.5">
+        <div className="flex flex-wrap items-center gap-1">
+          {CONTACTED_VIA.map(({ label, value, icon: Icon }) => {
+            const on = fuForm.contactedVia === value;
+            return (
               <button
-                onClick={() => setIsContactLogsOpen(false)}
-                className="flex items-center text-[#007AFF] dark:text-[#0A84FF] active:opacity-70 -ml-2 shrink-0"
+                key={value}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setFuForm(f => ({ ...f, contactedVia: on ? "" : value }))}
+                className={cn(
+                  "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[13px] font-medium transition-colors",
+                  on
+                    ? "border-[#017D58] bg-[#017D58] text-white dark:border-[#2FB585] dark:bg-[#2FB585] dark:text-black"
+                    : "bg-background text-foreground/80 hover:bg-muted",
+                )}
               >
-                <ChevronLeft className="w-[28px] h-[28px]" strokeWidth={2.5} />
-                <span className="text-[17px] font-medium tracking-tight">Back</span>
+                <Icon className="hidden h-3.5 w-3.5 sm:block" />
+                {label}
               </button>
-              <span className="absolute inset-x-0 text-center pointer-events-none text-[17px] font-semibold tracking-tight text-foreground truncate px-20">Contact logs</span>
-              <div className="w-10 shrink-0" />
-            </div>
+            );
+          })}
+          <button
+            type="button"
+            disabled={isRnrMaxed}
+            aria-pressed={fuForm.rnr === nextRnrValue}
+            title="Mark this attempt as Ringing, No Response"
+            onClick={() => {
+              const isApplying = fuForm.rnr !== nextRnrValue;
+              setFuForm(f => ({
+                ...f,
+                rnr: isApplying ? nextRnrValue : "",
+                notes: isApplying ? `RNR ${nextRnrNumber} for this lead` : (f.notes === `RNR ${nextRnrNumber} for this lead` ? "" : f.notes)
+              }));
+            }}
+            className={cn(
+              "ml-auto inline-flex h-8 items-center rounded-md border px-2.5 text-[13px] font-medium transition-colors disabled:opacity-50",
+              fuForm.rnr === nextRnrValue
+                ? "border-orange-500 bg-orange-500 text-white"
+                : "bg-background text-foreground/80 hover:bg-muted",
+            )}
+          >
+            {isRnrMaxed ? "Max RNR" : fuForm.rnr === nextRnrValue ? `RNR ${nextRnrNumber} ✓` : `RNR ${nextRnrNumber}`}
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="min-w-[160px] flex-1 sm:w-[200px] sm:flex-none">
+            <DateTimePicker
+              value={getFuDateObj(fuForm.nextFollowUpDate, fuForm.nextFollowUpTime)}
+              onChange={handleFuDateTimeChange}
+              placeholder="Next follow-up"
+              className="h-8! rounded-md! text-[13px]!"
+            />
+          </div>
+          <div className="w-[130px]">
+            <FormSelect
+              name="priority"
+              placeholder="Priority"
+              options={PRIORITIES}
+              value={fuForm.priority}
+              onValueChange={v => setFuForm(f => ({ ...f, priority: v || "" }))}
+              className="h-8! rounded-md! bg-background! text-[13px]!"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleSaveFollowUp}
+            disabled={isSavingFu}
+            className={cn(HEADER_PRIMARY, "ml-auto disabled:opacity-60")}
+          >
+            {isSavingFu ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpRight className="h-4 w-4" />}
+            Log follow-up
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const empty = (icon: ReactNode, title: string, hint: string) => (
+    <div className="flex flex-col items-center py-14 text-center">
+      <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-foreground/[0.05] text-muted-foreground">{icon}</span>
+      <p className="text-[14px] font-medium text-foreground">{title}</p>
+      <p className="mt-1 text-[13px] text-muted-foreground">{hint}</p>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col md:h-full lg:-mx-6 lg:-mb-8 lg:-mt-6 lg:h-[calc(100%+3.5rem)]">
+
+      <MobileHeader title={lead.name || "Lead"} showBack />
+
+      {/* ── Header actions (desktop page header) ── */}
+      <PageActions>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => fetchLead(true)} title="Refresh" aria-label="Refresh" className={cn(HEADER_BUTTON, "w-8 justify-center px-0")}>
+            <RefreshCw className={cn("h-3.5 w-3.5 text-muted-foreground", isRefreshing && "animate-spin")} />
+          </button>
+          {canEdit ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<button type="button" className={HEADER_BUTTON} aria-label="Change status" />}>
+                {statusDot}
+                {statusName}
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="max-h-[360px] w-56">
+                {STATUS_OPTIONS.map((opt) => (
+                  <DropdownMenuItem key={opt.value} onClick={() => changeStatus(opt.value)} className="gap-2 text-[14px]">
+                    <span className={cn("h-2 w-2 rounded-full", opt.dot)} />
+                    <span className="flex-1">{opt.label}</span>
+                    {opt.value === statusName && <span className="text-[12px] text-muted-foreground">Current</span>}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <span className={cn(HEADER_BUTTON, "hover:bg-background")}>{statusDot}{statusName}</span>
+          )}
+          {showReassign && (
+            <button type="button" onClick={() => setIsAssignOpen(true)} className={HEADER_BUTTON}>
+              <UserPlus className="h-3.5 w-3.5 text-muted-foreground" />
+              Reassign
+            </button>
+          )}
+          {showConvert && (
+            <button type="button" onClick={openConvert} className={HEADER_PRIMARY}>
+              <TrendingUp className="h-3.5 w-3.5" />
+              Convert
+            </button>
+          )}
+        </div>
+      </PageActions>
+
+      {/* ── Phone summary ── */}
+      <div className="space-y-4 px-4 pb-4 pt-1 md:hidden">
+        <div className="flex flex-wrap items-center gap-2 text-[14px] text-muted-foreground">
+          {canEdit ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<button type="button" className="inline-flex h-7 items-center gap-1.5 rounded-full bg-foreground/[0.06] px-3 text-[13px] font-medium text-foreground" aria-label="Change status" />}>
+                {statusDot}
+                {statusName}
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="max-h-[360px] w-56">
+                {STATUS_OPTIONS.map((opt) => (
+                  <DropdownMenuItem key={opt.value} onClick={() => changeStatus(opt.value)} className="gap-2 text-[15px]">
+                    <span className={cn("h-2 w-2 rounded-full", opt.dot)} />
+                    {opt.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-foreground/[0.06] px-3 text-[13px] font-medium text-foreground">{statusDot}{statusName}</span>
+          )}
+          {repeatBadge}
+          <span>{leadCode(lead.id)}</span>
+        </div>
+        <div className="flex gap-2">{quickActions}</div>
+        {(showReassign || showConvert) && (
+          <div className="flex gap-2">
+            {showReassign && (
+              <button type="button" onClick={() => setIsAssignOpen(true)} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-foreground/[0.06] text-[15px] font-medium text-foreground">
+                <UserPlus className="h-4 w-4" /> Reassign
+              </button>
+            )}
+            {showConvert && (
+              <button type="button" onClick={openConvert} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-[#017D58] text-[15px] font-semibold text-white dark:bg-[#2FB585] dark:text-black">
+                <TrendingUp className="h-4 w-4" /> Convert
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+
+        {/* ── Main: tabs ── */}
+        <div className="flex min-w-0 flex-1 flex-col md:min-h-0">
+          <div
+            role="tablist"
+            aria-label="Lead sections"
+            className="sticky top-[calc(env(safe-area-inset-top)+2.75rem)] z-20 flex shrink-0 gap-1.5 overflow-x-auto bg-background px-4 py-2 scrollbar-hide md:static md:gap-5 md:border-b md:px-5 md:py-0"
+          >
+            {tabs.map((t) => (
+              <TabButton
+                key={t.key}
+                active={shownTab === t.key}
+                onClick={() => setActiveTab(t.key)}
+                icon={t.icon}
+                label={t.label}
+                count={t.count}
+                className={t.mobileOnly ? "md:hidden" : undefined}
+              />
+            ))}
           </div>
 
-          <SheetHeader className="hidden md:block p-6 border-b shrink-0">
-            <SheetTitle className="text-lg">Contact logs {contactLogs.length > 0 && `(${contactLogs.length})`}</SheetTitle>
-            <SheetDescription>Calls, messages, and emails recorded for this lead.</SheetDescription>
-          </SheetHeader>
+          <div className={cn("md:min-h-0 md:flex-1", shownTab === "followups" ? "md:overflow-hidden" : "md:overflow-y-auto")}>
+            {shownTab === "details" && (
+              <div className="mx-4 mt-2 overflow-hidden rounded-xl border bg-card">{fields}</div>
+            )}
 
-          <div className="flex-1 overflow-y-auto p-5">
-            {contactLogs.length === 0 ? (
-              <div className="py-16 text-center">
-                <Clock className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
-                <p className="text-sm font-medium text-foreground">No contact logs yet</p>
-                <p className="mt-1 text-xs text-muted-foreground">New calls and communication will appear here.</p>
+            {shownTab === "activity" && (
+              <div className="mx-auto max-w-3xl space-y-6 px-4 py-4 md:px-6 md:py-6">
+                {composer}
+                {activity.length ? <ActivityFeed items={activity} /> : empty(<Clock className="h-5 w-5" />, "No activity yet", "Follow-ups, calls and messages will show up here.")}
               </div>
-            ) : (
-              <div className="relative space-y-0">
-                <div className="absolute left-[19px] top-2 bottom-2 w-px bg-border" />
-                {contactLogs.map((log: any) => (
-                  <div key={log.id} className="relative flex gap-4 pb-5 last:pb-0">
-                    <div className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-background ${CONTACT_TYPE_STYLES[log.contact_type] || "bg-muted text-muted-foreground"}`}>
-                      {contactLogIcon(log)}
-                    </div>
-                    <div className="min-w-0 flex-1 rounded-xl border bg-card px-3.5 py-3 shadow-sm">
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="text-[13px] font-semibold text-foreground">
-                          <span className="text-[#0052FF]">{contactLogAuthor(log)}</span>
-                          <span className="mx-1.5 text-muted-foreground/60">•</span>
-                          {log.contact_type === "call" ? (
-                            <>{log.call_direction || "Voice"} call <span className="font-normal text-muted-foreground whitespace-nowrap">({formatDuration(log.call_duration)})</span></>
-                          ) : (
-                            <span className="capitalize">{log.contact_type}</span>
-                          )}
-                        </p>
-                        <span className="shrink-0 text-[10px] leading-4 text-muted-foreground">{formatTimestamp(log.created_at)}</span>
-                      </div>
-                      {log.subject && <p className="mt-2 text-xs font-medium text-muted-foreground">Subject: {log.subject}</p>}
-                      {log.message && <p className="mt-2 rounded-lg bg-muted/50 px-2.5 py-2 text-[12px] leading-relaxed text-foreground/75">{log.message}</p>}
-                    </div>
+            )}
+
+            {shownTab === "followups" && (
+              <div className="h-[70dvh] md:h-full">
+                <FollowUpPanel
+                  entityId={Number(id)}
+                  entityType="leads"
+                  followUps={followUps}
+                  onRefresh={() => fetchLead(true)}
+                />
+              </div>
+            )}
+
+            {shownTab === "contact" && (
+              <div className="mx-auto max-w-3xl space-y-6 px-4 py-4 md:px-6 md:py-6">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="rounded-xl border bg-card p-3.5">
+                    <p className="flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground"><PhoneIncoming className="h-3.5 w-3.5" /> Calls</p>
+                    <p className="mt-1 text-[24px] font-semibold tabular-nums leading-8 text-foreground">{contactCounts.call || 0}</p>
+                    <p className="text-[11.5px] text-muted-foreground">
+                      {callDirectionCounts.incoming || 0} in · {callDirectionCounts.outgoing || 0} out · {callDirectionCounts.missed || 0} missed
+                    </p>
                   </div>
-                ))}
+                  {(["whatsapp", "sms", "email"] as const).map((type) => (
+                    <div key={type} className="rounded-xl border bg-card p-3.5">
+                      <p className="flex items-center gap-1.5 text-[12px] font-medium capitalize text-muted-foreground">{CONTACT_TYPE_ICONS[type]} {type === "sms" ? "SMS" : type}</p>
+                      <p className="mt-1 text-[24px] font-semibold tabular-nums leading-8 text-foreground">{contactCounts[type] || 0}</p>
+                    </div>
+                  ))}
+                </div>
+                {contactLogs.length === 0 ? (
+                  empty(<Clock className="h-5 w-5" />, "No contact logs yet", "Calls and messages will appear here.")
+                ) : (
+                  <ul className="divide-y rounded-xl border bg-card">
+                    {contactLogs.map((log: any) => (
+                      <li key={log.id} className="flex gap-3 px-4 py-3">
+                        <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full [&_svg]:h-4 [&_svg]:w-4", CONTACT_TYPE_STYLES[log.contact_type] || "bg-muted text-muted-foreground")}>
+                          {contactLogIcon(log)}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline gap-3">
+                            <p className="min-w-0 flex-1 truncate text-[14px] font-medium text-foreground">
+                              {log.contact_type === "call"
+                                ? <>{log.call_direction || "Voice"} call <span className="font-normal text-muted-foreground">· {formatDuration(log.call_duration)}</span></>
+                                : <span className="capitalize">{log.contact_type === "sms" ? "SMS" : log.contact_type}</span>}
+                            </p>
+                            <span className="shrink-0 text-[12px] text-muted-foreground">{formatTimestamp(log.created_at)}</span>
+                          </div>
+                          <p className="text-[13px] text-muted-foreground">{contactLogAuthor(log)}</p>
+                          {log.subject && <p className="mt-1.5 text-[13px] font-medium text-foreground/80">Subject: {log.subject}</p>}
+                          {log.message && <p className="mt-1.5 whitespace-pre-wrap rounded-lg bg-muted/40 px-3 py-2 text-[13px] leading-relaxed text-foreground/80">{log.message}</p>}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {shownTab === "emails" && (
+              <div className="mx-auto max-w-3xl px-4 py-4 md:px-6 md:py-6">
+                <MailPanel entityType="lead" entityId={lead.id} refreshKey={mailRefresh} recipients={lead.email ? [lead.email] : []} />
+              </div>
+            )}
+
+            {shownTab === "requirements" && (
+              <div className="mx-auto max-w-4xl space-y-5 px-4 py-4 md:px-6 md:py-6">
+                {(lead.interestedProperty || lead.visit) && (
+                  <Panel
+                    title="Interested in"
+                    action={lead.visit && (
+                      <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[12px] font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                        Site visit{lead.visit.date ? ` · ${String(lead.visit.date).slice(0, 10)}` : ""}{lead.visit.slot ? ` ${String(lead.visit.slot).slice(0, 5)}` : ""}
+                      </span>
+                    )}
+                  >
+                    {lead.interestedProperty ? (
+                      <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-[14px]">
+                        {/* TODO: move site URL to NEXT_PUBLIC_SITE_URL once added to .env */}
+                        <a
+                          href={`${process.env.NEXT_PUBLIC_SITE_URL || "https://majestan.in"}/properties/${lead.interestedProperty.slug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 font-semibold text-[#017D58] hover:underline dark:text-[#2FB585]"
+                        >
+                          {lead.interestedProperty.title}
+                          <ArrowUpRight className="h-3.5 w-3.5 shrink-0" />
+                        </a>
+                        {lead.interestedProperty.code && <span className="text-muted-foreground">ID: {lead.interestedProperty.code}</span>}
+                        {lead.interestedProperty.propertyType && <span className="text-muted-foreground">{lead.interestedProperty.propertyType}</span>}
+                        {lead.interestedProperty.city && <span className="text-muted-foreground">{lead.interestedProperty.city}</span>}
+                        {lead.interestedProperty.price != null && (
+                          <span className="font-medium">
+                            {new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(Number(lead.interestedProperty.price))}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-[14px] text-muted-foreground">Property details not available.</p>
+                    )}
+                  </Panel>
+                )}
+
+                {inquiries.length === 0 && empty(<Building2 className="h-5 w-5" />, "No requirements yet", "Requirements captured for this lead will show up here.")}
+
+                {inquiries.map((inq: any, idx: number) => {
+                  const typeOptions = PROPERTY_TYPES_MAP[inq.property_category] ?? Object.values(PROPERTY_TYPES_MAP).flat();
+                  const prefs = Object.entries(inq.preferences ?? {}).filter(([, v]) => v !== "" && v != null);
+                  return (
+                    <Panel
+                      key={inq.id || idx}
+                      title={inquiries.length > 1 ? `Requirement #${idx + 1}` : "Requirement"}
+                      action={canEdit && (
+                        <div className="flex items-center gap-2">
+                          <button type="button" onClick={() => setEditInquiry(inq)} className={HEADER_BUTTON}>
+                            <Pencil className="h-3.5 w-3.5 text-muted-foreground" /> <span className="sm:hidden">Edit</span><span className="hidden sm:inline">Location & preferences</span>
+                          </button>
+                          {idx === 0 && (
+                            <button type="button" onClick={fetchAutoMatch} disabled={isMatching} className={cn(HEADER_PRIMARY, "disabled:opacity-60")}>
+                              {isMatching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                              <span className="sm:hidden">Match</span><span className="hidden sm:inline">Auto match</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    >
+                      <div className="grid gap-x-8 gap-y-0 md:grid-cols-2">
+                        <div>
+                          <InlineSelect label="Purchase type" value={inq.purchase_type} options={PURCHASE_TYPES} onSave={(v) => saveInquiry(inq.id, { purchaseType: v })} disabled={!canEdit} />
+                          <InlineSelect label="Category" value={inq.property_category} options={PROPERTY_CATEGORIES} onSave={(v) => saveInquiry(inq.id, { propertyCategory: v, propertyType: null })} disabled={!canEdit} />
+                          <InlineSelect label="Property type" value={inq.property_type} options={typeOptions} onSave={(v) => saveInquiry(inq.id, { propertyType: v })} disabled={!canEdit} />
+                          <InlineSelect label="Funding" value={inq.funder} options={FUNDERS} onSave={(v) => saveInquiry(inq.id, { funder: v })} disabled={!canEdit} />
+                        </div>
+                        <div>
+                          <InlineText label="Project" value={inq.project_list} onSave={(v) => saveInquiry(inq.id, { project: v || null })} disabled={!canEdit} />
+                          <InlineSelect label="Timeline" value={inq.purchase_timeline} options={PURCHASE_TIMELINES} onSave={(v) => saveInquiry(inq.id, { purchaseTimeline: v })} disabled={!canEdit} />
+                          <InlineSelect label="Purpose" value={inq.qualification_purpose} options={QUALIFICATION_PURPOSES} onSave={(v) => saveInquiry(inq.id, { qualificationPurpose: v })} disabled={!canEdit} />
+                          <InlineText label="Decision maker" value={inq.decision_maker} placeholder="e.g. Self, Spouse" onSave={(v) => saveInquiry(inq.id, { decisionMaker: v || null })} disabled={!canEdit} />
+                        </div>
+                      </div>
+                      {(inq.sub_locations?.length > 0 || prefs.length > 0) && (
+                        <div className="mt-3 space-y-3 border-t pt-3">
+                          {inq.sub_locations?.length > 0 && (
+                            <FieldRow label="Locations">
+                              <div className="flex flex-wrap gap-1.5 px-2 py-1">
+                                {inq.sub_locations.map((loc: string) => (
+                                  <span key={loc} className="rounded-md bg-foreground/[0.06] px-2 py-0.5 text-[13px] text-foreground/85">{loc}</span>
+                                ))}
+                              </div>
+                            </FieldRow>
+                          )}
+                          {prefs.length > 0 && (
+                            <div className="grid gap-x-8 md:grid-cols-2">
+                              {prefs.map(([key, val]) => (
+                                <FieldRow key={key} label={key === "bhk" ? "BHK" : humanize(key.replace(/([A-Z])/g, " $1")).trim().replace(/^./, (c) => c.toUpperCase())}>
+                                  <span className="truncate px-2 text-[14px] text-foreground">{String(val)}</span>
+                                </FieldRow>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </Panel>
+                  );
+                })}
+              </div>
+            )}
+
+            {shownTab === "attachments" && (
+              <div className="mx-auto max-w-3xl px-4 py-4 md:px-6 md:py-6">
+                <LeadAttachments
+                  leadId={id as string}
+                  documents={lead?.documents || []}
+                  onRefresh={() => fetchLead(true)}
+                />
               </div>
             )}
           </div>
-        </SheetContent>
-      </Sheet>
+        </div>
+
+        {/* ── Sidebar: the record ── */}
+        <aside className="hidden w-[340px] shrink-0 flex-col overflow-y-auto border-l md:flex xl:w-[360px]">
+          <div className="space-y-3 border-b p-4">
+            <div className="flex items-center gap-3">
+              <span className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-[17px] font-semibold", avatarTone(lead.name || ""))}>
+                {initials(lead.name || "")}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-[17px] font-semibold leading-6 text-foreground">{lead.name}</p>
+                <p className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+                  {leadCode(lead.id)}
+                  {repeatBadge}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1.5">{quickActions}</div>
+          </div>
+          {fields}
+          {canEdit && (
+            <p className="mt-auto flex items-center gap-1.5 px-4 py-3 text-[12px] text-muted-foreground">
+              <History className="h-3.5 w-3.5" /> Changes save as you go. Press <kbd className="rounded border px-1 font-mono text-[11px]">A</kbd> for follow-ups.
+            </p>
+          )}
+        </aside>
+      </div>
 
       {/* ── Auto Match Slider (Sheet) ── */}
       <Sheet open={isAutoMatchOpen} onOpenChange={setIsAutoMatchOpen}>

@@ -42,11 +42,11 @@ export function PageHeader() {
     return { href, label: label ?? titleCase(decodeURIComponent(seg)) };
   });
 
-  // Browser tab reads "<page> · CRM", e.g. "Leads · CRM" or "Asha Raman · CRM" on a record.
+  // Browser tab reads just the page, e.g. "Leads", or "Asha Raman" on a record.
   const pageName = crumbs[crumbs.length - 1]?.label;
   useEffect(() => {
     if (!pageName || pageName === "…") return;
-    document.title = `${pageName} · CRM`;
+    document.title = pageName;
   }, [pageName, pathname]);
 
   return (
