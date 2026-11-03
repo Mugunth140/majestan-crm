@@ -13,8 +13,9 @@ import { FormSelect } from "@/components/shared/form-select";
 import { PriceInput } from "@/components/shared/price-input";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
 import { SearchCombobox } from "@/components/shared/search-combobox";
+import { MultiSearchSelect } from "@/components/shared/multi-search-select";
 import {
-  FieldRow, FOCUS_BUTTON, FOCUS_FIELD, FocusField, FocusModal, FocusSection, ToggleCard, stepStatus,
+  FieldRow, FOCUS_BUTTON, FOCUS_FIELD, FocusField, FocusModal, FocusSection, ToggleCard, fieldName, stepStatus,
 } from "@/components/shared/focus-modal";
 import {
   AREA_CATEGORIES, BHK_OPTIONS, DECISION_MAKERS, FACING_OPTIONS, FUNDERS, FURNISHING_OPTIONS,
@@ -112,6 +113,8 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
   const [active, setActive] = useState<StepKey>("customer");
   const [visited, setVisited] = useState<Set<StepKey>>(() => new Set(["customer"]));
   const [showErrors, setShowErrors] = useState<Set<StepKey>>(() => new Set());
+  /** Text fields the user has typed in and left: their problems show straight away. */
+  const [touched, setTouched] = useState<Set<string>>(() => new Set());
   const [submitting, setSubmitting] = useState(false);
 
   const [user] = useState<{ id?: number; role?: { name?: string } | string } | null>(() => {
@@ -135,6 +138,7 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
       setActive("customer");
       setVisited(new Set(["customer"]));
       setShowErrors(new Set());
+      setTouched(new Set());
     }
   }
 
@@ -196,7 +200,10 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
 
   const errorsFor = (step: StepKey) => check(step, form, isStaff);
   const valid = (step: StepKey) => Object.keys(errorsFor(step)).length === 0;
-  const errors = showErrors.has(active) ? errorsFor(active) : {};
+  const errors: Errors = showErrors.has(active)
+    ? errorsFor(active)
+    : Object.fromEntries(Object.entries(errorsFor(active)).filter(([k]) => touched.has(k)));
+  const ready = valid(active);
   const index = STEPS.findIndex((s) => s.key === active);
   const last = index === STEPS.length - 1;
 
@@ -308,6 +315,7 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
     }
   };
 
+  const localityNames = useMemo(() => [...new Set(localities.map((l) => l.locality_name))], [localities]);
   const loading = <div className={cn(INPUT, "flex items-center border")}><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>;
   const types = form.category ? PROPERTY_TYPES_MAP[form.category] ?? [] : [];
   const assigneeOptions = isStaff
@@ -319,10 +327,12 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
     body = (
       <FocusSection title="Customer" description="Who the lead is and how to reach them.">
         <FieldRow>
-          <FocusField label="Name" htmlFor="nl-name" error={errors.name}>
+          <FocusField required name="name" label="Name" htmlFor="nl-name" error={errors.name}>
             <Input id="nl-name" autoFocus value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Priya Raman" aria-invalid={!!errors.name} className={INPUT} />
           </FocusField>
           <FocusField
+            required
+            name="mobile"
             label="Mobile"
             htmlFor="nl-mobile"
             error={errors.mobile}
@@ -339,15 +349,15 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
           </FocusField>
         </FieldRow>
         <FieldRow>
-          <FocusField label="WhatsApp" htmlFor="nl-wa" optional error={errors.whatsapp}>
+          <FocusField name="whatsapp" label="WhatsApp" htmlFor="nl-wa" optional error={errors.whatsapp}>
             <Input id="nl-wa" inputMode="tel" value={form.whatsapp} onChange={(e) => set("whatsapp", e.target.value)} placeholder="Same as mobile if empty" className={INPUT} />
           </FocusField>
-          <FocusField label="Email" htmlFor="nl-email" optional error={errors.email}>
+          <FocusField name="email" label="Email" htmlFor="nl-email" optional error={errors.email}>
             <Input id="nl-email" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="priya@example.com" className={INPUT} />
           </FocusField>
         </FieldRow>
         <FieldRow>
-          <FocusField label="City" error={errors.city}>
+          <FocusField required name="city" label="City" error={errors.city}>
             {cities === null ? loading : (
               <FormSelect name="city" placeholder="Select city" className={SELECT} value={form.city || null}
                 options={cities.map((c) => ({ label: c.city_name, value: String(c.id) }))}
@@ -365,13 +375,13 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
       <>
         <FocusSection title="Source" description="Where the lead came from and the commission on it.">
           <FieldRow>
-            <FocusField label="Lead source" error={errors.source}>
+            <FocusField required name="source" label="Lead source" error={errors.source}>
               {sources === null ? loading : (
                 <FormSelect name="source" placeholder="Select source" className={SELECT} value={form.source || null} options={sources} onValueChange={(v) => set("source", v)} />
               )}
             </FocusField>
             {form.source === "others" && (
-              <FocusField label="Source name" htmlFor="nl-other" error={errors.otherSource} hint="Added to the source list for next time.">
+              <FocusField required name="otherSource" label="Source name" htmlFor="nl-other" error={errors.otherSource} hint="Added to the source list for next time.">
                 <Input id="nl-other" autoFocus value={form.otherSource} onChange={(e) => set("otherSource", e.target.value)} placeholder="e.g. Hoarding, OMR" className={INPUT} />
               </FocusField>
             )}
@@ -396,10 +406,10 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
             description="When on, we'll note who referred them and how to reach them."
           >
             <FieldRow>
-              <FocusField label="Referred by" htmlFor="nl-ref" error={errors.referredByName}>
+              <FocusField required name="referredByName" label="Referred by" htmlFor="nl-ref" error={errors.referredByName}>
                 <Input id="nl-ref" value={form.referredByName} onChange={(e) => set("referredByName", e.target.value)} placeholder="Karthik S" className={INPUT} />
               </FocusField>
-              <FocusField label="Their contact" htmlFor="nl-refc" error={errors.referredByContact}>
+              <FocusField required name="referredByContact" label="Their contact" htmlFor="nl-refc" error={errors.referredByContact}>
                 <Input id="nl-refc" inputMode="tel" value={form.referredByContact} onChange={(e) => set("referredByContact", e.target.value)} placeholder="98400 12345" className={INPUT} />
               </FocusField>
             </FieldRow>
@@ -412,19 +422,19 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
       <>
         <FocusSection title="Requirement" description="What the customer wants to buy or rent.">
           <FieldRow>
-            <FocusField label="Purchase type" error={errors.purchaseType}>
+            <FocusField required name="purchaseType" label="Purchase type" error={errors.purchaseType}>
               <FormSelect name="purchaseType" placeholder="Select" className={SELECT} value={form.purchaseType || null} options={PURCHASE_TYPES} onValueChange={(v) => set("purchaseType", v)} />
             </FocusField>
-            <FocusField label="Funding" error={errors.funder}>
+            <FocusField required name="funder" label="Funding" error={errors.funder}>
               <FormSelect name="funder" placeholder="Select" className={SELECT} value={form.funder || null} options={FUNDERS} onValueChange={(v) => set("funder", v)} />
             </FocusField>
           </FieldRow>
           <FieldRow>
-            <FocusField label="Property category" error={errors.category}>
+            <FocusField required name="category" label="Property category" error={errors.category}>
               <FormSelect name="category" placeholder="Select" className={SELECT} value={form.category || null} options={PROPERTY_CATEGORIES}
                 onValueChange={(v) => setForm((f) => ({ ...f, category: v, propertyType: "" }))} />
             </FocusField>
-            <FocusField label="Property type" error={errors.propertyType}>
+            <FocusField required name="propertyType" label="Property type" error={errors.propertyType}>
               <FormSelect name="propertyType" placeholder={form.category ? "Select" : "Pick a category first"} className={SELECT} disabled={!form.category}
                 value={form.propertyType || null} options={types} onValueChange={(v) => set("propertyType", v)} />
             </FocusField>
@@ -445,29 +455,15 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
           </FieldRow>
           {form.cityId && (
             <FocusField label="Localities" optional>
-              {localities.length ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {localities.map((l) => {
-                    const on = form.subLocations.includes(l.locality_name);
-                    return (
-                      <button
-                        key={l.locality_name}
-                        type="button"
-                        aria-pressed={on}
-                        onClick={() => set("subLocations", on ? form.subLocations.filter((x) => x !== l.locality_name) : [...form.subLocations, l.locality_name])}
-                        className={cn(
-                          "h-7 rounded-md border px-2.5 text-[13px] transition-colors",
-                          on ? "border-foreground bg-foreground text-background" : "bg-muted/40 text-foreground/80 hover:bg-muted dark:bg-white/[0.04]",
-                        )}
-                      >
-                        {l.locality_name}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-[13px] text-muted-foreground">No localities for this city yet.</p>
-              )}
+              <MultiSearchSelect
+                options={localityNames}
+                value={form.subLocations}
+                onChange={(v) => set("subLocations", v)}
+                placeholder="Search localities…"
+                allowCustom
+                className={FOCUS_FIELD}
+                emptyText="No localities for this city yet."
+              />
             </FocusField>
           )}
         </FocusSection>
@@ -540,7 +536,7 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
       <>
         <FocusSection title="First follow-up" description="When to get back to them, and anything to remember.">
           <FieldRow>
-            <FocusField label="Next follow-up" optional error={errors.followUp}>
+            <FocusField name="followUp" label="Next follow-up" optional error={errors.followUp}>
               <DateTimePicker value={form.followUp} onChange={(d) => set("followUp", d)} placeholder="Pick date & time" className={cn(FOCUS_FIELD, "h-9 w-full justify-start border")} />
             </FocusField>
             <FocusField label="Priority" optional>
@@ -553,7 +549,7 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
         </FocusSection>
         <FocusSection title="Assignment" description="Who works this lead. The routing queue lets a team lead hand it out later.">
           <FieldRow>
-            <FocusField label="Assign to" error={errors.assignee}>
+            <FocusField required name="assignee" label="Assign to" error={errors.assignee}>
               {!isStaff && staff === null ? loading : (
                 <FormSelect name="assignee" placeholder="Select" className={SELECT}
                   value={form.assignee || (isStaff ? "me" : null)} options={assigneeOptions} onValueChange={(v) => set("assignee", v)} />
@@ -579,7 +575,15 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
           {index > 0 && (
             <button type="button" className={FOCUS_BUTTON.secondary} onClick={() => go(STEPS[index - 1].key)} disabled={submitting}>Back</button>
           )}
-          <button type="button" className={last ? FOCUS_BUTTON.primary : FOCUS_BUTTON.secondary} onClick={next} disabled={submitting}>
+          {/* Greyed out until the step is complete; a click still points at what's missing. */}
+          <button
+            type="button"
+            aria-disabled={!ready}
+            title={ready ? undefined : "Fill in the fields marked * first"}
+            className={cn(last ? FOCUS_BUTTON.primary : FOCUS_BUTTON.secondary, !ready && "cursor-not-allowed opacity-50")}
+            onClick={next}
+            disabled={submitting}
+          >
             {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {last ? (submitting ? "Creating…" : "Create lead") : "Continue"}
           </button>
@@ -588,6 +592,12 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
     >
       <form
         onSubmit={(e) => { e.preventDefault(); next(); }}
+        onBlur={(e) => {
+          // Only typed fields: a select loses focus to its own menu before anything is picked.
+          if (!(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) return;
+          const name = fieldName(e.target);
+          if (name && !touched.has(name)) setTouched((t) => new Set(t).add(name));
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); next(); }
         }}

@@ -155,16 +155,24 @@ export function FocusSection({ title, description, children, className }: { titl
   );
 }
 
+/** The `name` of the field an event happened in, for tracking which fields were visited. */
+export const fieldName = (target: EventTarget | null) =>
+  (target instanceof Element ? target.closest<HTMLElement>("[data-field]")?.dataset.field : undefined) ?? null;
+
 /** Lays fields out in columns on wider screens. */
 export function FieldRow({ cols = 2, children }: { cols?: 2 | 3; children: ReactNode }) {
   return <div className={cn("grid gap-4", cols === 3 ? "md:grid-cols-3" : "md:grid-cols-2")}>{children}</div>;
 }
 
 export function FocusField({
-  label, htmlFor, optional, info, hint, error, className, children,
+  label, htmlFor, name, required, optional, info, hint, error, className, children,
 }: {
   label: string;
   htmlFor?: string;
+  /** Tags the field so the form can tell which ones were visited (see `fieldName`). */
+  name?: string;
+  /** Marks the field with a red asterisk. */
+  required?: boolean;
   optional?: boolean;
   info?: string;
   hint?: ReactNode;
@@ -173,9 +181,10 @@ export function FocusField({
   children: ReactNode;
 }) {
   return (
-    <div className={cn("min-w-0 space-y-2", className)}>
+    <div data-field={name} className={cn("min-w-0 space-y-2", className)}>
       <label htmlFor={htmlFor} className="flex items-center gap-1 text-[14px] font-medium text-foreground">
         {label}
+        {required && <span aria-hidden className="-ml-0.5 text-red-500">*</span>}
         {info && (
           <span title={info} className="inline-flex text-muted-foreground"><Info className="h-3.5 w-3.5" /></span>
         )}
