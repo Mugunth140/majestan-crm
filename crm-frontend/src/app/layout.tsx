@@ -46,7 +46,7 @@ const themeScript = `
     }
     // Kumo UI reads dark mode from data-mode
     document.documentElement.setAttribute('data-mode', isDark ? 'dark' : 'light');
-    var color = isDark ? '#1C1C1E' : '#ffffff';
+    var color = isDark ? '#0a0a0a' : '#ffffff';
     var meta = document.querySelector('meta[name="theme-color"]');
     if (!meta) {
       meta = document.createElement('meta');

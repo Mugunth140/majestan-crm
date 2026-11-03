@@ -30,7 +30,8 @@ import { Device } from "@/components/shared/device";
 import { LEAD_STATUS_DOTS, LEAD_STATUS_ORDER, LEAD_STATUS_STYLES } from "@/lib/lead-constants";
 import { StatusCell } from "@/components/tables/cells";
 import { ViewSwitcher, type ViewType } from "@/components/views/view-switcher";
-import { LeadsKanban } from "@/components/leads/leads-kanban";
+import { LeadsKanban, leadCard, type KanbanLead } from "@/components/leads/leads-kanban";
+import { MobileRowsProvider, type MobileRowData } from "@/components/mobile/mobile-rows";
 import { NameAvatar } from "@/components/shared/name-avatar";
 import { EmptyState } from "@/components/shared/empty-state";
 import { GroupedList } from "@/components/tables/grouped-list";
@@ -95,6 +96,12 @@ type LeadsFilterOptions = {
   staff: string[];
 };
 const EMPTY_FILTER_OPTIONS: LeadsFilterOptions = { statuses: [], sources: [], categories: [], types: [], staff: [] };
+
+/** A lead as a phone list row: its board card, with the pipeline status beside the phone number. */
+const leadRow = (lead: KanbanLead): MobileRowData => ({
+  ...leadCard(lead),
+  status: lead.status ? { label: lead.status, dot: LEAD_STATUS_DOTS[lead.status] ?? "bg-gray-400" } : undefined,
+});
 
 export default function LeadsPage() {
   const router = useRouter();
@@ -914,10 +921,10 @@ export default function LeadsPage() {
     <Popover>
       <PopoverTrigger render={
         isMobile ? (
-          <Button variant="outline" size="icon" className="h-12 w-12 rounded-2xl bg-black/5 dark:bg-white/10 border-transparent relative shrink-0">
+          <Button variant="outline" size="icon" className="h-10 w-10 rounded-[11px] bg-foreground/[0.06] border-transparent relative shrink-0">
             <Filter className="h-5 w-5 text-foreground" />
             {activeFiltersCount > 0 && (
-              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#0052FF] border-2 border-background text-white text-[10px] font-bold flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#017D58] border-2 border-background text-white text-[10px] font-bold flex items-center justify-center">
                 {activeFiltersCount}
               </span>
             )}
@@ -1272,17 +1279,17 @@ export default function LeadsPage() {
   );
 
   const mobileFilters = (
-    <div className="px-4 pb-2 space-y-4">
+    <div className="px-4 pb-2 space-y-3">
       {/* iOS Search Bar & Filter (hidden during import review — it only filters saved leads) */}
       {!isReviewingImports && (
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-muted-foreground" />
           <Input 
             placeholder="Search leads..." 
             value={searchQuery}
             onChange={e => { setSearchQuery(e.target.value); resetPage(); }}
-            className="pl-11 h-12 bg-black/5 dark:bg-white/10 border-transparent rounded-2xl text-[16px] focus-visible:ring-1 focus-visible:ring-primary shadow-none"
+            className="pl-10 h-10 bg-foreground/[0.06] border-transparent rounded-[11px] text-[16px] placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-[#017D58]/30 shadow-none"
           />
           {searchQuery && (
             <button onClick={() => { setSearchQuery(""); resetPage(); }} className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 bg-muted-foreground/20 rounded-full text-foreground hover:bg-muted-foreground/30">
@@ -1303,8 +1310,8 @@ export default function LeadsPage() {
               key={tab}
               onClick={() => { setActiveTab(tab); resetPage(); }}
               className={cn(
-                "px-5 h-10 rounded-full text-[14px] font-semibold whitespace-nowrap transition-all border active:scale-95",
-                isActive ? "bg-foreground text-background border-foreground shadow-sm" : "bg-card text-muted-foreground border-border hover:bg-muted"
+                "px-3.5 h-8 rounded-full text-[14px] font-medium whitespace-nowrap transition-colors active:opacity-60",
+                isActive ? "bg-[#017D58] text-white dark:bg-[#2FB585] dark:text-black" : "bg-foreground/[0.06] text-foreground"
               )}
             >
               {tab}
@@ -1321,8 +1328,8 @@ export default function LeadsPage() {
               key={d.value}
               onClick={() => { setDeptFilter(d.value); resetPage(); }}
               className={cn(
-                "px-4 h-9 rounded-full text-[13px] font-medium whitespace-nowrap transition-all border active:scale-95",
-                deptFilter === d.value ? "bg-[#0052FF] text-white border-[#0052FF] shadow-sm" : "bg-background text-muted-foreground border-border hover:bg-muted"
+                "px-3 h-7 rounded-full text-[13px] font-medium whitespace-nowrap transition-colors border active:opacity-60",
+                deptFilter === d.value ? "border-foreground/70 text-foreground" : "border-border text-muted-foreground"
               )}
             >
               {d.label}
@@ -1418,7 +1425,7 @@ export default function LeadsPage() {
 
   return (
     <>
-      <MobileHeader title="Leads Dashboard" />
+      <MobileHeader title="Leads" />
       <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:h-full">
         <PageActions>
           <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
@@ -1504,8 +1511,14 @@ export default function LeadsPage() {
                   <h3 className="text-lg font-bold text-foreground mb-2">No Imported Leads</h3>
                 </div>
               ) : (
-                <div className="w-full overflow-x-auto">
-                  {isLoading ? <TableSkeleton /> : <DataTable key={isReviewingImports ? `review-${reviewEpoch}` : "leads"} {...tableProps} />}
+                <div className={isReviewingImports ? "w-full overflow-x-auto" : "-mx-4"}>
+                  {isLoading ? <TableSkeleton /> : isReviewingImports ? (
+                    <DataTable key={`review-${reviewEpoch}`} {...tableProps} />
+                  ) : (
+                    <MobileRowsProvider row={leadRow} onOpen={(lead: KanbanLead) => router.push(`/leads/${lead.rawId}`)}>
+                      <DataTable key="leads" {...tableProps} />
+                    </MobileRowsProvider>
+                  )}
                 </div>
               )}
             </div>

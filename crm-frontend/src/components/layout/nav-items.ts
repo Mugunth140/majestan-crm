@@ -21,6 +21,7 @@ import {
   type LucideProps,
 } from "lucide-react";
 import { canViewAds } from "@/lib/ads-access";
+import { can } from "@/lib/permissions";
 
 export type NavAccess = "adminOnly" | "adminOrManager" | "adsAccess" | "blogAccess";
 
@@ -90,4 +91,25 @@ export function canSee(access: NavAccess | undefined, viewer: NavViewer | null) 
   if (access === "adminOrManager") return isAdmin || role === "Manager";
   if (access === "blogAccess") return !!viewer?.blogAccess;
   return canViewAds({ role, department: viewer?.department ?? "" });
+}
+
+export interface StoredUser extends NavViewer {
+  name: string;
+}
+
+/** The signed-in user as the navigation needs them (null before sign-in or if storage is unreadable). */
+export function readUser(): StoredUser | null {
+  try {
+    const raw = localStorage.getItem("crm_user");
+    if (!raw) return null;
+    const user = JSON.parse(raw);
+    return {
+      name: user?.name ?? user?.email ?? "",
+      role: user?.role?.name ?? user?.role ?? "",
+      department: user?.department?.name ?? user?.department ?? "",
+      blogAccess: can("blog.manage", user),
+    };
+  } catch {
+    return null;
+  }
 }

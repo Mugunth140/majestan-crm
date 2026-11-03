@@ -4,7 +4,7 @@ import { apiFetch } from "@/lib/api-fetch";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { DataTable } from "@/components/tables/data-table";
-import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { ModuleMobileRows, ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
 import { IdCell, StatusCell, statusDot } from "@/components/tables/cells";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
@@ -149,10 +149,10 @@ export default function AssetInventoryPage() {
     <Popover>
       <PopoverTrigger render={
         isMobile ? (
-          <Button variant="outline" size="icon" className="h-12 w-12 rounded-2xl bg-black/5 dark:bg-white/10 border-transparent relative shrink-0">
+          <Button variant="outline" size="icon" className="h-10 w-10 rounded-[11px] bg-foreground/[0.06] border-transparent relative shrink-0">
             <Filter className="h-5 w-5 text-foreground" />
             {activeFiltersCount > 0 && (
-              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#0052FF] border-2 border-background text-white text-[10px] font-bold flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#017D58] border-2 border-background text-white text-[10px] font-bold flex items-center justify-center">
                 {activeFiltersCount}
               </span>
             )}
@@ -293,16 +293,20 @@ export default function AssetInventoryPage() {
     },
   };
 
+  type Row = (typeof filteredAssets)[number];
+  const rowCard = (a: Row) => ({ title: [a.location?.district, a.location?.taluk, a.location?.village].filter(Boolean).join(", ") || "Asset", avatar: false, id: `AST${String(a.id).padStart(5, "0")}`, href: `/asset-inventory/${a.id}`, subtitle: a.feature?.extent != null ? `${a.feature.extent} Acres` : undefined, tag: a.location?.zone });
+  const openRow = (a: Row) => router.push(`/asset-inventory/${a.id}`);
+
   const mobileFilters = (
     <div className="px-4 pb-2">
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-muted-foreground" />
           <Input
             placeholder="Search Assets..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="pl-11 h-12 bg-black/5 dark:bg-white/10 border-transparent rounded-2xl text-[16px] focus-visible:ring-1 focus-visible:ring-primary shadow-none"
+            className="pl-10 h-10 bg-foreground/[0.06] border-transparent rounded-[11px] text-[16px] placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-[#017D58]/30 shadow-none"
           />
           {searchQuery && (
             <button onClick={() => setSearchQuery("")} className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 bg-muted-foreground/20 rounded-full text-foreground hover:bg-muted-foreground/30">
@@ -335,8 +339,8 @@ export default function AssetInventoryPage() {
             <DataTable {...tableProps} variant="list" />
           }
           getKey={(a) => a.id}
-          onOpen={(a) => router.push(`/asset-inventory/${a.id}`)}
-          card={(a) => ({ title: [a.location?.district, a.location?.taluk, a.location?.village].filter(Boolean).join(", ") || "Asset", avatar: false, id: `AST${String(a.id).padStart(5, "0")}`, href: `/asset-inventory/${a.id}`, subtitle: a.feature?.extent != null ? `${a.feature.extent} Acres` : undefined, tag: a.location?.zone })}
+          onOpen={openRow}
+          card={rowCard}
           noun="assets"
         />}
       </div>
@@ -364,9 +368,11 @@ export default function AssetInventoryPage() {
         <Device
           desktop={null}
           mobile={
-            <div className="w-full px-4 pb-4">
+            <ModuleMobileRows state={views} card={rowCard} onOpen={openRow}>
+            <div className="w-full pb-4">
               {isLoading ? <TableSkeleton /> : <DataTable {...tableProps} />}
             </div>
+            </ModuleMobileRows>
           }
         />
       </div>

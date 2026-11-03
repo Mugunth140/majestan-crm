@@ -312,10 +312,10 @@ export default function PropertiesPage() {
     <Popover>
       <PopoverTrigger render={
         isMobile ? (
-          <Button aria-label="Filters" variant="outline" size="icon" className="h-12 w-12 rounded-2xl bg-black/5 dark:bg-white/10 border-transparent relative shrink-0">
+          <Button aria-label="Filters" variant="outline" size="icon" className="h-10 w-10 rounded-[11px] bg-foreground/[0.06] border-transparent relative shrink-0">
             <Filter className="h-5 w-5 text-foreground" />
             {activeFiltersCount > 0 && (
-              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#0052FF] border-2 border-background text-white text-[10px] font-bold flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#017D58] border-2 border-background text-white text-[10px] font-bold flex items-center justify-center">
                 {activeFiltersCount}
               </span>
             )}
@@ -399,13 +399,13 @@ export default function PropertiesPage() {
 
   const searchBar = (isMobile: boolean) => (
     <div className="relative flex-1">
-      <Search className={isMobile ? "absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" : "absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"} />
+      <Search className={isMobile ? "absolute left-3 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-muted-foreground" : "absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"} />
       <Input
         placeholder={isMobile ? "Search properties..." : "Search title, code, owner, city..."}
         value={searchQuery}
         onChange={(e) => { setSearchQuery(e.target.value); resetPage(); }}
         className={isMobile
-          ? "pl-11 h-12 bg-black/5 dark:bg-white/10 border-transparent rounded-2xl text-[16px] focus-visible:ring-1 focus-visible:ring-primary shadow-none"
+          ? "pl-10 h-10 bg-foreground/[0.06] border-transparent rounded-[11px] text-[16px] placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-[#017D58]/30 shadow-none"
           : "pl-9 h-10 bg-muted/30 rounded-xl border-border/60 text-[13.5px]"}
       />
       {isMobile && searchQuery && (
@@ -426,8 +426,8 @@ export default function PropertiesPage() {
             aria-pressed={activeTab === tab}
             onClick={() => { setActiveTab(tab); resetPage(); }}
             className={cn(
-              "px-5 h-10 rounded-full text-[14px] font-semibold whitespace-nowrap transition-all border active:scale-95",
-              isActive ? "bg-foreground text-background border-foreground shadow-sm" : "bg-card text-muted-foreground border-border hover:bg-muted"
+              "px-3.5 h-8 rounded-full text-[14px] font-medium whitespace-nowrap transition-colors active:opacity-60",
+              isActive ? "bg-[#017D58] text-white dark:bg-[#2FB585] dark:text-black" : "bg-foreground/[0.06] text-foreground"
             )}
           >
             {tab}
@@ -473,15 +473,11 @@ export default function PropertiesPage() {
   );
 
   const mobileFilters = (
-    <div className="px-4 pb-2 space-y-4">
+    <div className="px-4 pb-2 space-y-3">
       <div className="flex items-center gap-2">
         {searchBar(true)}
         {renderFilterPopover(true)}
       </div>
-      <Link href="/properties/new" className="flex h-11 w-full rounded-xl bg-[#0052FF] px-4 text-[14px] font-semibold text-white shadow-md hover:bg-[#0052FF]/90 items-center justify-center gap-2 transition-transform active:scale-95">
-        <Plus size={18} />
-        Add Property
-      </Link>
       {pillTabs}
     </div>
   );
@@ -499,7 +495,7 @@ export default function PropertiesPage() {
         </PageActions>
 
         <Device mobile={mobileFilters} desktop={desktopFilters} />
-        <Device desktop={null} mobile={<div className="w-full px-4 md:px-0">{tableSection}</div>} />
+        <Device desktop={null} mobile={<div className="w-full">{tableSection}</div>} />
 
       </div>
 

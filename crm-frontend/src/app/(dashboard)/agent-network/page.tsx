@@ -6,7 +6,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/tables/data-table";
-import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { ModuleMobileRows, ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
 import { moveRow } from "@/lib/move-row";
 import { IdCell, NameCell, StatusCell, statusDot, type StatusTone } from "@/components/tables/cells";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -255,10 +255,10 @@ export default function AgentsPage() {
     <Popover>
       <PopoverTrigger render={
         isMobile ? (
-          <Button variant="outline" size="icon" className="h-12 w-12 rounded-2xl bg-black/5 dark:bg-white/10 border-transparent relative shrink-0">
+          <Button variant="outline" size="icon" className="h-10 w-10 rounded-[11px] bg-foreground/[0.06] border-transparent relative shrink-0">
             <Filter className="h-5 w-5 text-foreground" />
             {activeFiltersCount > 0 && (
-              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#0052FF] border-2 border-background text-white text-[10px] font-bold flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#017D58] border-2 border-background text-white text-[10px] font-bold flex items-center justify-center">
                 {activeFiltersCount}
               </span>
             )}
@@ -302,17 +302,21 @@ export default function AgentsPage() {
     </Popover>
   );
 
+  type Row = (typeof displayedAgents)[number];
+  const rowCard = (a: Row) => ({ title: a.name, id: `A${String(a.id).padStart(5, "0")}`, href: `/agent-network/${a.id}`, subtitle: a.mobile, footer: a.company_name, tag: a.partner_type?.replace(/_/g, " ") });
+  const openRow = (a: Row) => router.push(`/agent-network/${a.id}`);
+
   const mobileFilters = (
-    <div className="px-4 pb-2 space-y-4">
+    <div className="px-4 pb-2 space-y-3">
       {/* Search & Filter */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-muted-foreground" />
           <Input
             placeholder="Search Agents..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="pl-11 h-12 bg-black/5 dark:bg-white/10 border-transparent rounded-2xl text-[16px] focus-visible:ring-1 focus-visible:ring-primary shadow-none"
+            className="pl-10 h-10 bg-foreground/[0.06] border-transparent rounded-[11px] text-[16px] placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-[#017D58]/30 shadow-none"
           />
           {searchQuery && (
             <button onClick={() => setSearchQuery("")} className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 bg-muted-foreground/20 rounded-full text-foreground hover:bg-muted-foreground/30">
@@ -331,7 +335,7 @@ export default function AgentsPage() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-5 h-10 rounded-full text-[14px] font-semibold whitespace-nowrap transition-all border active:scale-95 ${isActive ? "bg-foreground text-background border-foreground shadow-sm" : "bg-card text-muted-foreground border-border hover:bg-muted"}`}
+              className={`px-5 h-10 rounded-full text-[14px] font-semibold whitespace-nowrap transition-all border active:scale-95 ${isActive ? "bg-[#017D58] text-white dark:bg-[#2FB585] dark:text-black" : "bg-foreground/[0.06] text-foreground"}`}
             >
               {tab}
             </button>
@@ -481,11 +485,11 @@ export default function AgentsPage() {
             />
             }
             getKey={(a) => a.id}
-            onOpen={(a) => router.push(`/agent-network/${a.id}`)}
+            onOpen={openRow}
             onMove={(a, status) =>
               moveRow({ setRows: setAgents, row: a, same: (x, y) => x.id === y.id, patch: { status }, request: { path: `/agents/${a.id}/status`, method: "PUT", body: { status_name: status } }, success: `Moved to ${status}` })
             }
-            card={(a) => ({ title: a.name, id: `A${String(a.id).padStart(5, "0")}`, href: `/agent-network/${a.id}`, subtitle: a.mobile, footer: a.company_name, tag: a.partner_type?.replace(/_/g, " ") })}
+            card={rowCard}
             noun="agents"
           />
         )}
@@ -514,7 +518,8 @@ export default function AgentsPage() {
         <Device
           desktop={null}
           mobile={
-            <div className="w-full px-4 pb-4">
+            <ModuleMobileRows state={views} card={rowCard} onOpen={openRow}>
+            <div className="w-full pb-4">
               {isLoading ? <TableSkeleton columns={6} rows={5} /> : (
                 <DataTable
                   flush
@@ -535,6 +540,7 @@ export default function AgentsPage() {
                 />
               )}
             </div>
+            </ModuleMobileRows>
           }
         />
       </div>

@@ -2,16 +2,20 @@
 
 import { useMobileHeader } from "./mobile-header-context";
 import { type ReactNode, useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
+import { hidesTabBar } from "./mobile-navbar";
+import { cn } from "@/lib/utils";
 
 export function MainScrollArea({ children }: { children: ReactNode }) {
   const { setIsScrolled, resolvedTitle } = useMobileHeader();
   const mainRef = useRef<HTMLElement>(null);
+  const pathname = usePathname() ?? "/";
 
   useEffect(() => {
     const handleWindowScroll = () => {
       // On mobile, the body scrolls.
       if (window.innerWidth < 768) {
-        setIsScrolled(window.scrollY > 35);
+        setIsScrolled(window.scrollY > 30);
       }
     };
     window.addEventListener("scroll", handleWindowScroll, { passive: true });
@@ -31,11 +35,13 @@ export function MainScrollArea({ children }: { children: ReactNode }) {
       onScroll={handleElementScroll}
       className="flex-1 w-full md:overflow-x-hidden md:overflow-y-auto scrollbar-hide lg:px-6 lg:pb-8 lg:pt-6 relative md:flex md:flex-col md:min-h-0"
     >
-      <div className="md:hidden px-4 pb-2 pt-[calc(env(safe-area-inset-top)+4.5rem)]">
-        <h1 className="text-[34px] font-bold tracking-tight text-foreground leading-tight">{resolvedTitle}</h1>
+      {/* Large title under the clear nav bar; it hands over to the bar's small title on scroll */}
+      <div className="md:hidden px-4 pb-1 pt-[calc(env(safe-area-inset-top)+2.75rem)]">
+        <h1 className="truncate text-[32px] font-bold leading-[1.15] tracking-[-0.02em] text-foreground">{resolvedTitle}</h1>
       </div>
       {children}
-      <div className="md:hidden h-[calc(env(safe-area-inset-bottom))] shrink-0 w-full" />
+      {/* Room for the tab bar, so the last row scrolls clear of it */}
+      <div className={cn("md:hidden w-full shrink-0", hidesTabBar(pathname) ? "h-[env(safe-area-inset-bottom)]" : "h-[calc(env(safe-area-inset-bottom)+5rem)]")} />
     </main>
   );
 }

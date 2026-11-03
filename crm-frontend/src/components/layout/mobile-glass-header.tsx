@@ -1,80 +1,75 @@
 "use client";
 
+import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "motion/react";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Plus } from "lucide-react";
 import { useMobileHeader } from "./mobile-header-context";
-import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { CreateSheet, createRouteFor } from "./mobile-create";
 import { guardNavigation } from "@/lib/leave-guard";
+import { cn } from "@/lib/utils";
 
+/**
+ * Phone navigation bar. Clear over the large page title, it turns into frosted
+ * material with the small title once the page scrolls under it. The trailing
+ * "+" creates a record in the current module, or opens the Create sheet on Home.
+ */
 export function MobileGlassHeader() {
   const router = useRouter();
   const pathname = usePathname() ?? "/";
   const { resolvedTitle, showBack: overrideBack, isScrolled } = useMobileHeader();
-  const { resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const showBack = overrideBack || pathname.split("/").filter(Boolean).length >= 2;
-  const titleKey = `${pathname}|${resolvedTitle}`;
-
-  // Default to light mode values before hydration to avoid mismatch
-  const isDark = mounted && resolvedTheme === "dark";
-  const bgGlass = isDark ? "rgba(28, 28, 30, 0.55)" : "rgba(255, 255, 255, 0.6)";
-  const borderGlass = isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)";
+  const createRoute = createRouteFor(pathname);
+  const canCreate = !!createRoute || pathname === "/";
 
   return (
-    <header className="md:hidden fixed inset-x-0 top-0 z-40">
-      <motion.div 
-        className="relative pt-[env(safe-area-inset-top)] border-b"
-        animate={{
-          backgroundColor: isScrolled ? bgGlass : "rgba(0,0,0,0)",
-          borderColor: isScrolled ? borderGlass : "rgba(0,0,0,0)",
-          backdropFilter: isScrolled ? "blur(24px) saturate(150%)" : "blur(0px) saturate(100%)",
-        }}
-        transition={{ duration: 0.2 }}
+    <>
+      <header
+        className={cn(
+          "fixed inset-x-0 top-0 z-40 select-none border-b pt-[env(safe-area-inset-top)] transition-[background-color,border-color,backdrop-filter] duration-200 md:hidden",
+          isScrolled ? "m-bar" : "border-transparent bg-transparent",
+        )}
       >
-        <motion.div 
-          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 to-transparent dark:via-white/25"
-          animate={{ opacity: isScrolled ? 1 : 0 }}
-          transition={{ duration: 0.2 }}
-        />
-        
-        <div className="relative h-12 flex items-center justify-between px-4">
-          <div className="z-10 flex items-center">
+        <div className="relative flex h-11 items-center justify-between px-2">
+          <div className="z-10 flex min-w-0 items-center">
             {showBack && (
               <button
+                type="button"
                 onClick={() => guardNavigation(() => router.back())}
-                className="flex items-center text-[#007AFF] dark:text-[#0A84FF] active:opacity-70 -ml-2 shrink-0"
+                className="flex h-11 items-center pr-2 text-[#017D58] active:opacity-50 dark:text-[#2FB585]"
               >
-                <ChevronLeft className="w-[28px] h-[28px]" strokeWidth={2.5} />
-                <span className="text-[17px] font-medium tracking-tight">Back</span>
+                <ChevronLeft className="size-7" strokeWidth={2.25} />
+                <span className="-ml-0.5 text-[17px]">Back</span>
               </button>
             )}
           </div>
 
-          <div className="z-10 flex items-center justify-end" />
+          <h1
+            aria-hidden={!isScrolled}
+            className={cn(
+              "pointer-events-none absolute inset-x-24 truncate text-center text-[17px] font-semibold tracking-tight text-foreground transition-opacity duration-150",
+              isScrolled ? "opacity-100" : "opacity-0",
+            )}
+          >
+            {resolvedTitle}
+          </h1>
 
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-24 overflow-hidden">
-            <AnimatePresence initial={false}>
-              {isScrolled && (
-                <motion.h1
-                  key={titleKey}
-                  initial={{ opacity: 0, y: 10, filter: "blur(3px)" }}
-                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, y: -10, filter: "blur(3px)" }}
-                  transition={{ duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
-                  className="text-[17px] font-semibold tracking-tight text-foreground truncate max-w-full"
-                >
-                  {resolvedTitle}
-                </motion.h1>
-              )}
-            </AnimatePresence>
+          <div className="z-10 flex items-center pr-1">
+            {canCreate && (
+              <button
+                type="button"
+                aria-label="Create"
+                onClick={() => (createRoute ? router.push(createRoute) : setCreateOpen(true))}
+                className="flex size-9 items-center justify-center rounded-full bg-[#017D58] text-white shadow-[0_2px_8px_-2px_rgba(1,125,88,0.5)] transition-transform active:scale-90 dark:bg-[#2FB585] dark:text-black"
+              >
+                <Plus className="size-5" strokeWidth={2.5} />
+              </button>
+            )}
           </div>
         </div>
-      </motion.div>
-    </header>
+      </header>
+      <CreateSheet open={createOpen} onClose={() => setCreateOpen(false)} />
+    </>
   );
 }

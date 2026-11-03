@@ -149,12 +149,12 @@ export default function TasksPage() {
     <div className="px-4 pb-4 space-y-4">
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-muted-foreground" />
         <Input
           placeholder="Search tasks..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-11 h-12 bg-black/5 dark:bg-white/10 border-transparent rounded-2xl text-[16px] focus-visible:ring-1 focus-visible:ring-primary shadow-none"
+          className="pl-10 h-10 bg-foreground/[0.06] border-transparent rounded-[11px] text-[16px] placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-[#017D58]/30 shadow-none"
         />
         {searchQuery && (
           <button
@@ -173,7 +173,7 @@ export default function TasksPage() {
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={cn(
-              "px-5 h-10 rounded-full text-[14px] font-semibold whitespace-nowrap transition-all border active:scale-95",
+              "px-3.5 h-8 rounded-full text-[14px] font-medium whitespace-nowrap transition-colors active:opacity-60",
               activeTab === tab
                 ? "bg-foreground text-background border-foreground shadow-sm"
                 : "bg-card text-muted-foreground border-border hover:bg-muted"

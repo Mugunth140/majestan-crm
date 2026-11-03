@@ -8,7 +8,8 @@ export function ThemeStatusBar() {
 
   useEffect(() => {
     const isDark = resolvedTheme === "dark";
-    const color = isDark ? "#1C1C1E" : "#ffffff";
+    // Matches --background, so the status bar reads as part of the app
+    const color = isDark ? "#0a0a0a" : "#ffffff";
 
     let meta = document.querySelector('meta[name="theme-color"]');
     if (!meta) {

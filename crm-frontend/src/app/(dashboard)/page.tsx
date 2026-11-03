@@ -1,12 +1,9 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { 
-  User, Building2, Layers, Users, TrendingUp, Route, 
-  Inbox, Network, Briefcase, Package, UserPen, Target, 
-  Activity, Settings, Database, Contact, Home, BookOpen
-} from "lucide-react";
-import { can } from "@/lib/permissions";
+import Link from "next/link";
+import { Target, Users } from "lucide-react";
+import { readUser } from "@/components/layout/nav-items";
+import { appModules } from "@/components/mobile/app-modules";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-fetch";
 
@@ -17,7 +14,6 @@ import { TeamLeadDashboard } from '@/components/metrics/TeamLeadDashboard';
 import { StaffDashboard } from '@/components/metrics/StaffDashboard';
 
 export default function DashboardPage() {
-  const router = useRouter();
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
@@ -52,44 +48,15 @@ export default function DashboardPage() {
 
   return (
     <>
-      <MobileHeader title="Dashboard" />
-      <div className="space-y-6 px-2 pt-4 lg:p-0">
+      <MobileHeader title="Home" />
+      <div className="space-y-6 px-2 pt-5 lg:p-0">
         
       {/* MOBILE ONLY: Master Navigation Hub */}
       <Device 
         desktop={null}
         mobile={
-          <div className="space-y-6 pb-6">
-            <MenuSection title="Core Pipeline">
-              <MenuCard icon={Contact} label="Leads" onClick={() => router.push('/leads')} color="text-blue-600" bg="bg-blue-500/10" />
-              <MenuCard icon={Route} label="Lead Routing" onClick={() => router.push('/lead-routing')} color="text-indigo-600" bg="bg-indigo-500/10" />
-              <MenuCard icon={Inbox} label="Inbound" onClick={() => router.push('/inbound')} color="text-emerald-600" bg="bg-emerald-500/10" />
-            </MenuSection>
-
-            <MenuSection title="Inventory & Projects">
-              {can("blog.manage", user) && <MenuCard icon={BookOpen} label="Blog" onClick={() => router.push("/blog")} color="text-blue-600" bg="bg-blue-500/10" />}
-              <MenuCard icon={Briefcase} label="Projects" onClick={() => router.push('/projects')} color="text-rose-600" bg="bg-rose-500/10" />
-              <MenuCard icon={Home} label="Properties" onClick={() => router.push('/properties')} color="text-teal-600" bg="bg-teal-500/10" />
-              <MenuCard icon={Package} label="Asset Inventory" onClick={() => router.push('/asset-inventory')} color="text-amber-600" bg="bg-amber-500/10" />
-            </MenuSection>
-
-            <MenuSection title="Network & Team">
-              <MenuCard icon={Network} label="Agent Network" onClick={() => router.push('/agent-network')} color="text-cyan-600" bg="bg-cyan-500/10" />
-              <MenuCard icon={UserPen} label="HR Panel" onClick={() => router.push('/hr')} color="text-fuchsia-600" bg="bg-fuchsia-500/10" />
-              {isAdmin && <MenuCard icon={Users} label="Users" onClick={() => router.push('/users')} color="text-violet-600" bg="bg-violet-500/10" />}
-            </MenuSection>
-
-            <MenuSection title="System">
-              <MenuCard icon={Target} label="Tasks" onClick={() => router.push('/tasks')} color="text-orange-600" bg="bg-orange-500/10" />
-              <MenuCard icon={Settings} label="Settings" onClick={() => router.push('/settings')} color="text-slate-600" bg="bg-slate-500/10" />
-              {isAdmin && (
-                <>
-                  <MenuCard icon={Activity} label="Activity Logs" onClick={() => router.push('/activity-logs')} color="text-red-600" bg="bg-red-500/10" />
-                  <MenuCard icon={Database} label="Master Registry" onClick={() => router.push('/master')} color="text-zinc-600" bg="bg-zinc-500/10" />
-                </>
-              )}
-            </MenuSection>
-            
+          <div className="space-y-7 pb-6">
+            <AppLauncher />
             {tasksSection}
           </div>
         }
@@ -120,29 +87,21 @@ export default function DashboardPage() {
   );
 }
 
-function MenuSection({ title, children }: { title: string, children: React.ReactNode }) {
+/** Every module the user can open, as a grid of app icons. */
+function AppLauncher() {
+  const [viewer] = useState(readUser);
   return (
-    <div className="space-y-3">
-      <h3 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider pl-1">{title}</h3>
-      <div className="grid grid-cols-2 gap-3">
-        {children}
-      </div>
-    </div>
-  )
-}
-
-function MenuCard({ icon: Icon, label, onClick, color, bg }: any) {
-  return (
-    <button 
-      onClick={onClick} 
-      className="bg-card hover:bg-muted/50 border border-border p-4 rounded-[1.25rem] flex flex-col items-start gap-4 transition-colors active:scale-95 shadow-sm"
-    >
-      <div className={cn("w-10 h-10 rounded-full flex items-center justify-center", bg)}>
-        <Icon className={cn("w-5 h-5", color)} strokeWidth={2.5} />
-      </div>
-      <span className="font-semibold text-[13px] text-foreground text-left leading-tight">{label}</span>
-    </button>
-  )
+    <nav aria-label="Modules" className="grid grid-cols-4 gap-x-2 gap-y-5 px-2">
+      {appModules(viewer).map((m) => (
+        <Link key={m.href} href={m.href} className="group flex flex-col items-center gap-1.5 outline-none">
+          <span className={cn("flex size-[58px] items-center justify-center rounded-[16px] shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_1px_2px_rgba(0,0,0,0.12)] transition-transform duration-150 group-active:scale-90", m.tile)}>
+            <m.icon className="size-[26px] text-white" strokeWidth={1.9} />
+          </span>
+          <span className="w-full truncate text-center text-[12px] font-medium text-foreground/85">{m.name}</span>
+        </Link>
+      ))}
+    </nav>
+  );
 }
 
 function TasksOverviewSection({ data, isStaff }: { data: any; isStaff: boolean }) {

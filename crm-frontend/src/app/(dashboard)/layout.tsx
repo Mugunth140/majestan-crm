@@ -14,6 +14,7 @@ import { MainScrollArea } from "@/components/layout/mobile-main-scroller";
 import { NotificationProvider } from "@/context/notification-context";
 import { useIsClient } from "@/hooks/use-is-client";
 import DashboardLoading from "./loading";
+import "@/components/mobile/mobile.css";
 
 export default function DashboardLayout({
   children,

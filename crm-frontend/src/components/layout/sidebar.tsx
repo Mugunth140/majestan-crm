@@ -6,35 +6,14 @@ import { useEffect, useState, type CSSProperties, type ReactElement } from "reac
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import { Bell, ChevronRight, Search } from "lucide-react";
 import { useNotifications } from "@/context/notification-context";
-import { can } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "./sidebar-context";
 import { NotificationsSheet } from "./notifications-sheet";
 import { UpdateButton } from "./app-update";
-import { NAVIGATION, canSee, type NavViewer } from "./nav-items";
+import { NAVIGATION, canSee, readUser, type StoredUser } from "./nav-items";
 import { SearchPalette, useSearchShortcut } from "./search-palette";
 import { WorkspaceMenu } from "./workspace-menu";
 import "./sidebar.css";
-
-interface StoredUser extends NavViewer {
-  name: string;
-}
-
-function readUser(): StoredUser | null {
-  try {
-    const raw = localStorage.getItem("crm_user");
-    if (!raw) return null;
-    const user = JSON.parse(raw);
-    return {
-      name: user?.name ?? user?.email ?? "",
-      role: user?.role?.name ?? user?.role ?? "",
-      department: user?.department?.name ?? user?.department ?? "",
-      blogAccess: can("blog.manage", user),
-    };
-  } catch {
-    return null;
-  }
-}
 
 const isActivePath = (pathname: string, href: string) =>
   href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");

@@ -1,4 +1,5 @@
 {
+  "id": "/",
   "name": "Prismark CRM",
   "short_name": "Prismark",
   "description": "Prismark CRM and Field App",
@@ -24,6 +25,39 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New lead",
+      "short_name": "New lead",
+      "url": "/leads/new",
+      "icons": [
+        {
+          "src": "/favicon/android-chrome-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Tasks",
+      "url": "/tasks",
+      "icons": [
+        {
+          "src": "/favicon/android-chrome-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Inbox",
+      "url": "/inbox",
+      "icons": [
+        {
+          "src": "/favicon/android-chrome-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }

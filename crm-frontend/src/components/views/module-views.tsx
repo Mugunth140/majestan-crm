@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { ViewSwitcher, type ViewType } from "@/components/views/view-switcher";
 import { GroupByPicker } from "@/components/views/group-by-picker";
 import { KanbanBoard, type KanbanCardData } from "@/components/views/kanban-board";
+import { MobileRowsProvider } from "@/components/mobile/mobile-rows";
 import { cn } from "@/lib/utils";
 
 // List / Kanban / Group By for any module. A module describes the fields it can
@@ -69,6 +70,30 @@ function FieldLabel<T>({ field, value }: { field: ViewField<T>; value: string })
   );
 }
 
+/** Lets the module's DataTable list rows natively on phones: the card's fields, with the board column's value as the status. */
+export function ModuleMobileRows<T>({
+  state,
+  card,
+  onOpen,
+  children,
+}: {
+  state: ModuleViewState<T>;
+  card: (row: T) => KanbanCardData;
+  onOpen?: (row: T) => void;
+  children: ReactNode;
+}) {
+  const field = state.columnField;
+  const row = (r: T) => {
+    const value = field.get(r);
+    return { ...card(r), status: value ? { label: value, dot: field.dot?.(value) } : undefined };
+  };
+  return (
+    <MobileRowsProvider row={row} onOpen={onOpen}>
+      {children}
+    </MobileRowsProvider>
+  );
+}
+
 export function ModuleViews<T>({
   state,
   data,
@@ -103,7 +128,13 @@ export function ModuleViews<T>({
   noun?: string;
 }) {
   const { view, groupField, columnField } = state;
-  if (view === "list") return <>{list}</>;
+  if (view === "list") {
+    return (
+      <ModuleMobileRows state={state} card={card} onOpen={onOpen}>
+        {list}
+      </ModuleMobileRows>
+    );
+  }
 
   const truncated = totalCount != null && totalCount > data.length && (
     <p className="border-t px-5 py-2 text-[13px] text-muted-foreground">

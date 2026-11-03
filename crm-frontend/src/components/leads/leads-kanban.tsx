@@ -3,7 +3,7 @@
 import { Phone } from "lucide-react";
 import { NameAvatar } from "@/components/shared/name-avatar";
 import { EmptyState } from "@/components/shared/empty-state";
-import { KanbanBoard } from "@/components/views/kanban-board";
+import { KanbanBoard, type KanbanCardData } from "@/components/views/kanban-board";
 import { LEAD_STATUS_DOTS, LEAD_STATUS_ORDER } from "@/lib/lead-constants";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +22,29 @@ export interface KanbanLead {
 
 // These statuses need details first (visit slot, drop reason), so they're set from the lead page.
 export const KANBAN_LOCKED_STATUSES = ["Site Visit Scheduled", "Re Visit Scheduled", "Not Interested", "Dropped"];
+
+/** What a lead shows as a board card, and as a list row on phones. */
+export const leadCard = (lead: KanbanLead): KanbanCardData => ({
+    title: lead.name,
+    id: lead.id,
+    href: `/leads/${lead.rawId}`,
+    subtitle: lead.mobile && (
+      <span className="flex items-center gap-1.5 tabular-nums">
+        <Phone className="size-3.5" strokeWidth={1.75} />
+        {lead.mobile}
+      </span>
+    ),
+    footer:
+      lead.staff && lead.staff !== "Unassigned" ? (
+        <>
+          <NameAvatar name={lead.staff} className="size-5 text-[10px]" />
+          <span className="truncate">{lead.staff}</span>
+        </>
+      ) : (
+        <span className="text-muted-foreground">Unassigned</span>
+      ),
+    tag: lead.propertyType?.replace(/_/g, " "),
+  });
 
 // Leads as a board, one column per status in pipeline order. Cards drag between columns to change status.
 export function LeadsKanban({
@@ -48,27 +71,7 @@ export function LeadsKanban({
       lockedHint={(status) => (KANBAN_LOCKED_STATUSES.includes(status) ? "Set from the lead page" : "Can't move here")}
       emptyColumnLabel="No leads"
       emptyState={<EmptyState kind="people" title="No leads to show" description="Leads that match this view will appear here as cards." />}
-      card={(lead) => ({
-        title: lead.name,
-        id: lead.id,
-        href: `/leads/${lead.rawId}`,
-        subtitle: lead.mobile && (
-          <span className="flex items-center gap-1.5 tabular-nums">
-            <Phone className="size-3.5" strokeWidth={1.75} />
-            {lead.mobile}
-          </span>
-        ),
-        footer:
-          lead.staff && lead.staff !== "Unassigned" ? (
-            <>
-              <NameAvatar name={lead.staff} className="size-5 text-[10px]" />
-              <span className="truncate">{lead.staff}</span>
-            </>
-          ) : (
-            <span className="text-muted-foreground">Unassigned</span>
-          ),
-        tag: lead.propertyType?.replace(/_/g, " "),
-      })}
+      card={leadCard}
     />
   );
 }
