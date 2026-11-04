@@ -12,7 +12,7 @@ import { guardNavigation } from "@/lib/leave-guard";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FormSelect } from "@/components/shared/form-select";
+import { FormSelect, SearchableFormSelect } from "@/components/shared/form-select";
 import { IconPicker } from "@/components/shared/icon-picker";
 import { DatePicker } from "@/components/shared/date-picker";
 import { PriceInput } from "@/components/shared/price-input";
@@ -60,7 +60,7 @@ const inputClass = cn(FOCUS_FIELD, "h-9");
 const roomInputClass = cn(FOCUS_FIELD, "h-9");
 const selectClass = cn(FOCUS_FIELD, "h-9! rounded-md! border-border! text-[14px]!");
 const unitSectionTitle =
-  "text-[11px] font-bold uppercase tracking-wider text-muted-foreground border-b border-border/40 pb-2";
+  "border-b border-border/40 pb-2 text-[13px] font-medium text-muted-foreground";
 
 const PROJECT_TYPE_OPTIONS = [
   { value: "apartment", label: "Apartment" },
@@ -1974,7 +1974,7 @@ export function ProjectForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
               <label className={labelClass}>City <span className="text-red-500">*</span></label>
-              <FormSelect className={selectClass}
+              <SearchableFormSelect className={selectClass}
                 name="city"
                 options={formData.cities.map((c: any) => {
                   const n = c.cityName ?? c.city_name ?? "";
@@ -1995,7 +1995,7 @@ export function ProjectForm({
             </div>
             <div className="space-y-2">
               <label className={labelClass}>State</label>
-              <FormSelect className={selectClass}
+              <SearchableFormSelect className={selectClass}
                 name="state"
                 options={stateOptions}
                 value={state}
@@ -2009,7 +2009,7 @@ export function ProjectForm({
             </div>
             <div className="space-y-2">
               <label className={labelClass}>Sublocation / Locality <span className="text-red-500">*</span></label>
-              <FormSelect className={selectClass}
+              <SearchableFormSelect className={selectClass}
                 name="sublocation"
                 options={formData.sublocations
                   .filter((s: any) => {
@@ -2065,12 +2065,21 @@ export function ProjectForm({
               />
             </div>
             <div className="space-y-2 md:col-span-2">
+              <label className={labelClass}>Address</label>
+              <Textarea
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Site address"
+                className={cn(FOCUS_FIELD, "min-h-[90px] py-2")}
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
               <Button
                 type="button"
                 variant="outline"
                 disabled={locating}
                 onClick={handleLocateCoordinates}
-                className="h-11 rounded-xl px-5"
+                className={FOCUS_BUTTON.secondary}
               >
                 {locating ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -2080,18 +2089,9 @@ export function ProjectForm({
                 {locating ? "Locating..." : "Auto Populate"}
               </Button>
               <p className="text-xs text-muted-foreground">
-                Uses the address above (falls back to locality, city and state).
+                Uses the address (falls back to locality, city and state).
                 Fills pincode, latitude and longitude.
               </p>
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <label className={labelClass}>Address</label>
-              <Textarea
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="Site address"
-                className="rounded-md border-border bg-muted/40 text-[14px] min-h-[90px] dark:bg-white/[0.04]"
-              />
             </div>
           </div>
         </div>
@@ -2123,7 +2123,7 @@ export function ProjectForm({
                   setPossessionDate(d ? format(d, "yyyy-MM-dd") : "")
                 }
                 placeholder="Pick possession date"
-                className="h-12 rounded-xl bg-muted/30"
+                className={cn(inputClass, "h-9! w-full border font-normal")}
               />
             </div>
           </div>
@@ -2205,7 +2205,7 @@ export function ProjectForm({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="About this project..."
-                className="rounded-xl bg-muted/30 min-h-[120px]"
+                className={cn(FOCUS_FIELD, "min-h-[120px] py-2")}
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -2221,7 +2221,7 @@ export function ProjectForm({
               {coverPreview &&
               (coverPreview.startsWith("http") ||
                 coverPreview.startsWith("blob:")) ? (
-                <div className="relative w-full h-44 rounded-xl overflow-hidden border border-border/60 bg-muted/20">
+                <div className="relative w-full h-44 rounded-lg overflow-hidden border border-border/60 bg-muted/20">
                   <img
                     src={coverPreview}
                     alt="Cover preview"
@@ -2240,14 +2240,14 @@ export function ProjectForm({
                   </button>
                 </div>
               ) : coverImageUrl ? (
-                <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 p-2">
+                <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/20 p-2">
                   <span className="flex-1 truncate text-xs text-muted-foreground">
                     {coverImageUrl}
                   </span>
                   <button
                     type="button"
                     onClick={() => coverInputRef.current?.click()}
-                    className="!px-3 !py-1.5 !text-[12px] !font-medium !text-[#0052FF] hover:!bg-[#0052FF]/10 !rounded-lg"
+                    className="!px-3 !py-1.5 !text-[12px] !font-medium !text-foreground hover:!bg-foreground/[0.06] !rounded-lg"
                   >
                     Replace
                   </button>
@@ -2268,7 +2268,7 @@ export function ProjectForm({
                   type="button"
                   disabled={uploadingCover}
                   onClick={() => coverInputRef.current?.click()}
-                  className="w-full h-24 rounded-xl border-2 border-dashed border-border/60 flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:border-[#0052FF]/50 hover:text-[#0052FF] transition-colors disabled:opacity-60"
+                  className="w-full h-24 rounded-lg border-2 border-dashed border-border/60 flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors disabled:opacity-60"
                 >
                   {uploadingCover ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -2291,7 +2291,7 @@ export function ProjectForm({
               {mobileCoverPreview &&
               (mobileCoverPreview.startsWith("http") ||
                 mobileCoverPreview.startsWith("blob:")) ? (
-                <div className="relative w-full h-44 rounded-xl overflow-hidden border border-border/60 bg-muted/20">
+                <div className="relative w-full h-44 rounded-lg overflow-hidden border border-border/60 bg-muted/20">
                   <img
                     src={mobileCoverPreview}
                     alt="Mobile cover preview"
@@ -2310,7 +2310,7 @@ export function ProjectForm({
                   </button>
                 </div>
               ) : mobileCoverImageUrl ? (
-                <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 p-2">
+                <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/20 p-2">
                   <span className="flex-1 truncate text-xs text-muted-foreground">
                     {mobileCoverImageUrl}
                   </span>
@@ -2318,7 +2318,7 @@ export function ProjectForm({
                     type="button"
                     disabled={uploadingMobileCover}
                     onClick={() => mobileCoverInputRef.current?.click()}
-                    className="!px-3 !py-1.5 !text-[12px] !font-medium !text-[#0052FF] hover:!bg-[#0052FF]/10 !rounded-lg disabled:opacity-60"
+                    className="!px-3 !py-1.5 !text-[12px] !font-medium !text-foreground hover:!bg-foreground/[0.06] !rounded-lg disabled:opacity-60"
                   >
                     Replace
                   </button>
@@ -2340,7 +2340,7 @@ export function ProjectForm({
                   type="button"
                   disabled={uploadingMobileCover}
                   onClick={() => mobileCoverInputRef.current?.click()}
-                  className="w-full h-24 rounded-xl border-2 border-dashed border-border/60 flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:border-[#0052FF]/50 hover:text-[#0052FF] transition-colors disabled:opacity-60"
+                  className="w-full h-24 rounded-lg border-2 border-dashed border-border/60 flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors disabled:opacity-60"
                 >
                   {uploadingMobileCover ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -2363,7 +2363,7 @@ export function ProjectForm({
                 onChange={handleBrochureFile}
               />
               {brochureKey ? (
-                <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 p-2">
+                <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/20 p-2">
                   <span className="flex-1 truncate text-xs text-muted-foreground">
                     {brochureName || brochureKey}
                   </span>
@@ -2371,7 +2371,7 @@ export function ProjectForm({
                     type="button"
                     disabled={uploadingBrochure}
                     onClick={() => brochureInputRef.current?.click()}
-                    className="!px-3 !py-1.5 !text-[12px] !font-medium !text-[#0052FF] hover:!bg-[#0052FF]/10 !rounded-lg disabled:opacity-60 inline-flex items-center gap-1.5"
+                    className="!px-3 !py-1.5 !text-[12px] !font-medium !text-foreground hover:!bg-foreground/[0.06] !rounded-lg disabled:opacity-60 inline-flex items-center gap-1.5"
                   >
                     {uploadingBrochure && (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -2396,7 +2396,7 @@ export function ProjectForm({
                   type="button"
                   disabled={uploadingBrochure}
                   onClick={() => brochureInputRef.current?.click()}
-                  className="w-full h-24 rounded-xl border-2 border-dashed border-border/60 flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:border-[#0052FF]/50 hover:text-[#0052FF] transition-colors disabled:opacity-60"
+                  className="w-full h-24 rounded-lg border-2 border-dashed border-border/60 flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors disabled:opacity-60"
                 >
                   {uploadingBrochure ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -2418,7 +2418,7 @@ export function ProjectForm({
             Structure &amp; Layout
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <div className="space-y-2">
+            <div className="space-y-2 md:col-span-3">
               <label className={labelClass}>Project Area</label>
               <div className="flex gap-2">
                 <Input
@@ -2432,7 +2432,7 @@ export function ProjectForm({
                 />
                 <FormSelect
                   name="projectAreaUnit"
-                  className="w-32 shrink-0"
+                  className={cn(selectClass, "w-28! shrink-0")}
                   placeholder="Unit"
                   options={PROJECT_AREA_UNITS.map((u) => ({
                     label: u.label,
@@ -2505,7 +2505,7 @@ export function ProjectForm({
           {projectType === "apartment" && (
             <div className="mt-6 space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-foreground">
+                <span className="text-[14px] font-medium text-foreground">
                   Tower Details
                 </span>
                 <Button
@@ -2514,7 +2514,7 @@ export function ProjectForm({
                   onClick={() =>
                     setTowerDetails((prev) => [...prev, emptyTowerDetail()])
                   }
-                  className="h-9 rounded-full px-4"
+                  className={FOCUS_BUTTON.secondary}
                 >
                   <Plus className="h-4 w-4 mr-1" /> Add Tower
                 </Button>
@@ -2588,7 +2588,7 @@ export function ProjectForm({
                           prev.filter((_, j) => j !== i),
                         )
                       }
-                      className="h-12 w-12 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                      className="h-9 w-9 text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
                       aria-label="Remove tower"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -2613,9 +2613,9 @@ export function ProjectForm({
                 {formData.amenities.map((amenity: any) => (
                   <label
                     key={amenity.id}
-                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                       amenityIds.includes(amenity.id)
-                        ? "bg-[#0052FF]/5 border-[#0052FF]/30"
+                        ? "bg-foreground/[0.04] border-foreground/40"
                         : "bg-muted/10 border-border/40 hover:bg-muted/30"
                     }`}
                   >
@@ -2637,7 +2637,7 @@ export function ProjectForm({
                       >
                         {amenity.name}
                       </span>
-                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">
+                      <span className="truncate text-[11px] text-muted-foreground">
                         {amenity.category || "General"}
                       </span>
                     </div>
@@ -2659,12 +2659,12 @@ export function ProjectForm({
                   value={highlights}
                   onChange={(e) => setHighlights(e.target.value)}
                   placeholder="Key selling points of this project..."
-                  className="rounded-md border-border bg-muted/40 text-[14px] min-h-[90px] dark:bg-white/[0.04]"
+                  className={cn(FOCUS_FIELD, "min-h-[90px] py-2")}
                 />
               </div>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-foreground">
+                  <span className="text-[14px] font-medium text-foreground">
                     Specifications
                   </span>
                   <Button
@@ -2676,7 +2676,7 @@ export function ProjectForm({
                         emptySpecification(),
                       ])
                     }
-                    className="h-9 rounded-full px-4"
+                    className={FOCUS_BUTTON.secondary}
                   >
                     <Plus className="h-4 w-4 mr-1" /> Add Row
                   </Button>
@@ -2777,7 +2777,7 @@ export function ProjectForm({
                                 ),
                               )
                             }
-                            className="h-8 rounded-full px-3 text-xs"
+                            className={cn(FOCUS_BUTTON.secondary, "h-7 text-[12px]")}
                           >
                             <Plus className="h-3.5 w-3.5 mr-1" /> Add point
                           </Button>
@@ -2799,7 +2799,7 @@ export function ProjectForm({
                             prev.filter((_, j) => j !== i),
                           )
                         }
-                        className="h-12 w-12 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                        className="h-9 w-9 text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
                         aria-label="Remove specification"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -2822,7 +2822,7 @@ export function ProjectForm({
               variant="outline"
               disabled={uploadingGallery}
               onClick={() => galleryInputRef.current?.click()}
-              className="h-9 rounded-full px-4"
+              className={FOCUS_BUTTON.secondary}
             >
               {uploadingGallery ? (
                 <Loader2 className="h-4 w-4 mr-1 animate-spin" />
@@ -2855,7 +2855,7 @@ export function ProjectForm({
                   onDrop={onGalleryDrop(i)}
                   onDragEnd={onGalleryDragEnd}
                   title="Drag to reorder — first photo is primary"
-                  className={`relative h-28 rounded-xl overflow-hidden border border-border/60 bg-muted/20 cursor-grab active:cursor-grabbing transition-opacity ${
+                  className={`relative h-28 rounded-lg overflow-hidden border border-border/60 bg-muted/20 cursor-grab active:cursor-grabbing transition-opacity ${
                     draggingGallery === i ? "opacity-40" : ""
                   }`}
                 >
@@ -2871,7 +2871,7 @@ export function ProjectForm({
                     </span>
                   )}
                   {i === 0 && (
-                    <span className="absolute top-1.5 left-1.5 bg-[#0052FF] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                    <span className="absolute top-1.5 left-1.5 bg-foreground text-background text-[10px] font-medium px-1.5 py-0.5 rounded-md">
                       Primary
                     </span>
                   )}
@@ -2906,7 +2906,7 @@ export function ProjectForm({
               onClick={() =>
                 setVideos((prev) => [...prev, { title: "", url: "" }])
               }
-              className="h-9 rounded-full px-4"
+              className={FOCUS_BUTTON.secondary}
             >
               <Plus className="h-4 w-4 mr-1" /> Add Video
             </Button>
@@ -2941,7 +2941,7 @@ export function ProjectForm({
                       )
                     }
                     placeholder="e.g. Site walkthrough"
-                    className="h-10 rounded-xl bg-muted/30 border-border/60 text-[13.5px]"
+                    className={inputClass}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -2965,7 +2965,7 @@ export function ProjectForm({
                     aria-invalid={
                       v.url.trim() !== "" && !YOUTUBE_URL_RE.test(v.url.trim())
                     }
-                    className="h-10 rounded-xl bg-muted/30 border-border/60 text-[13.5px] aria-[invalid=true]:border-red-400"
+                    className={cn(inputClass, "aria-[invalid=true]:border-red-400")}
                   />
                 </div>
                 <button
@@ -2993,7 +2993,7 @@ export function ProjectForm({
               variant="outline"
               disabled={fetchingNearby}
               onClick={handleAutoPopulateNearby}
-              className="h-9 rounded-full px-4"
+              className={FOCUS_BUTTON.secondary}
             >
               {fetchingNearby ? (
                 <Loader2 className="h-4 w-4 mr-1 animate-spin" />
@@ -3008,9 +3008,9 @@ export function ProjectForm({
               {nearbyCategories.map((cat: any, i: number) => (
                 <div
                   key={i}
-                  className="rounded-xl border border-border/60 bg-muted/10 p-4"
+                  className="rounded-lg border border-border/60 bg-muted/10 p-4"
                 >
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                  <p className="mb-2 text-[13px] font-medium text-muted-foreground">
                     {cat.title}
                   </p>
                   <ul className="space-y-1">
@@ -3034,7 +3034,7 @@ export function ProjectForm({
           )}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-foreground">
+              <span className="text-[14px] font-medium text-foreground">
                 Connectivity Highlights
               </span>
               <Button
@@ -3043,7 +3043,7 @@ export function ProjectForm({
                 onClick={() =>
                   setConnectivity((prev) => [...prev, emptyConnectivity()])
                 }
-                className="h-9 rounded-full px-4"
+                className={FOCUS_BUTTON.secondary}
               >
                 <Plus className="h-4 w-4 mr-1" /> Add Highlight
               </Button>
@@ -3115,7 +3115,7 @@ export function ProjectForm({
                     onClick={() =>
                       setConnectivity((prev) => prev.filter((_, j) => j !== i))
                     }
-                    className="h-12 w-12 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                    className="h-9 w-9 text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
                     aria-label="Remove highlight"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -3133,7 +3133,7 @@ export function ProjectForm({
             </h3>
             <div className="flex items-center gap-3">
               {preview.unitsCount > 0 && (
-                <span className="text-sm font-semibold text-[#0052FF]">
+                <span className="text-[13px] font-medium text-muted-foreground">
                   {formatPriceRange(preview.minPrice, preview.maxPrice)}
                 </span>
               )}
@@ -3167,7 +3167,7 @@ export function ProjectForm({
             {units.map((unit, idx) => (
               <div
                 key={idx}
-                className="border border-border/60 rounded-2xl bg-muted/10 overflow-hidden"
+                className="border border-border/60 rounded-lg bg-muted/10 overflow-hidden"
               >
                 <div
                   className="flex items-center gap-3 p-5 cursor-pointer select-none"
@@ -3182,7 +3182,7 @@ export function ProjectForm({
                   }}
                   aria-expanded={isUnitOpen(idx)}
                 >
-                  <span className="text-sm font-bold text-foreground shrink-0">
+                  <span className="shrink-0 text-[14px] font-medium text-foreground">
                     Unit {idx + 1}
                   </span>
                   <span className="flex-1 truncate text-[13px] text-muted-foreground">
@@ -3207,7 +3207,7 @@ export function ProjectForm({
                 {isUnitOpen(idx) && (
                   <div className="px-5 pb-5 space-y-4 border-t border-border/40 pt-4">
                     <div
-                      className="flex gap-1 rounded-xl bg-muted/40 p-1 overflow-x-auto"
+                      className="flex gap-1 rounded-lg bg-muted/40 p-1 overflow-x-auto"
                       role="tablist"
                       aria-label={`Unit ${idx + 1} sections`}
                     >
@@ -3223,7 +3223,7 @@ export function ProjectForm({
                           onClick={() => setUnitTab(idx, t.id)}
                           className={`flex-1 whitespace-nowrap px-3 py-2 rounded-lg text-[13px] font-semibold transition-colors cursor-pointer ${
                             unitTab(idx) === t.id
-                              ? "bg-white text-[#0052FF] shadow-sm dark:bg-card dark:text-white"
+                              ? "bg-background text-foreground shadow-sm dark:bg-white/[0.08]"
                               : "text-muted-foreground hover:text-foreground"
                           }`}
                         >
@@ -3379,6 +3379,7 @@ export function ProjectForm({
                                 <div className="space-y-2">
                                   <label className={labelClass}>Floor Nos</label>
                                   <FloorNosInput
+                                    className="min-h-9! rounded-md! bg-muted/40! py-1! dark:bg-white/[0.04]!"
                                     value={unit.floorNo}
                                     onChange={(val) =>
                                       updateUnit(idx, { floorNo: val })
@@ -3622,9 +3623,9 @@ export function ProjectForm({
                                 return (
                                   <label
                                     key={key}
-                                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                                       checked
-                                        ? "bg-[#0052FF]/5 border-[#0052FF]/30"
+                                        ? "bg-foreground/[0.04] border-foreground/40"
                                         : "bg-muted/10 border-border/40 hover:bg-muted/30"
                                     }`}
                                   >
@@ -3657,9 +3658,9 @@ export function ProjectForm({
                                   return (
                                     <label
                                       key={item.id}
-                                      className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                                      className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                                         checked
-                                          ? "bg-[#0052FF]/5 border-[#0052FF]/30"
+                                          ? "bg-foreground/[0.04] border-foreground/40"
                                           : "bg-muted/10 border-border/40 hover:bg-muted/30"
                                       }`}
                                     >
@@ -3735,9 +3736,9 @@ export function ProjectForm({
                                   Guest Parking
                                 </span>
                                 <label
-                                  className={`flex h-12 items-center gap-3 px-4 rounded-xl border cursor-pointer transition-colors ${
+                                  className={`flex h-10 items-center gap-3 px-3 rounded-md border cursor-pointer transition-colors ${
                                     unit.unitGuestParking
-                                      ? "bg-[#0052FF]/5 border-[#0052FF]/30"
+                                      ? "bg-foreground/[0.04] border-foreground/40"
                                       : "bg-muted/10 border-border/40 hover:bg-muted/30"
                                   }`}
                                 >
@@ -3766,6 +3767,7 @@ export function ProjectForm({
                           <div className="space-y-2">
                             <label className={labelClass}>Price (₹)</label>
                             <PriceInput
+                              className={inputClass}
                               value={unit.price}
                               onChange={(v) => updateUnit(idx, { price: v })}
                               placeholder="e.g. 80L or 1.2Cr"
@@ -3793,14 +3795,14 @@ export function ProjectForm({
                             <label className={labelClass}>Plot Layout Image</label>
                             <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => handleFloorPlanFiles(e, unit.clientId, `plot-layout:${unit.clientId}`)} />
                             {unit.floorPlanImageUrl ? (
-                              <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 p-2">
+                              <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/20 p-2">
                                 {(floorPlanPreviews[`plot-layout:${unit.clientId}`] || /^https?:/i.test(unit.floorPlanImageUrl)) && <img src={floorPlanPreviews[`plot-layout:${unit.clientId}`] || unit.floorPlanImageUrl} alt="Plot layout" className="h-16 w-16 rounded-lg object-cover bg-white" />}
                                 <span className="flex-1 truncate text-xs text-muted-foreground">{unit.floorPlanImageUrl}</span>
                                 <Button type="button" variant="outline" size="sm" disabled={uploadingFloorPlanId !== null} onClick={(e) => (e.currentTarget.parentElement?.parentElement?.querySelector("input[type=file]") as HTMLInputElement | null)?.click()}>Replace image</Button>
                                 <Button type="button" variant="ghost" size="sm" aria-label="Remove plot layout" onClick={() => updateUnit(idx, { floorPlanImageUrl: "", floorPlanImageKey: "" })}><X className="h-4 w-4" /></Button>
                               </div>
                             ) : (
-                              <Button type="button" variant="outline" disabled={uploadingFloorPlanId !== null} onClick={(e) => (e.currentTarget.parentElement?.querySelector("input[type=file]") as HTMLInputElement | null)?.click()} className="h-11 w-full border-dashed">
+                              <Button type="button" variant="outline" disabled={uploadingFloorPlanId !== null} onClick={(e) => (e.currentTarget.parentElement?.querySelector("input[type=file]") as HTMLInputElement | null)?.click()} className={cn(FOCUS_BUTTON.secondary, "h-10 w-full border-dashed")}>
                                 {uploadingFloorPlanId === `plot-layout:${unit.clientId}` ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />}
                                 {uploadingFloorPlanId === `plot-layout:${unit.clientId}` ? "Uploading..." : "Upload plot layout"}
                               </Button>
@@ -3813,7 +3815,7 @@ export function ProjectForm({
                             {unit.floorPlans.map((plan) => {
                               const preview = floorPlanPreviews[plan.id] || plan.imageUrl || plan.imageKey;
                               return (
-                                <div key={plan.id} className="rounded-xl border border-border/60 bg-muted/20 p-3 space-y-3">
+                                <div key={plan.id} className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-3">
                                   <div className="flex items-end gap-3">
                                     <div className="flex-1 space-y-2">
                                       <label className={labelClass}>Floor name</label>
@@ -3822,7 +3824,7 @@ export function ProjectForm({
                                     <Button type="button" variant="ghost" onClick={() => {
                                       updateUnit(idx, { floorPlans: unit.floorPlans.filter((row) => row.id !== plan.id) });
                                       setFloorPlanPreviews((prev) => { const next = { ...prev }; delete next[plan.id]; return next; });
-                                    }} className="h-12 w-12 shrink-0 text-muted-foreground hover:text-red-600" aria-label={`Remove ${plan.floorName || "unnamed"} floor plan`}>
+                                    }} className="h-9 w-9 shrink-0 text-muted-foreground hover:text-red-600" aria-label={`Remove ${plan.floorName || "unnamed"} floor plan`}>
                                       <X className="h-4 w-4" />
                                     </Button>
                                   </div>
@@ -3834,7 +3836,7 @@ export function ProjectForm({
                                         <Button type="button" variant="outline" size="sm" disabled={uploadingFloorPlanId !== null} onClick={(e) => (e.currentTarget.parentElement?.querySelector("input[type=file]") as HTMLInputElement | null)?.click()}>Replace image</Button>
                                       </>
                                     ) : (
-                                      <Button type="button" variant="outline" disabled={uploadingFloorPlanId !== null} onClick={(e) => (e.currentTarget.parentElement?.querySelector("input[type=file]") as HTMLInputElement | null)?.click()} className="h-11 w-full border-dashed">
+                                      <Button type="button" variant="outline" disabled={uploadingFloorPlanId !== null} onClick={(e) => (e.currentTarget.parentElement?.querySelector("input[type=file]") as HTMLInputElement | null)?.click()} className={cn(FOCUS_BUTTON.secondary, "h-10 w-full border-dashed")}>
                                         {uploadingFloorPlanId === plan.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />}
                                         {uploadingFloorPlanId === plan.id ? "Uploading..." : "Upload floor image"}
                                       </Button>
@@ -3852,7 +3854,7 @@ export function ProjectForm({
                       !isPlotProject(projectType) && (
                         <div className="space-y-3 pt-1">
                           <div className="flex items-center justify-between border-b border-border/40 pb-2">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                            <span className="text-[13px] font-medium text-muted-foreground">
                               Room Dimensions
                             </span>
                             <Button
@@ -3866,7 +3868,7 @@ export function ProjectForm({
                                   ],
                                 })
                               }
-                              className="h-8 rounded-full px-3 text-xs"
+                              className={cn(FOCUS_BUTTON.secondary, "h-7 text-[12px]")}
                             >
                               <Plus className="h-3.5 w-3.5 mr-1" /> Add Room
                             </Button>
@@ -3950,7 +3952,7 @@ export function ProjectForm({
                                         ),
                                     })
                                   }
-                                  className="h-12 w-12 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                                  className="h-9 w-9 text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
                                   aria-label="Remove room"
                                 >
                                   <Trash2 className="h-4 w-4" />
@@ -3971,7 +3973,7 @@ export function ProjectForm({
                 setUnits((prev) => [...prev, emptyUnit()]);
                 setOpenUnits((prev) => ({ ...prev, [units.length]: true }));
               }}
-              className="w-full border-dashed border-2 h-12"
+              className={cn(FOCUS_BUTTON.secondary, "h-10 w-full border-dashed")}
             >
               <Plus className="h-4 w-4 mr-2" /> Add Unit
             </Button>
@@ -3987,7 +3989,7 @@ export function ProjectForm({
               onClick={() =>
                 setFaqs((prev) => [...prev, { ...emptyFaq(), section: faqTab }])
               }
-              className="h-9 rounded-full px-4"
+              className={FOCUS_BUTTON.secondary}
             >
               <Plus className="h-4 w-4 mr-1" /> Add FAQ
             </Button>
@@ -4026,10 +4028,10 @@ export function ProjectForm({
               {visibleFaqs.map(({ faq: f, idx: i }) => (
                 <div
                   key={i}
-                  className="border border-border/60 rounded-2xl p-5 space-y-4 bg-muted/10"
+                  className="border border-border/60 rounded-lg p-5 space-y-4 bg-muted/10"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-foreground">
+                    <span className="text-[14px] font-medium text-foreground">
                       FAQ {i + 1}
                     </span>
                     <Button
@@ -4073,7 +4075,7 @@ export function ProjectForm({
                         )
                       }
                       placeholder="Type the answer here..."
-                      className="rounded-md border-border bg-muted/40 text-[14px] min-h-[90px] dark:bg-white/[0.04]"
+                      className={cn(FOCUS_FIELD, "min-h-[90px] py-2")}
                     />
                   </div>
                 </div>
@@ -4100,7 +4102,7 @@ export function ProjectForm({
             <Button variant="outline" onClick={restoreDraft}>
               Restore my changes
             </Button>
-            <Button onClick={keepSavedVersion} className="bg-[#0052FF] hover:bg-[#0052FF]/90">
+            <Button onClick={keepSavedVersion} className="bg-foreground text-background hover:bg-foreground/85">
               Keep saved version
             </Button>
           </DialogFooter>
@@ -4125,7 +4127,7 @@ export function ProjectForm({
               <Button variant="outline" onClick={leaveKeepingDraft}>
                 Keep as draft
               </Button>
-              <Button onClick={saveAndLeave} className="bg-[#0052FF] hover:bg-[#0052FF]/90">
+              <Button onClick={saveAndLeave} className="bg-foreground text-background hover:bg-foreground/85">
                 Save &amp; leave
               </Button>
             </div>
@@ -4150,7 +4152,7 @@ export function ProjectForm({
             <Button variant="outline" onClick={() => setSaveConflict(null)}>
               Cancel
             </Button>
-            <Button onClick={loadLatestVersion} className="bg-[#0052FF] hover:bg-[#0052FF]/90">
+            <Button onClick={loadLatestVersion} className="bg-foreground text-background hover:bg-foreground/85">
               Load latest version
             </Button>
           </DialogFooter>
