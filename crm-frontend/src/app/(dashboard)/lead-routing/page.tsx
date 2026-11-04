@@ -1051,7 +1051,51 @@ export default function LeadRoutingPage() {
             <SegmentTabs label="Pipeline" value={deptTab} onChange={setDeptTab} tabs={visibleDeptTabs.map((d) => ({ value: d.value, label: d.label }))} />
           )}
 
-          {activeView.picker && <div className="ml-auto">{activeView.picker}</div>}
+          {activeView.picker && <div className={mainTab === "history" ? undefined : "ml-auto"}>{activeView.picker}</div>}
+
+          {mainTab === "history" && (
+            <div role="group" aria-label="Routing history filters" className="ml-auto flex w-full min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-2 md:w-auto">
+              <div role="group" aria-label="Date range" className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:w-auto sm:grid-cols-[9rem_auto_9rem]">
+                <DatePicker
+                  value={historyDateFrom}
+                  onChange={(d) => { setHistoryDateFrom(d); setHistoryPage(1); }}
+                  placeholder="From date"
+                  className="h-8 min-w-0 gap-2 rounded-md border-transparent bg-muted/70 px-2 text-sm shadow-none hover:bg-muted [&_svg]:mr-0"
+                />
+                <span aria-hidden className="text-xs text-muted-foreground">to</span>
+                <DatePicker
+                  value={historyDateTo}
+                  onChange={(d) => { setHistoryDateTo(d); setHistoryPage(1); }}
+                  placeholder="To date"
+                  className="h-8 min-w-0 gap-2 rounded-md border-transparent bg-muted/70 px-2 text-sm shadow-none hover:bg-muted [&_svg]:mr-0"
+                />
+              </div>
+              <ToolbarSelect
+                label="Event"
+                options={EVENT_TYPE_OPTIONS}
+                closeOnSelect
+                value={historyEventFilter}
+                onChange={(value) => { setHistoryEventFilter(value); setHistoryPage(1); }}
+              />
+              {(historyDateFrom !== undefined || historyDateTo !== undefined || historyEventFilter) && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 rounded-md px-2 text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setHistoryDateFrom(undefined);
+                    setHistoryDateTo(undefined);
+                    setHistoryEventFilter("");
+                    setHistoryPage(1);
+                  }}
+                >
+                  <X aria-hidden className="size-4" />
+                  Clear filters
+                </Button>
+              )}
+            </div>
+          )}
 
           {mainTab === "enquiry" && (
             <div className={activeView.picker ? "relative" : "relative ml-auto"}>
@@ -1345,48 +1389,6 @@ export default function LeadRoutingPage() {
         {/* History Tab */}
         {mainTab === "history" && (
           <div className="w-full md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col p-4 md:p-0">
-            <div role="group" aria-label="Routing history filters" className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 pb-2 md:px-6 md:pt-4">
-              <div role="group" aria-label="Date range" className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:w-auto sm:grid-cols-[9rem_auto_9rem]">
-                <DatePicker
-                  value={historyDateFrom}
-                  onChange={(d) => { setHistoryDateFrom(d); setHistoryPage(1); }}
-                  placeholder="From date"
-                  className="h-8 min-w-0 gap-2 rounded-md border-transparent bg-muted/70 px-2 text-sm shadow-none hover:bg-muted [&_svg]:mr-0"
-                />
-                <span aria-hidden className="text-xs text-muted-foreground">to</span>
-                <DatePicker
-                  value={historyDateTo}
-                  onChange={(d) => { setHistoryDateTo(d); setHistoryPage(1); }}
-                  placeholder="To date"
-                  className="h-8 min-w-0 gap-2 rounded-md border-transparent bg-muted/70 px-2 text-sm shadow-none hover:bg-muted [&_svg]:mr-0"
-                />
-              </div>
-              <ToolbarSelect
-                label="Event"
-                options={EVENT_TYPE_OPTIONS}
-                closeOnSelect
-                value={historyEventFilter}
-                onChange={(value) => { setHistoryEventFilter(value); setHistoryPage(1); }}
-              />
-              {(historyDateFrom !== undefined || historyDateTo !== undefined || historyEventFilter) && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 rounded-md px-2 text-muted-foreground hover:text-foreground"
-                  onClick={() => {
-                    setHistoryDateFrom(undefined);
-                    setHistoryDateTo(undefined);
-                    setHistoryEventFilter("");
-                    setHistoryPage(1);
-                  }}
-                >
-                  <X aria-hidden className="size-4" />
-                  Clear filters
-                </Button>
-              )}
-            </div>
-
             {historyLoading ? (
               <TableSkeleton />
             ) : (
