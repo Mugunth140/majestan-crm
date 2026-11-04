@@ -5,6 +5,7 @@ import { User, fullUser } from '../../database/entities/user.entity';
 import * as bcrypt from 'bcrypt';
 import { PermissionsService } from '../permissions/permissions.service';
 import { ContactLogsService } from '../contact-logs/contact-logs.service';
+import { UserAvatarsService } from './user-avatars.service';
 
 @Injectable()
 export class UsersService {
@@ -13,6 +14,7 @@ export class UsersService {
     private readonly userRepository: Repository<User>,
     private readonly permissionsService: PermissionsService,
     private readonly contactLogsService: ContactLogsService,
+    private readonly avatars: UserAvatarsService,
   ) {}
 
   private validateRoleDepartment(roleId: number, departmentId: number | null): number | null {
@@ -138,6 +140,25 @@ export class UsersService {
       await this.contactLogsService.revokeAllUserDevices(saved.id);
     }
     return fullUser(saved);
+  }
+
+  /** Stores a new profile photo, then removes the old one. */
+  async setAvatar(id: number, file: Express.Multer.File) {
+    const user = await this.mustFind(id);
+    const previous = user.avatar_url;
+    const url = await this.avatars.upload(id, file);
+    await this.userRepository.update(id, { avatar_url: url });
+    await this.avatars.discard(previous).catch(() => {}); // a leftover file is harmless
+    return { avatar_url: url };
+  }
+
+  async removeAvatar(id: number) {
+    const user = await this.mustFind(id);
+    if (user.avatar_url) {
+      await this.userRepository.update(id, { avatar_url: null });
+      await this.avatars.discard(user.avatar_url).catch(() => {});
+    }
+    return { avatar_url: null };
   }
 
   async delete(id: number) {

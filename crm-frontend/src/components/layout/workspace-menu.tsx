@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { ChevronDown, LogOut, Moon, PanelLeftClose, PanelLeftOpen, Settings, Sun, type LucideIcon } from "lucide-react";
 import { PrismarkMark } from "@/components/brand/prismark-mark";
 import { cn } from "@/lib/utils";
+import { Avatar } from "@/components/record/feed";
 
 // Frappe-style menu surface: elevated card, groups split by hairlines, compact rows.
 const popupClass =
@@ -27,11 +28,13 @@ function Item({ icon: Icon, label, onClick, danger }: { icon: LucideIcon; label:
 export function WorkspaceMenu({
   userName,
   role,
+  avatar,
   collapsed,
   onToggleCollapsed,
 }: {
   userName: string;
   role: string;
+  avatar?: string | null;
   collapsed: boolean;
   onToggleCollapsed: () => void;
 }) {
@@ -73,9 +76,12 @@ export function WorkspaceMenu({
         <Menu.Positioner side="bottom" align="start" sideOffset={6} className="z-50 outline-none">
           <Menu.Popup className={popupClass}>
             {(userName || role) && (
-              <div className="px-3.5 py-2.5">
-                <p className="truncate text-[14px] font-medium leading-tight text-foreground">{userName}</p>
-                {role && <p className="mt-0.5 truncate text-xs text-muted-foreground">{role}</p>}
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+                {userName && <Avatar name={userName} src={avatar} className="h-8 w-8 text-[11px]" />}
+                <div className="min-w-0">
+                  <p className="truncate text-[14px] font-medium leading-tight text-foreground">{userName}</p>
+                  {role && <p className="mt-0.5 truncate text-xs text-muted-foreground">{role}</p>}
+                </div>
               </div>
             )}
             <Menu.Group className="p-1.5">

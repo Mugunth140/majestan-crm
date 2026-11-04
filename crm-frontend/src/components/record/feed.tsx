@@ -37,9 +37,12 @@ const TONES = [
   "bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300",
 ];
 
-export function Avatar({ name, className }: { name: string; className?: string }) {
+/** A person's photo, or their initials on a colour picked from the name. */
+export function Avatar({ name, src, className }: { name: string; src?: string | null; className?: string }) {
   const hash = [...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("") || "?";
+  // eslint-disable-next-line @next/next/no-img-element -- CDN photo, already small
+  if (src) return <img src={src} alt="" className={cn("h-6 w-6 shrink-0 rounded-full bg-muted object-cover", className)} />;
   return (
     <span className={cn("inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold", TONES[hash % TONES.length], className)}>
       {initials}

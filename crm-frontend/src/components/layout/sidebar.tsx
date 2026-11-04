@@ -54,9 +54,13 @@ export function Sidebar() {
   useSearchShortcut(setSearchOpen);
 
   useEffect(() => {
-    // localStorage is client-only; read once after mount.
+    // localStorage is client-only; read after mount, and again when the
+    // signed-in user changes their photo.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setUser(readUser());
+    const reread = () => setUser(readUser());
+    window.addEventListener("crm-user-updated", reread);
+    return () => window.removeEventListener("crm-user-updated", reread);
   }, []);
 
   return (
@@ -71,6 +75,7 @@ export function Sidebar() {
         <WorkspaceMenu
           userName={user?.name ?? ""}
           role={user?.role ?? ""}
+          avatar={user?.avatar ?? null}
           collapsed={isCollapsed}
           onToggleCollapsed={() => setIsCollapsed(!isCollapsed)}
         />

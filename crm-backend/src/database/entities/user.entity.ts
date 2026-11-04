@@ -42,6 +42,10 @@ export class User {
   @Column({ nullable: true })
   qualification: string;
 
+  /** Profile photo on the public CDN; null shows initials. */
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  avatar_url: string | null;
+
   @Column({ name: 'role_id' })
   role_id: number;
 
@@ -85,6 +89,7 @@ export class User {
       role_id: this.role_id,
       department_id: this.department_id,
       is_active: this.is_active,
+      avatar_url: this.avatar_url ?? null,
       role: this.role,
       department: this.department,
       created_at: this.created_at,

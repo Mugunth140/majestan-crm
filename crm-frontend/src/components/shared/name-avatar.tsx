@@ -24,7 +24,9 @@ export function avatarColor(name?: string) {
 }
 
 // Round first-letter avatar.
-export function NameAvatar({ name, className }: { name?: string; className?: string }) {
+export function NameAvatar({ name, src, className }: { name?: string; src?: string | null; className?: string }) {
+  // eslint-disable-next-line @next/next/no-img-element -- CDN photo, already small
+  if (src) return <img src={src} alt="" aria-hidden className={cn("size-6 shrink-0 rounded-full bg-muted object-cover", className)} />;
   return (
     <span
       aria-hidden

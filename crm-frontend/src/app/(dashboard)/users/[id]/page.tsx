@@ -11,7 +11,8 @@ import { fetchLoggerDevices, type LoggerDevice } from "@/lib/logger-devices";
 import { InlineSelect, InlineText, Section, withCurrent } from "@/components/record/inline-field";
 import { DataCard, Fact, RecordPage, RecordSkeleton, type RecordTab } from "@/components/record/record-page";
 import { HEADER_BUTTON, StatusMenu } from "@/components/record/header-actions";
-import { Avatar, TabHeader } from "@/components/record/feed";
+import { TabHeader } from "@/components/record/feed";
+import { ProfilePhoto } from "@/components/users/profile-photo";
 import { statusDot, statusPillClass, formatTableDate } from "@/components/tables/cells";
 import { DeviceCard } from "@/components/logger/device-card";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -30,6 +31,7 @@ type User = {
   role?: { id: number; name: string } | null; department?: { id: number; name: string } | null;
   phone?: string | null; whatsapp_no?: string | null; dob?: string | null; qualification?: string | null; address?: string | null;
   aadhaar_no?: string | null; bank_account_no?: string | null; join_date?: string | null; created_at?: string;
+  avatar_url?: string | null;
   permissions?: string[];
 };
 
@@ -37,8 +39,9 @@ const STATUS_OPTIONS = [
   { value: "Active", dot: statusDot("Active", "green") },
   { value: "Inactive", dot: statusDot("Inactive", "gray") },
 ];
-const errorText = (result: { message?: string | string[] } | null) =>
-  Array.isArray(result?.message) ? result.message.join(", ") : result?.message;
+// Validation errors come as `message` (sometimes a list), others as `error`.
+const errorText = (result: { message?: string | string[]; error?: string } | null) =>
+  Array.isArray(result?.message) ? result.message.join(", ") : result?.message ?? result?.error;
 const dateOnly = (v?: string | null) => (v ? String(v).slice(0, 10) : "");
 
 function UserPage() {
@@ -58,6 +61,10 @@ function UserPage() {
   const [password, setPassword] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [canEdit] = useState(() => isAdminUser());
+  // Admins change anyone's photo; people can also change their own.
+  const [isSelf] = useState(() => {
+    try { return String(JSON.parse(localStorage.getItem("crm_user") || "{}")?.id) === id; } catch { return false; }
+  });
 
   const fetchUser = useCallback(async (): Promise<User | null> => {
     try {
@@ -115,6 +122,10 @@ function UserPage() {
   const roleId = String(u.role_id ?? u.role?.id ?? "");
   const deptNeeded = needsDepartment(roleId);
   const status = u.is_active ? "Active" : "Inactive";
+  const photo = (className: string) => (
+    <ProfilePhoto userId={u.id} name={u.name} src={u.avatar_url} editable={canEdit || isSelf} className={className}
+      onChange={(url) => setUser((prev) => (prev ? { ...prev, avatar_url: url } : prev))} />
+  );
   const subtitle = [userCode(u.id), u.role?.name, u.department?.name].filter(Boolean).join(" · ");
 
   const changeRole = async (next: string) => {
@@ -250,7 +261,7 @@ function UserPage() {
         </>}
         phone={
           <div className="flex items-center gap-3">
-            <Avatar name={u.name} className="h-10 w-10 text-[13px]" />
+            {photo("h-10 w-10 text-[13px]")}
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] text-muted-foreground">{subtitle}</p>
             </div>
@@ -260,7 +271,7 @@ function UserPage() {
         aside={
           <>
             <div className="flex items-center gap-3 border-b p-4">
-              <Avatar name={u.name} className="h-12 w-12 text-[15px]" />
+              {photo("h-12 w-12 text-[15px]")}
               <div className="min-w-0">
                 <p className="truncate text-[17px] font-semibold leading-6 text-foreground">{u.name}</p>
                 <p className="truncate text-[13px] text-muted-foreground">{subtitle}</p>

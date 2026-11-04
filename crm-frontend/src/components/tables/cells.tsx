@@ -30,11 +30,11 @@ export function IdCell({ href, onClick, children }: { href?: string; onClick?: (
 }
 
 /** Primary column: the record's name, optionally with a letter avatar. */
-export function NameCell({ name, avatar = false, sub, className }: { name?: ReactNode; avatar?: boolean; sub?: ReactNode; className?: string }) {
+export function NameCell({ name, avatar = false, image, sub, className }: { name?: ReactNode; avatar?: boolean; image?: string | null; sub?: ReactNode; className?: string }) {
   const label = name ?? <span className="text-muted-foreground">—</span>;
   return (
     <span className={cn("inline-flex min-w-0 items-center gap-2", className)}>
-      {avatar && <NameAvatar name={typeof name === "string" ? name : undefined} />}
+      {avatar && <NameAvatar name={typeof name === "string" ? name : undefined} src={image} />}
       <span className="min-w-0">
         <span className="block truncate font-medium text-foreground">{label}</span>
         {sub && <span className="block truncate text-[12px] text-muted-foreground">{sub}</span>}

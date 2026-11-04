@@ -9,7 +9,7 @@ describe('User serialisation', () => {
 
   it('never puts the password hash or personal details in a response', () => {
     const json = JSON.parse(JSON.stringify({ follow_ups: [{ created_by: user }] }));
-    expect(json.follow_ups[0].created_by).toEqual({ id: 7, name: 'Tele Staff', email: 'tele@example.com', role_id: 3, department_id: 2, is_active: true });
+    expect(json.follow_ups[0].created_by).toEqual({ id: 7, name: 'Tele Staff', email: 'tele@example.com', role_id: 3, department_id: 2, is_active: true, avatar_url: null });
   });
 
   it('keeps every field but the hash for the admin Users screens', () => {

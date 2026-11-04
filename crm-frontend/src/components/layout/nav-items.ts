@@ -95,6 +95,8 @@ export function canSee(access: NavAccess | undefined, viewer: NavViewer | null) 
 
 export interface StoredUser extends NavViewer {
   name: string;
+  /** Profile photo URL, when they've set one. */
+  avatar: string | null;
 }
 
 /** The signed-in user as the navigation needs them (null before sign-in or if storage is unreadable). */
@@ -108,6 +110,7 @@ export function readUser(): StoredUser | null {
       role: user?.role?.name ?? user?.role ?? "",
       department: user?.department?.name ?? user?.department ?? "",
       blogAccess: can("blog.manage", user),
+      avatar: user?.avatar_url ?? null,
     };
   } catch {
     return null;
