@@ -17,7 +17,7 @@ import {
   FieldRow, FOCUS_BUTTON, FOCUS_FIELD, FocusField, FocusModal, FocusSection, fieldName, stepStatus,
 } from "@/components/shared/focus-modal";
 import {
-  ADVANCE_MONTHS, BHK_CHOICES, BROKERAGE_ACCEPTED, BROKERAGE_PAYERS, BROKERAGE_TYPES, EMPTY_INBOUND, INBOUND_CATEGORIES,
+  ADVANCE_MONTHS, BHK_CHOICES, BROKERAGE_ACCEPTED, BROKERAGE_PAYERS, BROKERAGE_TYPES, EMPTY_INBOUND, INBOUND_CATEGORIES, INDIAN_STATES,
   INBOUND_PURPOSES, INBOUND_STATUSES, INBOUND_STEPS, INBOUND_TYPES, KEY_HOLDERS, PRIMARY_CONTACTS, SPECIAL_PURPOSES,
   checkInbound, hasBhk, hasFloor, hasFloorPricing, inboundErrorMessage, inboundPayload,
   type FloorRow, type InboundForm, type InboundStep,
@@ -350,8 +350,10 @@ export function NewInboundModal({ open, onOpenChange, onCreated, quick = false }
     body = (
       <FocusSection title="Location" description="Where the property is.">
         <FieldRow cols={3}>
-          <FocusField required name="state" label="State" htmlFor="ni-state" error={errors.state}>
-            <Input id="ni-state" value={form.state} onChange={(e) => set("state", e.target.value)} className={INPUT} />
+          <FocusField required name="state" label="State" error={errors.state}>
+            <FormSelect name="state" placeholder="Select" className={SELECT} value={form.state || null}
+              options={INDIAN_STATES.some((o) => o.value === form.state) || !form.state ? INDIAN_STATES : [{ label: form.state, value: form.state }, ...INDIAN_STATES]}
+              onValueChange={(v) => set("state", v)} />
           </FocusField>
           <FocusField required name="city" label="City" error={errors.city}>
             {cities === null ? loading : (

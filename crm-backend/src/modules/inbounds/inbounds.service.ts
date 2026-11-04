@@ -12,6 +12,7 @@ import { S3Client } from 'bun';
 import { extname } from 'path';
 import { readInboundPhotoCoordinates, submissionStatuses } from './inbound-submissions';
 import { buildWatermarkedImageUrl } from '../../common/imgproxy-watermark';
+import { RecordEventsService } from '../record-events/record-events.service';
 
 // Sensitive contact values masked for Team Lead / Staff without the
 // `inbounds.call_tracking` grant. Names, roles and the property address stay
@@ -30,6 +31,12 @@ const INBOUND_CONTACT_KEYS = [
   'broker_mobile',
 ] as const;
 
+// Columns the Activity tab doesn't describe: bookkeeping, or recorded as their own event.
+const UNTRACKED = new Set([
+  'id', 'property_id', 'created_at', 'updated_at', 'quality_score', 'image_url', 'uploaded_by_id',
+  'is_queued', 'assigned_staff_id', 'follow_ups', 'contact_logs', 'units', 'assigned_staff', 'uploaded_by',
+]);
+
 @Injectable()
 export class InboundsService {
   private _s3Client: S3Client | null = null;
@@ -45,6 +52,7 @@ export class InboundsService {
     private unitsRepository: Repository<InboundUnit>,
     private readonly permissionsService: PermissionsService,
     @Optional() private readonly events?: EventEmitter2,
+    @Optional() private readonly recordEvents?: RecordEventsService,
   ) {}
 
   private get s3Client(): S3Client {
@@ -60,8 +68,9 @@ export class InboundsService {
     return this._s3Client;
   }
 
-  async uploadImage(id: number, file: Express.Multer.File) {
+  async uploadImage(id: number, file: Express.Multer.File, actorId: number | null = null) {
     const inbound = await this.mustFindOne(id);
+    const hadPhoto = !!inbound.image_url;
 
     if (file.size > 10 * 1024 * 1024) {
       throw new BadRequestException('Image size exceeds 10MB limit');
@@ -115,6 +124,7 @@ export class InboundsService {
       inbound.image_url = tempFileUrl;
     }
     
+    await this.recordEvents?.record({ entity: 'inbound', entityId: id, actorId, type: hadPhoto ? 'photo_replaced' : 'photo_added' });
     // Serialize the final image save with late GPS updates, including after an app reload.
     return this.inboundsRepository.manager.transaction(async manager => {
       const current = await manager.findOne(Inbound, {
@@ -176,6 +186,10 @@ export class InboundsService {
     }
 
     // listings@ "property received" draft (only reaches owners with an email).
+    await this.recordEvents?.record({
+      entity: 'inbound', entityId: savedInbound.id, actorId, type: 'created', to: savedInbound.status,
+      meta: { quick: !!quick_capture },
+    });
     await this.events?.emitAsync('listings.inbound.created', { entityId: savedInbound.id, actorId });
     return savedInbound;
   }
@@ -218,9 +232,17 @@ export class InboundsService {
     if (staffId !== null && !(await this.assignableStaff()).some(person => person.id === staffId)) {
       throw new BadRequestException('Choose an active inbound staff member');
     }
-    const records = await this.inboundsRepository.find({ where: { id: In(ids) }, select: { id: true } });
+    const records = await this.inboundsRepository.find({ where: { id: In(ids) }, select: { id: true, assigned_staff_id: true } });
     if (records.length !== ids.length) throw new NotFoundException('One or more inbounds were not found');
     await this.inboundsRepository.update({ id: In(ids) }, { assigned_staff_id: staffId as any, is_queued: staffId === null });
+    const people = await this.userRepository().find({
+      where: { id: In([staffId, ...records.map(r => r.assigned_staff_id)].filter((x): x is number => !!x)) }, select: { id: true, name: true },
+    });
+    const name = (personId: number | null) => people.find(p => p.id === personId)?.name ?? null;
+    await this.recordEvents?.record(records.filter(r => r.assigned_staff_id !== staffId).map(r => ({
+      entity: 'inbound' as const, entityId: r.id, actorId: actor?.id ?? null,
+      type: staffId === null ? 'unassigned' : 'assigned', from: name(r.assigned_staff_id), to: name(staffId),
+    })));
     return { success: true, assigned: ids.length };
   }
 
@@ -291,6 +313,12 @@ export class InboundsService {
     });
   }
 
+  /** The inbound's Activity, for anyone who can open it. */
+  async activity(id: number, user?: any) {
+    await this.findOne(id, user);
+    return this.recordEvents?.activity('inbound', id) ?? [];
+  }
+
   async findOne(id: number, user?: any): Promise<Inbound> {
     const inbound = await this.mustFindOne(id);
 
@@ -351,14 +379,19 @@ export class InboundsService {
 
   async update(id: number, updateInboundDto: Omit<Partial<Inbound>, 'units'> & { units?: any[] }, actorId: number | null = null): Promise<Inbound> {
     const inbound = await this.mustFindOne(id);
-    const previousStatus = inbound.status;
-
     const { units, uploaded_by_id: _uploader, is_queued: _queued, quick_capture: _quick, ...rest } = updateInboundDto as typeof updateInboundDto & { quick_capture?: boolean };
+    const previousStatus = inbound.status;
+    const before: Record<string, unknown> = { ...inbound };
+    const previousUnits = units !== undefined ? await this.unitsRepository.find({ where: { inbound_id: id }, order: { id: 'ASC' } }) : [];
+
     // update properties (TypeORM hooks will trigger on save)
     Object.assign(inbound, rest);
 
     const saved = await this.inboundsRepository.save(inbound);
+    const changed = Object.keys(rest).filter((k) => !UNTRACKED.has(k) && k !== 'status');
+    await this.recordEvents?.recordChanges('inbound', id, actorId, before, saved as unknown as Record<string, unknown>, changed, [...INBOUND_CONTACT_KEYS]);
     if (saved.status !== previousStatus) {
+      await this.recordEvents?.record({ entity: 'inbound', entityId: id, actorId, type: 'status_changed', field: 'status', from: previousStatus, to: saved.status });
       await this.events?.emitAsync('listings.inbound.status_changed', { entityId: id, actorId, from: previousStatus, to: saved.status });
     }
 
@@ -366,6 +399,10 @@ export class InboundsService {
     if (units !== undefined) {
       await this.unitsRepository.delete({ inbound_id: id });
       const cleanUnits = this.sanitizeUnits(units);
+      const floors = (rows: { floor_label: string }[]) => rows.map((u) => u.floor_label).join(', ');
+      if (floors(previousUnits) !== floors(cleanUnits) || JSON.stringify(previousUnits.map((u) => [u.area ?? null, u.price == null ? null : Number(u.price), u.notes ?? null])) !== JSON.stringify(cleanUnits.map((u) => [u.area ?? null, u.price ?? null, u.notes ?? null]))) {
+        await this.recordEvents?.record({ entity: 'inbound', entityId: id, actorId, type: 'floors_changed', from: floors(previousUnits), to: floors(cleanUnits) });
+      }
       (saved as any).units = cleanUnits.length > 0
         ? await this.unitsRepository.save(
             cleanUnits.map((u) => this.unitsRepository.create({ ...u, inbound_id: id })),

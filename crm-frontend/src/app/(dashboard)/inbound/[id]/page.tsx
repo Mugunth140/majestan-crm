@@ -4,16 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
-  Building2, ChevronDown, ExternalLink, ImageIcon, Info, Loader2, Lock, MapPin, MessagesSquare, Plus, Upload, Wallet, X,
+  ChevronDown, Database, ExternalLink, History, ImageIcon, Info, Loader2, Lock, MapPin, MessagesSquare, Plus, Upload, Wallet, X,
 } from "lucide-react";
 import { apiFetch, apiJson } from "@/lib/api-fetch";
-import { useIsMobile } from "@/hooks/use-device";
 import { canViewInboundContacts } from "@/lib/permissions";
 import { sortContactLogs } from "@/lib/contact-log-utils";
 import { formatIndianCurrencyShort, parseIndianCurrency } from "@/lib/indian-currency";
 import { INBOUND_STATUS_OPTIONS } from "@/lib/inbound-status";
 import {
-  ADVANCE_MONTHS, BHK_CHOICES, BROKERAGE_ACCEPTED, BROKERAGE_PAYERS, BROKERAGE_TYPES, INBOUND_CATEGORIES, INBOUND_PURPOSES,
+  ADVANCE_MONTHS, BHK_CHOICES, BROKERAGE_ACCEPTED, BROKERAGE_PAYERS, BROKERAGE_TYPES, INBOUND_CATEGORIES, INBOUND_PURPOSES, INDIAN_STATES,
   INBOUND_STATUSES, INBOUND_STATUS_TONES, INBOUND_TYPES, KEY_HOLDERS, PRIMARY_CONTACTS, SPECIAL_PURPOSES,
   hasBhk, hasFloor, hasFloorPricing, inboundErrorMessage, normalizeCategoryAndType, typeLabel,
 } from "@/lib/inbound-form";
@@ -23,9 +22,11 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { PageActions } from "@/components/layout/page-actions";
-import { InboundAssignmentDialog } from "@/components/inbound/inbound-assignment-dialog";
-import { FieldRow, InlineAction, InlineMulti, InlineSelect, InlineText, Section, type Option } from "@/components/record/inline-field";
-import { TabHeader } from "@/components/record/feed";
+import { FieldRow, InlineMulti, InlineSelect, InlineText, Section, type Option } from "@/components/record/inline-field";
+import { Feed, TabHeader } from "@/components/record/feed";
+import { AssigneePicker } from "@/components/record/assignee-picker";
+import { ScoreRing } from "@/components/record/score-ring";
+import { activityItems, type ActivityEntry } from "@/components/inbound/inbound-activity";
 import { INBOUND_ENTITY, LeadConversation } from "@/components/record/conversation";
 import { FollowUpComposer } from "@/components/record/follow-up-composer";
 import { AttachmentsArt, EmptyState } from "@/components/record/empty-state";
@@ -33,7 +34,7 @@ import { cn } from "@/lib/utils";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
-type Tab = "conversation" | "details" | "pricing" | "photo";
+type Tab = "activity" | "conversation" | "data" | "pricing" | "photo";
 type Inbound = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 type Patch = Record<string, unknown>;
 
@@ -42,6 +43,10 @@ const yesNo = (v: unknown) => (v ? "yes" : "no");
 
 const HEADER_BUTTON =
   "inline-flex h-8 items-center gap-1.5 rounded-md border bg-background px-3 text-[14px] font-medium text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors hover:bg-muted disabled:opacity-50";
+
+// The assignee field in the side panel, styled like the other inline fields.
+const FIELD_TRIGGER =
+  "flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[14px] text-foreground transition-colors hover:bg-foreground/[0.05] data-[popup-open]:bg-foreground/[0.05]";
 
 const inboundCode = (i: Inbound) => i.property_id || `IN${String(i.id).padStart(5, "0")}`;
 const rupees = (v: unknown) => (v == null || v === "" ? "" : formatIndianCurrencyShort(Number(v)));
@@ -67,7 +72,7 @@ function PageSkeleton() {
       </div>
       <div className="hidden w-[340px] shrink-0 border-l md:block xl:w-[360px]">
         <div className="flex items-center gap-3 border-b p-4">
-          <Skeleton className="h-12 w-12 rounded-xl" />
+          <Skeleton className="h-12 w-12 rounded-full" />
           <div className="space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-24" /></div>
         </div>
         <div className="space-y-3 p-4">{[...Array(9)].map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}</div>
@@ -112,16 +117,13 @@ function Restricted({ label }: { label: string }) {
   );
 }
 
-/** How good the listing is (0–100): the same bands the inbound team uses. */
-function QualityScore({ score }: { score: number }) {
-  const band = score >= 90 ? ["Premium", "bg-emerald-500"] : score >= 75 ? ["Featured", "bg-blue-500"] : score >= 60 ? ["Standard", "bg-amber-500"] : ["Needs work", "bg-rose-500"];
+/** One group of fields on the Data tab, two columns wide on desktop. */
+function DataCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div title={`Quality score ${score}/100`} className="flex items-center gap-2 text-[12px] text-muted-foreground">
-      <span className="h-1.5 w-16 overflow-hidden rounded-full bg-foreground/[0.08]">
-        <span className={cn("block h-full rounded-full", band[1])} style={{ width: `${Math.min(100, Math.max(0, score))}%` }} />
-      </span>
-      {band[0]} · {score}
-    </div>
+    <section className="overflow-hidden rounded-xl border bg-card">
+      <h3 className="flex h-11 items-center border-b px-4 text-[14px] font-semibold text-foreground">{title}</h3>
+      <div className="grid gap-x-8 px-3 py-2 md:grid-cols-2 md:px-4">{children}</div>
+    </section>
   );
 }
 
@@ -129,16 +131,15 @@ function InboundDetail() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
-  const isMobile = useIsMobile();
 
   const [inbound, setInbound] = useState<Inbound | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<Tab>("conversation");
+  const [activeTab, setActiveTab] = useState<Tab>("activity");
+  const [activity, setActivity] = useState<ActivityEntry[] | null>(null);
   const [mailRefresh, setMailRefresh] = useState(0);
   const [cities, setCities] = useState<Option[]>([]);
   const [localities, setLocalities] = useState<{ city: string; options: Option[] } | null>(null);
   const [staff, setStaff] = useState<{ canAssign: boolean; people: { id: number; name: string }[] }>({ canAssign: false, people: [] });
-  const [assigning, setAssigning] = useState<"open" | "busy" | null>(null);
   const [photoOpen, setPhotoOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const photoInput = useRef<HTMLInputElement>(null);
@@ -165,6 +166,12 @@ function InboundDetail() {
     }
     return null;
   }, [id, router]);
+  // The Activity history; an older backend without it just shows none.
+  const loadActivity = useCallback(
+    () => apiJson<{ data?: ActivityEntry[] }>(`${API_URL}/inbounds/${id}/activity`).then((r) => r.data ?? [], () => []),
+    [id],
+  );
+  const refreshActivity = useCallback(() => { void loadActivity().then(setActivity); }, [loadActivity]);
   const fetchInbound = useCallback(() => loadInbound().then((data) => { if (data) setInbound(data); }), [loadInbound]);
 
   useEffect(() => {
@@ -174,8 +181,9 @@ function InboundDetail() {
       if (data) setInbound(data);
       setIsLoading(false);
     });
+    loadActivity().then((entries) => { if (live) setActivity(entries); });
     return () => { live = false; };
-  }, [loadInbound]);
+  }, [loadInbound, loadActivity]);
 
   useEffect(() => {
     let live = true;
@@ -197,13 +205,13 @@ function InboundDetail() {
     return () => { live = false; };
   }, [city]);
 
-  // A for the conversation, as on the lead page.
+  // A switches between Activity and Conversation, as on the lead page.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = document.activeElement as HTMLElement | null;
       if (e.key.toLowerCase() === "a" && !e.metaKey && !e.ctrlKey && !e.altKey && el?.tagName !== "INPUT" && el?.tagName !== "TEXTAREA" && !el?.isContentEditable) {
         e.preventDefault();
-        setActiveTab("conversation");
+        setActiveTab((prev) => (prev === "conversation" ? "activity" : "conversation"));
       }
     };
     window.addEventListener("keydown", onKey);
@@ -228,6 +236,7 @@ function InboundDetail() {
         updated_at: saved.updated_at ?? prev.updated_at,
       });
       toast.success("Saved");
+      refreshActivity();
       if ("status" in patch) setMailRefresh((n) => n + 1); // an approval can draft an email
     } catch (reason) {
       toast.error(reason instanceof Error ? reason.message : "Couldn't save the change");
@@ -240,6 +249,7 @@ function InboundDetail() {
   const followUps = useMemo(() => inbound?.follow_ups ?? [], [inbound]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- API rows, as on the lead page
   const contactLogs: any[] = useMemo(() => sortContactLogs(inbound?.contact_logs ?? []), [inbound]);
+  const activityFeed = useMemo(() => activityItems(activity ?? []), [activity]);
 
   if (isLoading) return <PageSkeleton />;
   if (!inbound) return null;
@@ -248,7 +258,7 @@ function InboundDetail() {
   const status: string = inbound.status || "New Inbound";
   const statusOptions: Option[] = [...(INBOUND_STATUSES.includes(status) ? [] : [status]), ...INBOUND_STATUSES]
     .map((s) => ({ label: s, value: s, dot: statusDot(s, INBOUND_STATUS_TONES[s]) }));
-  const pill = cn("inline-flex items-center gap-1 whitespace-nowrap rounded-full font-medium", statusPillClass(status, INBOUND_STATUS_TONES[status]));
+  const pill = cn("inline-flex items-center gap-1 whitespace-nowrap rounded-md font-medium", statusPillClass(status, INBOUND_STATUS_TONES[status]));
   const assignee = staff.people.find((p) => p.id === inbound.assigned_staff_id)?.name;
   const title: string = inbound.property_title || [typeLabel(type), inbound.locality || inbound.area, inbound.city].filter(Boolean).join(", ") || `Inbound ${inboundCode(inbound)}`;
   const rent = inbound.purpose === "Rent";
@@ -289,16 +299,31 @@ function InboundDetail() {
     </>
   );
   const assign = async (staffId: number | null) => {
-    setAssigning("busy");
     try {
       await apiJson(`${API_URL}/inbounds/assign`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ inboundIds: [inbound.id], staffId }) });
       toast.success(staffId === null ? "Returned to the queue." : "Assigned.");
-      setAssigning(null);
-      void fetchInbound();
+      setInbound((prev) => prev && { ...prev, assigned_staff_id: staffId, is_queued: staffId === null });
+      refreshActivity();
     } catch (reason) {
       toast.error(reason instanceof Error ? reason.message : "Assignment failed");
-      setAssigning("open");
+      throw reason;
     }
+  };
+  const assignPicker = (trigger: React.ReactElement, content: ReactNode, align: "start" | "end" = "end") => (
+    <AssigneePicker people={staff.people} value={inbound.assigned_staff_id} onPick={assign} trigger={trigger} align={align} clearLabel="Return to the queue">
+      {content}
+    </AssigneePicker>
+  );
+
+  /** Latitude and longitude, checked before saving. */
+  const saveCoordinate = (key: "latitude" | "longitude") => async (v: string) => {
+    const n = Number(v.trim());
+    const max = key === "latitude" ? 90 : 180;
+    if (v.trim() && (!Number.isFinite(n) || Math.abs(n) > max)) {
+      toast.error(`${key === "latitude" ? "Latitude" : "Longitude"} must be a number between -${max} and ${max}.`);
+      throw new Error("invalid coordinate");
+    }
+    return save({ [key]: v.trim() ? n : null });
   };
 
   const uploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -314,6 +339,7 @@ function InboundDetail() {
       if (!res.ok) throw new Error();
       toast.success("Photo uploaded.");
       void fetchInbound();
+      refreshActivity();
     } catch {
       toast.error("The photo didn't upload.");
     } finally {
@@ -321,115 +347,132 @@ function InboundDetail() {
     }
   };
 
-  // ── Record fields (desktop side panel, phone "Details" tab) ──
+  // ── Fields: a short summary in the side panel, everything on the Data tab ──
   const contact = (label: string, key: string, kind: "tel" | "email" | "text" = "tel", placeholder?: string) =>
     canSeeContacts
       ? <InlineText label={label} type={kind === "text" ? "text" : kind} value={inbound[key]} placeholder={placeholder} onSave={saveText(key)} />
       : <Restricted label={label} />;
+  const added = new Date(inbound.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
+  const assigneeField = (
+    <FieldRow label="Assigned to">
+      {staff.canAssign
+        ? assignPicker(<button type="button" aria-label={`Assigned to ${assignee ?? "nobody"}. Reassign`} className={FIELD_TRIGGER} />, assigneeLabel, "start")
+        : <span className="flex h-8 items-center gap-2 px-2 text-[14px] text-foreground">{assigneeLabel}</span>}
+    </FieldRow>
+  );
+  // A picker shows the current value even when it's no longer one of the options.
+  const withCurrent = (options: Option[], value?: string | null) =>
+    !value || options.some((o) => o.value === value) ? options : [{ label: value, value }, ...options];
 
-  const fields = (
-    <>
-      <Section title="Details">
-        <InlineSelect label="Status" value={status} options={statusOptions} onSave={(v) => save({ status: v })} />
-        <InlineSelect label="Availability" value={inbound.inbound_status} options={INBOUND_STATUS_OPTIONS} onSave={(v) => save({ inbound_status: v })} />
-        <InlineText label="Title" value={inbound.property_title} placeholder={title} onSave={saveText("property_title")} />
-        <InlineSelect label="Category" value={category} options={INBOUND_CATEGORIES} onSave={(v) => save({ property_category: v, property_type: null, bhk: null })} />
-        <InlineSelect label="Type" value={type} options={(category && INBOUND_TYPES[category]) || []} placeholder={category ? "Select…" : "Pick a category first"} disabled={!category} onSave={(v) => save({ property_type: v })} />
-        {hasBhk(category, type) && <InlineSelect label="BHK" value={inbound.bhk} options={BHK_CHOICES} onSave={(v) => save({ bhk: v })} />}
-        <InlineSelect label="Purpose" value={inbound.purpose} options={INBOUND_PURPOSES} onSave={(v) => save({ purpose: v })} />
-        {category === "commercial" && (
-          <InlineMulti label="Suits" values={special} options={SPECIAL_PURPOSES.map((s) => ({ label: s, value: s }))} onSave={(v) => save({ special_purpose: v.length ? v.join(", ") : null })} />
-        )}
-        {staff.canAssign ? (
-          <InlineAction label="Assigned to" onClick={() => setAssigning("open")}>{assigneeLabel}</InlineAction>
-        ) : (
-          <InlineAction label="Assigned to">{assigneeLabel}</InlineAction>
-        )}
-        <FieldRow label="Added">
-          <span className="px-2 text-[14px] text-foreground">
-            {new Date(inbound.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}
-          </span>
-        </FieldRow>
-      </Section>
-
-      <Section title="Location">
-        <InlineSelect label="City" value={inbound.city} options={cities.some((c) => c.value === inbound.city) || !inbound.city ? cities : [{ label: inbound.city, value: inbound.city }, ...cities]}
-          onSave={(v) => save({ city: v, locality: null })} />
-        <InlineSelect label="Locality" value={inbound.locality} options={localityOptions.some((l) => l.value === inbound.locality) || !inbound.locality ? localityOptions : [{ label: inbound.locality, value: inbound.locality }, ...localityOptions]}
-          placeholder={inbound.city ? "Select…" : "Pick a city first"} disabled={!inbound.city} onSave={(v) => save({ locality: v })} />
-        <InlineText label="Area" value={inbound.area} placeholder="1500 sq ft" onSave={saveText("area")} />
-        <InlineText label="Landmark" value={inbound.landmark} onSave={saveText("landmark")} />
-        <InlineText label="State" value={inbound.state} onSave={saveText("state")} />
-        {hasMap && (
-          <FieldRow label="Map">
-            <a href={`https://www.google.com/maps?q=${encodeURIComponent(`${inbound.latitude},${inbound.longitude}`)}`} target="_blank" rel="noopener noreferrer"
-              className="flex h-8 items-center gap-1.5 px-2 text-[14px] font-medium text-[#017D58] hover:underline dark:text-[#2FB585]">
-              Open in Maps <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-          </FieldRow>
-        )}
-      </Section>
-
-      <Section title="Owner">
-        <InlineText label="Name" value={inbound.owner_name} onSave={saveText("owner_name")} />
-        {contact("Mobile", "mobile_number")}
-        {contact("WhatsApp", "whatsapp_number")}
-        {contact("Email", "email", "email")}
-        {contact("Alternate no.", "alternate_contact")}
-        {contact("Other contact", "alternative_contact", "text", "Name or details")}
-        <InlineText label="Best time" value={inbound.preferred_contact_time} placeholder="e.g. 10:00" onSave={saveText("preferred_contact_time")} />
-        {canSeeContacts ? <InlineText label="Address" multiline value={inbound.address} onSave={saveText("address")} /> : <Restricted label="Address" />}
-        <InlineSelect label="PAN" value={yesNo(inbound.pan_available)} options={YES_NO} onSave={(v) => save({ pan_available: v === "yes" })} />
-        <InlineSelect label="GST" value={yesNo(inbound.gst_applicable)} options={YES_NO} onSave={(v) => save({ gst_applicable: v === "yes" })} />
-      </Section>
-
-      <Section title="Access" defaultOpen={!isMobile}>
-        <InlineSelect label="Visits via" value={inbound.primary_contact} options={PRIMARY_CONTACTS} onSave={(v) => save({ primary_contact: v })} />
-        {inbound.primary_contact && inbound.primary_contact !== "Owner" && (
-          <>
-            <InlineText label={`${inbound.primary_contact}'s name`} value={inbound.primary_contact_name} onSave={saveText("primary_contact_name")} />
-            {contact(`${inbound.primary_contact}'s no.`, "primary_contact_number")}
-          </>
-        )}
-        <InlineSelect label="Keys with" value={inbound.key_available_with} options={KEY_HOLDERS} onSave={(v) => save({ key_available_with: v })} />
-        {inbound.key_available_with && inbound.key_available_with !== "Owner" && inbound.key_available_with !== inbound.primary_contact && (
-          <>
-            <InlineText label="Key holder" value={inbound.key_contact_name} onSave={saveText("key_contact_name")} />
-            {contact("Key holder no.", "key_contact_number")}
-          </>
-        )}
-        <InlineSelect label="Appointment" value={yesNo(inbound.prior_appointment_required)} options={YES_NO} onSave={(v) => save({ prior_appointment_required: v === "yes" })} />
-      </Section>
-
-      <Section title="Brokerage" defaultOpen={!isMobile}>
-        <InlineSelect label="Accepted" value={inbound.brokerage_accepted} options={BROKERAGE_ACCEPTED} onSave={(v) => save({ brokerage_accepted: v })} />
-        {brokered && (
-          <>
-            <InlineSelect label="Type" value={inbound.brokerage_type} options={BROKERAGE_TYPES} onSave={(v) => save({ brokerage_type: v })} />
-            {inbound.brokerage_type === "Percentage" && <InlineText label="Percentage" type="number" value={inbound.percentage} placeholder="2" onSave={saveText("percentage", true)} />}
-            {inbound.brokerage_type === "Fixed" && <InlineText label="Amount" type="number" value={inbound.fixed_amount} placeholder="50000" onSave={saveText("fixed_amount", true)} />}
-            {inbound.brokerage_type === "Days" && <InlineText label="Days of rent" type="number" value={inbound.brokerage_days} placeholder="15" onSave={saveText("brokerage_days", true)} />}
-            <InlineMulti label="Paid by" values={paidBy} options={BROKERAGE_PAYERS.map((p) => ({ label: p, value: p }))} onSave={(v) => save({ brokerage_paid_by: v })} />
-            <InlineText label="Remarks" multiline value={inbound.brokerage_remarks} onSave={saveText("brokerage_remarks")} />
-          </>
-        )}
-      </Section>
-
-      <Section title="Listing" defaultOpen={!isMobile}>
-        <InlineSelect label="Exclusive" value={yesNo(inbound.is_exclusive)} options={YES_NO} onSave={(v) => save({ is_exclusive: v === "yes" })} />
-        <InlineSelect label="Prime location" value={yesNo(inbound.is_prime_location)} options={YES_NO} onSave={(v) => save({ is_prime_location: v === "yes" })} />
-        <InlineSelect label="Documents" value={yesNo(inbound.documents_collected)} options={[{ label: "Collected", value: "yes" }, { label: "Not yet", value: "no" }]} onSave={(v) => save({ documents_collected: v === "yes" })} />
-      </Section>
-    </>
+  const summary = (
+    <Section title="Details">
+      <InlineSelect label="Status" value={status} options={statusOptions} onSave={(v) => save({ status: v })} />
+      <InlineSelect label="Availability" value={inbound.inbound_status} options={INBOUND_STATUS_OPTIONS} onSave={(v) => save({ inbound_status: v })} />
+      {assigneeField}
+      <InlineText label="Owner" value={inbound.owner_name} onSave={saveText("owner_name")} />
+      {contact("Mobile", "mobile_number")}
+      <FieldRow label="Added"><span className="px-2 text-[14px] text-foreground">{added}</span></FieldRow>
+    </Section>
   );
 
-  const tabs: { key: Tab; label: string; icon: typeof Info; count?: number; mobileOnly?: boolean }[] = [
+  const data: ReactNode = (
+    <div className="pb-6">
+      <TabHeader title="Data" />
+      <div className="space-y-5 px-3 sm:px-10">
+        <DataCard title="Property">
+          <InlineText label="Title" value={inbound.property_title} placeholder={title} onSave={saveText("property_title")} />
+          <InlineSelect label="Category" value={category} options={INBOUND_CATEGORIES} onSave={(v) => save({ property_category: v, property_type: null, bhk: null })} />
+          <InlineSelect label="Type" value={type} options={(category && INBOUND_TYPES[category]) || []} placeholder={category ? "Select…" : "Pick a category first"} disabled={!category} onSave={(v) => save({ property_type: v })} />
+          {hasBhk(category, type) && <InlineSelect label="BHK" value={inbound.bhk} options={BHK_CHOICES} onSave={(v) => save({ bhk: v })} />}
+          <InlineSelect label="Purpose" value={inbound.purpose} options={INBOUND_PURPOSES} onSave={(v) => save({ purpose: v })} />
+          {category === "commercial" && (
+            <InlineMulti label="Suits" values={special} options={SPECIAL_PURPOSES.map((s) => ({ label: s, value: s }))} onSave={(v) => save({ special_purpose: v.length ? v.join(", ") : null })} />
+          )}
+          <InlineSelect label="Availability" value={inbound.inbound_status} options={INBOUND_STATUS_OPTIONS} onSave={(v) => save({ inbound_status: v })} />
+          {assigneeField}
+          <FieldRow label="Added"><span className="px-2 text-[14px] text-foreground">{added}</span></FieldRow>
+        </DataCard>
+
+        <DataCard title="Location">
+          <InlineSelect label="State" value={inbound.state} options={withCurrent(INDIAN_STATES, inbound.state)} onSave={(v) => save({ state: v })} />
+          <InlineSelect label="City" value={inbound.city} options={withCurrent(cities, inbound.city)} onSave={(v) => save({ city: v, locality: null })} />
+          <InlineSelect label="Locality" value={inbound.locality} options={withCurrent(localityOptions, inbound.locality)}
+            placeholder={inbound.city ? "Select…" : "Pick a city first"} disabled={!inbound.city} onSave={(v) => save({ locality: v })} />
+          <InlineText label="Area" value={inbound.area} placeholder="1500 sq ft" onSave={saveText("area")} />
+          <InlineText label="Landmark" value={inbound.landmark} onSave={saveText("landmark")} />
+          <InlineText label="Latitude" type="number" value={inbound.latitude} placeholder="13.0827" onSave={saveCoordinate("latitude")} />
+          <InlineText label="Longitude" type="number" value={inbound.longitude} placeholder="80.2707" onSave={saveCoordinate("longitude")} />
+          {hasMap && (
+            <FieldRow label="Map">
+              <a href={`https://www.google.com/maps?q=${encodeURIComponent(`${inbound.latitude},${inbound.longitude}`)}`} target="_blank" rel="noopener noreferrer"
+                className="flex h-8 items-center gap-1.5 px-2 text-[14px] font-medium text-[#017D58] hover:underline dark:text-[#2FB585]">
+                Open in Maps <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            </FieldRow>
+          )}
+        </DataCard>
+
+        <DataCard title="Owner">
+          <InlineText label="Name" value={inbound.owner_name} onSave={saveText("owner_name")} />
+          {contact("Mobile", "mobile_number")}
+          {contact("WhatsApp", "whatsapp_number")}
+          {contact("Email", "email", "email")}
+          {contact("Alternate no.", "alternate_contact")}
+          {contact("Other contact", "alternative_contact", "text", "Name or details")}
+          <InlineText label="Best time" value={inbound.preferred_contact_time} placeholder="e.g. 10:00" onSave={saveText("preferred_contact_time")} />
+          {canSeeContacts ? <InlineText label="Address" multiline value={inbound.address} onSave={saveText("address")} /> : <Restricted label="Address" />}
+          <InlineSelect label="PAN" value={yesNo(inbound.pan_available)} options={YES_NO} onSave={(v) => save({ pan_available: v === "yes" })} />
+          <InlineSelect label="GST" value={yesNo(inbound.gst_applicable)} options={YES_NO} onSave={(v) => save({ gst_applicable: v === "yes" })} />
+        </DataCard>
+
+        <DataCard title="Access">
+          <InlineSelect label="Visits via" value={inbound.primary_contact} options={PRIMARY_CONTACTS} onSave={(v) => save({ primary_contact: v })} />
+          {inbound.primary_contact && inbound.primary_contact !== "Owner" && (
+            <>
+              <InlineText label={`${inbound.primary_contact}'s name`} value={inbound.primary_contact_name} onSave={saveText("primary_contact_name")} />
+              {contact(`${inbound.primary_contact}'s no.`, "primary_contact_number")}
+            </>
+          )}
+          <InlineSelect label="Keys with" value={inbound.key_available_with} options={KEY_HOLDERS} onSave={(v) => save({ key_available_with: v })} />
+          {inbound.key_available_with && inbound.key_available_with !== "Owner" && inbound.key_available_with !== inbound.primary_contact && (
+            <>
+              <InlineText label="Key holder" value={inbound.key_contact_name} onSave={saveText("key_contact_name")} />
+              {contact("Key holder no.", "key_contact_number")}
+            </>
+          )}
+          <InlineSelect label="Appointment" value={yesNo(inbound.prior_appointment_required)} options={YES_NO} onSave={(v) => save({ prior_appointment_required: v === "yes" })} />
+        </DataCard>
+
+        <DataCard title="Brokerage">
+          <InlineSelect label="Accepted" value={inbound.brokerage_accepted} options={BROKERAGE_ACCEPTED} onSave={(v) => save({ brokerage_accepted: v })} />
+          {brokered && (
+            <>
+              <InlineSelect label="Type" value={inbound.brokerage_type} options={BROKERAGE_TYPES} onSave={(v) => save({ brokerage_type: v })} />
+              {inbound.brokerage_type === "Percentage" && <InlineText label="Percentage" type="number" value={inbound.percentage} placeholder="2" onSave={saveText("percentage", true)} />}
+              {inbound.brokerage_type === "Fixed" && <InlineText label="Amount" type="number" value={inbound.fixed_amount} placeholder="50000" onSave={saveText("fixed_amount", true)} />}
+              {inbound.brokerage_type === "Days" && <InlineText label="Days of rent" type="number" value={inbound.brokerage_days} placeholder="15" onSave={saveText("brokerage_days", true)} />}
+              <InlineMulti label="Paid by" values={paidBy} options={BROKERAGE_PAYERS.map((p) => ({ label: p, value: p }))} onSave={(v) => save({ brokerage_paid_by: v })} />
+              <InlineText label="Remarks" multiline value={inbound.brokerage_remarks} onSave={saveText("brokerage_remarks")} />
+            </>
+          )}
+        </DataCard>
+
+        <DataCard title="Listing">
+          <InlineSelect label="Exclusive" value={yesNo(inbound.is_exclusive)} options={YES_NO} onSave={(v) => save({ is_exclusive: v === "yes" })} />
+          <InlineSelect label="Prime location" value={yesNo(inbound.is_prime_location)} options={YES_NO} onSave={(v) => save({ is_prime_location: v === "yes" })} />
+          <InlineSelect label="Documents" value={yesNo(inbound.documents_collected)} options={[{ label: "Collected", value: "yes" }, { label: "Not yet", value: "no" }]} onSave={(v) => save({ documents_collected: v === "yes" })} />
+        </DataCard>
+      </div>
+    </div>
+  );
+
+  const tabs: { key: Tab; label: string; icon: typeof Info; count?: number }[] = [
+    { key: "activity", label: "Activity", icon: History },
     { key: "conversation", label: "Conversation", icon: MessagesSquare, count: followUps.length + contactLogs.length },
-    { key: "details", label: "Details", icon: Info, mobileOnly: true },
+    { key: "data", label: "Data", icon: Database },
     { key: "pricing", label: "Pricing", icon: Wallet },
     { key: "photo", label: "Photo", icon: ImageIcon, count: inbound.image_url ? 1 : undefined },
   ];
-  const shownTab: Tab = activeTab === "details" && !isMobile ? "conversation" : activeTab;
 
   const pricing: ReactNode = (
     <div className="pb-6">
@@ -534,10 +577,10 @@ function InboundDetail() {
         <div className="flex items-center gap-2">
           {statusMenu("h-8")}
           {staff.canAssign ? (
-            <button type="button" onClick={() => setAssigning("open")} aria-label={`Assigned to ${assignee ?? "nobody"}. Reassign`} className={cn(HEADER_BUTTON, "pl-1.5 pr-2")}>
-              {assigneeLabel}
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-            </button>
+            assignPicker(
+              <button type="button" aria-label={`Assigned to ${assignee ?? "nobody"}. Reassign`} className={cn(HEADER_BUTTON, "pl-1.5 pr-2")} />,
+              <>{assigneeLabel}<ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /></>,
+            )
           ) : (
             <span className={cn(HEADER_BUTTON, "pl-1.5 hover:bg-background")}>{assigneeLabel}</span>
           )}
@@ -546,16 +589,23 @@ function InboundDetail() {
 
       {/* ── Phone summary ── */}
       <div className="space-y-3 px-4 pb-4 pt-1 md:hidden">
-        <div className="flex flex-wrap items-center gap-2 text-[14px] text-muted-foreground">
-          {statusMenu("h-7")}
-          <span>{inboundCode(inbound)}</span>
-          <QualityScore score={Number(inbound.quality_score) || 0} />
+        <div className="flex items-center gap-3">
+          <ScoreRing score={Number(inbound.quality_score) || 0} size={40} />
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-[14px] text-muted-foreground">
+            {statusMenu("h-7")}
+            <span>{inboundCode(inbound)}</span>
+          </div>
         </div>
-        <button type="button" disabled={!staff.canAssign} onClick={() => setAssigning("open")}
-          className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-foreground/[0.06] px-3 text-[15px] font-medium text-foreground disabled:bg-foreground/[0.04]">
-          {assigneeLabel}
-          {staff.canAssign && <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />}
-        </button>
+        {staff.canAssign ? (
+          assignPicker(
+            <button type="button" aria-label={`Assigned to ${assignee ?? "nobody"}. Reassign`}
+              className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-foreground/[0.06] px-3 text-[15px] font-medium text-foreground" />,
+            <>{assigneeLabel}<ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /></>,
+            "start",
+          )
+        ) : (
+          <span className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-foreground/[0.04] px-3 text-[15px] font-medium text-foreground">{assigneeLabel}</span>
+        )}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
@@ -563,13 +613,25 @@ function InboundDetail() {
           <div role="tablist" aria-label="Inbound sections"
             className="sticky top-[calc(env(safe-area-inset-top)+2.75rem)] z-20 flex shrink-0 gap-1.5 overflow-x-auto bg-background px-4 py-2 scrollbar-hide md:static md:gap-5 md:border-b md:px-5 md:py-0">
             {tabs.map((t) => (
-              <TabButton key={t.key} active={shownTab === t.key} onClick={() => setActiveTab(t.key)} icon={t.icon} label={t.label} count={t.count} className={t.mobileOnly ? "md:hidden" : undefined} />
+              <TabButton key={t.key} active={activeTab === t.key} onClick={() => setActiveTab(t.key)} icon={t.icon} label={t.label} count={t.count} />
             ))}
           </div>
 
-          <div className={cn("md:min-h-0 md:flex-1", shownTab === "conversation" ? "md:flex md:flex-col" : "md:overflow-y-auto")}>
-            {shownTab === "details" && <div className="mx-4 mt-2 overflow-hidden rounded-xl border bg-card">{fields}</div>}
-            {shownTab === "conversation" && (
+          <div className={cn("md:min-h-0 md:flex-1", activeTab === "conversation" ? "md:flex md:flex-col" : "md:overflow-y-auto")}>
+            {activeTab === "activity" && (
+              <div className="pb-4">
+                <TabHeader title="Activity" />
+                {activity === null ? (
+                  <p className="flex items-center gap-2 px-3 text-[13px] text-muted-foreground sm:px-10"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…</p>
+                ) : activityFeed.length ? (
+                  <Feed items={activityFeed} />
+                ) : (
+                  <EmptyState art={<AttachmentsArt />} title="Nothing recorded yet" hint="Status changes, edits, assignments and photos will show up here." />
+                )}
+              </div>
+            )}
+            {activeTab === "data" && data}
+            {activeTab === "conversation" && (
               <LeadConversation
                 leadId={inbound.id}
                 leadName={inbound.owner_name}
@@ -586,37 +648,26 @@ function InboundDetail() {
                 onRefresh={() => fetchInbound()}
               />
             )}
-            {shownTab === "pricing" && pricing}
-            {shownTab === "photo" && photo}
+            {activeTab === "pricing" && pricing}
+            {activeTab === "photo" && photo}
           </div>
         </div>
 
         <aside className="hidden w-[340px] shrink-0 flex-col overflow-y-auto border-l md:flex xl:w-[360px]">
-          <div className="space-y-2 border-b p-4">
-            <div className="flex items-center gap-3">
-              {inbound.image_url ? (
-                <button type="button" onClick={() => setPhotoOpen(true)} className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- CDN photo thumbnail */}
-                  <img src={inbound.image_url} alt="" className="h-full w-full object-cover" />
-                </button>
-              ) : (
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-foreground/[0.06] text-muted-foreground"><Building2 className="h-5 w-5" /></span>
-              )}
-              <div className="min-w-0">
-                <p className="truncate text-[17px] font-semibold leading-6 text-foreground" title={title}>{title}</p>
-                <p className="text-[13px] text-muted-foreground">{inboundCode(inbound)}</p>
-              </div>
+          <div className="flex items-center gap-3 border-b p-4">
+            <ScoreRing score={Number(inbound.quality_score) || 0} />
+            <div className="min-w-0">
+              <p className="truncate text-[17px] font-semibold leading-6 text-foreground" title={title}>{title}</p>
+              <p className="text-[13px] text-muted-foreground">{inboundCode(inbound)}</p>
             </div>
-            <QualityScore score={Number(inbound.quality_score) || 0} />
           </div>
-          {fields}
+          {summary}
           <p className="mt-auto hidden items-center gap-1.5 px-4 py-3 text-[12px] text-muted-foreground md:flex">
-            Press <kbd className="rounded border px-1 font-mono text-[11px]">A</kbd> to open the conversation.
+            Press <kbd className="rounded border px-1 font-mono text-[11px]">A</kbd> to switch between activity and conversation.
           </p>
         </aside>
       </div>
 
-      <InboundAssignmentDialog open={assigning !== null} count={1} busy={assigning === "busy"} onClose={() => setAssigning(null)} onConfirm={assign} />
 
       <Dialog open={photoOpen} onOpenChange={setPhotoOpen}>
         <DialogContent className="h-[90vh] w-full max-w-[95vw] overflow-hidden border-none bg-black/95 p-0 sm:max-w-[95vw]">

@@ -51,6 +51,14 @@ export const BROKERAGE_ACCEPTED = opts("Yes", "No", "Negotiable");
 export const BROKERAGE_PAYERS = ["Owner", "Buyer", "Tenant"];
 export const BROKERAGE_TYPES = opts("Percentage", "Fixed", "Days");
 export const BHK_CHOICES: Opt[] = [1, 2, 3, 4, 5, 6].map((n) => ({ label: `${n} BHK`, value: String(n) }));
+/** States and union territories, for the State dropdown. */
+export const INDIAN_STATES = opts(
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", "Himachal Pradesh",
+  "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha",
+  "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
+  "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir",
+  "Ladakh", "Lakshadweep", "Puducherry",
+);
 export const ADVANCE_MONTHS: Opt[] = Array.from({ length: 12 }, (_, i) => ({ label: `${i + 1} month${i ? "s" : ""}`, value: String(i + 1) }));
 
 /** The listing's progress, as the inbound table colours it. */

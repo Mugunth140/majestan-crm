@@ -123,3 +123,22 @@ export const sortNewestFirst = (items: FeedItem[]) =>
   items.filter((i) => !Number.isNaN(i.at.getTime())).sort((a, b) => b.at.getTime() - a.at.getTime());
 
 export const sortOldestFirst = (items: FeedItem[]) => sortNewestFirst(items).reverse();
+
+/** A history value as shown in a sentence: booleans as Yes/No, snake_case as words. */
+export const pretty = (v: string | null) => {
+  if (v === null || v === "") return null;
+  if (v === "1" || v === "true") return "Yes";
+  if (v === "0" || v === "false") return "No";
+  return v.replace(/_/g, " ");
+};
+
+export const Value = ({ children }: { children: ReactNode }) => <span className="font-medium text-foreground">{children}</span>;
+
+/** "Asha changed city from Chennai to Coimbatore", "set …", or "cleared …". */
+export function change(actor: ReactNode, label: string, from: string | null, to: string | null) {
+  const a = pretty(from);
+  const b = pretty(to);
+  if (a && b) return <>{actor} changed {label} from <Value>{a}</Value> to <Value>{b}</Value></>;
+  if (b) return <>{actor} set {label} to <Value>{b}</Value></>;
+  return <>{actor} cleared {label}{a ? <> (was <Value>{a}</Value>)</> : null}</>;
+}

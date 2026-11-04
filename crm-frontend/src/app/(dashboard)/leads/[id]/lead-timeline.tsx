@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { LEAD_STATUS_DOTS } from "@/lib/lead-constants";
 import { cn } from "@/lib/utils";
-import { Chip, Feed, Who, sortNewestFirst, type FeedItem } from "@/components/record/feed";
+import { Chip, Feed, Value, Who, change, pretty, sortNewestFirst, type FeedItem } from "@/components/record/feed";
 
 /** One entry from GET /leads/:id/timeline. */
 export type TimelineEntry = {
@@ -30,15 +30,6 @@ const FIELD_LABELS: Record<string, string> = {
 };
 
 
-const pretty = (v: string | null) => {
-  if (v === null || v === "") return null;
-  if (v === "1" || v === "true") return "Yes";
-  if (v === "0" || v === "false") return "No";
-  return v.replace(/_/g, " ");
-};
-
-const Value = ({ children }: { children: ReactNode }) => <span className="font-medium text-foreground">{children}</span>;
-
 function Status({ name }: { name: string | null }) {
   if (!name) return <Value>none</Value>;
   return (
@@ -47,15 +38,6 @@ function Status({ name }: { name: string | null }) {
       {name}
     </span>
   );
-}
-
-/** "Asha changed city from Chennai to Coimbatore", "set …", or "cleared …". */
-function change(actor: ReactNode, label: string, from: string | null, to: string | null) {
-  const a = pretty(from);
-  const b = pretty(to);
-  if (a && b) return <>{actor} changed {label} from <Value>{a}</Value> to <Value>{b}</Value></>;
-  if (b) return <>{actor} set {label} to <Value>{b}</Value></>;
-  return <>{actor} cleared {label}{a ? <> (was <Value>{a}</Value>)</> : null}</>;
 }
 
 function toItem(e: TimelineEntry): FeedItem {

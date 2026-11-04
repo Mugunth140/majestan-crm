@@ -599,7 +599,7 @@ function LeadDetail() {
   const shownTab: Tab = activeTab === "details" && !isMobile ? "timeline" : activeTab;
 
   const tabs: { key: Tab; label: string; icon: typeof Activity; count?: number; mobileOnly?: boolean }[] = [
-    { key: "timeline", label: "Timeline", icon: History },
+    { key: "timeline", label: "Activity", icon: History },
     { key: "conversation", label: "Conversation", icon: MessagesSquare, count: followUps.length + contactLogs.length },
     { key: "details", label: "Details", icon: Info, mobileOnly: true },
     { key: "requirements", label: "Requirements", icon: Building2, count: inquiries.length },
@@ -713,7 +713,7 @@ function LeadDetail() {
   );
 
   // The status pill and the assignee, as the leads table shows them.
-  const statusPill = cn("inline-flex items-center gap-1 whitespace-nowrap rounded-full font-medium transition-[filter] hover:brightness-[0.97] dark:hover:brightness-110", leadStatusPill(statusName));
+  const statusPill = cn("inline-flex items-center gap-1 whitespace-nowrap rounded-md font-medium transition-[filter] hover:brightness-[0.97] dark:hover:brightness-110", leadStatusPill(statusName));
   const assignee = lead.assigned_staff?.name as string | undefined;
   const assigneeLabel = (
     <>
@@ -887,7 +887,7 @@ function LeadDetail() {
 
             {shownTab === "timeline" && (
               <div className="pb-4">
-                <TabHeader title="Timeline" />
+                <TabHeader title="Activity" />
                 {timelineFeed.length ? <Feed items={timelineFeed} /> : empty(<History className="h-5 w-5" />, "Nothing recorded yet", "Status changes, edits and assignments will show up here.")}
               </div>
             )}

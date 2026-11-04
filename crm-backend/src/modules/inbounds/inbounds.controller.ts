@@ -30,11 +30,12 @@ export class InboundsController {
   async uploadImage(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
+    @Request() req: any,
   ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
-    return this.inboundsService.uploadImage(+id, file);
+    return this.inboundsService.uploadImage(+id, file, req.user?.id ?? null);
   }
 
   @Post()
@@ -58,6 +59,11 @@ export class InboundsController {
   @Post('assign')
   assign(@Body() body: AssignInboundsDto, @Request() req: any) {
     return this.inboundsService.assign(body.inboundIds, body.staffId, req.user);
+  }
+
+  @Get(':id/activity')
+  async activity(@Param('id') id: string, @Request() req: any) {
+    return { success: true, data: await this.inboundsService.activity(+id, req.user) };
   }
 
   @Get(':id')
