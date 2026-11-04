@@ -10,6 +10,7 @@ import { apiFetch, apiJson } from "@/lib/api-fetch";
 import { canViewInboundContacts } from "@/lib/permissions";
 import { sortContactLogs } from "@/lib/contact-log-utils";
 import { formatIndianCurrencyShort, parseIndianCurrency } from "@/lib/indian-currency";
+import { readStoredCoordinates } from "@/lib/image-coordinates";
 import { INBOUND_STATUS_OPTIONS } from "@/lib/inbound-status";
 import {
   ADVANCE_MONTHS, BHK_CHOICES, BROKERAGE_ACCEPTED, BROKERAGE_PAYERS, BROKERAGE_TYPES, INBOUND_CATEGORIES, INBOUND_PURPOSES, INDIAN_STATES,
@@ -260,7 +261,12 @@ function InboundDetail() {
     try { return JSON.parse(inbound.brokerage_paid_by || "[]"); } catch { return []; }
   })();
   const localityOptions = localities && localities.city === inbound.city ? localities.options : [];
-  const hasMap = inbound.latitude != null && inbound.longitude != null;
+  const coordinates = readStoredCoordinates({
+    latitude: inbound.latitude,
+    longitude: inbound.longitude,
+    google_map_location: inbound.google_map_location,
+  });
+  const hasMap = coordinates.latitude !== "" && coordinates.longitude !== "";
   const units: { floor_label: string; area?: string | null; price?: number | null; notes?: string | null }[] = inbound.units ?? [];
   const saveUnits = (next: typeof units) => save({ units: next.map((u) => ({ floor_label: u.floor_label, area: u.area || null, price: u.price ?? null, notes: u.notes || null })) });
 
@@ -293,7 +299,16 @@ function InboundDetail() {
       toast.error(`${key === "latitude" ? "Latitude" : "Longitude"} must be a number between -${max} and ${max}.`);
       throw new Error("invalid coordinate");
     }
-    return save({ [key]: v.trim() ? n : null });
+    const otherKey = key === "latitude" ? "longitude" : "latitude";
+    const patch: Patch = { [key]: v.trim() ? n : null };
+    if (inbound.google_map_location) {
+      // Preserve the other coordinate if it only exists in the legacy link.
+      if (inbound[otherKey] == null && coordinates[otherKey] !== "") {
+        patch[otherKey] = Number(coordinates[otherKey]);
+      }
+      patch.google_map_location = null;
+    }
+    return save(patch);
   };
 
   const uploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -364,11 +379,11 @@ function InboundDetail() {
             placeholder={inbound.city ? "Select…" : "Pick a city first"} disabled={!inbound.city} onSave={(v) => save({ locality: v })} />
           <InlineText label="Area" value={inbound.area} placeholder="1500 sq ft" onSave={saveText("area")} />
           <InlineText label="Landmark" value={inbound.landmark} onSave={saveText("landmark")} />
-          <InlineText label="Latitude" type="number" value={inbound.latitude} placeholder="13.0827" onSave={saveCoordinate("latitude")} />
-          <InlineText label="Longitude" type="number" value={inbound.longitude} placeholder="80.2707" onSave={saveCoordinate("longitude")} />
+          <InlineText label="Latitude" type="number" value={coordinates.latitude} placeholder="13.0827" onSave={saveCoordinate("latitude")} />
+          <InlineText label="Longitude" type="number" value={coordinates.longitude} placeholder="80.2707" onSave={saveCoordinate("longitude")} />
           {hasMap && (
             <FieldRow label="Map">
-              <a href={`https://www.google.com/maps?q=${encodeURIComponent(`${inbound.latitude},${inbound.longitude}`)}`} target="_blank" rel="noopener noreferrer"
+              <a href={`https://www.google.com/maps?q=${encodeURIComponent(`${coordinates.latitude},${coordinates.longitude}`)}`} target="_blank" rel="noopener noreferrer"
                 className="flex h-8 items-center gap-1.5 px-2 text-[14px] font-medium text-[#017D58] hover:underline dark:text-[#2FB585]">
                 Open in Maps <ExternalLink className="h-3.5 w-3.5" />
               </a>
@@ -524,7 +539,7 @@ function InboundDetail() {
         {hasMap && (
           <p className="mt-3 flex items-center gap-1.5 text-[13px] text-muted-foreground">
             <MapPin className="h-3.5 w-3.5" /> {Number(inbound.latitude).toFixed(5)}, {Number(inbound.longitude).toFixed(5)}
-            <a href={`https://www.google.com/maps?q=${encodeURIComponent(`${inbound.latitude},${inbound.longitude}`)}`} target="_blank" rel="noopener noreferrer" className="ml-1 font-medium text-[#017D58] hover:underline dark:text-[#2FB585]">
+            <a href={`https://www.google.com/maps?q=${encodeURIComponent(`${coordinates.latitude},${coordinates.longitude}`)}`} target="_blank" rel="noopener noreferrer" className="ml-1 font-medium text-[#017D58] hover:underline dark:text-[#2FB585]">
               Open in Maps
             </a>
           </p>
