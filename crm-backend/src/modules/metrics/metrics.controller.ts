@@ -1,10 +1,21 @@
 import { Controller, Delete, Get, Query, Request, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CoachingService } from './coaching.service';
 import { MetricsService } from './metrics.service';
 @Controller('api/v1/metrics')
 @UseGuards(JwtAuthGuard)
 export class MetricsController {
-  constructor(private readonly metricsService: MetricsService) {}
+  constructor(private readonly metricsService: MetricsService, private readonly coaching: CoachingService) {}
+
+  @Get('coaching/people')
+  async getCoachingPeople(@Request() req: any) {
+    return { success: true, data: await this.coaching.people(req.user) };
+  }
+
+  @Get('coaching')
+  async getCoaching(@Query('person') person: string, @Query('days') days: string, @Request() req: any) {
+    return { success: true, data: await this.coaching.report(req.user, person, days) };
+  }
   @Get('summary')
   async getSummary(@Query('from') from: string, @Query('to') to: string, @Request() req: any) {
     const now = new Date();

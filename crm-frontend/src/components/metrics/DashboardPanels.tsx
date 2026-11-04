@@ -1,32 +1,5 @@
 import type { ReactNode } from 'react';
-import { RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-export function DashboardHeading({ title, description, busy, refreshing, onRefresh }: {
-  title: string;
-  description: ReactNode;
-  busy: boolean;
-  refreshing: boolean;
-  onRefresh: () => void;
-}) {
-  return (
-    <header className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
-      <div className="min-w-0">
-        <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      </div>
-      <button
-        type="button"
-        onClick={onRefresh}
-        disabled={busy}
-        className="inline-flex h-8 items-center gap-2 rounded-md border bg-card px-3 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-50"
-      >
-        <RefreshCw aria-hidden className={cn('size-3.5', refreshing && 'motion-safe:animate-spin')} />
-        Refresh
-      </button>
-    </header>
-  );
-}
 
 export function DashboardSection({ title, context, children }: {
   title: string;

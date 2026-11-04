@@ -13,6 +13,7 @@ import { Device } from "@/components/shared/device";
 import { AdminDashboard } from '@/components/metrics/AdminDashboard';
 import { TeamLeadDashboard } from '@/components/metrics/TeamLeadDashboard';
 import { StaffDashboard } from '@/components/metrics/StaffDashboard';
+import { CoachingDashboard } from '@/components/metrics/CoachingDashboard';
 import { DashboardSection } from '@/components/metrics/DashboardPanels';
 
 type TasksDashboard = {
@@ -66,15 +67,13 @@ function DashboardContent() {
 
   return (
     <div className="mx-auto w-full max-w-screen-2xl space-y-6 px-4 pt-4 lg:px-0 lg:pt-0">
-      <Device
-        mobile={<><AppLauncher />{tasksSection}</>}
-        desktop={
-          <>
-            {role === "Staff" ? <StaffDashboard /> : role === "Team Lead" ? <TeamLeadDashboard /> : <AdminDashboard />}
-            {tasksSection}
-          </>
-        }
-      />
+      <CoachingDashboard role={role} legacy={
+        <>
+          {role === "Staff" ? <StaffDashboard /> : role === "Team Lead" ? <TeamLeadDashboard /> : <AdminDashboard />}
+          {tasksSection && <div className="mt-6">{tasksSection}</div>}
+        </>
+      } />
+      <Device desktop={null} mobile={<><AppLauncher />{tasksSection}</>} />
     </div>
   );
 }

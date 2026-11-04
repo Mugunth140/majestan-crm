@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api-fetch';
 import { MetricCard } from './MetricCard';
-import { DashboardHeading, DashboardPanel, DashboardSection } from './DashboardPanels';
+import { DashboardPanel, DashboardSection } from './DashboardPanels';
 import { LeadTrendChart } from './charts/LeadTrendChart';
 import { LeadFunnelChart } from './charts/LeadFunnelChart';
 import { LeadSourceDonut } from './charts/LeadSourceDonut';
@@ -31,7 +31,6 @@ export function AdminDashboard() {
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [charts, setCharts] = useState<Record<string, any>>({});
   const [loadingCharts, setLoadingCharts] = useState<Record<string, boolean>>({});
-  const [refreshing, setRefreshing] = useState(false);
 
   // KPI cards are all-time live totals (no date filter). Charts use the current month range.
   const fetchSummary = useCallback(async () => {
@@ -83,18 +82,6 @@ export function AdminDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await apiFetch('/api/v1/metrics/cache', { method: 'DELETE' });
-    } catch {
-      // ignore cache-clear errors, still refetch
-    } finally {
-      fetchAll();
-      setRefreshing(false);
-    }
-  };
-
   const pipe = summary?.pipeline ?? {};
   const inb = summary?.inbound ?? {};
   const ag = summary?.agents ?? {};
@@ -103,18 +90,9 @@ export function AdminDashboard() {
   const hr = summary?.hr ?? {};
   const task = summary?.tasks ?? {};
 
-  const busy = loadingSummary || refreshing;
 
   return (
     <div className="min-w-0 space-y-6">
-      <DashboardHeading
-        title="Organization overview"
-        description="Sales, inventory and team activity"
-        busy={busy}
-        refreshing={refreshing}
-        onRefresh={handleRefresh}
-      />
-
       <DashboardSection title="Lead pipeline" context="Live totals">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <MetricCard label="Total Leads" value={n(pipe.total)} loading={loadingSummary} />

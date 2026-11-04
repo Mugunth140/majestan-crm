@@ -64,6 +64,10 @@ export class MetricsService {
   }
 
   getChartData(user: any, type: string, from: string, to: string) {
+    const allowed = this.isAdmin(user.role)
+      ? ['trends', 'funnel', 'sources', 'dept_perf', 'scatter', 'heatmap']
+      : user.role === 'Team Lead' && user.department_id ? ['team_progress', 'team_trend', 'team_leads'] : [];
+    if (!allowed.includes(type)) throw new ForbiddenException('This chart is outside your dashboard scope');
     return this.cache.wrap<object>(this.key(user, 'charts', `${type}:${from}:${to}`), CACHE_TTL, () => this.buildChartData(user, type, from, to));
   }
 

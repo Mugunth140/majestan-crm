@@ -3,27 +3,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api-fetch';
 import { MetricCard } from './MetricCard';
-import { DashboardHeading, DashboardSection } from './DashboardPanels';
+import { DashboardSection } from './DashboardPanels';
 import { MonthlyRings } from './staff/MonthlyRings';
 import { WeeklyCompare } from './staff/WeeklyCompare';
 import { MilestoneBadges } from './staff/MilestoneBadges';
 import { ActivityCalendar } from './staff/ActivityCalendar';
-
-function monthStart(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
-}
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 const n = (v: any): string | number => (v ?? '--') as string | number;
 
 export function StaffDashboard() {
   const [summary, setSummary] = useState<any>(null);
   const [loadingSummary, setLoadingSummary] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
   const fetchSummary = useCallback(async () => {
     setLoadingSummary(true);
@@ -47,32 +37,10 @@ export function StaffDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await apiFetch('/api/v1/metrics/cache', { method: 'DELETE' });
-    } catch {
-      // ignore cache-clear errors, still refetch
-    } finally {
-      await fetchSummary();
-      setRefreshing(false);
-    }
-  };
-
   const sm = summary?.staffMetrics ?? {};
-  const busy = loadingSummary || refreshing;
-  const hasRank = sm.monthlyRankInDept != null || sm.deptSize != null;
 
   return (
     <div className="min-w-0 space-y-6">
-      <DashboardHeading
-        title="My dashboard"
-        description={hasRank && !loadingSummary ? `Rank #${n(sm.monthlyRankInDept)} of ${n(sm.deptSize)} in your department` : "Personal activity"}
-        busy={busy}
-        refreshing={refreshing}
-        onRefresh={handleRefresh}
-      />
-
       <DashboardSection title="My KPIs">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           <MetricCard label="Leads Assigned" value={n(sm.myLeadsAssigned)} loading={loadingSummary} />

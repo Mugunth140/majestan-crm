@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api-fetch';
 import { MetricCard } from './MetricCard';
-import { DashboardHeading, DashboardPanel, DashboardSection } from './DashboardPanels';
+import { DashboardPanel, DashboardSection } from './DashboardPanels';
 import { TeamProgressChart } from './charts/TeamProgressChart';
 import { TeamTrendChart } from './charts/TeamTrendChart';
 import { TeamLeadDonut } from './charts/TeamLeadDonut';
@@ -28,7 +28,6 @@ export function TeamLeadDashboard() {
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [charts, setCharts] = useState<Record<string, any>>({});
   const [loadingCharts, setLoadingCharts] = useState<Record<string, boolean>>({});
-  const [refreshing, setRefreshing] = useState(false);
 
   // KPI cards are all-time live totals (no date filter). Charts use the current month range.
   const fetchSummary = useCallback(async () => {
@@ -80,33 +79,12 @@ export function TeamLeadDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await apiFetch('/api/v1/metrics/cache', { method: 'DELETE' });
-    } catch {
-      // ignore cache-clear errors, still refetch
-    } finally {
-      fetchAll();
-      setRefreshing(false);
-    }
-  };
-
   const tlm = summary?.teamLeadMetrics ?? {};
-  const busy = loadingSummary || refreshing;
   const best = tlm.bestPerformer as { name?: string; pct?: number } | undefined;
   const needsAttention = tlm.needsAttention as { name?: string; pct?: number } | undefined;
 
   return (
     <div className="min-w-0 space-y-6">
-      <DashboardHeading
-        title="Team dashboard"
-        description="Department overview"
-        busy={busy}
-        refreshing={refreshing}
-        onRefresh={handleRefresh}
-      />
-
       <DashboardSection title="Team KPIs">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           <MetricCard label="Active Staff" value={n(tlm.activeStaffInDept)} loading={loadingSummary} />
