@@ -1,4 +1,5 @@
 "use client";
+import { isAdmin } from "@/lib/permissions";
 import { DataTable } from "@/components/tables/data-table";
 import { DateCell, IdCell, NameCell, StatusCell, formatTableDate, statusDot } from "@/components/tables/cells";
 import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
@@ -139,7 +140,7 @@ export function BlogPostList({
                 variant="list"
                 pageSizeOptions={[30]}
                 showToolbar
-                showDeleteAction
+                showDeleteAction={isAdmin()}
                 onDeleteSelected={onDelete}
                 renderToolbarActions={(selected, clear) =>
                   selected.length === 1 ? (

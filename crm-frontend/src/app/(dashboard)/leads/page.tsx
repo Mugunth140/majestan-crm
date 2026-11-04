@@ -1,5 +1,6 @@
 "use client";
 
+import { isAdmin } from "@/lib/permissions";
 import { apiFetch, apiJson } from "@/lib/api-fetch";
 import { normalizeDepartment } from "@/lib/department";
 
@@ -1011,7 +1012,7 @@ export default function LeadsPage() {
     data: displayedLeads,
     showToolbar: !isReviewingImports,
     onSelectionChange: setPendingSelection,
-    showDeleteAction: role === "Admin" && activeTab !== "Open Pipeline",
+    showDeleteAction: isAdmin({ role }) && activeTab !== "Open Pipeline",
     onDeleteSelected: (rows: any[]) => setBulkDeleteIds(rows.map(r => r.rawId)),
     renderToolbarActions: (selectedRows: any[], clearSelection: any) => {
       const isSingle = selectedRows.length === 1;

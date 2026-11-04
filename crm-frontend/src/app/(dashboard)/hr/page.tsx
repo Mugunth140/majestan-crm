@@ -1,4 +1,5 @@
 "use client";
+import { isAdmin } from "@/lib/permissions";
 import { useState, useEffect, useMemo } from "react";
 import { DataTable } from "@/components/tables/data-table";
 import { ModuleMobileRows, ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
@@ -456,7 +457,7 @@ export default function HrPage() {
               columns={columns}
               data={displayedCandidates}
               showToolbar={true}
-              showDeleteAction={role === "Admin"}
+              showDeleteAction={isAdmin({ role })}
               onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
               renderToolbarActions={(selectedRows) => {
                 if (!selectedRows.length) return null;
@@ -525,7 +526,7 @@ export default function HrPage() {
                   columns={columns}
                   data={displayedCandidates}
                   showToolbar={true}
-                  showDeleteAction={role === "Admin"}
+                  showDeleteAction={isAdmin({ role })}
                   onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
                   renderToolbarActions={(selectedRows) => {
               if (!selectedRows.length) return null;

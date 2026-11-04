@@ -26,6 +26,9 @@ import { PermissionsModule } from '../permissions/permissions.module';
 import { PermissionsService } from '../permissions/permissions.service';
 import { PropertiesModule } from '../properties/properties.module';
 import { SiteApiService } from '../properties/site-api.service';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+
 @Injectable()
 export class BlogAccessGuard implements CanActivate {
   constructor(private readonly permissions: PermissionsService) {}
@@ -116,6 +119,8 @@ export class BlogController {
       ),
     };
   }
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
   @Delete(':id') async remove(
     @Param('id', ParseIntPipe) id: number,
     @Query('revision', ParseIntPipe) revision: number,

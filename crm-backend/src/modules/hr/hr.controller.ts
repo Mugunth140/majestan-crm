@@ -35,6 +35,8 @@ export class HrController {
     return this.hrService.updateFollowUp(+id, +fuId, data);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
   @Delete(':id/follow-ups/:fuId')
   async deleteFollowUp(@Param('id', ParseIntPipe) id: number, @Param('fuId', ParseIntPipe) fuId: number) {
     return this.hrService.deleteFollowUp(+id, +fuId);
@@ -63,6 +65,8 @@ export class HrController {
     return this.hrService.update(+id, updateDto, req.user);
   }
   
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
   @Delete(':id') remove(@Param('id', ParseIntPipe) id: number) { return this.hrService.remove(+id); }
 
   @Post(':id/upload/:docType')

@@ -33,7 +33,7 @@ import { ListFrame, ListToolbar, SegmentTabs, ToolbarEnd, ToolbarSearch, headerP
 import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { cn } from "@/lib/utils";
-import { canViewInboundContacts } from "@/lib/permissions";
+import { canViewInboundContacts, isAdmin } from "@/lib/permissions";
 import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -370,7 +370,7 @@ export default function InboundPage() {
     columns,
     data: displayedInbounds,
     showToolbar: true,
-    showDeleteAction: role === "Admin",
+    showDeleteAction: isAdmin({ role }),
     onDeleteSelected: (rows: any[]) => setBulkDeleteIds(rows.map(r => r.rawId || r.id)),
     renderToolbarActions: (selectedRows: any[]) => {
       if (!selectedRows.length) return null;

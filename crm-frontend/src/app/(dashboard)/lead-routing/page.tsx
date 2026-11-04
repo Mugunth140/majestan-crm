@@ -1,5 +1,6 @@
 "use client";
 
+import { isAdmin } from "@/lib/permissions";
 import { apiFetch } from "@/lib/api-fetch";
 import { normalizeDepartment } from "@/lib/department";
 
@@ -1192,7 +1193,7 @@ export default function LeadRoutingPage() {
                     columns={queueColumns} 
                     data={queue} 
                     showToolbar={true}
-                    showDeleteAction={role === "Admin"}
+                    showDeleteAction={isAdmin({ role })}
                     onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
                     renderToolbarActions={(selectedRows, clearSelection) => {
                       return (

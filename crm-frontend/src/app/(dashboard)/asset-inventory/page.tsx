@@ -1,5 +1,6 @@
 "use client";
 
+import { isAdmin } from "@/lib/permissions";
 import { apiFetch } from "@/lib/api-fetch";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -275,7 +276,7 @@ export default function AssetInventoryPage() {
     columns,
     data: filteredAssets,
     showToolbar: true,
-    showDeleteAction: role === "Admin",
+    showDeleteAction: isAdmin({ role }),
     onDeleteSelected: (rows: any[]) => setBulkDeleteIds(rows.map(r => r.id)),
     renderToolbarActions: (selectedRows: any[]) => {
       if (selectedRows.length !== 1) return null;

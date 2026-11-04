@@ -14,6 +14,8 @@ import { UpdateLeadInquiryDto } from './dto/update-lead-inquiry.dto';
 import { CreateLeadContactLogDto } from './dto/create-lead-contact-log.dto';
 import { CreateLeadFollowUpDto } from './dto/create-lead-follow-up.dto';
 import { UpdateLeadFollowUpDto } from './dto/update-lead-follow-up.dto';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('api/v1/leads')
 @UseGuards(JwtAuthGuard)
@@ -130,6 +132,8 @@ export class LeadsController {
     return { success: true, data };
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
   @Delete(':id')
   async deleteLead(@Param('id') id: string) {
     await this.leadsService.deleteLead(Number(id));
@@ -166,6 +170,8 @@ export class LeadsController {
     return { success: true, data };
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
   @Delete(':id/follow-ups/:followUpId')
   async deleteFollowUp(
     @Param('id') id: string,
@@ -185,6 +191,8 @@ export class LeadsController {
     return { success: true, data };
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
   @Delete(':id/documents/:docId')
   async deleteDocument(@Param('id') id: string, @Param('docId') docId: string, @Request() req: any) {
     const data = await this.leadsService.deleteDocument(Number(id), Number(docId), req.user?.id ?? null);

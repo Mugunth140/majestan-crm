@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Post, Put, Patch, Delete, Param, UseGuards, Request } from '@nestjs/common';
 import { AgentsService } from './agents.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('api/v1/agents')
 @UseGuards(JwtAuthGuard)
@@ -68,6 +70,8 @@ export class AgentsController {
     return { success: true, data };
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
   @Delete(':id')
   async deleteAgent(@Param('id') id: string) {
     await this.agentsService.deleteAgent(Number(id));
@@ -98,6 +102,8 @@ export class AgentsController {
     return { success: true, data };
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
   @Delete(':id/follow-ups/:followUpId')
   async deleteFollowUp(
     @Param('id') id: string,

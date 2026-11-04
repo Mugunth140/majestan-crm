@@ -9,6 +9,8 @@ import { UpdateInboundDto } from './dto/update-inbound.dto';
 import { CreateInboundFollowUpDto } from './dto/create-inbound-follow-up.dto';
 import { UpdateInboundFollowUpDto } from './dto/update-inbound-follow-up.dto';
 import { CreateInboundContactLogDto } from './dto/create-inbound-contact-log.dto';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('api/v1/inbounds')
 @UseGuards(JwtAuthGuard)
@@ -115,6 +117,8 @@ export class InboundsController {
     return { success: true, data };
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
   @Delete(':id/follow-ups/:followUpId')
   async deleteFollowUp(
     @Param('id') id: string,
@@ -124,6 +128,8 @@ export class InboundsController {
     return { success: true, data };
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.inboundsService.remove(+id);

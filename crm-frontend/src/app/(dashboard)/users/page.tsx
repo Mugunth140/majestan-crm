@@ -1,5 +1,6 @@
 "use client";
 
+import { isAdmin } from "@/lib/permissions";
 import { apiFetch } from "@/lib/api-fetch";
 
 import { useEffect, useState, Suspense } from "react";
@@ -186,7 +187,7 @@ function UsersList() {
                 columns={columns}
                 data={searchedUsers}
                 showToolbar={true}
-                showDeleteAction={role === "Admin"}
+                showDeleteAction={isAdmin({ role })}
                 onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
                 renderToolbarActions={(selectedRows) => {
                   if (selectedRows.length !== 1) return null;

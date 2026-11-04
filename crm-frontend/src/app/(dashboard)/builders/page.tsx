@@ -1,5 +1,6 @@
 "use client";
 
+import { isAdmin } from "@/lib/permissions";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -223,7 +224,7 @@ export default function BuildersPage() {
     columns,
     data: builders,
     showToolbar: true,
-    showDeleteAction: true,
+    showDeleteAction: isAdmin(),
     onDeleteSelected: (rows: BuilderRecord[]) => setBulkDeleteIds(rows.map((r) => r.id)),
     renderToolbarActions: (selectedRows: BuilderRecord[], clearSelection: () => void) => {
       const isSingle = selectedRows.length === 1;

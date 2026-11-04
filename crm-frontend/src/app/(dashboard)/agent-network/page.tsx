@@ -1,5 +1,6 @@
 "use client";
 
+import { isAdmin as isAdminUser } from "@/lib/permissions";
 import { apiFetch } from "@/lib/api-fetch";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
@@ -74,7 +75,7 @@ export default function AgentsPage() {
       try {
         const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
         setRole(user?.role?.name || user?.role || "");
-        setIsAdmin(user.role === "Admin" || user.role === "Super Admin");
+        setIsAdmin(isAdminUser(user));
       } catch {}
     }
   }, []);
@@ -472,7 +473,7 @@ export default function AgentsPage() {
               columns={columns}
               data={displayedAgents}
               showToolbar={true}
-              showDeleteAction={role === "Admin"}
+              showDeleteAction={isAdmin}
               onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
               renderToolbarActions={(selectedRows) => {
                 if (selectedRows.length !== 1) return null;
@@ -527,7 +528,7 @@ export default function AgentsPage() {
                   columns={columns}
                   data={displayedAgents}
                   showToolbar={true}
-                  showDeleteAction={role === "Admin"}
+                  showDeleteAction={isAdmin}
                   onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
                   renderToolbarActions={(selectedRows) => {
                     if (selectedRows.length !== 1) return null;

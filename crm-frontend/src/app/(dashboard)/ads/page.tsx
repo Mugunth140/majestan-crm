@@ -1,5 +1,6 @@
 "use client";
 
+import { isAdmin } from "@/lib/permissions";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -339,7 +340,7 @@ export default function AdsPage() {
     columns,
     data: displayedAds,
     showToolbar: true,
-    showDeleteAction: ["Admin", "Super Admin"].includes(role) && !isBusy,
+    showDeleteAction: isAdmin({ role }) && !isBusy,
     persistKey: false as const,
     onDeleteSelected: (rows: AdItem[]) => setBulkDeleteIds(rows.map((r) => r.id)),
     renderToolbarActions: (selectedRows: AdItem[], clearSelection: () => void) => {

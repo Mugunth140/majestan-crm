@@ -379,13 +379,13 @@ export default function TaskDetailPage() {
                           </a>
                           <span className="text-[11px] text-muted-foreground">{r.upload_date}</span>
                         </div>
-                        <button
+                        {isAdmin && <button
                           onClick={() => handleDeleteReceipt(r.id)}
                           className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-red-50 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all active:scale-95 shrink-0"
                           title="Delete Receipt"
                         >
                           <X className="w-4 h-4" />
-                        </button>
+                        </button>}
                       </div>
                     ))}
                   </div>

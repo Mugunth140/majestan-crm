@@ -1,5 +1,6 @@
 "use client";
 
+import { isAdmin } from "@/lib/permissions";
 import { AMENITY_CATEGORIES } from "@/lib/master-kinds";
 import { apiFetch } from "@/lib/api-fetch";
 
@@ -338,7 +339,7 @@ export default function AmenitiesMasterPage() {
                 columns={columns}
                 data={filteredAmenities}
                 showToolbar={true}
-                showDeleteAction={true}
+                showDeleteAction={isAdmin()}
                 onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
               />
                 }

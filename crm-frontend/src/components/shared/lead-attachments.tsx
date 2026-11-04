@@ -6,6 +6,7 @@ import React, { useState, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Download, FileImage, FileText, File as FileIcon, Loader2, Trash2, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 
 interface Document {
   id: number;
@@ -36,6 +37,8 @@ const kind = (name: string) => {
 };
 
 export function LeadAttachments({ leadId, documents = [], onRefresh, empty, header }: LeadAttachmentsProps) {
+  // Removing a file is for admins; everyone can upload and download.
+  const canDelete = useIsAdmin();
   const [isUploading, setIsUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -141,7 +144,7 @@ export function LeadAttachments({ leadId, documents = [], onRefresh, empty, head
                 >
                   <Download className="h-4 w-4" />
                 </a>
-                <button
+                {canDelete && <button
                   type="button"
                   aria-label={`Remove ${doc.file_name}`}
                   onClick={() => handleDelete(doc.id)}
@@ -149,7 +152,7 @@ export function LeadAttachments({ leadId, documents = [], onRefresh, empty, head
                   className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
                 >
                   {deletingId === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                </button>
+                </button>}
               </div>
             </li>
           );

@@ -1,5 +1,6 @@
 "use client";
 
+import { isAdmin } from "@/lib/permissions";
 import { apiFetch } from "@/lib/api-fetch";
 import { useState, useEffect, useCallback } from "react";
 import { DataTable } from "@/components/tables/data-table";
@@ -348,7 +349,7 @@ export default function MasterSublocationsPage() {
                 columns={columns} 
                 data={sublocations} 
                 showToolbar={true}
-                showDeleteAction={true}
+                showDeleteAction={isAdmin()}
                 onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
               />
                 }

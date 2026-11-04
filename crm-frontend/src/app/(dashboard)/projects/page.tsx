@@ -1,5 +1,6 @@
 "use client";
 
+import { isAdmin } from "@/lib/permissions";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ProjectForm } from "./_components/ProjectForm";
@@ -206,7 +207,7 @@ export default function ProjectsPage() {
     columns,
     data: projects,
     showToolbar: true,
-    showDeleteAction: role === "Admin" || role === "Super Admin",
+    showDeleteAction: isAdmin({ role }),
     onDeleteSelected: (rows: any[]) => setBulkDeleteIds(rows.map((r) => r.id)),
     renderToolbarActions: (selectedRows: any[], clearSelection: () => void) => {
       const isSingle = selectedRows.length === 1;

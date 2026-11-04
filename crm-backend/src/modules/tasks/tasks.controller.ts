@@ -5,6 +5,8 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TasksService } from './tasks.service';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('api/v1/tasks')
 @UseGuards(JwtAuthGuard)
@@ -81,6 +83,8 @@ export class TasksController {
   }
 
   // DELETE /api/v1/tasks/:id/receipts/:rid
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
   @Delete(':id/receipts/:rid')
   async deleteReceipt(
     @Param('id') id: string,
@@ -92,6 +96,8 @@ export class TasksController {
   }
 
   // DELETE /api/v1/tasks/:id
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
   @Delete(':id')
   async deleteTaskTemplate(@Param('id') id: string, @Request() req: any) {
     const data = await this.tasksService.deleteTaskTemplate(Number(id), req.user);

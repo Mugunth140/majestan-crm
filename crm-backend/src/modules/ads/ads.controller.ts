@@ -16,6 +16,8 @@ import { AdsService } from './ads.service';
 import { CreateAdDto } from './dto/create-ad.dto';
 import { UpdateAdDto } from './dto/update-ad.dto';
 import { ReorderAdsDto } from './dto/reorder-ads.dto';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('api/v1/ads')
 @UseGuards(JwtAuthGuard, AdsAccessGuard)
@@ -65,6 +67,8 @@ export class AdsController {
     return { success: true, data };
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
   @Delete(':id')
   async remove(@Param('id', ParseIntPipe) id: number) {
     const data = await this.adsService.remove(id);

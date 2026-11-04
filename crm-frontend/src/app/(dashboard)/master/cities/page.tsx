@@ -1,5 +1,6 @@
 "use client";
 
+import { isAdmin } from "@/lib/permissions";
 import { INDIA_STATES } from "@/lib/master-kinds";
 import { apiFetch } from "@/lib/api-fetch";
 import { useState, useEffect, useCallback } from "react";
@@ -299,7 +300,7 @@ export default function MasterCitiesPage() {
               columns={columns} 
               data={cities}
               showToolbar={true}
-              showDeleteAction={true}
+              showDeleteAction={isAdmin()}
               onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
             />
               }

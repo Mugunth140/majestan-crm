@@ -1,5 +1,6 @@
 "use client";
 
+import { useIsAdmin } from "@/hooks/use-is-admin";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { Editor } from "@tiptap/react";
 import { AlertTriangle, Eye, FilePlus2, Loader2, Lock, Mail, PencilLine, RotateCcw, Save, Trash2, Zap } from "lucide-react";
@@ -40,6 +41,8 @@ export default function EmailTemplatesPage() {
   const [busy, setBusy] = useState<"save" | "reset" | "delete" | null>(null);
   // Role comes from localStorage: read it on the client only (false during SSR).
   const editable = useSyncExternalStore(noopSubscribe, canEditTemplates, () => false);
+  // Resetting and deleting templates are for admins.
+  const admin = useIsAdmin();
   const subjectRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<Editor | null>(null);
 
@@ -358,12 +361,12 @@ export default function EmailTemplatesPage() {
                   {editable && (
                     <div className="flex flex-wrap items-center justify-between gap-2 border-t px-5 py-3">
                       <div className="flex gap-2">
-                        {system?.customized && (
+                        {admin && system?.customized && (
                           <Button variant="outline" onClick={reset} disabled={busy !== null} className="rounded-xl">
                             {busy === "reset" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />} Reset to original
                           </Button>
                         )}
-                        {selection?.kind === "saved" && (
+                        {admin && selection?.kind === "saved" && (
                           <Button variant="outline" onClick={remove} disabled={busy !== null} className="rounded-xl text-red-600 hover:text-red-700 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/40">
                             {busy === "delete" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />} Delete
                           </Button>

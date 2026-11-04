@@ -27,7 +27,7 @@ import { useClampedPage, usePersistedState } from "@/hooks/use-persisted-state";
 import { propertiesApi } from "@/lib/properties-api";
 import { PROPERTY_TABS } from "@/lib/property-tabs";
 import { usePropertiesList } from "@/hooks/use-properties-list";
-import { canViewPropertyContacts } from "@/lib/permissions";
+import { canViewPropertyContacts, isAdmin } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { Check, Edit, Eye, Filter, Lock, Plus, RefreshCw, Search, X } from "lucide-react";
 
@@ -264,7 +264,7 @@ export default function PropertiesPage() {
     columns,
     data: properties,
     showToolbar: true,
-    showDeleteAction: role === "Admin" || role === "Super Admin",
+    showDeleteAction: isAdmin({ role }),
     onDeleteSelected: (rows: any[]) => setBulkDeleteIds(rows.map((r) => r.id)),
     renderToolbarActions: (selectedRows: any[], clearSelection: () => void) => {
       const isSingle = selectedRows.length === 1;

@@ -1,5 +1,6 @@
 "use client";
 
+import { isAdmin } from "@/lib/permissions";
 import { apiFetch } from "@/lib/api-fetch";
 
 import { useState, useEffect, useCallback } from "react";
@@ -294,7 +295,7 @@ export default function RoomDimensionsMasterPage() {
                 columns={columns}
                 data={filteredDims}
                 showToolbar={true}
-                showDeleteAction={true}
+                showDeleteAction={isAdmin()}
                 onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
               />
                 }

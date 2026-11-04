@@ -1,5 +1,6 @@
 "use client";
 
+import { isAdmin as isAdminUser } from "@/lib/permissions";
 import { toHrFollowUpPayload } from "@/lib/hr-follow-up";
 import { apiFetch } from "@/lib/api-fetch";
 
@@ -90,7 +91,7 @@ export function FollowUpPanel({ entityId, entityType, followUps, onRefresh }: Fo
       const userStr = localStorage.getItem("crm_user");
       if (userStr) {
         const user = JSON.parse(userStr);
-        setIsAdmin(user.role === "Admin" || user.role === "Super Admin");
+        setIsAdmin(isAdminUser(user));
       }
     } catch {
       /* ignore */

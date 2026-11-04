@@ -6,6 +6,8 @@ import type { MailOutboxStatus } from '../../database/entities/mail-outbox.entit
 import { ComposeDto, ComposeSendDto, DraftActionDto, PreviewMailDto, SendMailDto, SuppressionDto } from './dto/mail.dto';
 import { MAX_ATTACHMENT_BYTES, MailAttachmentsService } from './attachments/mail-attachments.service';
 import { MailService } from './mail.service';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 /** One API for every module's email. Permissions are checked per email type in MailService. */
 @Controller('api/v1/mail')
@@ -101,6 +103,8 @@ export class MailController {
     return this.mail.addSuppression(body.email, body.reason, body.note ?? null, req.user);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
   @Delete('suppressions/:id')
   removeSuppression(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     return this.mail.removeSuppression(id, req.user);

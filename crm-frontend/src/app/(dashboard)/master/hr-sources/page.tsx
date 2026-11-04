@@ -1,5 +1,6 @@
 "use client";
 
+import { isAdmin } from "@/lib/permissions";
 import { apiFetch } from "@/lib/api-fetch";
 
 import { useState, useEffect, useCallback } from "react";
@@ -269,7 +270,7 @@ export default function HrSourcesMasterPage() {
                 columns={columns} 
                 data={filteredSources} 
                 showToolbar={true}
-                showDeleteAction={true}
+                showDeleteAction={isAdmin()}
                 onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
               />
                 }
