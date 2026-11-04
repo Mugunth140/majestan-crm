@@ -3,7 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
 /** The modules whose history lives in record_events (leads use lead_events). */
-export type RecordEntity = 'inbound';
+export type RecordEntity = 'inbound' | 'agent';
 
 export interface RecordEventInput {
   entity: RecordEntity;

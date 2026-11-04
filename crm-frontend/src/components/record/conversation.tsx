@@ -86,9 +86,10 @@ const dateTime = (d?: string | null, t?: string | null) => {
 };
 
 /** Which record the conversation belongs to: its API path and mail entity. */
-export type ConversationEntity = { api: "leads" | "inbounds"; mail: "lead" | "inbound"; noun: string; editMethod: "PUT" | "PATCH" };
+export type ConversationEntity = { api: "leads" | "inbounds" | "agents"; mail: "lead" | "inbound" | "agent"; noun: string; editMethod: "PUT" | "PATCH" };
 export const LEAD_ENTITY: ConversationEntity = { api: "leads", mail: "lead", noun: "lead", editMethod: "PUT" };
 export const INBOUND_ENTITY: ConversationEntity = { api: "inbounds", mail: "inbound", noun: "inbound", editMethod: "PATCH" };
+export const AGENT_ENTITY: ConversationEntity = { api: "agents", mail: "agent", noun: "agent", editMethod: "PUT" };
 
 export type ComposeMode = "followup" | "email" | "whatsapp" | "sms";
 type Mode = ComposeMode;

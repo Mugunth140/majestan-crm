@@ -10,7 +10,7 @@ import { INBOUND_STATUS_OPTIONS } from "@/lib/inbound-status";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FormSelect } from "@/components/shared/form-select";
+import { FormSelect, SearchableFormSelect } from "@/components/shared/form-select";
 import { PriceInput } from "@/components/shared/price-input";
 import { TimePicker } from "@/components/shared/time-picker";
 import {
@@ -351,7 +351,7 @@ export function NewInboundModal({ open, onOpenChange, onCreated, quick = false }
       <FocusSection title="Location" description="Where the property is.">
         <FieldRow cols={3}>
           <FocusField required name="state" label="State" error={errors.state}>
-            <FormSelect name="state" placeholder="Select" className={SELECT} value={form.state || null}
+            <SearchableFormSelect name="state" placeholder="Select" searchPlaceholder="Search states…" className={SELECT} value={form.state || null}
               options={INDIAN_STATES.some((o) => o.value === form.state) || !form.state ? INDIAN_STATES : [{ label: form.state, value: form.state }, ...INDIAN_STATES]}
               onValueChange={(v) => set("state", v)} />
           </FocusField>
@@ -362,7 +362,7 @@ export function NewInboundModal({ open, onOpenChange, onCreated, quick = false }
             )}
           </FocusField>
           <FocusField required name="locality" label="Locality" error={errors.locality}>
-            <FormSelect name="locality" placeholder={form.city ? "Select" : "Pick a city first"} className={SELECT} disabled={!form.city}
+            <SearchableFormSelect name="locality" placeholder={form.city ? "Select" : "Pick a city first"} searchPlaceholder="Search localities…" className={SELECT} disabled={!form.city}
               value={form.locality || null} options={localityOptions} onValueChange={(v) => set("locality", v)} />
           </FocusField>
         </FieldRow>

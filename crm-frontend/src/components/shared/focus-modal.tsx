@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
-import { Info, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Info, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
@@ -64,11 +64,42 @@ export function FocusModal({
   footer?: ReactNode;
   children: ReactNode;
 }) {
-  // On a phone the tab strip scrolls: keep the current step in view.
+  // The tab strip scrolls sideways when the steps don't fit: keep the current
+  // step in view, and show arrows on whichever side has more.
   const activeTab = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
-    activeTab.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    activeTab.current?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
   }, [active]);
+
+  const [strip, setStrip] = useState<HTMLElement | null>(null);
+  const [edges, setEdges] = useState({ left: false, right: false });
+  const measure = useCallback(() => {
+    if (!strip) return;
+    const left = strip.scrollLeft > 1;
+    const right = strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 1;
+    setEdges((e) => (e.left === left && e.right === right ? e : { left, right }));
+  }, [strip]);
+  useEffect(() => {
+    if (!strip) return;
+    // The observer also fires once on observe, which takes the first measurement.
+    const observer = new ResizeObserver(measure);
+    observer.observe(strip);
+    strip.addEventListener("scroll", measure, { passive: true });
+    return () => { observer.disconnect(); strip.removeEventListener("scroll", measure); };
+  }, [strip, measure]);
+  const scrollStrip = (direction: -1 | 1) => strip?.scrollBy({ left: direction * strip.clientWidth * 0.7, behavior: "smooth" });
+
+  // Left/Right/Home/End move between steps, as in any tab list.
+  const onTabKey = (e: KeyboardEvent<HTMLElement>) => {
+    if (!steps?.length) return;
+    const at = steps.findIndex((s) => s.key === active);
+    const next = e.key === "ArrowRight" ? at + 1 : e.key === "ArrowLeft" ? at - 1 : e.key === "Home" ? 0 : e.key === "End" ? steps.length - 1 : null;
+    if (next === null || next < 0 || next >= steps.length) return;
+    e.preventDefault();
+    onStepChange?.(steps[next].key);
+    requestAnimationFrame(() => strip?.querySelector<HTMLButtonElement>(`[data-step="${steps[next].key}"]`)?.focus());
+  };
+  const arrow = "absolute inset-y-0 z-10 flex w-10 items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(next) => onOpenChange(next)}>
@@ -90,19 +121,28 @@ export function FocusModal({
               <kbd className="hidden h-6 items-center rounded-md border bg-muted/60 px-1.5 font-sans text-[12px] text-muted-foreground md:inline-flex">esc</kbd>
             </div>
             {steps && steps.length > 0 && (
-              <nav role="tablist" aria-label="Steps" className="flex min-w-0 flex-1 overflow-x-auto scrollbar-hide">
+              <div className="relative flex min-w-0 flex-1">
+              {edges.left && (
+                <button type="button" onClick={() => scrollStrip(-1)} aria-label="Show earlier steps"
+                  className={cn(arrow, "left-0 border-r bg-gradient-to-r from-background from-60% to-background/80")}>
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+              )}
+              <nav ref={setStrip} role="tablist" aria-label="Steps" onKeyDown={onTabKey} className="flex min-w-0 flex-1 overflow-x-auto scroll-smooth scrollbar-hide">
                 {steps.map((step) => {
                   const current = step.key === active;
                   return (
                     <button
                       key={step.key}
                       ref={current ? activeTab : undefined}
+                      data-step={step.key}
                       type="button"
                       role="tab"
                       aria-selected={current}
+                      tabIndex={current ? 0 : -1}
                       onClick={() => onStepChange?.(step.key)}
                       className={cn(
-                        "flex h-full w-auto shrink-0 items-center gap-2 border-r px-4 text-[14px] transition-colors md:w-auto md:min-w-[140px] md:max-w-[240px] md:flex-1 md:shrink",
+                        "flex h-full w-auto min-w-[150px] shrink-0 items-center gap-2 border-r px-4 text-[14px] transition-colors md:min-w-[180px] md:max-w-[260px] md:flex-1",
                         current
                           ? "bg-background font-medium text-foreground"
                           : "bg-muted/50 text-muted-foreground hover:text-foreground dark:bg-black/20",
@@ -114,6 +154,13 @@ export function FocusModal({
                   );
                 })}
               </nav>
+              {edges.right && (
+                <button type="button" onClick={() => scrollStrip(1)} aria-label="Show more steps"
+                  className={cn(arrow, "right-0 border-l bg-gradient-to-l from-background from-60% to-background/80")}>
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              )}
+              </div>
             )}
           </header>
 

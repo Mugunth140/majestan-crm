@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronDown, Loader2, Search, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { OptionSearchList } from "@/components/shared/option-search-list";
 import { cn } from "@/lib/utils";
 
 // Frappe-style record fields: each row reads as plain text and turns into an
@@ -137,6 +138,7 @@ export function InlineSelect({
   onSave,
   disabled,
   placeholder = "Select…",
+  searchable,
 }: {
   label: string;
   value: string | null | undefined;
@@ -144,8 +146,11 @@ export function InlineSelect({
   onSave: Save;
   disabled?: boolean;
   placeholder?: string;
+  /** Adds a search box: for long lists like localities. */
+  searchable?: boolean;
 }) {
   const { saving, run } = useSaving(onSave);
+  const [open, setOpen] = useState(false);
   const byValue = useMemo(() => new Map(options.map((o) => [o.value, o])), [options]);
   const current = value ? byValue.get(value) : undefined;
 
@@ -156,6 +161,30 @@ export function InlineSelect({
           {current?.dot && <span className={cn("h-2 w-2 rounded-full", current.dot)} />}
           {current?.label ?? (value || "—")}
         </span>
+      </FieldRow>
+    );
+  }
+
+  if (searchable) {
+    return (
+      <FieldRow label={label}>
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger render={<button type="button" aria-label={label} disabled={saving} className={TRIGGER} />}>
+            {current?.dot && <span className={cn("h-2 w-2 shrink-0 rounded-full", current.dot)} />}
+            <span className={cn("min-w-0 flex-1 truncate", !value && "text-muted-foreground/60")}>{current?.label ?? (value || placeholder)}</span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-[min(300px,calc(100vw-2rem))] gap-0 p-0">
+            <OptionSearchList
+              options={options}
+              value={value}
+              label={label}
+              placeholder={`Search ${label.toLowerCase()}…`}
+              onPick={(next) => { setOpen(false); if (next !== value) run(next).catch(() => {}); }}
+            />
+          </PopoverContent>
+        </Popover>
+        {saving && <Spinner />}
       </FieldRow>
     );
   }

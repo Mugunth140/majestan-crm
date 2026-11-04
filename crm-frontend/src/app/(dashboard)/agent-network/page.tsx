@@ -3,7 +3,6 @@
 import { apiFetch } from "@/lib/api-fetch";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/tables/data-table";
 import { ModuleMobileRows, ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
@@ -26,6 +25,7 @@ import { MobileHeader } from "@/components/layout/mobile-header";
 import { ListFrame, ListToolbar, SegmentTabs, ToolbarEnd, ToolbarSearch, headerPrimaryClass, toolbarFilterButton } from "@/components/layout/list-page";
 import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
+import { NewAgentModal } from "@/components/agents/new-agent-modal";
 import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -56,6 +56,7 @@ export default function AgentsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [creating, setCreating] = useState(false);
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
   const [role, setRole] = useState<string>("");
@@ -505,10 +506,10 @@ export default function AgentsPage() {
       <div className="flex flex-col space-y-4 md:space-y-0 md:h-full">
         {/* Desktop page header */}
         <PageActions>
-          <Link href="/agent-network/new" className={headerPrimaryClass}>
+          <button type="button" onClick={() => setCreating(true)} className={headerPrimaryClass}>
             <Plus className="size-4" />
             Add Agent
-          </Link>
+          </button>
         </PageActions>
 
         {/* Filters + Table */}
@@ -563,6 +564,7 @@ export default function AgentsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <NewAgentModal open={creating} onOpenChange={setCreating} onCreated={(id) => { if (id) router.push(`/agent-network/${id}`); }} />
     </>
   );
 }

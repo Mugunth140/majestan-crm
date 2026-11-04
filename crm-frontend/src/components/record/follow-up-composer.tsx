@@ -65,7 +65,7 @@ export function latestRnr(followUps: FollowUpLike[]) {
  * Shared by leads and inbounds (`api` is the record's API path).
  */
 export function FollowUpComposer({ api, entityId, noun, followUps, onSaved }: {
-  api: "leads" | "inbounds";
+  api: "leads" | "inbounds" | "agents";
   entityId: number | string;
   /** "lead", "owner"… for the messages. */
   noun: string;

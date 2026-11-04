@@ -16,8 +16,13 @@ CREATE TABLE IF NOT EXISTS record_events (
   KEY idx_record_events_type (entity, type, created_at)
 );
 
--- Backfill creation so every existing inbound's Activity has a starting point.
+-- Backfill creation so every existing inbound's and agent's Activity has a starting point.
 INSERT INTO record_events (entity, entity_id, actor_id, type, to_value, meta, created_at)
 SELECT 'inbound', i.id, i.uploaded_by_id, 'created', i.status, JSON_OBJECT('backfilled', TRUE), i.created_at
 FROM inbounds i
 WHERE NOT EXISTS (SELECT 1 FROM record_events e WHERE e.entity = 'inbound' AND e.entity_id = i.id AND e.type = 'created');
+
+INSERT INTO record_events (entity, entity_id, actor_id, type, to_value, meta, created_at)
+SELECT 'agent', a.id, NULL, 'created', a.status, JSON_OBJECT('backfilled', TRUE), a.created_at
+FROM agents a
+WHERE NOT EXISTS (SELECT 1 FROM record_events e WHERE e.entity = 'agent' AND e.entity_id = a.id AND e.type = 'created');

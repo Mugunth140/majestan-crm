@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Put, Delete, Param, UseGuards, Request } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, Patch, Delete, Param, UseGuards, Request } from '@nestjs/common';
 import { AgentsService } from './agents.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
@@ -11,6 +11,16 @@ export class AgentsController {
   async getAgents(@Request() req: any) {
     const data = await this.agentsService.getAgents(req.user);
     return { success: true, data };
+  }
+
+  @Get('staff-list')
+  async staffList(@Request() req: any) {
+    return { success: true, ...(await this.agentsService.staffList(req.user)) };
+  }
+
+  @Get(':id/activity')
+  async activity(@Param('id') id: string, @Request() req: any) {
+    return { success: true, data: await this.agentsService.activity(Number(id), req.user) };
   }
 
   @Get(':id')
@@ -46,6 +56,12 @@ export class AgentsController {
     return { success: true, data };
   }
 
+  @Patch(':id')
+  async patchAgent(@Param('id') id: string, @Body() body: Record<string, unknown>, @Request() req: any) {
+    const data = await this.agentsService.patchAgent(Number(id), body, req.user);
+    return { success: true, data };
+  }
+
   @Put(':id')
   async updateAgent(@Param('id') id: string, @Body() body: any) {
     const data = await this.agentsService.updateAgent(Number(id), body);
@@ -60,15 +76,15 @@ export class AgentsController {
 
   // ── Contact Logs ───────────────────────────────────────────────────────────
   @Post(':id/contact-log')
-  async addContactLog(@Param('id') id: string, @Body() body: any) {
-    const data = await this.agentsService.addContactLog(Number(id), body);
+  async addContactLog(@Param('id') id: string, @Body() body: any, @Request() req: any) {
+    const data = await this.agentsService.addContactLog(Number(id), body, req.user?.id ?? null);
     return { success: true, data };
   }
 
   // ── Follow-Up CRUD ─────────────────────────────────────────────────────────
   @Post(':id/follow-ups')
-  async addFollowUp(@Param('id') id: string, @Body() body: any) {
-    const data = await this.agentsService.addFollowUp(Number(id), body);
+  async addFollowUp(@Param('id') id: string, @Body() body: any, @Request() req: any) {
+    const data = await this.agentsService.addFollowUp(Number(id), body, req.user?.id ?? null);
     return { success: true, data };
   }
 

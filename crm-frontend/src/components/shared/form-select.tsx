@@ -1,7 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { OptionSearchList } from "@/components/shared/option-search-list";
 import { cn } from "@/lib/utils";
 
 interface FormSelectProps {
@@ -64,3 +67,46 @@ export function FormSelect({
     </Select>
   );
 }
+
+/**
+ * FormSelect with a search box, for long lists (localities). Looks like the
+ * other selects; the list opens in a popover so typing filters it.
+ */
+export function SearchableFormSelect({
+  id, name, placeholder, options, className, value, onValueChange, disabled, searchPlaceholder,
+}: Omit<FormSelectProps, "defaultValue" | "required"> & { searchPlaceholder?: string }) {
+  const [open, setOpen] = useState(false);
+  const current = options.find((o) => o.value === value);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <button
+            id={id}
+            type="button"
+            name={name}
+            disabled={disabled}
+            aria-haspopup="listbox"
+            className={cn(
+              "flex w-full h-12! items-center justify-between gap-2 rounded-xl border border-border/60 bg-muted/30 px-3 text-left text-[15px] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0052FF]/20 disabled:cursor-not-allowed disabled:opacity-50 data-[popup-open]:border-ring",
+              className,
+            )}
+          />
+        }
+      >
+        <span className={cn("min-w-0 flex-1 truncate", !current && !value && "text-muted-foreground")}>{current?.label ?? (value || placeholder)}</span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-(--anchor-width) min-w-[240px] gap-0 p-0">
+        <OptionSearchList
+          options={options}
+          value={value}
+          label={placeholder}
+          placeholder={searchPlaceholder}
+          onPick={(v) => { setOpen(false); if (v !== value) onValueChange?.(v); }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+

@@ -26,7 +26,8 @@ import { FieldRow, InlineMulti, InlineSelect, InlineText, Section, type Option }
 import { Feed, TabHeader } from "@/components/record/feed";
 import { AssigneePicker } from "@/components/record/assignee-picker";
 import { ScoreRing } from "@/components/record/score-ring";
-import { activityItems, type ActivityEntry } from "@/components/inbound/inbound-activity";
+import { activityItems, type ActivityEntry } from "@/components/record/activity";
+import { INBOUND_ACTIVITY } from "@/components/inbound/inbound-activity";
 import { INBOUND_ENTITY, LeadConversation } from "@/components/record/conversation";
 import { FollowUpComposer } from "@/components/record/follow-up-composer";
 import { AttachmentsArt, EmptyState } from "@/components/record/empty-state";
@@ -249,7 +250,7 @@ function InboundDetail() {
   const followUps = useMemo(() => inbound?.follow_ups ?? [], [inbound]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- API rows, as on the lead page
   const contactLogs: any[] = useMemo(() => sortContactLogs(inbound?.contact_logs ?? []), [inbound]);
-  const activityFeed = useMemo(() => activityItems(activity ?? []), [activity]);
+  const activityFeed = useMemo(() => activityItems(activity ?? [], INBOUND_ACTIVITY), [activity]);
 
   if (isLoading) return <PageSkeleton />;
   if (!inbound) return null;
@@ -394,9 +395,9 @@ function InboundDetail() {
         </DataCard>
 
         <DataCard title="Location">
-          <InlineSelect label="State" value={inbound.state} options={withCurrent(INDIAN_STATES, inbound.state)} onSave={(v) => save({ state: v })} />
-          <InlineSelect label="City" value={inbound.city} options={withCurrent(cities, inbound.city)} onSave={(v) => save({ city: v, locality: null })} />
-          <InlineSelect label="Locality" value={inbound.locality} options={withCurrent(localityOptions, inbound.locality)}
+          <InlineSelect searchable label="State" value={inbound.state} options={withCurrent(INDIAN_STATES, inbound.state)} onSave={(v) => save({ state: v })} />
+          <InlineSelect searchable label="City" value={inbound.city} options={withCurrent(cities, inbound.city)} onSave={(v) => save({ city: v, locality: null })} />
+          <InlineSelect searchable label="Locality" value={inbound.locality} options={withCurrent(localityOptions, inbound.locality)}
             placeholder={inbound.city ? "Select…" : "Pick a city first"} disabled={!inbound.city} onSave={(v) => save({ locality: v })} />
           <InlineText label="Area" value={inbound.area} placeholder="1500 sq ft" onSave={saveText("area")} />
           <InlineText label="Landmark" value={inbound.landmark} onSave={saveText("landmark")} />
