@@ -394,12 +394,12 @@ export function NewInboundModal({ open, onOpenChange, onCreated, quick = false }
         <FocusSection title="Pricing" description={form.purpose ? `The ${form.purpose.toLowerCase()} terms.` : "Pick a purpose on the Property step to see its terms."}>
           <FieldRow>
             {rent && (
-              <FocusField label="Monthly rent" optional>
+              <FocusField name="total_rent" label="Monthly rent" optional error={errors.total_rent}>
                 <PriceInput type="number" value={form.total_rent} onChange={(v) => set("total_rent", v)} placeholder="15000" className={INPUT} />
               </FocusField>
             )}
             {form.purpose === "Sale" && form.category === "residential" && (
-              <FocusField label="Sale price" optional>
+              <FocusField name="sale_price" label="Sale price" optional error={errors.sale_price}>
                 <PriceInput value={form.sale_price} onChange={(v) => set("sale_price", v)} placeholder="85 Lakhs" className={INPUT} />
               </FocusField>
             )}
@@ -413,7 +413,7 @@ export function NewInboundModal({ open, onOpenChange, onCreated, quick = false }
               </FocusField>
             )}
             {rent && (
-              <FocusField label="Rent per sq ft" optional>
+              <FocusField name="rent_per_sqft" label="Rent per sq ft" optional error={errors.rent_per_sqft}>
                 <PriceInput type="number" step="0.01" value={form.rent_per_sqft} onChange={(v) => set("rent_per_sqft", v)} placeholder="25.5" className={INPUT} />
               </FocusField>
             )}
@@ -426,6 +426,7 @@ export function NewInboundModal({ open, onOpenChange, onCreated, quick = false }
         </FocusSection>
         {hasFloorPricing(form.category, form.type) && (
           <FocusSection title="Floors" description="Only when floors are priced differently; otherwise the pricing above covers it.">
+            {errors.units && <p role="alert" className="text-sm text-destructive">{errors.units}</p>}
             {form.units.map((u, i) => (
               <div key={i} className="grid gap-3 rounded-lg border p-3 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
                 <FocusField label="Floor" required>
@@ -547,7 +548,7 @@ export function NewInboundModal({ open, onOpenChange, onCreated, quick = false }
             <>
               {form.brokerage_type === "Percentage" && (
                 <FieldRow>
-                  <FocusField label="Percentage" htmlFor="ni-pct" optional>
+                  <FocusField label="Percentage" name="percentage" htmlFor="ni-pct" optional error={errors.percentage}>
                     <div className="relative">
                       <Input id="ni-pct" type="number" step="0.1" min="0" value={form.percentage} onChange={(e) => set("percentage", e.target.value)} placeholder="2" className={cn(INPUT, "pr-8")} />
                       <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[14px] text-muted-foreground">%</span>
@@ -557,14 +558,14 @@ export function NewInboundModal({ open, onOpenChange, onCreated, quick = false }
               )}
               {form.brokerage_type === "Fixed" && (
                 <FieldRow>
-                  <FocusField label="Fixed amount" htmlFor="ni-fix" optional>
+                  <FocusField label="Fixed amount" name="fixed_amount" htmlFor="ni-fix" optional error={errors.fixed_amount}>
                     <Input id="ni-fix" type="number" min="0" value={form.fixed_amount} onChange={(e) => set("fixed_amount", e.target.value)} placeholder="50000" className={INPUT} />
                   </FocusField>
                 </FieldRow>
               )}
               {form.brokerage_type === "Days" && (
                 <FieldRow>
-                  <FocusField label="Days of rent" htmlFor="ni-days" optional>
+                  <FocusField label="Days of rent" name="brokerage_days" htmlFor="ni-days" optional error={errors.brokerage_days}>
                     <Input id="ni-days" type="number" min="0" value={form.brokerage_days} onChange={(e) => set("brokerage_days", e.target.value)} placeholder="15" className={INPUT} />
                   </FocusField>
                 </FieldRow>

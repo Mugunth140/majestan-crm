@@ -1,3 +1,4 @@
+import { validateInboundRequiredEdits } from './dto/update-inbound.dto';
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -380,6 +381,7 @@ export class InboundsService {
   async update(id: number, updateInboundDto: Omit<Partial<Inbound>, 'units'> & { units?: any[] }, actorId: number | null = null): Promise<Inbound> {
     const inbound = await this.mustFindOne(id);
     const { units, uploaded_by_id: _uploader, is_queued: _queued, quick_capture: _quick, ...rest } = updateInboundDto as typeof updateInboundDto & { quick_capture?: boolean };
+    validateInboundRequiredEdits(rest);
     const previousStatus = inbound.status;
     const before: Record<string, unknown> = { ...inbound };
     const previousUnits = units !== undefined ? await this.unitsRepository.find({ where: { inbound_id: id }, order: { id: 'ASC' } }) : [];
@@ -461,14 +463,14 @@ export class InboundsService {
       throw new NotFoundException(`Follow-up with ID ${followUpId} not found`);
     }
     
-    if (body.followUpDate !== undefined) followUp.follow_up_date = body.followUpDate;
-    if (body.followUpTime !== undefined) followUp.follow_up_time = body.followUpTime;
-    if (body.contactedVia !== undefined) followUp.contacted_via = body.contactedVia;
-    if (body.nextFollowUpDate !== undefined) followUp.next_follow_up_date = body.nextFollowUpDate;
-    if (body.nextFollowUpTime !== undefined) followUp.next_follow_up_time = body.nextFollowUpTime;
+    if (body.followUpDate !== undefined) followUp.follow_up_date = body.followUpDate || null;
+    if (body.followUpTime !== undefined) followUp.follow_up_time = body.followUpTime || null;
+    if (body.contactedVia !== undefined) followUp.contacted_via = body.contactedVia || null;
+    if (body.nextFollowUpDate !== undefined) followUp.next_follow_up_date = body.nextFollowUpDate || null;
+    if (body.nextFollowUpTime !== undefined) followUp.next_follow_up_time = body.nextFollowUpTime || null;
     if (body.purpose !== undefined) followUp.purpose = body.purpose;
-    if (body.priority !== undefined) followUp.priority = body.priority;
-    if (body.rnr !== undefined) followUp.rnr = body.rnr;
+    if (body.priority !== undefined) followUp.priority = body.priority || null;
+    if (body.rnr !== undefined) followUp.rnr = body.rnr || null;
     if (body.notes !== undefined) followUp.notes = body.notes;
 
     return this.followUpsRepository.save(followUp);

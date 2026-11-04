@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsInt, IsBoolean, IsNumber, IsArray, ValidateNested, MaxLength, IsIn, IsNotEmpty, Matches, IsLatitude, IsLongitude } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsBoolean, IsNumber, IsArray, ValidateNested, MaxLength, IsIn, IsNotEmpty, Matches, IsLatitude, IsLongitude, IsEmail, ValidateIf, Min } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 export class InboundUnitDto {
@@ -143,8 +143,9 @@ export class CreateInboundDto {
   @IsString()
   whatsapp_number?: string;
 
-  @IsOptional()
-  @IsString()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  @ValidateIf((_, value) => value != null && value !== '')
+  @IsEmail({}, { message: 'Enter a valid email address' })
   email?: string;
 
   @IsOptional()
@@ -250,10 +251,12 @@ export class CreateInboundDto {
 
   @IsOptional()
   @IsNumber()
+  @Min(0)
   percentage?: number;
 
   @IsOptional()
   @IsNumber()
+  @Min(0)
   fixed_amount?: number;
 
   @IsOptional()
@@ -261,7 +264,8 @@ export class CreateInboundDto {
   rental_brokerage?: string;
 
   @IsOptional()
-  @IsNumber()
+  @IsInt()
+  @Min(0)
   brokerage_days?: number;
 
   @IsOptional()

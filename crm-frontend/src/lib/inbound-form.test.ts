@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY_INBOUND, checkInbound, inboundPayload, normalizeCategoryAndType, type InboundForm } from "./inbound-form";
+import { EMPTY_INBOUND, checkInbound, inboundPayload, normalizeCategoryAndType, parseInboundPrice, type InboundForm } from "./inbound-form";
 
 const form = (patch: Partial<InboundForm>): InboundForm => ({ ...EMPTY_INBOUND, ...patch });
 
@@ -54,4 +54,26 @@ it("maps old display values to the form's keys", () => {
   expect(normalizeCategoryAndType("Commercial", "Office Space")).toEqual({ category: "commercial", type: "office" });
   expect(normalizeCategoryAndType("residential", "Warehouse")).toEqual({ category: "commercial", type: "warehouse" });
   expect(normalizeCategoryAndType(null, null)).toEqual({ category: null, type: null });
+});
+
+it("rejects invalid optional coordinates and prices before creating a record", () => {
+  expect(checkInbound("location", form({
+    city: "Coimbatore", locality: "Peelamedu", latitude: "not a number", longitude: "181",
+  }))).toHaveProperty("latitude");
+  expect(checkInbound("location", form({
+    city: "Coimbatore", locality: "Peelamedu", latitude: "0", longitude: "0",
+  }))).toEqual({});
+  expect(checkInbound("pricing", form({
+    category: "residential", purpose: "Sale", sale_price: "85garbage",
+  }))).toHaveProperty("sale_price");
+  expect(checkInbound("owner", form({
+    owner_name: "Audit owner", mobile: "9876543210", email: "invalid-email",
+  }))).toHaveProperty("email");
+});
+
+it("accepts rupee labels and zero in the same parser used by inline pricing", () => {
+  expect(parseInboundPrice("₹ 1.25 Cr")).toBe(12500000);
+  expect(parseInboundPrice("0")).toBe(0);
+  expect(parseInboundPrice("")).toBeNull();
+  expect(() => parseInboundPrice("garbage")).toThrow();
 });

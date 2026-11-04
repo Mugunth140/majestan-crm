@@ -175,8 +175,21 @@ export function checkInbound(step: InboundStep, f: InboundForm): Record<string, 
     need("state", "Enter the state.");
     need("city", "Pick the city.");
     need("locality", "Pick the locality.");
-    if (f.latitude.trim() && Math.abs(Number(f.latitude)) > 90) e.latitude = "Latitude runs from -90 to 90.";
-    if (f.longitude.trim() && Math.abs(Number(f.longitude)) > 180) e.longitude = "Longitude runs from -180 to 180.";
+    if (f.latitude.trim() && (!Number.isFinite(Number(f.latitude)) || Math.abs(Number(f.latitude)) > 90)) e.latitude = "Latitude runs from -90 to 90.";
+    if (f.longitude.trim() && (!Number.isFinite(Number(f.longitude)) || Math.abs(Number(f.longitude)) > 180)) e.longitude = "Longitude runs from -180 to 180.";
+  }
+  if (step === "pricing") {
+    const checkPrice = (key: string, value: string) => {
+      try { parseInboundPrice(value); } catch { e[key] = "Enter a valid price."; }
+    };
+    if (f.purpose === "Rent") {
+      if (f.total_rent.trim() && !Number.isFinite(Number(f.total_rent))) e.total_rent = "Enter a valid rent.";
+      if (f.rent_per_sqft.trim() && !Number.isFinite(Number(f.rent_per_sqft))) e.rent_per_sqft = "Enter a valid rent per square foot.";
+    }
+    if (f.purpose === "Sale" && f.category === "residential") checkPrice("sale_price", f.sale_price);
+    if (hasFloorPricing(f.category, f.type)) {
+      for (const unit of f.units) if (unit.floor_label.trim()) checkPrice("units", unit.price);
+    }
   }
   if (step === "owner") {
     need("owner_name", "Enter the owner's name.");
@@ -187,13 +200,30 @@ export function checkInbound(step: InboundStep, f: InboundForm): Record<string, 
     need("primary_contact", "Who should we contact?");
     need("key_with", "Who has the keys?");
   }
-  if (step === "brokerage") need("brokerage_accepted", "Does the owner accept brokerage?");
+  if (step === "brokerage") {
+    need("brokerage_accepted", "Does the owner accept brokerage?");
+    if (brokered(f)) {
+      if (f.brokerage_type === "Percentage" && f.percentage.trim() && (!Number.isFinite(Number(f.percentage)) || Number(f.percentage) < 0)) e.percentage = "Enter a valid percentage.";
+      if (f.brokerage_type === "Fixed" && f.fixed_amount.trim() && (!Number.isFinite(Number(f.fixed_amount)) || Number(f.fixed_amount) < 0)) e.fixed_amount = "Enter a valid amount.";
+      if (f.brokerage_type === "Days" && f.brokerage_days.trim() && (!Number.isInteger(Number(f.brokerage_days)) || Number(f.brokerage_days) < 0)) e.brokerage_days = "Enter a whole number of days.";
+    }
+  }
   return e;
 }
 
 const num = (v: string) => (v.trim() === "" ? null : Number(v));
 const text = (v: string) => v.trim() || null;
-const money = (v: string) => (v.trim() ? parseIndianCurrency(v) || null : null);
+export function parseInboundPrice(value: string): number | null {
+  const text = value.trim();
+  if (!text) return null;
+  const cleaned = text.replace(/^₹\s*/, "").replace(/,/g, "");
+  if (!/^(?:\d+(?:\.\d*)?|\.\d+)\s*(?:cr(?:ores?)?|l(?:akhs?)?|lacs?|k|thousands?)?$/i.test(cleaned)) {
+    throw new Error("Enter a valid price.");
+  }
+  const price = parseIndianCurrency(cleaned);
+  if (!Number.isFinite(price)) throw new Error("Enter a valid price.");
+  return price;
+}
 
 /** The body for POST /inbounds. The quick form sends only what it asks for. */
 export function inboundPayload(f: InboundForm, quick = false): Record<string, unknown> {
@@ -228,16 +258,16 @@ export function inboundPayload(f: InboundForm, quick = false): Record<string, un
     longitude: num(f.longitude),
     total_rent: rent ? num(f.total_rent) : null,
     rent_per_sqft: rent ? num(f.rent_per_sqft) : null,
-    sale_price: f.purpose === "Sale" && f.category === "residential" ? money(f.sale_price) : null,
+    sale_price: f.purpose === "Sale" && f.category === "residential" ? parseInboundPrice(f.sale_price) : null,
     // Rent advance is a number of months; otherwise an amount like "5 Lakhs".
-    advance: f.advance.trim() ? (rent ? f.advance : money(f.advance) ?? f.advance) : null,
+    advance: f.advance.trim() ? (rent ? f.advance : parseIndianCurrency(f.advance) || f.advance) : null,
     floor_number: hasFloor(f.type) ? text(f.floor_number) : null,
     ...(hasFloorPricing(f.category, f.type) && f.units.some((u) => u.floor_label.trim())
       ? {
           units: f.units.filter((u) => u.floor_label.trim()).map((u) => ({
             floor_label: u.floor_label.trim(),
             area: text(u.area),
-            price: money(u.price),
+            price: parseInboundPrice(u.price),
             notes: text(u.notes),
           })),
         }

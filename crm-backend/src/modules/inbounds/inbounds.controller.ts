@@ -107,6 +107,8 @@ export class InboundsController {
     return { success: true, data };
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
   @Patch(':id/follow-ups/:followUpId')
   async updateFollowUp(
     @Param('id') id: string,

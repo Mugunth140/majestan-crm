@@ -9,6 +9,7 @@ import { apiFetch } from "@/lib/api-fetch";
 import { mailApi, MAIL_STATUS, newDraftIds, type MailCatalog, type MailSummary, type MailTarget } from "@/lib/mail-api";
 import { contactLogAuthor, formatDuration } from "@/lib/contact-log-utils";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -17,6 +18,7 @@ import { DateTimePicker } from "@/components/shared/datetime-picker";
 import { MailComposer, type ComposerStart } from "@/components/mail/mail-composer";
 import { MailPreviewDialog } from "@/components/mail/mail-preview-dialog";
 import { cn } from "@/lib/utils";
+import { withCurrent } from "./inline-field";
 import { Avatar, CARD, Chip, Feed, FeedTime, TabHeader, Who, sortOldestFirst, type FeedItem } from "./feed";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -66,8 +68,17 @@ const PRIORITIES = [
   { label: "Urgent", value: "urgent" },
 ];
 
-const followUpTime = (fu: FollowUp) =>
-  fu.created_at ? new Date(fu.created_at) : new Date(`${fu.follow_up_date}T${fu.follow_up_time || "00:00"}`);
+function followUpTime(fu: FollowUp, useContactDate: boolean) {
+  const contactDate = new Date(`${fu.follow_up_date?.slice(0, 10)}T${fu.follow_up_time || "00:00"}`);
+  return fu.created_at && (!useContactDate || Number.isNaN(contactDate.getTime())) ? new Date(fu.created_at) : contactDate;
+}
+
+const NO_SELECTION = { label: "None", value: "__none" };
+const followUpChoice = (value: string | null) => value && value !== NO_SELECTION.value ? value : "";
+const EDIT_CHANNELS = [NO_SELECTION, ...Object.entries(VIA).map(([value, { label }]) => ({
+  value, label: label[0].toUpperCase() + label.slice(1),
+}))];
+const EDIT_RNR = [NO_SELECTION, ...[1, 2, 3, 4, 5].map((n) => ({ label: `RNR ${n}`, value: `rnr${n}` }))];
 
 function nextFollowUp(fu: FollowUp): string | null {
   if (!fu.next_follow_up_date) return null;
@@ -221,7 +232,7 @@ export function LeadConversation({
       const next = nextFollowUp(fu);
       list.push({
         key: `fu-${fu.id}`,
-        at: followUpTime(fu),
+        at: followUpTime(fu, entity.api === "inbounds"),
         icon: <Icon />,
         who,
         title: <><Who>{who}</Who> logged {via ? (via.label === "SMS" ? "an SMS" : `a ${via.label}`) : "a"} follow-up</>,
@@ -386,7 +397,7 @@ export function LeadConversation({
     return sortOldestFirst(list);
     // retry/deleteFollowUp only read state through setters and props already listed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [followUps, contactLogs, mails, isAdmin, canSendMail, retrying, expanded, leadName, email]);
+  }, [followUps, contactLogs, mails, entity.api, isAdmin, canSendMail, retrying, expanded, leadName, email]);
 
   // Like a chat: open at the latest message, and follow new ones as they arrive.
   useEffect(() => {
@@ -616,6 +627,12 @@ function EditFollowUpDialog({ leadId, entity, followUp, onClose, onSaved }: {
   const [priority, setPriority] = useState("");
   const [next, setNext] = useState<Date | undefined>();
   const [saving, setSaving] = useState(false);
+  const isInbound = entity.api === "inbounds";
+  const [inboundFields, setInboundFields] = useState({
+    followUpDate: "", followUpTime: "", nextFollowUpDate: "", nextFollowUpTime: "", contactedVia: "", rnr: "",
+  });
+  const setInboundField = (key: keyof typeof inboundFields, value: string) =>
+    setInboundFields((fields) => ({ ...fields, [key]: value }));
   const [openedFor, setOpenedFor] = useState<number | null>(null);
 
   // Load the follow-up's values each time a different one is opened.
@@ -624,6 +641,14 @@ function EditFollowUpDialog({ leadId, entity, followUp, onClose, onSaved }: {
     setNotes(followUp.notes ?? "");
     setPriority(followUp.priority ?? "");
     setNext(dateTime(followUp.next_follow_up_date, followUp.next_follow_up_time));
+    setInboundFields({
+      followUpDate: followUp.follow_up_date?.slice(0, 10) ?? "",
+      followUpTime: followUp.follow_up_time ?? "",
+      nextFollowUpDate: followUp.next_follow_up_date?.slice(0, 10) ?? "",
+      nextFollowUpTime: followUp.next_follow_up_time ?? "",
+      contactedVia: followUp.contacted_via ?? "",
+      rnr: followUp.rnr ?? "",
+    });
   }
   if (!followUp && openedFor !== null) setOpenedFor(null);
 
@@ -643,10 +668,11 @@ function EditFollowUpDialog({ leadId, entity, followUp, onClose, onSaved }: {
           priority,
           nextFollowUpDate: next ? format(next, "yyyy-MM-dd") : "",
           nextFollowUpTime: next ? format(next, "HH:mm") : "",
+          ...(isInbound ? inboundFields : {}),
         })),
       });
       const data = await res.json();
-      if (!data.success) throw new Error();
+      if (!res.ok || !data.success) throw new Error();
       toast.success("Follow-up updated.");
       onSaved();
     } catch {
@@ -663,10 +689,39 @@ function EditFollowUpDialog({ leadId, entity, followUp, onClose, onSaved }: {
           <DialogTitle>Edit follow-up</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
-          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes" className="min-h-[96px] resize-none" />
+          <Textarea aria-label="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes" className="min-h-[96px] resize-none" />
+          {isInbound && (
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                ["followUpDate", "Contact date", "date"],
+                ["followUpTime", "Contact time", "time"],
+                ["nextFollowUpDate", "Next follow-up date", "date"],
+                ["nextFollowUpTime", "Next follow-up time", "time"],
+              ] as const).map(([key, label, type]) => (
+                <label key={key} className="min-w-0 space-y-1 text-sm">
+                  <span>{label}</span>
+                  <Input type={type} value={inboundFields[key]} onChange={(e) => setInboundField(key, e.target.value)} className="h-9 w-full min-w-0" />
+                </label>
+              ))}
+              <div className="space-y-1 text-sm">
+                <label htmlFor="edit-contacted-via">Contacted via</label>
+                <FormSelect id="edit-contacted-via" name="editContactedVia" placeholder="None" options={withCurrent(EDIT_CHANNELS, inboundFields.contactedVia)}
+                  value={inboundFields.contactedVia || NO_SELECTION.value} onValueChange={(v) => setInboundField("contactedVia", followUpChoice(v))} className="h-9! w-full rounded-md! text-sm" />
+              </div>
+              <div className="space-y-1 text-sm">
+                <label htmlFor="edit-rnr">RNR status</label>
+                <FormSelect id="edit-rnr" name="editRnr" placeholder="None" options={withCurrent(EDIT_RNR, inboundFields.rnr)}
+                  value={inboundFields.rnr || NO_SELECTION.value} onValueChange={(v) => setInboundField("rnr", followUpChoice(v))} className="h-9! w-full rounded-md! text-sm" />
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2">
-            <DateTimePicker value={next} onChange={setNext} placeholder="Next follow-up" className="h-9! rounded-md! text-[13px]!" />
-            <FormSelect name="editPriority" placeholder="Priority" options={PRIORITIES} value={priority} onValueChange={(v) => setPriority(v || "")} className="h-9! rounded-md! text-[13px]!" />
+            {!isInbound && <DateTimePicker value={next} onChange={setNext} placeholder="Next follow-up" className="h-9! rounded-md! text-[13px]!" />}
+            <div className="space-y-1 text-sm">
+              {isInbound && <label htmlFor="edit-priority">Priority</label>}
+              <FormSelect id="edit-priority" name="editPriority" placeholder="Priority" options={isInbound ? withCurrent([NO_SELECTION, ...PRIORITIES], priority) : PRIORITIES}
+                value={isInbound ? priority || NO_SELECTION.value : priority} onValueChange={(v) => setPriority(followUpChoice(v))} className="h-9! w-full rounded-md! text-[13px]!" />
+            </div>
           </div>
         </div>
         <DialogFooter>

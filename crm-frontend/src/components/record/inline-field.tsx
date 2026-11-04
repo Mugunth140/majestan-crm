@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { toast } from "sonner";
 import { Check, ChevronDown, Loader2, Search, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -112,6 +113,15 @@ export function InlineText({
           {...shared}
           type={type}
           inputMode={type === "number" ? "decimal" : undefined}
+          onBlur={(e) => {
+            if (e.currentTarget.validity.badInput) {
+              skipBlur.current = false;
+              setDraft(stored);
+              toast.error(`${label} must be a number.`);
+              return;
+            }
+            void commit();
+          }}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") e.currentTarget.blur();

@@ -10,12 +10,11 @@ import { apiFetch, apiJson } from "@/lib/api-fetch";
 import { canViewInboundContacts } from "@/lib/permissions";
 import { sortContactLogs } from "@/lib/contact-log-utils";
 import { formatIndianCurrencyShort, parseIndianCurrency } from "@/lib/indian-currency";
-import { readStoredCoordinates } from "@/lib/image-coordinates";
 import { INBOUND_STATUS_OPTIONS } from "@/lib/inbound-status";
 import {
   ADVANCE_MONTHS, BHK_CHOICES, BROKERAGE_ACCEPTED, BROKERAGE_PAYERS, BROKERAGE_TYPES, INBOUND_CATEGORIES, INBOUND_PURPOSES, INDIAN_STATES,
   INBOUND_STATUSES, INBOUND_STATUS_TONES, INBOUND_TYPES, KEY_HOLDERS, PRIMARY_CONTACTS, SPECIAL_PURPOSES,
-  hasBhk, hasFloor, hasFloorPricing, inboundErrorMessage, normalizeCategoryAndType, typeLabel,
+  hasBhk, hasFloor, hasFloorPricing, inboundErrorMessage, normalizeCategoryAndType, parseInboundPrice, typeLabel,
 } from "@/lib/inbound-form";
 import { statusDot, statusPillClass } from "@/components/tables/cells";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -43,7 +42,7 @@ const YES_NO: Option[] = [{ label: "Yes", value: "yes" }, { label: "No", value: 
 const yesNo = (v: unknown) => (v ? "yes" : "no");
 
 const inboundCode = (i: Inbound) => i.property_id || `IN${String(i.id).padStart(5, "0")}`;
-const rupees = (v: unknown) => (v == null || v === "" ? "" : formatIndianCurrencyShort(Number(v)));
+const rupees = (v: unknown) => (v == null || v === "" ? "" : Number(v) === 0 ? "0" : formatIndianCurrencyShort(Number(v)));
 
 function PageSkeleton() {
   return (
@@ -239,6 +238,14 @@ function InboundDetail() {
   };
   const saveText = (key: string, number = false) => (v: string) =>
     save({ [key]: v.trim() === "" ? null : number ? Number(v) : v.trim() });
+  const readPrice = (v: string) => {
+    try {
+      return parseInboundPrice(v);
+    } catch (error) {
+      toast.error("Enter a valid price.");
+      throw error;
+    }
+  };
 
   const followUps = useMemo(() => inbound?.follow_ups ?? [], [inbound]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- API rows, as on the lead page
@@ -248,7 +255,9 @@ function InboundDetail() {
   if (isLoading) return <PageSkeleton />;
   if (!inbound) return null;
 
-  const { category, type } = normalizeCategoryAndType(inbound.property_category ?? null, inbound.property_type ?? null);
+  const normalized = normalizeCategoryAndType(inbound.property_category ?? null, inbound.property_type ?? null);
+  const category = normalizeCategoryAndType(inbound.property_category ?? null, null).category ?? normalized.category;
+  const type = normalized.type;
   const status: string = inbound.status || "New Inbound";
   const statusOptions: Option[] = [...(INBOUND_STATUSES.includes(status) ? [] : [status]), ...INBOUND_STATUSES]
     .map((s) => ({ label: s, value: s, dot: statusDot(s, INBOUND_STATUS_TONES[s]) }));
@@ -261,12 +270,7 @@ function InboundDetail() {
     try { return JSON.parse(inbound.brokerage_paid_by || "[]"); } catch { return []; }
   })();
   const localityOptions = localities && localities.city === inbound.city ? localities.options : [];
-  const coordinates = readStoredCoordinates({
-    latitude: inbound.latitude,
-    longitude: inbound.longitude,
-    google_map_location: inbound.google_map_location,
-  });
-  const hasMap = coordinates.latitude !== "" && coordinates.longitude !== "";
+  const hasMap = inbound.latitude != null && inbound.longitude != null;
   const units: { floor_label: string; area?: string | null; price?: number | null; notes?: string | null }[] = inbound.units ?? [];
   const saveUnits = (next: typeof units) => save({ units: next.map((u) => ({ floor_label: u.floor_label, area: u.area || null, price: u.price ?? null, notes: u.notes || null })) });
 
@@ -299,16 +303,7 @@ function InboundDetail() {
       toast.error(`${key === "latitude" ? "Latitude" : "Longitude"} must be a number between -${max} and ${max}.`);
       throw new Error("invalid coordinate");
     }
-    const otherKey = key === "latitude" ? "longitude" : "latitude";
-    const patch: Patch = { [key]: v.trim() ? n : null };
-    if (inbound.google_map_location) {
-      // Preserve the other coordinate if it only exists in the legacy link.
-      if (inbound[otherKey] == null && coordinates[otherKey] !== "") {
-        patch[otherKey] = Number(coordinates[otherKey]);
-      }
-      patch.google_map_location = null;
-    }
-    return save(patch);
+    return save({ [key]: v.trim() ? n : null });
   };
 
   const uploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -360,12 +355,12 @@ function InboundDetail() {
       <div className="space-y-5 px-3 sm:px-10">
         <DataCard title="Property">
           <InlineText label="Title" value={inbound.property_title} placeholder={title} onSave={saveText("property_title")} />
-          <InlineSelect label="Category" value={category} options={INBOUND_CATEGORIES} onSave={(v) => save({ property_category: v, property_type: null, bhk: null })} />
-          <InlineSelect label="Type" value={type} options={(category && INBOUND_TYPES[category]) || []} placeholder={category ? "Select…" : "Pick a category first"} disabled={!category} onSave={(v) => save({ property_type: v })} />
-          {hasBhk(category, type) && <InlineSelect label="BHK" value={inbound.bhk} options={BHK_CHOICES} onSave={(v) => save({ bhk: v })} />}
-          <InlineSelect label="Purpose" value={inbound.purpose} options={INBOUND_PURPOSES} onSave={(v) => save({ purpose: v })} />
-          {category === "commercial" && (
-            <InlineMulti label="Suits" values={special} options={SPECIAL_PURPOSES.map((s) => ({ label: s, value: s }))} onSave={(v) => save({ special_purpose: v.length ? v.join(", ") : null })} />
+          <InlineSelect label="Category" value={category} options={withCurrent(INBOUND_CATEGORIES, category)} onSave={(v) => save({ property_category: v })} />
+          <InlineSelect label="Type" value={type} options={withCurrent((category && INBOUND_TYPES[category]) || [], type)} placeholder={category ? "Select…" : "Pick a category first"} disabled={!category} onSave={(v) => save({ property_type: v })} />
+          {(hasBhk(category, type) || inbound.bhk) && <InlineSelect label="BHK" value={inbound.bhk} options={withCurrent(BHK_CHOICES, inbound.bhk)} onSave={(v) => save({ bhk: v })} />}
+          <InlineSelect label="Purpose" value={inbound.purpose} options={withCurrent(INBOUND_PURPOSES, inbound.purpose)} onSave={(v) => save({ purpose: v })} />
+          {(category === "commercial" || special.length > 0) && (
+            <InlineMulti label="Suits" values={special} options={[...new Set([...SPECIAL_PURPOSES, ...special])].map((s) => ({ label: s, value: s }))} onSave={(v) => save({ special_purpose: v.length ? v.join(", ") : null })} />
           )}
           <InlineSelect label="Availability" value={inbound.inbound_status} options={INBOUND_STATUS_OPTIONS} onSave={(v) => save({ inbound_status: v })} />
           {assigneeField}
@@ -374,16 +369,16 @@ function InboundDetail() {
 
         <DataCard title="Location">
           <InlineSelect searchable label="State" value={inbound.state} options={withCurrent(INDIAN_STATES, inbound.state)} onSave={(v) => save({ state: v })} />
-          <InlineSelect searchable label="City" value={inbound.city} options={withCurrent(cities, inbound.city)} onSave={(v) => save({ city: v, locality: null })} />
+          <InlineSelect searchable label="City" value={inbound.city} options={withCurrent(cities, inbound.city)} onSave={(v) => save({ city: v })} />
           <InlineSelect searchable label="Locality" value={inbound.locality} options={withCurrent(localityOptions, inbound.locality)}
             placeholder={inbound.city ? "Select…" : "Pick a city first"} disabled={!inbound.city} onSave={(v) => save({ locality: v })} />
           <InlineText label="Area" value={inbound.area} placeholder="1500 sq ft" onSave={saveText("area")} />
           <InlineText label="Landmark" value={inbound.landmark} onSave={saveText("landmark")} />
-          <InlineText label="Latitude" type="number" value={coordinates.latitude} placeholder="13.0827" onSave={saveCoordinate("latitude")} />
-          <InlineText label="Longitude" type="number" value={coordinates.longitude} placeholder="80.2707" onSave={saveCoordinate("longitude")} />
+          <InlineText label="Latitude" type="number" value={inbound.latitude} placeholder="13.0827" onSave={saveCoordinate("latitude")} />
+          <InlineText label="Longitude" type="number" value={inbound.longitude} placeholder="80.2707" onSave={saveCoordinate("longitude")} />
           {hasMap && (
             <FieldRow label="Map">
-              <a href={`https://www.google.com/maps?q=${encodeURIComponent(`${coordinates.latitude},${coordinates.longitude}`)}`} target="_blank" rel="noopener noreferrer"
+              <a href={`https://www.google.com/maps?q=${encodeURIComponent(`${inbound.latitude},${inbound.longitude}`)}`} target="_blank" rel="noopener noreferrer"
                 className="flex h-8 items-center gap-1.5 px-2 text-[14px] font-medium text-[#017D58] hover:underline dark:text-[#2FB585]">
                 Open in Maps <ExternalLink className="h-3.5 w-3.5" />
               </a>
@@ -459,19 +454,19 @@ function InboundDetail() {
       <div className="space-y-5 px-3 sm:px-10">
         <section className="overflow-hidden rounded-xl border bg-card">
           <div className="grid gap-x-8 px-3 py-2 md:grid-cols-2 md:px-4">
-            <InlineSelect label="Purpose" value={inbound.purpose} options={INBOUND_PURPOSES} onSave={(v) => save({ purpose: v })} />
-            {rent && <InlineText label="Monthly rent" value={rupees(inbound.total_rent)} placeholder="15000" onSave={(v) => save({ total_rent: v.trim() ? parseIndianCurrency(v) || null : null })} />}
-            {rent && <InlineText label="Rent / sq ft" type="number" value={inbound.rent_per_sqft} placeholder="25.5" onSave={saveText("rent_per_sqft", true)} />}
-            {inbound.purpose === "Sale" && category === "residential" && (
-              <InlineText label="Sale price" value={rupees(inbound.sale_price)} placeholder="85L" onSave={(v) => save({ sale_price: v.trim() ? parseIndianCurrency(v) || null : null })} />
+            <InlineSelect label="Purpose" value={inbound.purpose} options={withCurrent(INBOUND_PURPOSES, inbound.purpose)} onSave={(v) => save({ purpose: v })} />
+            {(rent || inbound.total_rent != null) && <InlineText label="Monthly rent" value={rupees(inbound.total_rent)} placeholder="15000" onSave={(v) => save({ total_rent: readPrice(v) })} />}
+            {(rent || inbound.rent_per_sqft != null) && <InlineText label="Rent / sq ft" type="number" value={inbound.rent_per_sqft} placeholder="25.5" onSave={saveText("rent_per_sqft", true)} />}
+            {((inbound.purpose === "Sale" && category === "residential") || inbound.sale_price != null) && (
+              <InlineText label="Sale price" value={rupees(inbound.sale_price)} placeholder="85L" onSave={(v) => save({ sale_price: readPrice(v) })} />
             )}
             {rent ? (
-              <InlineSelect label="Advance" value={inbound.advance} options={ADVANCE_MONTHS} onSave={(v) => save({ advance: v })} />
-            ) : inbound.purpose ? (
+              <InlineSelect label="Advance" value={inbound.advance} options={withCurrent(ADVANCE_MONTHS, inbound.advance)} onSave={(v) => save({ advance: v })} />
+            ) : inbound.purpose || inbound.advance ? (
               <InlineText label="Advance" value={inbound.advance && /^\d+$/.test(String(inbound.advance)) ? rupees(inbound.advance) : inbound.advance} placeholder="5L"
                 onSave={(v) => save({ advance: v.trim() ? String(parseIndianCurrency(v) || v.trim()) : null })} />
             ) : null}
-            {hasFloor(type) && <InlineText label="Floor" value={inbound.floor_number} placeholder="Ground, 1st…" onSave={saveText("floor_number")} />}
+            {(hasFloor(type) || inbound.floor_number) && <InlineText label="Floor" value={inbound.floor_number} placeholder="Ground, 1st…" onSave={saveText("floor_number")} />}
           </div>
         </section>
 
@@ -493,7 +488,7 @@ function InboundDetail() {
                     <li key={i} className="group grid gap-x-6 px-3 py-1.5 md:grid-cols-[1fr_1fr_1fr_auto] md:items-center md:px-4">
                       <InlineText label="Floor" value={u.floor_label} onSave={(v) => (v.trim() ? update({ floor_label: v.trim() }) : undefined)} />
                       <InlineText label="Area" value={u.area} placeholder="1200 sq ft" onSave={(v) => update({ area: v.trim() || null })} />
-                      <InlineText label={rent ? "Rent" : "Price"} value={rupees(u.price)} placeholder="50000" onSave={(v) => update({ price: v.trim() ? parseIndianCurrency(v) || null : null })} />
+                      <InlineText label={rent ? "Rent" : "Price"} value={rupees(u.price)} placeholder="50000" onSave={(v) => update({ price: readPrice(v) })} />
                       <button type="button" aria-label={`Remove ${u.floor_label}`} onClick={() => { if (confirm(`Remove ${u.floor_label}?`)) void saveUnits(units.filter((_, j) => j !== i)).catch(() => {}); }}
                         className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground md:opacity-0 md:group-hover:opacity-100">
                         <X className="h-4 w-4" />
@@ -539,7 +534,7 @@ function InboundDetail() {
         {hasMap && (
           <p className="mt-3 flex items-center gap-1.5 text-[13px] text-muted-foreground">
             <MapPin className="h-3.5 w-3.5" /> {Number(inbound.latitude).toFixed(5)}, {Number(inbound.longitude).toFixed(5)}
-            <a href={`https://www.google.com/maps?q=${encodeURIComponent(`${coordinates.latitude},${coordinates.longitude}`)}`} target="_blank" rel="noopener noreferrer" className="ml-1 font-medium text-[#017D58] hover:underline dark:text-[#2FB585]">
+            <a href={`https://www.google.com/maps?q=${encodeURIComponent(`${inbound.latitude},${inbound.longitude}`)}`} target="_blank" rel="noopener noreferrer" className="ml-1 font-medium text-[#017D58] hover:underline dark:text-[#2FB585]">
               Open in Maps
             </a>
           </p>
