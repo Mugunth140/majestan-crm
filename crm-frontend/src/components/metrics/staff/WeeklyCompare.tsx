@@ -6,12 +6,12 @@ interface WeeklyCompareProps {
 }
 
 export function WeeklyCompare({ rows, loading }: WeeklyCompareProps) {
-  if (loading) return <div className="rounded-2xl border bg-card p-5 space-y-3 animate-pulse">{[0, 1, 2].map(i => <div key={i} className="h-8 bg-muted rounded-xl" />)}</div>;
+  if (loading) return <div className="space-y-3 motion-safe:animate-pulse">{[0, 1, 2].map(i => <div key={i} className="h-8 bg-muted rounded-xl" />)}</div>;
   const list: { key: string; label: string; thisWeek: number; lastWeek: number }[] = Array.isArray(rows) ? rows : [];
-  if (!list.length) return <div className="rounded-2xl border bg-card p-5 flex items-center justify-center text-sm text-muted-foreground">No data</div>;
+  if (!list.length) return <div className="flex min-h-24 items-center justify-center text-sm text-muted-foreground">No data</div>;
   const max = Math.max(...list.flatMap(r => [r.thisWeek ?? 0, r.lastWeek ?? 0]), 1);
   return (
-    <div className="rounded-2xl border bg-card p-5 space-y-3">
+    <div className="space-y-3">
       <div className="flex items-center gap-4 text-xs">
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#27427f]" /> This week</span>
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#ffc900]" /> Last week</span>

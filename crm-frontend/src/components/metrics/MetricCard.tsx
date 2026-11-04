@@ -1,7 +1,35 @@
-'use client';
 import { cn } from '@/lib/utils';
-interface MetricCardProps { label: string; value: string | number; trend?: number; subtitle?: string; loading?: boolean; className?: string; }
+
+interface MetricCardProps {
+  label: string;
+  value: string | number;
+  trend?: number;
+  subtitle?: string;
+  loading?: boolean;
+  className?: string;
+}
+
 export function MetricCard({ label, value, trend, subtitle, loading, className }: MetricCardProps) {
-  if (loading) return (<div className={cn('rounded-2xl border bg-card shadow p-5 flex flex-col gap-3 animate-pulse', className)}><div className="h-3 w-24 bg-muted rounded" /><div className="h-7 w-16 bg-muted rounded" /></div>);
-  return (<div className={cn('rounded-2xl border bg-card text-card-foreground shadow p-5 flex flex-col justify-between hover:shadow-md transition-shadow', className)}><div className="mb-3"><span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</span></div><div className="text-2xl font-bold tabular-nums">{typeof value === 'number' ? value.toLocaleString('en-IN') : value}</div>{(trend !== undefined || subtitle) && (<div className="mt-1 flex items-center gap-1">{trend !== undefined && (<span className={cn('text-xs font-medium', trend >= 0 ? 'text-emerald-600' : 'text-red-500')}>{trend >= 0 ? '↑' : '↓'} {Math.abs(trend)}%</span>)}{subtitle && <span className="text-xs text-muted-foreground">{subtitle}</span>}</div>)}</div>);
+  return (
+    <div className={cn('min-w-0 rounded-lg border bg-card px-4 py-3', className)} aria-busy={loading}>
+      <div className="text-sm text-muted-foreground">{label}</div>
+      {loading ? (
+        <div aria-hidden className="mt-2 h-6 w-12 rounded bg-muted motion-safe:animate-pulse" />
+      ) : (
+        <div className="mt-1 break-words text-2xl font-semibold tracking-tight tabular-nums">
+          {typeof value === 'number' ? value.toLocaleString('en-IN') : value === '--' ? '—' : value}
+        </div>
+      )}
+      {!loading && (trend !== undefined || subtitle) && (
+        <div className="mt-1 flex flex-wrap items-center gap-1 text-xs">
+          {trend !== undefined && (
+            <span className={cn('font-medium', trend >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
+              {trend >= 0 ? '↑' : '↓'} {Math.abs(trend)}%
+            </span>
+          )}
+          {subtitle && <span className="text-muted-foreground">{subtitle}</span>}
+        </div>
+      )}
+    </div>
+  );
 }

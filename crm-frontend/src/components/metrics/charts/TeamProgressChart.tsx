@@ -6,11 +6,11 @@ interface TeamProgressChartProps {
 }
 
 export function TeamProgressChart({ data, loading }: TeamProgressChartProps) {
-  if (loading) return <div className="rounded-2xl border bg-card p-5 space-y-3 animate-pulse">{[0, 1, 2].map(i => <div key={i} className="h-8 bg-muted rounded-xl" />)}</div>;
+  if (loading) return <div className="space-y-3 motion-safe:animate-pulse">{[0, 1, 2].map(i => <div key={i} className="h-8 bg-muted rounded-xl" />)}</div>;
   const staff: { name: string; pct: number }[] = data?.staff ?? [];
-  if (!staff.length) return <div className="rounded-2xl border bg-card p-5 flex items-center justify-center text-sm text-muted-foreground">No data</div>;
+  if (!staff.length) return <div className="flex min-h-24 items-center justify-center text-sm text-muted-foreground">No data</div>;
   return (
-    <div className="rounded-2xl border bg-card p-5 space-y-3">
+    <div className="space-y-3">
       {staff.map((s, i) => {
         const pct = Math.min(Math.max(s.pct ?? 0, 0), 100);
         return (

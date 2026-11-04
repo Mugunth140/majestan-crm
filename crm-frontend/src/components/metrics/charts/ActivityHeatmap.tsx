@@ -8,14 +8,14 @@ interface ActivityHeatmapProps {
 }
 
 export function ActivityHeatmap({ data, loading }: ActivityHeatmapProps) {
-  if (loading) return <div className="rounded-2xl border bg-card p-5 h-64 animate-pulse"><div className="h-full w-full bg-muted rounded-xl" /></div>;
+  if (loading) return <div className="h-64 motion-safe:animate-pulse"><div className="h-full w-full bg-muted rounded-xl" /></div>;
   const cells: { dow: number; hour: number; count: number }[] = data?.cells ?? [];
-  if (!cells.length) return <div className="rounded-2xl border bg-card p-5 h-64 flex items-center justify-center text-sm text-muted-foreground">No data</div>;
+  if (!cells.length) return <div className="h-64 flex min-h-24 items-center justify-center text-sm text-muted-foreground">No data</div>;
   const max = Math.max(...cells.map(c => c.count ?? 0), 1);
   const lookup = new Map(cells.map(c => [`${c.dow}-${c.hour}`, c.count ?? 0]));
   const hours = Array.from({ length: 24 }, (_, h) => h);
   return (
-    <div className="rounded-2xl border bg-card p-5 overflow-x-auto">
+    <div className="overflow-x-auto">
       <div className="min-w-[640px]">
         <div className="grid gap-1" style={{ gridTemplateColumns: `44px repeat(24, 1fr)` }}>
           <div />

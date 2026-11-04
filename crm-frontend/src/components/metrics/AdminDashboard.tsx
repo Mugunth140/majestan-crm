@@ -1,9 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
 import { MetricCard } from './MetricCard';
+import { DashboardHeading, DashboardPanel, DashboardSection } from './DashboardPanels';
 import { LeadTrendChart } from './charts/LeadTrendChart';
 import { LeadFunnelChart } from './charts/LeadFunnelChart';
 import { LeadSourceDonut } from './charts/LeadSourceDonut';
@@ -26,7 +26,7 @@ function today(): string {
 
 const n = (v: any): string | number => (v ?? '--') as string | number;
 
-export function AdminDashboard({ user }: { user: any }) {
+export function AdminDashboard() {
   const [summary, setSummary] = useState<any>(null);
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [charts, setCharts] = useState<Record<string, any>>({});
@@ -106,61 +106,43 @@ export function AdminDashboard({ user }: { user: any }) {
   const busy = loadingSummary || refreshing;
 
   return (
-    <div className="space-y-8 metrics-stagger">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-lg font-bold">Command Center</h2>
-          <p className="text-xs text-muted-foreground">
-            Welcome{user?.name ? `, ${user.name}` : ''} — org-wide KPIs
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleRefresh}
-            disabled={busy}
-            className="text-sm border border-border rounded-xl px-3 py-1.5 bg-card hover:bg-muted transition-colors disabled:opacity-50 flex items-center gap-1.5"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
-        </div>
-      </div>
+    <div className="min-w-0 space-y-6">
+      <DashboardHeading
+        title="Organization overview"
+        description="Sales, inventory and team activity"
+        busy={busy}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
+      />
 
-      <section>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="rounded-2xl border bg-card p-5 shadow-sm">
-            <h4 className="text-sm font-semibold mb-3">Lead Sources</h4>
+      <DashboardSection title="Lead pipeline" context="Live totals">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <MetricCard label="Total Leads" value={n(pipe.total)} loading={loadingSummary} />
+          <MetricCard label="New Leads" value={n(pipe.newLeads)} loading={loadingSummary} />
+          <MetricCard label="Follow-Up Leads" value={n(pipe.followUp)} loading={loadingSummary} />
+          <MetricCard label="Site Visits Done" value={n(pipe.svDone)} loading={loadingSummary} />
+          <MetricCard label="Bookings (Advance)" value={n(pipe.booked)} loading={loadingSummary} />
+          <MetricCard label="Converted → Inbound" value={n(pipe.convertedInbound)} loading={loadingSummary} />
+          <MetricCard label="Converted → Agent" value={n(pipe.convertedAgent)} loading={loadingSummary} />
+          <MetricCard label="Dropped / Unqualified" value={n(pipe.dropped)} loading={loadingSummary} />
+        </div>
+      </DashboardSection>
+
+      <DashboardSection title="Lead activity" context="Month to date">
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          <DashboardPanel title="Lead trend">
+            <LeadTrendChart data={charts.trends} loading={loadingCharts.trends} />
+          </DashboardPanel>
+          <DashboardPanel title="Lead sources">
             <LeadSourceDonut data={charts.sources} loading={loadingCharts.sources} />
-          </div>
-          <div className="lg:col-span-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Lead Pipeline</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <MetricCard label="Total Leads" value={n(pipe.total)} loading={loadingSummary} />
-              <MetricCard label="New Leads" value={n(pipe.newLeads)} loading={loadingSummary} />
-              <MetricCard label="Follow-Up Leads" value={n(pipe.followUp)} loading={loadingSummary} />
-              <MetricCard label="Site Visits Done" value={n(pipe.svDone)} loading={loadingSummary} />
-              <MetricCard label="Bookings (Advance)" value={n(pipe.booked)} loading={loadingSummary} />
-              <MetricCard label="Converted → Inbound" value={n(pipe.convertedInbound)} loading={loadingSummary} />
-              <MetricCard label="Converted → Agent" value={n(pipe.convertedAgent)} loading={loadingSummary} />
-              <MetricCard label="Dropped / Unqualified" value={n(pipe.dropped)} loading={loadingSummary} />
-            </div>
-          </div>
+          </DashboardPanel>
+          <DashboardPanel title="Lead funnel" className="xl:col-span-2">
+            <LeadFunnelChart data={charts.funnel} loading={loadingCharts.funnel} />
+          </DashboardPanel>
         </div>
-      </section>
+      </DashboardSection>
 
-      <div className="grid grid-cols-1 gap-4">
-        <div className="rounded-2xl border bg-card p-5 shadow-sm">
-          <h4 className="text-sm font-semibold mb-3">Lead Trend</h4>
-          <LeadTrendChart data={charts.trends} loading={loadingCharts.trends} />
-        </div>
-        <div className="rounded-2xl border bg-card p-5 shadow-sm">
-          <h4 className="text-sm font-semibold mb-3">Lead Funnel</h4>
-          <LeadFunnelChart data={charts.funnel} loading={loadingCharts.funnel} />
-        </div>
-      </div>
-
-      <section>
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Inbound Supply</h3>
+      <DashboardSection title="Inbound Supply">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <MetricCard label="Total Inbounds" value={n(inb.total)} loading={loadingSummary} />
           <MetricCard label="Active Inbounds" value={n(inb.active)} loading={loadingSummary} />
@@ -168,29 +150,26 @@ export function AdminDashboard({ user }: { user: any }) {
           <MetricCard label="Prime Locations" value={n(inb.prime)} loading={loadingSummary} />
           <MetricCard label="Avg Quality Score" value={n(inb.avgQuality)} loading={loadingSummary} />
         </div>
-      </section>
+      </DashboardSection>
 
-      <section>
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Agent Network</h3>
+      <DashboardSection title="Agent Network">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           <MetricCard label="Total Agents" value={n(ag.total)} loading={loadingSummary} />
           <MetricCard label="Active Agents" value={n(ag.active)} loading={loadingSummary} />
           <MetricCard label="Commission-Accepted" value={n(ag.commissionAccepted)} loading={loadingSummary} />
           <MetricCard label="New Agents (month)" value={n(ag.newInRange)} loading={loadingSummary} />
         </div>
-      </section>
+      </DashboardSection>
 
-      <section>
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Asset Inventory</h3>
+      <DashboardSection title="Asset Inventory">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <MetricCard label="Total Assets" value={n(ast.total)} loading={loadingSummary} />
           <MetricCard label="Approved Assets" value={n(ast.approved)} loading={loadingSummary} />
           <MetricCard label="Avg Asset Score" value={n(ast.avgQuality)} loading={loadingSummary} />
         </div>
-      </section>
+      </DashboardSection>
 
-      <section>
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Staff &amp; Activity</h3>
+      <DashboardSection title="Staff & Activity">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <MetricCard label="Active Staff" value={n(act.activeStaff)} loading={loadingSummary} />
           <MetricCard label="Follow-Ups Logged" value={n(act.followUps)} loading={loadingSummary} />
@@ -198,41 +177,40 @@ export function AdminDashboard({ user }: { user: any }) {
           <MetricCard label="WhatsApp Messages" value={n(act.whatsapp)} loading={loadingSummary} />
           <MetricCard label="Routing Events" value={n(act.routingEvents)} loading={loadingSummary} />
         </div>
-      </section>
+      </DashboardSection>
 
-      <div className="grid grid-cols-1 gap-4">
-        <div className="rounded-2xl border bg-card p-5 shadow-sm">
-          <h4 className="text-sm font-semibold mb-3">Staff Performance</h4>
-          <StaffScatterChart data={charts.scatter} loading={loadingCharts.scatter} />
+      <DashboardSection title="Staff activity charts" context="Month to date">
+        <div className="grid gap-3 2xl:grid-cols-2">
+          <DashboardPanel title="Staff performance">
+            <StaffScatterChart data={charts.scatter} loading={loadingCharts.scatter} />
+          </DashboardPanel>
+          <DashboardPanel title="Activity heatmap">
+            <ActivityHeatmap data={charts.heatmap} loading={loadingCharts.heatmap} />
+          </DashboardPanel>
         </div>
-        <div className="rounded-2xl border bg-card p-5 shadow-sm">
-          <h4 className="text-sm font-semibold mb-3">Activity Heatmap</h4>
-          <ActivityHeatmap data={charts.heatmap} loading={loadingCharts.heatmap} />
-        </div>
-      </div>
+      </DashboardSection>
 
-      <section>
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">HR Pipeline</h3>
+      <DashboardSection title="HR Pipeline">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <MetricCard label="Candidates" value={n(hr.total)} loading={loadingSummary} />
           <MetricCard label="Interviews Scheduled" value={n(hr.interviewsScheduled)} loading={loadingSummary} />
           <MetricCard label="Hires Made" value={n(hr.hired)} loading={loadingSummary} />
         </div>
-      </section>
+      </DashboardSection>
 
-      <section>
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Task Completion</h3>
+      <DashboardSection title="Task Completion">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <MetricCard label="Active Templates" value={n(task.activeTemplates)} loading={loadingSummary} />
           <MetricCard label="Org Completion %" value={n(task.completionPct)} loading={loadingSummary} />
           <MetricCard label="Manual Logs" value={n(task.manualLogs)} loading={loadingSummary} />
         </div>
-      </section>
+      </DashboardSection>
 
-      <div className="rounded-2xl border bg-card p-5 shadow-sm">
-        <h4 className="text-sm font-semibold mb-3">Department Performance</h4>
-        <DeptPerformanceChart data={charts.dept_perf} loading={loadingCharts.dept_perf} />
-      </div>
+      <DashboardSection title="Department performance" context="Month to date">
+        <div className="min-w-0 rounded-lg border bg-card px-4 py-3">
+          <DeptPerformanceChart data={charts.dept_perf} loading={loadingCharts.dept_perf} />
+        </div>
+      </DashboardSection>
     </div>
   );
 }

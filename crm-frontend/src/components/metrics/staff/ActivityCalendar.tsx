@@ -17,7 +17,7 @@ export function ActivityCalendar({ activeDates, loading }: ActivityCalendarProps
     }
   }, [activeDates]);
 
-  if (loading) return <div className="rounded-2xl border bg-card p-5 h-48 animate-pulse"><div className="h-full w-full bg-muted rounded-xl" /></div>;
+  if (loading) return <div className="h-48 motion-safe:animate-pulse"><div className="h-full w-full bg-muted rounded-xl" /></div>;
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
@@ -26,7 +26,7 @@ export function ActivityCalendar({ activeDates, loading }: ActivityCalendarProps
   const cells: (number | null)[] = [...Array(firstDow).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
   const iso = (d: number) => `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
   return (
-    <div className="rounded-2xl border bg-card p-5">
+    <div className="mx-auto max-w-md">
       <div className="text-xs font-semibold mb-3">{now.toLocaleString('en', { month: 'long', year: 'numeric' })}</div>
       <div className="grid grid-cols-7 gap-1">
         {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <div key={i} className="text-[10px] text-center text-muted-foreground font-medium">{d}</div>)}

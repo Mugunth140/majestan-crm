@@ -6,11 +6,11 @@ interface MonthlyRingsProps {
 }
 
 export function MonthlyRings({ rings, loading }: MonthlyRingsProps) {
-  if (loading) return <div className="rounded-2xl border bg-card p-5 flex gap-4 animate-pulse">{[0, 1, 2].map(i => <div key={i} className="w-24 h-24 rounded-full bg-muted" />)}</div>;
+  if (loading) return <div className="flex gap-4 motion-safe:animate-pulse">{[0, 1, 2].map(i => <div key={i} className="w-24 h-24 rounded-full bg-muted" />)}</div>;
   const list: { key: string; label: string; achieved: number; target: number; pct: number }[] = Array.isArray(rings) ? rings : [];
-  if (!list.length) return <div className="rounded-2xl border bg-card p-5 flex items-center justify-center text-sm text-muted-foreground">No data</div>;
+  if (!list.length) return <div className="flex min-h-24 items-center justify-center text-sm text-muted-foreground">No data</div>;
   return (
-    <div className="rounded-2xl border bg-card p-5 flex flex-wrap gap-5">
+    <div className="flex flex-wrap gap-5">
       {list.map((r, i) => {
         const pct = Math.min(Math.max(r.pct ?? 0, 0), 100);
         const C = 2 * Math.PI * 40;

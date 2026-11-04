@@ -1,9 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
 import { MetricCard } from './MetricCard';
+import { DashboardHeading, DashboardPanel, DashboardSection } from './DashboardPanels';
 import { TeamProgressChart } from './charts/TeamProgressChart';
 import { TeamTrendChart } from './charts/TeamTrendChart';
 import { TeamLeadDonut } from './charts/TeamLeadDonut';
@@ -23,7 +23,7 @@ function today(): string {
 
 const n = (v: any): string | number => (v ?? '--') as string | number;
 
-export function TeamLeadDashboard({ user }: { user: any }) {
+export function TeamLeadDashboard() {
   const [summary, setSummary] = useState<any>(null);
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [charts, setCharts] = useState<Record<string, any>>({});
@@ -98,28 +98,16 @@ export function TeamLeadDashboard({ user }: { user: any }) {
   const needsAttention = tlm.needsAttention as { name?: string; pct?: number } | undefined;
 
   return (
-    <div className="space-y-8 metrics-stagger">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-lg font-bold">Team Dashboard</h2>
-          <p className="text-xs text-muted-foreground">
-            Welcome{user?.name ? `, ${user.name}` : ''} — department KPIs
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleRefresh}
-            disabled={busy}
-            className="text-sm border border-border rounded-xl px-3 py-1.5 bg-card hover:bg-muted transition-colors disabled:opacity-50 flex items-center gap-1.5"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
-        </div>
-      </div>
+    <div className="min-w-0 space-y-6">
+      <DashboardHeading
+        title="Team dashboard"
+        description="Department overview"
+        busy={busy}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
+      />
 
-      <section>
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Team KPIs</h3>
+      <DashboardSection title="Team KPIs">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           <MetricCard label="Active Staff" value={n(tlm.activeStaffInDept)} loading={loadingSummary} />
           <MetricCard label="Leads Assigned" value={n(tlm.leadsAssigned)} loading={loadingSummary} />
@@ -138,25 +126,21 @@ export function TeamLeadDashboard({ user }: { user: any }) {
           <MetricCard label="Weekly Progress" value={tlm.weeklyAchieved != null || tlm.weeklyTarget != null ? `${n(tlm.weeklyAchieved)} / ${n(tlm.weeklyTarget)}` : '--'} loading={loadingSummary} />
           <MetricCard label="Monthly Progress" value={tlm.monthlyAchieved != null || tlm.monthlyTarget != null ? `${n(tlm.monthlyAchieved)} / ${n(tlm.monthlyTarget)}` : '--'} loading={loadingSummary} />
         </div>
-      </section>
+      </DashboardSection>
 
-      <section>
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Charts</h3>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="rounded-2xl border bg-card p-5 shadow-sm lg:col-span-2">
-            <h4 className="text-sm font-semibold mb-3">Team Trend</h4>
+      <DashboardSection title="Team activity" context="Month to date">
+        <div className="grid gap-3 lg:grid-cols-2">
+          <DashboardPanel title="Team trend" className="lg:col-span-2">
             <TeamTrendChart data={charts.team_trend} loading={loadingCharts.team_trend} />
-          </div>
-          <div className="rounded-2xl border bg-card p-5 shadow-sm">
-            <h4 className="text-sm font-semibold mb-3">Team Progress</h4>
+          </DashboardPanel>
+          <DashboardPanel title="Team progress">
             <TeamProgressChart data={charts.team_progress} loading={loadingCharts.team_progress} />
-          </div>
-          <div className="rounded-2xl border bg-card p-5 shadow-sm">
-            <h4 className="text-sm font-semibold mb-3">Team Leads</h4>
+          </DashboardPanel>
+          <DashboardPanel title="Team leads">
             <TeamLeadDonut data={charts.team_leads} loading={loadingCharts.team_leads} />
-          </div>
+          </DashboardPanel>
         </div>
-      </section>
+      </DashboardSection>
     </div>
   );
 }

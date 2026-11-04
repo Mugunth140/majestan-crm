@@ -25,8 +25,8 @@ export function LeadTrendChart({ data, loading }: LeadTrendChartProps) {
   const definition = useMemo(() => {
     return defineChart({
       marks: [
-        areaY(rows, { x: 'date', y: 'count', fill: '#27427f', fillOpacity: 0.12 }),
-        lineY(rows, { x: 'date', y: 'count', stroke: '#27427f', strokeWidth: 2, points: true }),
+        areaY(rows, { x: 'date', y: 'count', fill: '#238776', fillOpacity: 0.12 }),
+        lineY(rows, { x: 'date', y: 'count', stroke: '#238776', strokeWidth: 2, points: true }),
       ],
       scales: {
         x: { scale: () => scalePoint<string>().padding(0.2) },
@@ -36,10 +36,10 @@ export function LeadTrendChart({ data, loading }: LeadTrendChartProps) {
     });
   }, [rows]);
 
-  if (loading) return <div className="rounded-2xl border bg-card p-5 h-64 animate-pulse"><div className="h-full w-full bg-muted rounded-xl" /></div>;
-  if (!rows.length) return <div className="rounded-2xl border bg-card p-5 h-64 flex items-center justify-center text-sm text-muted-foreground">No data</div>;
+  if (loading) return <div className="h-64 motion-safe:animate-pulse"><div className="h-full w-full bg-muted rounded-xl" /></div>;
+  if (!rows.length) return <div className="h-64 flex min-h-24 items-center justify-center text-sm text-muted-foreground">No data</div>;
   return (
-    <div className="rounded-2xl border bg-card p-4">
+    <div className="min-w-0">
       <Chart definition={definition} height={240} ariaLabel="Lead trend over time" />
     </div>
   );

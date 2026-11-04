@@ -1,9 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
 import { MetricCard } from './MetricCard';
+import { DashboardHeading, DashboardSection } from './DashboardPanels';
 import { MonthlyRings } from './staff/MonthlyRings';
 import { WeeklyCompare } from './staff/WeeklyCompare';
 import { MilestoneBadges } from './staff/MilestoneBadges';
@@ -20,7 +20,7 @@ function today(): string {
 
 const n = (v: any): string | number => (v ?? '--') as string | number;
 
-export function StaffDashboard({ user }: { user: any }) {
+export function StaffDashboard() {
   const [summary, setSummary] = useState<any>(null);
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -64,29 +64,16 @@ export function StaffDashboard({ user }: { user: any }) {
   const hasRank = sm.monthlyRankInDept != null || sm.deptSize != null;
 
   return (
-    <div className="space-y-8 metrics-stagger">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-lg font-bold">My Dashboard</h2>
-          <p className="text-xs text-muted-foreground">
-            Welcome{user?.name ? `, ${user.name}` : ''}
-            {hasRank && !loadingSummary ? ` — Rank #${n(sm.monthlyRankInDept)} of ${n(sm.deptSize)}` : ''}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleRefresh}
-            disabled={busy}
-            className="text-sm border border-border rounded-xl px-3 py-1.5 bg-card hover:bg-muted transition-colors disabled:opacity-50 flex items-center gap-1.5"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
-        </div>
-      </div>
+    <div className="min-w-0 space-y-6">
+      <DashboardHeading
+        title="My dashboard"
+        description={hasRank && !loadingSummary ? `Rank #${n(sm.monthlyRankInDept)} of ${n(sm.deptSize)} in your department` : "Personal activity"}
+        busy={busy}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
+      />
 
-      <section>
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">My KPIs</h3>
+      <DashboardSection title="My KPIs">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           <MetricCard label="Leads Assigned" value={n(sm.myLeadsAssigned)} loading={loadingSummary} />
           <MetricCard label="Follow-Ups Today" value={n(sm.followUpsDoneToday)} loading={loadingSummary} />
@@ -97,27 +84,33 @@ export function StaffDashboard({ user }: { user: any }) {
           <MetricCard label="Activity Streak" value={sm.currentStreak != null ? `${sm.currentStreak} days` : '--'} loading={loadingSummary} />
           <MetricCard label="Team Rank" value={sm.monthlyRankInDept != null || sm.deptSize != null ? `#${n(sm.monthlyRankInDept)} / ${n(sm.deptSize)}` : '--'} loading={loadingSummary} />
         </div>
-      </section>
+      </DashboardSection>
 
-      <section>
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Milestones</h3>
-        <MilestoneBadges milestones={sm?.milestones ?? []} loading={loadingSummary} />
-      </section>
+      <DashboardSection title="Milestones">
+        <div className="min-w-0 rounded-lg border bg-card px-4 py-3">
+          <MilestoneBadges milestones={sm?.milestones ?? []} loading={loadingSummary} />
+        </div>
+      </DashboardSection>
 
-      <section>
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Monthly Metric Progress</h3>
-        <MonthlyRings rings={sm?.monthlyRings ?? []} loading={loadingSummary} />
-      </section>
+      <DashboardSection title="Monthly Metric Progress">
+        <div className="min-w-0 rounded-lg border bg-card px-4 py-3">
+          <MonthlyRings rings={sm?.monthlyRings ?? []} loading={loadingSummary} />
+        </div>
+      </DashboardSection>
 
-      <section>
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">This Week vs Last Week</h3>
-        <WeeklyCompare rows={sm?.weeklyCompare ?? []} loading={loadingSummary} />
-      </section>
+      <div className="grid items-start gap-3 xl:grid-cols-2">
+        <DashboardSection title="This week vs last week">
+          <div className="min-w-0 rounded-lg border bg-card px-4 py-3">
+            <WeeklyCompare rows={sm?.weeklyCompare ?? []} loading={loadingSummary} />
+          </div>
+        </DashboardSection>
 
-      <section>
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Activity This Month</h3>
-        <ActivityCalendar activeDates={sm?.activityCalendar ?? []} loading={loadingSummary} />
-      </section>
+        <DashboardSection title="Activity this month">
+          <div className="min-w-0 rounded-lg border bg-card px-4 py-3">
+            <ActivityCalendar activeDates={sm?.activityCalendar ?? []} loading={loadingSummary} />
+          </div>
+        </DashboardSection>
+      </div>
     </div>
   );
 }

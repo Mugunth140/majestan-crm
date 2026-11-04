@@ -37,10 +37,10 @@ export function DeptPerformanceChart({ data, loading }: DeptPerformanceChartProp
     });
   }, [rows]);
 
-  if (loading) return <div className="rounded-2xl border bg-card p-5 h-64 animate-pulse"><div className="h-full w-full bg-muted rounded-xl" /></div>;
-  if (!rows.length) return <div className="rounded-2xl border bg-card p-5 h-64 flex items-center justify-center text-sm text-muted-foreground">No data</div>;
+  if (loading) return <div className="h-64 motion-safe:animate-pulse"><div className="h-full w-full bg-muted rounded-xl" /></div>;
+  if (!rows.length) return <div className="h-64 flex min-h-24 items-center justify-center text-sm text-muted-foreground">No data</div>;
   return (
-    <div className="rounded-2xl border bg-card p-4">
+    <div className="min-w-0">
       <div className="flex items-center gap-4 text-xs px-2 pb-2">
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#94a3b8]" /> Target</span>
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#27427f]" /> Achieved</span>
