@@ -17,7 +17,7 @@ import { DateTimePicker } from "@/components/shared/datetime-picker";
 import { MailComposer, type ComposerStart } from "@/components/mail/mail-composer";
 import { MailPreviewDialog } from "@/components/mail/mail-preview-dialog";
 import { cn } from "@/lib/utils";
-import { Avatar, CARD, Chip, Feed, TabHeader, Who, ago, sortOldestFirst, type FeedItem } from "./feed";
+import { Avatar, CARD, Chip, Feed, FeedTime, TabHeader, Who, sortOldestFirst, type FeedItem } from "./feed";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -347,7 +347,7 @@ export function LeadConversation({
                   </span>
                 )}
               </p>
-              <time dateTime={at.toISOString()} title={format(at, "EEE, d MMM yyyy, h:mm a")} className="shrink-0 whitespace-nowrap text-[13px] text-muted-foreground">{ago(at)}</time>
+              <FeedTime at={at} className="shrink-0" />
               {canSendMail && email && <span className="-mr-1.5 flex shrink-0">{replyButton(false)}{mail.cc.length > 0 && replyButton(true)}</span>}
             </div>
             <div className="text-[14px] leading-6 text-foreground/90">

@@ -1,8 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { format, formatDistanceToNowStrict } from "date-fns";
 import { cn } from "@/lib/utils";
+import { feedDay, feedFullTime, feedTime } from "@/lib/feed-time";
 
 // The activity list behind the Timeline and Conversation tabs, after Frappe
 // CRM's: plain icons on a thin rail, one sentence per entry with the time on
@@ -57,7 +57,24 @@ export const Chip = ({ children }: { children: ReactNode }) => (
   </span>
 );
 
-export const ago = (d: Date) => formatDistanceToNowStrict(d, { addSuffix: true });
+/** An entry's time: "40 mins ago" within the hour, then "4:50 PM"; the full date on hover. */
+export const FeedTime = ({ at, className }: { at: Date; className?: string }) => (
+  <time dateTime={at.toISOString()} title={feedFullTime(at)} className={cn("whitespace-nowrap text-[13px] text-muted-foreground", className)}>
+    {feedTime(at)}
+  </time>
+);
+
+/** Consecutive entries that fall on the same calendar day, in the order given. */
+function byDay(items: FeedItem[]) {
+  const days: { label: string; items: FeedItem[] }[] = [];
+  for (const item of items) {
+    const label = feedDay(item.at);
+    const last = days[days.length - 1];
+    if (last?.label === label) last.items.push(item);
+    else days.push({ label, items: [item] });
+  }
+  return days;
+}
 
 /** The row above a tab's content: its name, and the action that adds to it. */
 export function TabHeader({ title, action }: { title: string; action?: ReactNode }) {
@@ -71,49 +88,62 @@ export function TabHeader({ title, action }: { title: string; action?: ReactNode
 
 // Measurements follow Frappe CRM's activity list: a 30px rail, 16px gap, 40px
 // side margins, 14px text with a touch of tracking, 13px grey timestamps.
+// Entries are split by day like a chat: a date pill ("Today", "Yesterday",
+// "26th Oct") heads each day, and each entry shows only its time.
 export function Feed({ items }: { items: FeedItem[] }) {
   return (
-    <ol className="text-[14px] tracking-[0.02em]">
-      {items.map((item, idx) => (
-        <li key={item.key} className="group/item grid grid-cols-[30px_minmax(0,1fr)] gap-2 px-3 sm:gap-4 sm:px-10">
-          <div
-            className={cn(
-              "relative z-0 flex justify-center before:absolute before:left-1/2 before:top-0 before:-z-[1] before:border-l before:border-border",
-              idx === items.length - 1 ? "before:h-4" : "before:h-full",
-            )}
-          >
-            <span className={cn("flex h-8 w-7 items-center justify-center bg-background text-foreground/85 [&_svg]:h-4 [&_svg]:w-4", item.iconClass)}>
-              {item.icon}
+    <div className="text-[14px] tracking-[0.02em]">
+      {byDay(items).map((day) => (
+        <section key={`${day.label}-${day.items[0].key}`} aria-label={day.label}>
+          <div className="mb-3 flex items-center gap-3 px-3 sm:px-10" role="separator">
+            <span className="h-px flex-1 bg-border" />
+            <span className="rounded-full border bg-background px-3 py-0.5 text-[12px] font-medium text-muted-foreground shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+              {day.label}
             </span>
+            <span className="h-px flex-1 bg-border" />
           </div>
-          <div className="mb-4 min-w-0">
-            {item.title !== undefined && (
-              <div className="mb-1 flex items-center gap-2 py-1">
-                <div className="inline-flex min-w-0 flex-wrap items-center gap-1 text-muted-foreground">
-                  {item.who && <Avatar name={item.who} className="mr-1" />}
-                  {item.title}
+          <ol>
+            {day.items.map((item, idx) => (
+              <li key={item.key} className="group/item grid grid-cols-[30px_minmax(0,1fr)] gap-2 px-3 sm:gap-4 sm:px-10">
+                <div
+                  className={cn(
+                    "relative z-0 flex justify-center before:absolute before:left-1/2 before:top-0 before:-z-[1] before:border-l before:border-border",
+                    idx === day.items.length - 1 ? "before:h-4" : "before:h-full",
+                  )}
+                >
+                  <span className={cn("flex h-8 w-7 items-center justify-center bg-background text-foreground/85 [&_svg]:h-4 [&_svg]:w-4", item.iconClass)}>
+                    {item.icon}
+                  </span>
                 </div>
-                <div className="ml-auto flex shrink-0 items-center gap-1 whitespace-nowrap">
-                  {item.actions}
-                  <time dateTime={item.at.toISOString()} title={format(item.at, "EEE, d MMM yyyy, h:mm a")} className="text-[13px] text-muted-foreground">
-                    {ago(item.at)}
-                  </time>
+                <div className="mb-4 min-w-0">
+                  {item.title !== undefined && (
+                    <div className="mb-1 flex items-center gap-2 py-1">
+                      <div className="inline-flex min-w-0 flex-wrap items-center gap-1 text-muted-foreground">
+                        {item.who && <Avatar name={item.who} className="mr-1" />}
+                        {item.title}
+                      </div>
+                      <div className="ml-auto flex shrink-0 items-center gap-1 whitespace-nowrap">
+                        {item.actions}
+                        <FeedTime at={item.at} />
+                      </div>
+                    </div>
+                  )}
+                  {item.body ? (
+                    <div className="rounded-lg bg-foreground/[0.04] px-3 py-[7.5px] leading-6 text-foreground/90 dark:bg-white/[0.05]">
+                      <p className="whitespace-pre-wrap">{item.body}</p>
+                      {item.chips && item.chips.length > 0 && <div className="mt-1.5 mb-0.5 flex flex-wrap gap-1.5">{item.chips}</div>}
+                    </div>
+                  ) : item.chips && item.chips.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">{item.chips}</div>
+                  ) : null}
+                  {item.extra}
                 </div>
-              </div>
-            )}
-            {item.body ? (
-              <div className="rounded-lg bg-foreground/[0.04] px-3 py-[7.5px] leading-6 text-foreground/90 dark:bg-white/[0.05]">
-                <p className="whitespace-pre-wrap">{item.body}</p>
-                {item.chips && item.chips.length > 0 && <div className="mt-1.5 mb-0.5 flex flex-wrap gap-1.5">{item.chips}</div>}
-              </div>
-            ) : item.chips && item.chips.length > 0 ? (
-              <div className="flex flex-wrap gap-1.5">{item.chips}</div>
-            ) : null}
-            {item.extra}
-          </div>
-        </li>
+              </li>
+            ))}
+          </ol>
+        </section>
       ))}
-    </ol>
+    </div>
   );
 }
 
