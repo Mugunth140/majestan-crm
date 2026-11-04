@@ -24,8 +24,9 @@ export class MasterController {
     return { success: true, data };
   }
 
+  // Any signed-in staff member can add one from the property/project forms;
+  // editing and deleting stay with admins.
   @Post('cities')
-  @Roles('Admin')
   async createCity(@Body() body: { city_name: string; state_name: string; country_name?: string; country_code?: string; is_active?: number }) {
     const data = await this.masterService.createCity(body);
     return { success: true, data };
@@ -59,8 +60,9 @@ export class MasterController {
     return { success: true, data };
   }
 
+  // Any signed-in staff member can add one from the property/project forms;
+  // editing and deleting stay with admins.
   @Post('sublocations')
-  @Roles('Admin')
   async createSublocation(@Body() body: { city_id: number; locality_name: string; postal_code?: string; description?: string | null; is_active?: number }) {
     const data = await this.masterService.createSublocation(body);
     return { success: true, data };
@@ -156,8 +158,9 @@ export class MasterController {
     return { success: true, data };
   }
 
+  // Any signed-in staff member can add one from the property/project forms;
+  // editing and deleting stay with admins.
   @Post('road-names')
-  @Roles('Admin')
   async createRoadName(@Body() body: { name: string }) {
     const data = await this.masterService.createRoadName(body.name);
     return { success: true, data };
@@ -191,8 +194,9 @@ export class MasterController {
     return { success: true, data };
   }
 
+  // Any signed-in staff member can add one from the property/project forms;
+  // editing and deleting stay with admins.
   @Post('registration-charges')
-  @Roles('Admin')
   async createRegistrationCharge(@Body() body: { name: string }) {
     const data = await this.masterService.createRegistrationCharge(body.name);
     return { success: true, data };
@@ -220,8 +224,9 @@ export class MasterController {
     return { success: true, data };
   }
 
+  // Any signed-in staff member can add one from the property/project forms;
+  // editing and deleting stay with admins.
   @Post('furnishing-items')
-  @Roles('Admin')
   async createFurnishingItem(@Body() body: { name: string; icon?: string }) {
     const data = await this.masterService.createFurnishingItem(body);
     return { success: true, data };
@@ -249,8 +254,9 @@ export class MasterController {
     return { success: true, data };
   }
 
+  // Any signed-in staff member can add one from the property/project forms;
+  // editing and deleting stay with admins.
   @Post('utilities')
-  @Roles('Admin')
   async createUtility(@Body() body: { name: string; icon?: string }) {
     const data = await this.masterService.createUtility(body);
     return { success: true, data };
@@ -284,8 +290,9 @@ export class MasterController {
     return { success: true, data };
   }
 
+  // Any signed-in staff member can add one from the property/project forms;
+  // editing and deleting stay with admins.
   @Post('room-names')
-  @Roles('Admin')
   async createRoomName(@Body() body: { name: string }) {
     const data = await this.masterService.createRoomName(body.name);
     return { success: true, data };
@@ -319,8 +326,9 @@ export class MasterController {
     return { success: true, data };
   }
 
+  // Any signed-in staff member can add one from the property/project forms;
+  // editing and deleting stay with admins.
   @Post('room-dimensions')
-  @Roles('Admin')
   async createRoomDimension(
     @Body() body: { name: string; lengthFt?: number | null; widthFt?: number | null },
   ) {
@@ -359,8 +367,9 @@ export class MasterController {
     return { success: true, data };
   }
 
+  // Any signed-in staff member can add one from the property/project forms;
+  // editing and deleting stay with admins.
   @Post('specifications')
-  @Roles('Admin')
   async createSpecification(@Body() body: { name: string }) {
     const data = await this.masterService.createSpecification(body.name);
     return { success: true, data };
@@ -429,8 +438,9 @@ export class MasterController {
     return { success: true, data };
   }
 
+  // Any signed-in staff member can add one from the property/project forms;
+  // editing and deleting stay with admins.
   @Post('amenities')
-  @Roles('Admin')
   async createAmenity(@Body() body: { name: string; category?: string; icon_key?: string }) {
     const data = await this.masterService.createAmenity(body);
     return { success: true, data };

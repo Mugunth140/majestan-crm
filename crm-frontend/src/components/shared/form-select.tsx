@@ -73,8 +73,13 @@ export function FormSelect({
  * other selects; the list opens in a popover so typing filters it.
  */
 export function SearchableFormSelect({
-  id, name, placeholder, options, className, value, onValueChange, disabled, searchPlaceholder,
-}: Omit<FormSelectProps, "defaultValue" | "required"> & { searchPlaceholder?: string }) {
+  id, name, placeholder, options, className, value, onValueChange, disabled, searchPlaceholder, onCreate, createNoun,
+}: Omit<FormSelectProps, "defaultValue" | "required"> & {
+  searchPlaceholder?: string;
+  /** Offered when a search matches nothing: add the typed value (e.g. to its master list). */
+  onCreate?: (query: string) => void;
+  createNoun?: string;
+}) {
   const [open, setOpen] = useState(false);
   const current = options.find((o) => o.value === value);
   return (
@@ -104,6 +109,8 @@ export function SearchableFormSelect({
           label={placeholder}
           placeholder={searchPlaceholder}
           onPick={(v) => { setOpen(false); if (v !== value) onValueChange?.(v); }}
+          onCreate={onCreate && ((q) => { setOpen(false); onCreate(q); })}
+          createNoun={createNoun}
         />
       </PopoverContent>
     </Popover>

@@ -36,6 +36,9 @@ import {
   fetchNearbyCategories,
 } from "@/lib/nearby-places";
 import { FurnishingIcon } from "@/components/shared/furnishing-icons";
+import { MasterMultiPicker } from "@/components/master/master-multi-picker";
+import { useMasterCreate } from "@/components/master/use-master-create";
+import { sameName } from "@/lib/master-kinds";
 import { FloorNosInput } from "@/components/shared/floor-nos-input";
 import {
   PROJECT_FAQ_SECTIONS,
@@ -434,6 +437,33 @@ const draftKeyFor = (mode: "create" | "edit", id: unknown) =>
     : "project-form-draft:new";
 
 
+type ProjectFormData = {
+  cities: any[];
+  sublocations: any[];
+  amenities: any[];
+  roomNames: { value: string; label: string }[];
+  roomDimensions: { value: string; label: string; lengthFt: number | null; widthFt: number | null }[];
+  specifications: { value: string; label: string }[];
+  furnishings: { id: number; name: string; icon?: string | null }[];
+};
+function shapeFormData(res: any): ProjectFormData {
+  const data = res?.data ?? res ?? {};
+  return {
+    cities: data.cities ?? [],
+    sublocations: data.sublocations ?? [],
+    amenities: data.amenities ?? [],
+    roomNames: data.roomNames ?? [],
+    roomDimensions: data.roomDimensions ?? [],
+    specifications: data.specifications ?? [],
+    furnishings: data.furnishings ?? [],
+  };
+}
+/** A room-dimension master row as a plot-dimension option. */
+const plotDimensionOption = (rd: ProjectFormData["roomDimensions"][number]) => {
+  const dims = formatRoomDimension(rd.lengthFt, rd.widthFt) ?? rd.value;
+  return { value: dims, label: rd.label !== dims ? `${rd.label} (${dims})` : dims };
+};
+
 interface ProjectFormProps {
   mode: "create" | "edit";
   initialData?: any;
@@ -485,46 +515,25 @@ export function ProjectForm({
     projectTypeValue === "villa";
 
   const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState<{
-    cities: any[];
-    sublocations: any[];
-    amenities: any[];
-    roomNames: { value: string; label: string }[];
-    roomDimensions: {
-      value: string;
-      label: string;
-      lengthFt: number | null;
-      widthFt: number | null;
-    }[];
-    specifications: { value: string; label: string }[];
-    furnishings: { id: number; name: string; icon?: string | null }[];
-  }>({
-    cities: [],
-    sublocations: [],
-    amenities: [],
-    roomNames: [],
-    roomDimensions: [],
-    specifications: [],
-    furnishings: [],
-  });
+  const [formData, setFormData] = useState<ProjectFormData>(() => shapeFormData({}));
 
   useEffect(() => {
     propertiesApi
       .formData()
-      .then((res: any) => {
-        const data = res?.data ?? res ?? {};
-        setFormData({
-          cities: data.cities ?? [],
-          sublocations: data.sublocations ?? [],
-          amenities: data.amenities ?? [],
-          roomNames: data.roomNames ?? [],
-          roomDimensions: data.roomDimensions ?? [],
-          specifications: data.specifications ?? [],
-          furnishings: data.furnishings ?? [],
-        });
-      })
-      .catch(() => {});
+      .then((res: any) => setFormData(shapeFormData(res)))
+      .catch(() => toast.error("Failed to load form data."));
   }, []);
+  /** Fresh lists (skipping the server cache) after a master item is added from this form. */
+  const reloadFormData = async () => {
+    const next = shapeFormData(await propertiesApi.formData(true));
+    setFormData(next);
+    return next;
+  };
+  // Missing amenities, localities, room names… are added from here (master add dialog).
+  const master = useMasterCreate<ProjectFormData>({
+    reload: reloadFormData,
+    cities: formData.cities.map((c) => ({ id: c.id, name: c.cityName ?? c.city_name ?? "" })),
+  });
 
   const cityIdOf = (cityName: string) => {
     const found = formData.cities.find(
@@ -1975,6 +1984,15 @@ export function ProjectForm({
             <div className="space-y-2">
               <label className={labelClass}>City <span className="text-red-500">*</span></label>
               <SearchableFormSelect className={selectClass}
+                createNoun="city"
+                onCreate={(q) => master.create("cities", q, (created, fresh) => {
+                  const match = fresh.cities.find((c) => sameName(c.cityName ?? c.city_name ?? "", created));
+                  if (!match) return;
+                  setCity(match.cityName ?? match.city_name);
+                  setSublocation("");
+                  const st = match.stateName ?? match.state_name ?? "";
+                  if (st) setState(String(st).trim());
+                })}
                 name="city"
                 options={formData.cities.map((c: any) => {
                   const n = c.cityName ?? c.city_name ?? "";
@@ -2010,6 +2028,16 @@ export function ProjectForm({
             <div className="space-y-2">
               <label className={labelClass}>Sublocation / Locality <span className="text-red-500">*</span></label>
               <SearchableFormSelect className={selectClass}
+                createNoun="locality"
+                onCreate={(q) => master.create("sublocations", q, (created, fresh) => {
+                  // The dialog may map it to another city; follow it there.
+                  const subs = fresh.sublocations.filter((x) => sameName(x.localityName ?? x.locality_name ?? x.name ?? "", created));
+                  const sub = subs.find((x) => String(x.cityId ?? x.city_id ?? "") === cityIdOf(city)) ?? subs[subs.length - 1];
+                  if (!sub) return;
+                  const owner = fresh.cities.find((c) => String(c.id) === String(sub.cityId ?? sub.city_id ?? ""));
+                  if (owner) setCity(owner.cityName ?? owner.city_name);
+                  setSublocation(sub.localityName ?? sub.locality_name ?? sub.name ?? created);
+                }, { cityId: cityIdOf(city) })}
                 name="sublocation"
                 options={formData.sublocations
                   .filter((s: any) => {
@@ -2604,47 +2632,17 @@ export function ProjectForm({
             <h3 className="mb-6 text-[20px] font-medium tracking-[-0.01em] text-foreground">
               Amenities
             </h3>
-            {formData.amenities.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic">
-                No amenities available in the master list.
-              </p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {formData.amenities.map((amenity: any) => (
-                  <label
-                    key={amenity.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      amenityIds.includes(amenity.id)
-                        ? "bg-foreground/[0.04] border-foreground/40"
-                        : "bg-muted/10 border-border/40 hover:bg-muted/30"
-                    }`}
-                  >
-                    <Checkbox
-                      checked={amenityIds.includes(amenity.id)}
-                      onCheckedChange={(checked) => {
-                        if (checked)
-                          setAmenityIds((prev) => [...prev, amenity.id]);
-                        else
-                          setAmenityIds((prev) =>
-                            prev.filter((id) => id !== amenity.id),
-                          );
-                      }}
-                    />
-                    <div className="flex flex-col min-w-0">
-                      <span
-                        className="text-sm font-semibold text-foreground truncate capitalize"
-                        title={amenity.name}
-                      >
-                        {amenity.name}
-                      </span>
-                      <span className="truncate text-[11px] text-muted-foreground">
-                        {amenity.category || "General"}
-                      </span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            )}
+            <MasterMultiPicker
+              noun="amenity"
+              plural="amenities"
+              items={formData.amenities.map((a) => ({ id: a.id, name: a.name, hint: a.category || "General" }))}
+              selected={amenityIds}
+              onChange={setAmenityIds}
+              onCreate={(q) => master.create("amenities", q, (name, fresh) => {
+                const created = fresh.amenities.find((a) => sameName(a.name, name));
+                if (created) setAmenityIds((ids) => (ids.includes(created.id) ? ids : [...ids, created.id]));
+              })}
+            />
           </div>
 
         {projectType !== "plot" && (
@@ -2688,7 +2686,10 @@ export function ProjectForm({
                   >
                     <div className="space-y-2">
                       <label className={labelClass}>Label</label>
-                      <FormSelect className={selectClass}
+                      <SearchableFormSelect className={selectClass}
+                        createNoun="specification"
+                        onCreate={(q) => master.create("specifications", q, (name) =>
+                          setSpecifications((prev) => prev.map((row, j) => (j === i ? { ...row, label: name } : row))))}
                         name={`specLabel-${i}`}
                         options={withLegacyOption(
                           formData.specifications.map((sp) => ({
@@ -3540,23 +3541,15 @@ export function ProjectForm({
                                   <label className={labelClass}>
                                     Plot Dimensions
                                   </label>
-                                  <FormSelect className={selectClass}
+                                  <SearchableFormSelect className={selectClass}
+                                    createNoun="dimension"
+                                    onCreate={(q) => master.create("room-dimensions", q, (name, fresh) => {
+                                      const rd = fresh.roomDimensions.find((x) => sameName(x.value, name));
+                                      updateUnit(idx, { plotDimensions: rd ? plotDimensionOption(rd).value : name });
+                                    })}
                                     name={`plotDims-${idx}`}
                                     options={withLegacyOption(
-                                      formData.roomDimensions.map((rd) => {
-                                        const dims =
-                                          formatRoomDimension(
-                                            rd.lengthFt,
-                                            rd.widthFt,
-                                          ) ?? rd.value;
-                                        return {
-                                          value: dims,
-                                          label:
-                                            rd.label !== dims
-                                              ? `${rd.label} (${dims})`
-                                              : dims,
-                                        };
-                                      }),
+                                      formData.roomDimensions.map(plotDimensionOption),
                                       unit.plotDimensions,
                                     )}
                                     value={unit.plotDimensions || null}
@@ -3645,59 +3638,18 @@ export function ProjectForm({
                               })}
                             </div>
                             <p className={unitSectionTitle}>Furnishing Items</p>
-                            {formData.furnishings.length === 0 ? (
-                              <p className="text-sm text-muted-foreground italic">
-                                No furnishing items available in the master
-                                list.
-                              </p>
-                            ) : (
-                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                {formData.furnishings.map((item: any) => {
-                                  const checked =
-                                    unit.furnishingItemIds.includes(item.id);
-                                  return (
-                                    <label
-                                      key={item.id}
-                                      className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                                        checked
-                                          ? "bg-foreground/[0.04] border-foreground/40"
-                                          : "bg-muted/10 border-border/40 hover:bg-muted/30"
-                                      }`}
-                                    >
-                                      <Checkbox
-                                        checked={checked}
-                                        onCheckedChange={(c) => {
-                                          if (c)
-                                            updateUnit(idx, {
-                                              furnishingItemIds: [
-                                                ...unit.furnishingItemIds,
-                                                item.id,
-                                              ],
-                                            });
-                                          else
-                                            updateUnit(idx, {
-                                              furnishingItemIds:
-                                                unit.furnishingItemIds.filter(
-                                                  (id) => id !== item.id,
-                                                ),
-                                            });
-                                        }}
-                                      />
-                                      <FurnishingIcon
-                                        name={item.icon ?? item.name}
-                                        className="h-4 w-4 shrink-0 text-muted-foreground"
-                                      />
-                                      <span
-                                        className="text-sm font-semibold text-foreground truncate"
-                                        title={item.name}
-                                      >
-                                        {item.name}
-                                      </span>
-                                    </label>
-                                  );
-                                })}
-                              </div>
-                            )}
+                            <MasterMultiPicker
+                              noun="furnishing item"
+                              limit={6}
+                              items={formData.furnishings.map((item) => ({ id: item.id, name: item.name, icon: <FurnishingIcon name={item.icon ?? item.name} className="h-4 w-4 shrink-0 text-muted-foreground" /> }))}
+                              selected={unit.furnishingItemIds}
+                              onChange={(ids) => updateUnit(idx, { furnishingItemIds: ids })}
+                              onCreate={(q) => master.create("furnishing-items", q, (name, fresh) => {
+                                const created = fresh.furnishings.find((f) => sameName(f.name, name));
+                                if (!created) return;
+                                setUnits((prev) => prev.map((u, i) => (i === idx && !u.furnishingItemIds.includes(created.id) ? { ...u, furnishingItemIds: [...u.furnishingItemIds, created.id] } : u)));
+                              })}
+                            />
                           </>
                         )}
                         {!isPlotProject(projectType) && (
@@ -3880,7 +3832,9 @@ export function ProjectForm({
                             >
                               <div className="space-y-2">
                                 <label className={labelClass}>Room</label>
-                                <FormSelect className={selectClass}
+                                <SearchableFormSelect className={selectClass}
+                                  createNoun="room name"
+                                  onCreate={(q) => master.create("room-names", q, (name) => updateUnitRoom(idx, rIdx, { name }))}
                                   name={`roomName-${idx}-${rIdx}`}
                                   options={withLegacyOption(
                                     formData.roomNames.map((rn) => ({
@@ -4085,6 +4039,7 @@ export function ProjectForm({
         </div>
 
       </form>
+      {master.dialog}
       </FocusModal>
 
       {/* Unsaved draft of the CURRENT version found when opening (outdated

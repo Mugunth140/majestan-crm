@@ -206,7 +206,7 @@ export default function ProjectsPage() {
     columns,
     data: projects,
     showToolbar: true,
-    showDeleteAction: role === "Admin",
+    showDeleteAction: role === "Admin" || role === "Super Admin",
     onDeleteSelected: (rows: any[]) => setBulkDeleteIds(rows.map((r) => r.id)),
     renderToolbarActions: (selectedRows: any[], clearSelection: () => void) => {
       const isSingle = selectedRows.length === 1;

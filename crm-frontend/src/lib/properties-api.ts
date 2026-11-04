@@ -12,7 +12,8 @@ export const propertiesApi = {
     );
     return apiJson(`${BASE}?${q}`);
   },
-  formData: () => apiJson(`${BASE}/form-data`),
+  /** `fresh` skips the server's short cache, e.g. right after adding a master item. */
+  formData: (fresh = false) => apiJson(`${BASE}/form-data${fresh ? "?fresh=1" : ""}`),
   presignedUrl: (fileName: string, fileType: string) => {
     const q = new URLSearchParams({ fileName, fileType });
     return apiJson(`${BASE}/presigned-url?${q}`);

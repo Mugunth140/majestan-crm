@@ -1,5 +1,6 @@
 "use client";
 
+import { AMENITY_CATEGORIES } from "@/lib/master-kinds";
 import { apiFetch } from "@/lib/api-fetch";
 
 import { useState, useEffect, useCallback } from "react";
@@ -28,18 +29,6 @@ import { cn } from "@/lib/utils";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
-// Mirrors the site AmenityCategory enum (site amenities table).
-const AMENITY_CATEGORIES = [
-  { value: "security", label: "Security" },
-  { value: "utilities", label: "Utilities" },
-  { value: "recreation", label: "Recreation" },
-  { value: "community", label: "Community" },
-  { value: "connectivity", label: "Connectivity" },
-  { value: "interior", label: "Interior" },
-  { value: "other", label: "Other" },
-  { value: "feature", label: "Feature" },
-  { value: "utility", label: "Utility" },
-];
 
 const categoryLabel = (value: string | null | undefined) =>
   AMENITY_CATEGORIES.find((c) => c.value === value)?.label ?? value ?? "—";

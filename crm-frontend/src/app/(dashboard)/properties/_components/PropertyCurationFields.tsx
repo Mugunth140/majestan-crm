@@ -411,12 +411,15 @@ export function AdditionalCurationFields({
   visible,
   hasRestroom,
   utilities,
+  onCreateUtility,
 }: {
   value: CurationDraft;
   onChange: (value: CurationDraft) => void;
   visible: (field: string) => boolean;
   hasRestroom: boolean;
   utilities: string[];
+  /** Adds a missing utility to the master list from the search. */
+  onCreateUtility?: (query: string) => void;
 }) {
   const change = <K extends keyof CurationDraft>(
     key: K,
@@ -556,6 +559,8 @@ export function AdditionalCurationFields({
                 value={value[key]}
                 options={options}
                 onChange={(next) => change(key, next)}
+                onCreate={key === "utilities" ? onCreateUtility : undefined}
+                createNoun="utility"
               />
             </div>
           ),

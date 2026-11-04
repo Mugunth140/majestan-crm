@@ -29,6 +29,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { PropertyFormSelect as FormSelect } from "./PropertyFormSelect";
 import { SearchableFormSelect } from "@/components/shared/form-select";
+import { MasterMultiPicker } from "@/components/master/master-multi-picker";
+import { useMasterCreate } from "@/components/master/use-master-create";
+import { sameName, type MasterKind } from "@/lib/master-kinds";
+import { parseMultiValue } from "./PropertyMultiSelect";
 import { FurnishingIcon } from "@/components/shared/furnishing-icons";
 import { DatePicker } from "@/components/shared/date-picker";
 import { format } from "date-fns";
@@ -296,6 +300,22 @@ interface FormDataShape {
   registrationCharges: { value: string; label: string }[];
   roomNames: { value: string; label: string }[];
   roomDimensions: { value: string; label: string; lengthFt: number | null; widthFt: number | null }[];
+}
+
+function shapeFormData(res: any): FormDataShape {
+  const data = res?.data ?? res ?? {};
+  return {
+    cities: data.cities ?? [],
+    sublocations: data.sublocations ?? [],
+    amenities: data.amenities ?? [],
+    furnishings: data.furnishings ?? [],
+    utilities: data.utilities ?? [],
+    roomNames: data.roomNames ?? [],
+    roomDimensions: data.roomDimensions ?? [],
+    propertyTypes: data.propertyTypes ?? [],
+    roadNames: data.roadNames ?? [],
+    registrationCharges: data.registrationCharges ?? [],
+  };
 }
 
 interface UploadedImage {
@@ -1231,33 +1251,23 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
   // Ask before leaving with unsaved changes (sidebar links, back buttons, tab close).
   const { pendingLeave, cancelLeave } = useLeaveGuard(isDirty);
 
-  // ---- Load form data (cities & sublocations) ----
+  // ---- Load form data (cities, localities and the other master lists) ----
   useEffect(() => {
     setIsLoadingFormData(true);
     propertiesApi
       .formData()
-      .then((res: any) => {
-        const data = res?.data ?? res ?? {};
-        if (data) {
-        setFormData({
-          cities: data.cities ?? [],
-          sublocations: data.sublocations ?? [],
-          amenities: data.amenities ?? [],
-          furnishings: data.furnishings ?? [],
-          utilities: data.utilities ?? [],
-          roomNames: data.roomNames ?? [],
-          roomDimensions: data.roomDimensions ?? [],
-          propertyTypes: data.propertyTypes ?? [],
-          roadNames: data.roadNames ?? [],
-          registrationCharges: data.registrationCharges ?? [],
-        });
-        }
-      })
+      .then((res: any) => setFormData(shapeFormData(res)))
       .catch(() => {
         toast.error("Failed to load form data.");
       })
       .finally(() => setIsLoadingFormData(false));
   }, []);
+  /** Fresh lists (skipping the server cache) after a master item is added from this form. */
+  const reloadFormData = async () => {
+    const next = shapeFormData(await propertiesApi.formData(true));
+    setFormData(next);
+    return next;
+  };
 
   // ---- Filtered sublocations based on selected city (tolerant field names) ----
   const subCityId = (s: any): string => String(s.cityId ?? s.city_id ?? "");
@@ -1267,6 +1277,15 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
   const filteredSublocations = cityId
     ? formData.sublocations.filter((s) => subCityId(s) === cityId)
     : [];
+
+  // Missing amenities, localities, room names… are added from here (master add dialog).
+  const master = useMasterCreate<FormDataShape>({
+    reload: reloadFormData,
+    cities: formData.cities.map((c) => ({ id: c.id, name: cityNameOf(c) })),
+  });
+  /** Name-valued master lists: pick the new value once it's saved. */
+  const createNamed = (kind: MasterKind, set: (name: string) => void) => (query: string) =>
+    master.create(kind, query, (name) => set(name));
 
   // ---- Property types filtered by listing type ----
   // Coworking is rental only; new farmland listings are sale only. PG/co-living is excluded.
@@ -2500,7 +2519,7 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
                 />
               </div>
             )}
-  <AdditionalCurationFields value={curation} onChange={setCuration} visible={isFieldVisible} hasRestroom={hasRestroom} utilities={formData.utilities.map((u: any) => u.name)} />
+  <AdditionalCurationFields value={curation} onChange={setCuration} visible={isFieldVisible} hasRestroom={hasRestroom} utilities={formData.utilities.map((u: any) => u.name)} onCreateUtility={createNamed("utilities", (name) => setCuration((c) => ({ ...c, utilities: JSON.stringify([...parseMultiValue(c.utilities), name]) })))} />
   {isFieldVisible("numberOfPortions") && <PortionFields count={numberOfPortions} onCountChange={setNumberOfPortions} value={curation} onChange={setCuration} />}
   {isFieldVisible("parkingSpaces") && <ParkingFields value={curation} onChange={setCuration} legacyParkingCount={parking} legacyParkingType={parkingType} />}
   {isFieldVisible("plotFacing") && <div className="space-y-2"><label className={labelClass}>Plot Facing</label><FormSelect name="plotFacing" placeholder="Select direction" options={FACING_DIRECTION_OPTIONS} value={plotFacing} onValueChange={setPlotFacing} /></div>}
@@ -2882,6 +2901,8 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
               <FormSelect
                 name="roadName"
                 placeholder="Select Road Name"
+                onCreate={createNamed("road-names", setRoadName)}
+                createNoun="road name"
                 options={formData.roadNames}
                 value={roadName || null}
                 onValueChange={setRoadName}
@@ -3107,6 +3128,8 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
                 <FormSelect
                   name="registrationCharge"
                   placeholder="Select Registration Charge"
+                  onCreate={createNamed("registration-charges", setRegistrationCharge)}
+                  createNoun="registration charge"
                   options={withLegacyOption(
                     formData.registrationCharges,
                     registrationCharge
@@ -3156,6 +3179,11 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
             <div className="space-y-2" id="pf-city">
               <label className={labelClass}>City <span className="text-red-500">*</span></label>
               <SearchableFormSelect className={PROPERTY_SELECT}
+                createNoun="city"
+                onCreate={(q) => master.create("cities", q, (name, fresh) => {
+                  const city = fresh.cities.find((c) => sameName(cityNameOf(c), name));
+                  if (city) { handleCityChange(String(city.id)); clearFieldError("city"); }
+                })}
                 name="cityId"
                 placeholder="Select City"
                 options={formData.cities.map((c) => ({
@@ -3172,6 +3200,16 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
             <div className="space-y-2" id="pf-locality">
               <label className={labelClass}>Locality <span className="text-red-500">*</span></label>
               <SearchableFormSelect className={PROPERTY_SELECT}
+                createNoun="locality"
+                onCreate={(q) => master.create("sublocations", q, (name, fresh) => {
+                  // The dialog may map it to another city; follow it there.
+                  const subs = fresh.sublocations.filter((x) => sameName(subName(x), name));
+                  const sub = subs.find((x) => subCityId(x) === cityId) ?? subs[subs.length - 1];
+                  if (!sub) return;
+                  setCityId(subCityId(sub));
+                  setSublocationId(String(sub.id));
+                  clearFieldError("locality");
+                }, { cityId })}
                 name="sublocationId"
                 placeholder={cityId ? "Select Locality" : "Select a city first"}
                 options={filteredSublocations.map((s) => ({
@@ -3180,7 +3218,7 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
                 }))}
                 value={sublocationId || null}
                 onValueChange={(v) => { setSublocationId(v); clearFieldError("locality"); }}
-                disabled={!cityId || filteredSublocations.length === 0}
+                disabled={!cityId}
               />
               <FormErr field="locality" />
             </div>
@@ -3591,6 +3629,8 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
                 <FormSelect
                   name="utilitiesProvided"
                   placeholder="Select Utility"
+                  onCreate={createNamed("utilities", setUtilitiesProvided)}
+                  createNoun="utility"
                   options={[
                     ...formData.utilities.map((u: any) => ({
                       value: u.name,
@@ -4847,38 +4887,17 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
         {isFieldVisible("amenityIds") && (
           <div className={sec("details")} data-pf-step="details">
             <h3 className={sectionTitle}>Amenities</h3>
-            {formData.amenities.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic">No amenities available in the master list.</p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {formData.amenities.map((amenity: any) => (
-                  <label
-                    key={amenity.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      amenityIds.includes(amenity.id)
-                        ? "bg-foreground/[0.04] border-foreground/40"
-                        : "bg-muted/10 border-border/40 hover:bg-muted/30"
-                    }`}
-                  >
-                    <Checkbox
-                      checked={amenityIds.includes(amenity.id)}
-                      onCheckedChange={(checked) => {
-                        if (checked) setAmenityIds((prev) => [...prev, amenity.id]);
-                        else setAmenityIds((prev) => prev.filter((id) => id !== amenity.id));
-                      }}
-                    />
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-sm font-semibold text-foreground truncate capitalize" title={amenity.name}>
-                        {amenity.name}
-                      </span>
-                      <span className="truncate text-[11px] text-muted-foreground">
-                        {amenity.category || "General"}
-                      </span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            )}
+            <MasterMultiPicker
+              noun="amenity"
+              plural="amenities"
+              items={formData.amenities.map((a) => ({ id: a.id, name: a.name, hint: a.category || "General" }))}
+              selected={amenityIds}
+              onChange={setAmenityIds}
+              onCreate={(q) => master.create("amenities", q, (name, fresh) => {
+                const created = fresh.amenities.find((a) => sameName(a.name, name));
+                if (created) setAmenityIds((ids) => (ids.includes(created.id) ? ids : [...ids, created.id]));
+              })}
+            />
           </div>
         )}
 
@@ -4886,36 +4905,16 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
         {isFieldVisible("furnishingItemIds") && (
           <div className={sec("details")} data-pf-step="details">
             <h3 className={sectionTitle}>Furnishing Items</h3>
-            {formData.furnishings.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic">No furnishing items available in the master list.</p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {formData.furnishings.map((item: { id: number; name: string; icon?: string | null }) => (
-                  <label
-                    key={item.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      furnishingItemIds.includes(item.id)
-                        ? "bg-foreground/[0.04] border-foreground/40"
-                        : "bg-muted/10 border-border/40 hover:bg-muted/30"
-                    }`}
-                  >
-                    <Checkbox
-                      checked={furnishingItemIds.includes(item.id)}
-                      onCheckedChange={(checked) => {
-                        if (checked) setFurnishingItemIds((prev) => [...prev, item.id]);
-                        else setFurnishingItemIds((prev) => prev.filter((id) => id !== item.id));
-                      }}
-                    />
-                    <FurnishingIcon name={item.icon} className="h-5 w-5 text-muted-foreground shrink-0" />
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-sm font-semibold text-foreground truncate" title={item.name}>
-                        {item.name}
-                      </span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            )}
+            <MasterMultiPicker
+              noun="furnishing item"
+              items={formData.furnishings.map((item) => ({ id: item.id, name: item.name, icon: <FurnishingIcon name={item.icon} className="h-4 w-4 shrink-0 text-muted-foreground" /> }))}
+              selected={furnishingItemIds}
+              onChange={setFurnishingItemIds}
+              onCreate={(q) => master.create("furnishing-items", q, (name, fresh) => {
+                const created = fresh.furnishings.find((f) => sameName(f.name, name));
+                if (created) setFurnishingItemIds((ids) => (ids.includes(created.id) ? ids : [...ids, created.id]));
+              })}
+            />
           </div>
         )}
 
@@ -4972,9 +4971,7 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
                     ]}
                     value={conn.icon || null}
                     onValueChange={(v) => {
-                      const newConn = [...connectivity];
-                      newConn[idx].icon = v;
-                      setConnectivity(newConn);
+                      setConnectivity((rows) => rows.map((row, i) => (i === idx ? { ...row, icon: v } : row)));
                     }}
                   />
                 </div>
@@ -4982,9 +4979,7 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
                   <Input
                     value={conn.label}
                     onChange={(e) => {
-                      const newConn = [...connectivity];
-                      newConn[idx].label = e.target.value;
-                      setConnectivity(newConn);
+                      setConnectivity((rows) => rows.map((row, i) => (i === idx ? { ...row, label: e.target.value } : row)));
                     }}
                     placeholder="Label (e.g. Highway)"
                     className={inputClass}
@@ -4994,9 +4989,7 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
                   <Input
                     value={conn.detail}
                     onChange={(e) => {
-                      const newConn = [...connectivity];
-                      newConn[idx].detail = e.target.value;
-                      setConnectivity(newConn);
+                      setConnectivity((rows) => rows.map((row, i) => (i === idx ? { ...row, detail: e.target.value } : row)));
                     }}
                     placeholder="Distance (e.g. 5 mins away)"
                     className={inputClass}
@@ -5064,9 +5057,7 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
                   <Input
                     value={faq.question}
                     onChange={(e) => {
-                      const newFaqs = [...faqs];
-                      newFaqs[idx].question = e.target.value;
-                      setFaqs(newFaqs);
+                      setFaqs((rows) => rows.map((row, i) => (i === idx ? { ...row, question: e.target.value } : row)));
                     }}
                     placeholder="Question"
                     className={inputClass}
@@ -5074,9 +5065,7 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
                   <Textarea
                     value={faq.answer}
                     onChange={(e) => {
-                      const newFaqs = [...faqs];
-                      newFaqs[idx].answer = e.target.value;
-                      setFaqs(newFaqs);
+                      setFaqs((rows) => rows.map((row, i) => (i === idx ? { ...row, answer: e.target.value } : row)));
                     }}
                     placeholder="Answer"
                     rows={2}
@@ -5128,11 +5117,9 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
                         room.name
                       )}
                       value={room.name || null}
-                      onValueChange={(v) => {
-                        const newRooms = [...roomDimensions];
-                        newRooms[idx].name = v;
-                        setRoomDimensions(newRooms);
-                      }}
+                      onValueChange={(v) => setRoomDimensions((rooms) => rooms.map((r, i) => (i === idx ? { ...r, name: v } : r)))}
+                      onCreate={createNamed("room-names", (name) => setRoomDimensions((rooms) => rooms.map((r, i) => (i === idx ? { ...r, name } : r))))}
+                      createNoun="room name"
                     />
                   </div>
                   <div className="w-full flex-1 space-y-2">
@@ -5229,6 +5216,7 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
         </div>)}
 
       </form>
+      {master.dialog}
       </FocusModal>
 
       {/* Unsaved draft of the CURRENT version found when opening (outdated
