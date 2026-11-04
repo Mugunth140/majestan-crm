@@ -7,13 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Pencil } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
-import type { BlogPost } from "@/lib/blog-api";
-function postStatus(post: BlogPost, now: number) {
-  if (post.status === "draft") return "Draft";
-  return new Date(post.published_at!).getTime() > now ? "Scheduled" : "Published";
-}
+import { postStatus, type BlogPost } from "@/lib/blog-api";
 
-const STATUS_TONE = { Published: "green", Scheduled: "blue", Draft: "amber" } as const;
+export const STATUS_TONE = { Published: "green", Scheduled: "blue", Draft: "amber" } as const;
 
 export function BlogPostList({
   posts,
@@ -24,6 +20,7 @@ export function BlogPostList({
   now,
   onPage,
   onEdit,
+  onOpen,
   onDelete,
 }: {
   posts: BlogPost[];
@@ -34,6 +31,8 @@ export function BlogPostList({
   now: number;
   onPage: (page: number) => void;
   onEdit: (id?: number) => void;
+  /** Opens the article's page. */
+  onOpen: (post: BlogPost) => void;
   onDelete: (posts: BlogPost[]) => void;
 }) {
   const fields: ViewField<BlogPost>[] = [
@@ -173,8 +172,8 @@ export function BlogPostList({
               />
             }
             getKey={(p) => p.id!}
-            onOpen={(p) => onEdit(p.id)}
-            card={(p) => ({ title: p.title, avatar: false, id: p.id, subtitle: p.category || undefined, tag: formatTableDate(p.published_at) || undefined })}
+            onOpen={onOpen}
+            card={(p) => ({ title: p.title, avatar: false, id: p.id, href: `/blog/${p.id}`, subtitle: p.category || undefined, tag: formatTableDate(p.published_at) || undefined })}
             totalCount={total}
             noun="articles"
           />

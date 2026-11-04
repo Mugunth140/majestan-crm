@@ -24,7 +24,8 @@ import { useClampedPage, usePersistedState } from "@/hooks/use-persisted-state";
 import { apiFetch } from "@/lib/api-fetch";
 import { cn } from "@/lib/utils";
 import { Edit, Filter, Plus, Search } from "lucide-react";
-import { BuilderRecord } from "./_components/BuilderDialog";
+import type { BuilderRecord } from "@/lib/builders-api";
+import { BuilderForm } from "./_components/BuilderForm";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -46,6 +47,7 @@ export default function BuildersPage() {
   const [builders, setBuilders] = useState<BuilderRecord[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
 
   // Bulk delete dialog state
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
@@ -350,7 +352,7 @@ export default function BuildersPage() {
 
   const tableSection = (
     <div className="w-full max-w-full min-w-0 md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col">
-      {isLoading ? <TableSkeleton columns={6} rows={10} flush /> : <DataTable {...tableProps} />}
+      {isLoading ? <TableSkeleton columns={6} rows={10} flush /> : <DataTable {...tableProps} onRowClick={(b) => router.push(`/builders/${b.id}`)} />}
     </div>
   );
 
@@ -374,11 +376,11 @@ export default function BuildersPage() {
             <DataTable {...tableProps} variant="list" />
           }
           getKey={(b) => b.id}
-          onOpen={(b) => router.push(`/builders/new?edit=${b.id}`)}
+          onOpen={(b) => router.push(`/builders/${b.id}`)}
           onMove={(b, column) =>
             moveRow({ setRows: setBuilders, row: b, same: (x, y) => x.id === y.id, patch: { isActive: column === "Active" }, request: { path: `/builders/${b.id}`, method: "PUT", body: { isActive: column === "Active" } }, success: `Marked ${column.toLowerCase()}` })
           }
-          card={(b) => ({ title: b.name, id: b.id, href: `/builders/new?edit=${b.id}`, subtitle: b.phone || b.email || undefined })}
+          card={(b) => ({ title: b.name, id: b.id, href: `/builders/${b.id}`, subtitle: b.phone || b.email || undefined })}
           totalCount={totalCount}
           noun="builders"
         />}
@@ -402,7 +404,7 @@ export default function BuildersPage() {
       {views.switcher}
       <div className="w-full flex flex-col space-y-6 pt-4 md:space-y-0 md:pt-0 md:h-full">
         <PageActions>
-          <button type="button" onClick={() => router.push("/builders/new")} className={headerPrimaryClass}>
+          <button type="button" onClick={() => setCreating(true)} className={headerPrimaryClass}>
             <Plus className="size-4" />
             Add Builder
           </button>
@@ -411,6 +413,18 @@ export default function BuildersPage() {
         <Device mobile={mobileFilters} desktop={desktopFilters} />
         <Device desktop={null} mobile={<div className="w-full">{tableSection}</div>} />
       </div>
+
+      {creating && (
+        <BuilderForm
+          mode="create"
+          onClose={() => setCreating(false)}
+          onSuccess={(id) => {
+            setCreating(false);
+            if (id) router.push(`/builders/${id}`);
+            else void fetchBuilders();
+          }}
+        />
+      )}
 
       {/* Bulk Delete Confirm Dialog */}
       <Dialog open={bulkDeleteIds !== null} onOpenChange={(open) => { if (!open) setBulkDeleteIds(null); }}>

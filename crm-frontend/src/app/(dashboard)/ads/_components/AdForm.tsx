@@ -1,15 +1,14 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Save, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Loader2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { FormSelect } from "@/components/shared/form-select";
-import { MobileHeader } from "@/components/layout/mobile-header";
+import { FOCUS_BUTTON, FOCUS_FIELD, FieldRow, FocusField, FocusModal, ToggleCard } from "@/components/shared/focus-modal";
+import { FOCUS_INPUT, FOCUS_SELECT, StepFooter, StepSection, useFocusSteps } from "@/components/shared/focus-steps";
+import { cn } from "@/lib/utils";
 import { validateAdImage, isInternalAdPath, readAdImageRatio } from "@/lib/ads-validation";
 import { persistedStateKey } from "@/hooks/use-persisted-state";
 import { adsApi, type Advertisement, type AdSavePayload } from "@/lib/ads-api";
@@ -20,12 +19,22 @@ export interface AdFormProps {
   initial?: Advertisement;
   /** Preselected placement for a new ad (from the list page's current tab). */
   defaultPlacement?: string;
+  /** Opened over a page: close back to it. Without it, the form leaves for the list. */
+  onClose?: () => void;
+  /** Called once saved, with where the ad now shows. */
+  onSuccess?: (saved: { id?: number; placement: string; isActive: boolean }) => void;
 }
 
-const labelClass = "text-sm font-semibold text-foreground";
-const inputClass = "h-12 rounded-xl bg-muted/30";
-const fileInputClass =
-  "h-12 rounded-xl bg-muted/30 file:mr-3 file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium";
+const AD_STEPS = [
+  { key: "placement", label: "Placement" },
+  { key: "images", label: "Images" },
+  { key: "link", label: "Link & status" },
+] as const;
+type AdStep = (typeof AD_STEPS)[number]["key"];
+
+const labelClass = "flex items-center gap-1 text-[14px] font-medium text-foreground";
+const fileInputClass = cn(FOCUS_FIELD, "h-9 py-1 file:mr-3 file:h-6 file:rounded file:border-0 file:bg-muted file:px-2.5 file:text-[13px] file:font-medium");
+const secondaryButton = cn(FOCUS_BUTTON.secondary, "w-fit");
 const ACCEPT = "image/jpeg,image/png,image/webp";
 const RATIO_TOLERANCE = 0.02; // matches the site backend
 const ALL_AUDIENCES = "__all";
@@ -73,16 +82,17 @@ function ImagePicker({
   return (
     <div className="space-y-2">
       <label htmlFor={inputId} className={labelClass}>
-        {label} {required ? "*" : <span className="normal-case font-medium tracking-normal">(optional)</span>}
+        {label}
+        {required ? <span aria-hidden className="-ml-0.5 text-red-500">*</span> : <span className="font-normal text-muted-foreground">(Optional)</span>}
       </label>
-      <p id={`${inputId}-hint`} className="text-xs text-muted-foreground">
+      <p id={`${inputId}-hint`} className="text-[13px] text-muted-foreground">
         {ratioLabel(ratio)}, e.g. {example} — JPEG, PNG or WebP, max 5MB.
         {!required && " Falls back to the desktop image when empty."}
       </p>
       <Input id={inputId} ref={inputRef} type="file" accept={ACCEPT} aria-invalid={!!error} aria-describedby={`${inputId}-hint${error ? ` ${inputId}-error` : ""}`} onChange={(e) => { onPick(e.target.files?.[0]); e.target.value = ""; }} className={fileInputClass} />
-      {error && <p id={`${inputId}-error`} role="alert" className="text-sm text-destructive">{error}</p>}
-      {error && onClear && !slot.preview && <button type="button" onClick={onClear} className="rounded-lg border px-3 py-2 text-sm font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring">Remove {label.toLowerCase()}</button>}
-      {error && onReset && <button type="button" onClick={onReset} className="rounded-lg border px-3 py-2 text-sm font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring">Keep current {label.toLowerCase()}</button>}
+      {error && <p id={`${inputId}-error`} role="alert" className="text-[13px] text-red-600 dark:text-red-400">{error}</p>}
+      {error && onClear && !slot.preview && <button type="button" onClick={onClear} className={secondaryButton}>Remove {label.toLowerCase()}</button>}
+      {error && onReset && <button type="button" onClick={onReset} className={secondaryButton}>Keep current {label.toLowerCase()}</button>}
       {slot.preview ? (
         <div className="space-y-1">
           <div className="relative inline-block w-full">
@@ -91,7 +101,7 @@ function ImagePicker({
               src={slot.preview}
               alt={`${label} preview`}
               style={{ aspectRatio: `${ratio[0]} / ${ratio[1]}` }}
-              className={"rounded-xl border border-border/60 object-cover bg-muted " + previewClass}
+              className={"rounded-lg border object-cover bg-muted " + previewClass}
             />
             {onClear && (
               <button
@@ -109,7 +119,7 @@ function ImagePicker({
             )}
           </div>
           {mode === "edit" && !slot.touched && (
-            <p className="text-xs text-muted-foreground">Current image — pick a new file to replace it.</p>
+            <p className="text-[13px] text-muted-foreground">Current image — pick a new file to replace it.</p>
           )}
         </div>
       ) : null}
@@ -117,7 +127,7 @@ function ImagePicker({
   );
 }
 
-export function AdForm({ mode, initial, defaultPlacement }: AdFormProps) {
+export function AdForm({ mode, initial, defaultPlacement, onClose, onSuccess }: AdFormProps) {
   const router = useRouter();
   const d = initial;
   const originalPlacement: string | undefined = d?.placement;
@@ -208,26 +218,41 @@ export function AdForm({ mode, initial, defaultPlacement }: AdFormProps) {
     (which === "desktop" ? setDesktop : setMobile)(slotFrom(which === "desktop" ? d?.desktopImage : d?.mobileImage));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  /** What a step still needs, by the same rules as saving. */
+  const stepProblem = (key: AdStep): string | null => {
+    if (key === "placement" && !title.trim()) return "Title is required.";
+    if (key === "images") {
+      if (pendingImages > 0) return "Wait for the images to be checked.";
+      const imageError = imageErrors.desktop ?? imageErrors.mobile;
+      if (imageError) return imageError;
+      if (!desktop.file && !desktop.preview) return `${spec.desktop.label} is required.`;
+      if (spec.mobile?.required && !mobile.file && !mobile.preview) return "Mobile image is required.";
+      if (placementChanged && !desktop.file) return "Each placement has its own image size — upload new images for the new placement.";
+    }
+    if (key === "link" && linkPreset === "custom") {
+      const customPath = linkCustom.trim();
+      if (!customPath) return "Custom path is required when link is Custom.";
+      if (!isInternalAdPath(customPath)) return "Custom path must be an internal path starting with “/” (e.g. /offers/diwali).";
+    }
+    return null;
+  };
+  const create = mode === "create";
+  const nav = useFocusSteps<AdStep>(AD_STEPS, { create, problem: stepProblem });
+  const close = () => (onClose ? onClose() : router.push(d?.id ? `/ads/${d.id}` : "/ads"));
+
+  const handleSubmit = async () => {
     if (isSaving || pendingImages > 0 || Object.values(imageErrors).some(Boolean)) return;
     setFormError(null);
-    const fail = (message: string) => setFormError(message);
-
-    const trimmedTitle = title.trim();
-    if (!trimmedTitle) return void fail("Title is required.");
-    if (!desktop.file && !desktop.preview) return void fail(`${spec.desktop.label} is required.`);
-    if (spec.mobile?.required && !mobile.file && !mobile.preview) return void fail("Mobile image is required.");
-    if (placementChanged && !desktop.file) {
-      return void fail("Each placement has its own image size — upload new images for the new placement.");
-    }
-    if (linkPreset === "custom") {
-      const customPath = linkCustom.trim();
-      if (!customPath) return void fail("Custom path is required when link is Custom.");
-      if (!isInternalAdPath(customPath)) {
-        return void fail("Custom path must be an internal path starting with “/” (e.g. /offers/diwali).");
+    // Show the step that's missing something, with the reason.
+    for (const { key } of AD_STEPS) {
+      const problem = stepProblem(key);
+      if (problem) {
+        setFormError(problem);
+        nav.go(key);
+        return;
       }
     }
+    const trimmedTitle = title.trim();
 
     setIsSaving(true);
     try {
@@ -255,6 +280,10 @@ export function AdForm({ mode, initial, defaultPlacement }: AdFormProps) {
       }
 
       toast.success(mode === "create" ? "Advertisement created." : "Advertisement updated.");
+      if (onSuccess) {
+        onSuccess({ id: d?.id ?? (result?.data ?? result)?.id, placement, isActive });
+        return;
+      }
       // Return to the saved placement/status so the result is immediately visible.
       try {
         sessionStorage.setItem(persistedStateKey("ads:placement"), JSON.stringify(placement));
@@ -270,120 +299,105 @@ export function AdForm({ mode, initial, defaultPlacement }: AdFormProps) {
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500 px-4 md:px-0 mt-2 md:mt-0 mb-20 md:mb-0">
-      <MobileHeader title={mode === "create" ? "Add Advertisement" : "Edit Advertisement"} showBack />
-
-      <Link href="/ads" className="hidden md:inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">← Back to advertisements</Link>
-
-      <div className="flex items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{mode === "create" ? "Add New Advertisement" : "Edit Advertisement"}</h1>
-          <p className="text-sm text-muted-foreground mt-1">Pick where it shows on the site, upload the creative, and choose where a click goes.</p>
-        </div>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <fieldset disabled={isSaving} className="bg-card border rounded-2xl p-4 md:p-8 shadow-sm space-y-6 disabled:opacity-70">
+    <FocusModal
+      open
+      onOpenChange={(o) => { if (!o && !isSaving) close(); }}
+      title={create ? "New advertisement" : "Edit advertisement"}
+      steps={nav.steps}
+      active={nav.step}
+      onStepChange={(k) => nav.jump(k as AdStep)}
+      footer={
+        <StepFooter nav={nav} create={create} saving={isSaving} onCancel={close} onSave={() => void handleSubmit()} createLabel="Create advertisement"
+          disabled={pendingImages > 0 || Object.values(imageErrors).some(Boolean)} />
+      }
+    >
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (create && !nav.last) nav.next();
+          else void handleSubmit();
+        }}
+      >
+        {formError && <div role="alert" className="mb-8 rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3 text-[14px] text-red-700 dark:text-red-400">{formError}</div>}
+        <fieldset disabled={isSaving} className="min-w-0 disabled:opacity-70">
           <legend className="sr-only">Advertisement details</legend>
-          <div className="space-y-2">
-            <label htmlFor="ad-title" className={labelClass}>Title *</label>
-            <Input id="ad-title" maxLength={120} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Diwali Home Fest" required className={inputClass} />
-            <p className="text-xs text-muted-foreground">Used as the image&apos;s alt text on the site.</p>
-          </div>
 
-          <div className={spec.audiences.length ? "grid grid-cols-1 md:grid-cols-2 gap-6" : ""}>
-            <div className="space-y-2">
-              <label htmlFor="ad-placement" className={labelClass}>Placement</label>
-              <FormSelect
-                id="ad-placement"
-                name="placement"
-                placeholder="Select placement"
-                options={PLACEMENT_OPTIONS}
-                value={placement}
-                onValueChange={(v) => changePlacement(v || "hero")}
-              />
-            </div>
-            {spec.audiences.length > 0 && (
-              <div className="space-y-2">
-                <label htmlFor="ad-audience" className={labelClass}>Show on</label>
-                <FormSelect
-                  id="ad-audience"
-                  name="audience"
-                  placeholder="Select audience"
-                  options={audienceOptions}
-                  value={audience}
-                  onValueChange={(v) => setAudience(v || ALL_AUDIENCES)}
-                />
-              </div>
+          <StepSection title="Placement" description="Where the ad shows on the website." hidden={nav.step !== "placement"}>
+            <FocusField label="Title" htmlFor="ad-title" required hint="Used as the image's alt text on the site.">
+              <Input id="ad-title" maxLength={120} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Diwali Home Fest" autoFocus className={FOCUS_INPUT} />
+            </FocusField>
+            {spec.audiences.length ? (
+              <FieldRow>
+                <FocusField label="Placement" htmlFor="ad-placement">
+                  <FormSelect id="ad-placement" name="placement" placeholder="Select placement" options={PLACEMENT_OPTIONS} value={placement} onValueChange={(v) => changePlacement(v || "hero")} className={FOCUS_SELECT} />
+                </FocusField>
+                <FocusField label="Show on" htmlFor="ad-audience">
+                  <FormSelect id="ad-audience" name="audience" placeholder="Select audience" options={audienceOptions} value={audience} onValueChange={(v) => setAudience(v || ALL_AUDIENCES)} className={FOCUS_SELECT} />
+                </FocusField>
+              </FieldRow>
+            ) : (
+              <FocusField label="Placement" htmlFor="ad-placement">
+                <FormSelect id="ad-placement" name="placement" placeholder="Select placement" options={PLACEMENT_OPTIONS} value={placement} onValueChange={(v) => changePlacement(v || "hero")} className={FOCUS_SELECT} />
+              </FocusField>
             )}
-          </div>
-          <p className="text-xs text-muted-foreground -mt-3">{spec.description}</p>
-          {placementChanged && (
-            <p className="text-xs font-medium text-amber-700 dark:text-amber-400 -mt-3">
-              Moving to a different placement needs new images sized for it.
-            </p>
-          )}
+            <p className="-mt-2 text-[13px] text-muted-foreground">{spec.description}</p>
+            {placementChanged && (
+              <p className="text-[13px] font-medium text-amber-700 dark:text-amber-400">
+                Moving to a different placement needs new images sized for it.
+              </p>
+            )}
+          </StepSection>
 
-          <div className={spec.mobile ? "grid grid-cols-1 md:grid-cols-2 gap-6" : ""}>
-            <ImagePicker
-              key={`${placement}-desktop`}
-              error={imageErrors.desktop}
-              label={spec.desktop.label}
-              ratio={spec.desktop.ratio}
-              example={spec.desktop.example}
-              required
-              slot={desktop}
-              mode={mode}
-              onPick={(f) => pickFile(f, "desktop")}
-              onReset={placement === originalPlacement && d?.desktopImage ? () => resetImage("desktop") : undefined}
-              previewClass={spec.mobile ? "w-full" : "w-full max-w-sm"}
-            />
-            {spec.mobile && (
+          <StepSection title="Images" description={`Sized for ${spec.label.toLowerCase()}.`} hidden={nav.step !== "images"}>
+            <div className={spec.mobile ? "grid grid-cols-1 gap-6 md:grid-cols-2" : ""}>
               <ImagePicker
-                key={`${placement}-mobile`}
-                error={imageErrors.mobile}
-                label="Mobile image"
-                ratio={spec.mobile.ratio}
-                example={spec.mobile.example}
-                required={spec.mobile.required}
-                slot={mobile}
+                key={`${placement}-desktop`}
+                error={imageErrors.desktop}
+                label={spec.desktop.label}
+                ratio={spec.desktop.ratio}
+                example={spec.desktop.example}
+                required
+                slot={desktop}
                 mode={mode}
-                onPick={(f) => pickFile(f, "mobile")}
-                onReset={placement === originalPlacement && d?.mobileImage ? () => resetImage("mobile") : undefined}
-                onClear={!spec.mobile.required ? clearMobile : undefined}
-                previewClass={spec.mobile.ratio[0] < spec.mobile.ratio[1] ? "w-32" : "w-full"}
+                onPick={(f) => pickFile(f, "desktop")}
+                onReset={placement === originalPlacement && d?.desktopImage ? () => resetImage("desktop") : undefined}
+                previewClass={spec.mobile ? "w-full" : "w-full max-w-sm"}
               />
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="ad-link" className={labelClass}>Click destination</label>
-            <FormSelect id="ad-link" name="linkPreset" placeholder="Select link" options={LINK_PRESET_OPTIONS} value={linkPreset} onValueChange={(v) => setLinkPreset(v)} />
-            <p className="text-xs text-muted-foreground">Buy and Rent links open for the visitor&apos;s selected city.</p>
-          </div>
-
-          {linkPreset === "custom" && (
-            <div className="space-y-2">
-              <label htmlFor="ad-custom-path" className={labelClass}>Custom path *</label>
-              <Input id="ad-custom-path" maxLength={500} value={linkCustom} onChange={(e) => setLinkCustom(e.target.value)} placeholder="/offers/diwali" required className={inputClass} />
+              {spec.mobile && (
+                <ImagePicker
+                  key={`${placement}-mobile`}
+                  error={imageErrors.mobile}
+                  label="Mobile image"
+                  ratio={spec.mobile.ratio}
+                  example={spec.mobile.example}
+                  required={spec.mobile.required}
+                  slot={mobile}
+                  mode={mode}
+                  onPick={(f) => pickFile(f, "mobile")}
+                  onReset={placement === originalPlacement && d?.mobileImage ? () => resetImage("mobile") : undefined}
+                  onClear={!spec.mobile.required ? clearMobile : undefined}
+                  previewClass={spec.mobile.ratio[0] < spec.mobile.ratio[1] ? "w-32" : "w-full"}
+                />
+              )}
             </div>
-          )}
+            {pendingImages > 0 && (
+              <p role="status" className="flex items-center gap-2 text-[13px] text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Checking images…</p>
+            )}
+          </StepSection>
 
-          <label className="flex items-center space-x-3 bg-muted/10 border border-border/40 p-4 h-12 rounded-xl transition-colors hover:bg-muted/30 cursor-pointer">
-            <Checkbox checked={isActive} onCheckedChange={(v) => setIsActive(v === true)} />
-            <span className="text-sm font-medium">Active on the website</span>
-          </label>
+          <StepSection title="Link & status" description="Where a click goes, and whether the ad is live." hidden={nav.step !== "link"}>
+            <FocusField label="Click destination" htmlFor="ad-link" hint="Buy and Rent links open for the visitor's selected city.">
+              <FormSelect id="ad-link" name="linkPreset" placeholder="Select link" options={LINK_PRESET_OPTIONS} value={linkPreset} onValueChange={(v) => setLinkPreset(v)} className={FOCUS_SELECT} />
+            </FocusField>
+            {linkPreset === "custom" && (
+              <FocusField label="Custom path" htmlFor="ad-custom-path" required>
+                <Input id="ad-custom-path" maxLength={500} value={linkCustom} onChange={(e) => setLinkCustom(e.target.value)} placeholder="/offers/diwali" className={FOCUS_INPUT} />
+              </FocusField>
+            )}
+            <ToggleCard checked={isActive} onCheckedChange={setIsActive} title="Active on the website" description="Inactive ads are kept but not shown." />
+          </StepSection>
         </fieldset>
-
-        {formError && <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{formError}</div>}
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          <Button type="button" variant="outline" disabled={isSaving} onClick={() => router.push("/ads")} className="h-12 px-4">Cancel</Button>
-          <Button type="submit" disabled={isSaving || pendingImages > 0 || Object.values(imageErrors).some(Boolean)} className="h-12 px-8 rounded-xl bg-[#0052FF] hover:bg-[#0052FF]/90">
-            {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-            {pendingImages > 0 ? "Checking images…" : isSaving ? "Saving..." : mode === "create" ? "Create Advertisement" : "Save Changes"}
-          </Button>
-        </div>
       </form>
-    </div>
+    </FocusModal>
   );
 }

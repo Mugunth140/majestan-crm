@@ -25,6 +25,7 @@ import { adsApi } from "@/lib/ads-api";
 import { ADS_PLACEMENTS, getPlacement } from "@/lib/ads-link-presets";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp, Edit, Plus, Search, X } from "lucide-react";
+import { AdForm } from "./_components/AdForm";
 
 interface AdItem {
   id: number;
@@ -62,6 +63,7 @@ export default function AdsPage() {
   const [isReordering, setIsReordering] = useState(false);
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [role] = useState(() => {
     try {
       const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
@@ -431,7 +433,7 @@ export default function AdsPage() {
           ) : searchQuery.trim() ? (
             <button type="button" className={headerButtonClass} onClick={() => setSearchQuery("")}>Clear search</button>
           ) : (
-            <Link href={`/ads/new?placement=${placement}`} className={headerPrimaryClass}>Add advertisement</Link>
+            <button type="button" onClick={() => setCreating(true)} className={headerPrimaryClass}>Add advertisement</button>
           )
         }
       />
@@ -448,7 +450,7 @@ export default function AdsPage() {
           )}
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 space-y-1">
-              <h2 className="break-words text-base font-semibold">{ad.title}</h2>
+              <h2 className="break-words text-base font-semibold"><Link href={`/ads/${ad.id}`} className="hover:underline">{ad.title}</Link></h2>
               <p className="text-xs text-muted-foreground">{placementSpec.audiences.find((a) => a.value === ad.audience)?.label || placementSpec.label}</p>
             </div>
             <Switch checked={ad.isActive} disabled={isBusy} onCheckedChange={(next) => handleToggleStatus(ad, next)} aria-label={`${ad.isActive ? "Deactivate" : "Activate"} ${ad.title}`} />
@@ -476,9 +478,9 @@ export default function AdsPage() {
           columns={columns}
           list={<DataTable key={displayedAds.map((ad) => ad.id).join(",")} {...tableProps} variant="list" />}
           getKey={(ad) => ad.id}
-          onOpen={(ad) => router.push(`/ads/new?edit=${ad.id}`)}
+          onOpen={(ad) => router.push(`/ads/${ad.id}`)}
           onMove={(ad, column) => handleToggleStatus(ad, column === "Active")}
-          card={(ad) => ({ title: ad.title || "Advertisement", avatar: false, id: ad.id, href: `/ads/new?edit=${ad.id}`, subtitle: ad.updatedAt ? `Updated ${formatTableDate(ad.updatedAt)}` : undefined, tag: ad.isActive ? undefined : "Inactive" })}
+          card={(ad) => ({ title: ad.title || "Advertisement", avatar: false, id: ad.id, href: `/ads/${ad.id}`, subtitle: ad.updatedAt ? `Updated ${formatTableDate(ad.updatedAt)}` : undefined, tag: ad.isActive ? undefined : "Inactive" })}
           noun="ads"
         />
       } />}
@@ -525,10 +527,10 @@ export default function AdsPage() {
       <div className="flex items-center gap-2">
         {searchBar(true)}
       </div>
-      <Link href={`/ads/new?placement=${placement}`} className="flex h-11 w-full rounded-xl bg-[#0052FF] px-4 text-[14px] font-semibold text-white shadow-md hover:bg-[#0052FF]/90 items-center justify-center gap-2 transition-transform active:scale-95">
+      <button type="button" onClick={() => setCreating(true)} className="flex h-11 w-full rounded-xl bg-[#0052FF] px-4 text-[14px] font-semibold text-white shadow-md hover:bg-[#0052FF]/90 items-center justify-center gap-2 transition-transform active:scale-95">
         <Plus size={18} />
         Add Advertisement
-      </Link>
+      </button>
       {placementPicker(true)}
       <p className="text-xs text-muted-foreground">{placementSpec.description}</p>
       {pillTabs}
@@ -541,16 +543,32 @@ export default function AdsPage() {
       {views.switcher}
       <div className="w-full flex flex-col space-y-6 pt-4 md:space-y-0 md:pt-0 md:h-full">
         <PageActions>
-          <Link href={`/ads/new?placement=${placement}`} className={headerPrimaryClass}>
+          <button type="button" onClick={() => setCreating(true)} className={headerPrimaryClass}>
             <Plus className="size-4" />
             Add Advertisement
-          </Link>
+          </button>
         </PageActions>
 
         <Device mobile={mobileFilters} desktop={desktopFilters} />
         <Device desktop={null} mobile={<div className="w-full">{tableSection}</div>} />
 
       </div>
+
+      {creating && (
+        <AdForm
+          mode="create"
+          defaultPlacement={placement}
+          onClose={() => setCreating(false)}
+          onSuccess={(saved) => {
+            setCreating(false);
+            // Show the list the new ad landed in.
+            setSearchQuery("");
+            setActiveTab(saved.isActive ? "Active" : "Inactive");
+            if (saved.placement !== placement) setPlacement(saved.placement);
+            else void fetchAds();
+          }}
+        />
+      )}
 
       <Dialog open={bulkDeleteIds !== null} onOpenChange={(open) => { if (!open && !isDeleting) setBulkDeleteIds(null); }}>
         <DialogContent className="sm:max-w-[425px]">
