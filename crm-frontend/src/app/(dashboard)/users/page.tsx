@@ -9,8 +9,9 @@ import { ModuleViews, useModuleView, type ViewField } from "@/components/views/m
 import { ActiveCell, IdCell, NameCell, statusDot } from "@/components/tables/cells";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ColumnDef } from "@tanstack/react-table";
-import { Edit, Plus, ShieldAlert } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { UserForm } from "./_components/UserForm";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
@@ -33,6 +34,7 @@ function UsersList() {
   const [role, setRole] = useState<string>("");
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -133,6 +135,7 @@ function UsersList() {
     { accessorKey: "id", header: "ID", cell: ({ row }) => <IdCell href={`/users/${row.original.id}`}>{row.original.id}</IdCell> },
     { accessorKey: "name", header: "Name", cell: ({ row }) => <NameCell name={row.original.name} avatar /> },
     { accessorKey: "email", header: "Email", cell: ({ row }) => <span className="text-muted-foreground">{row.original.email}</span> },
+    { accessorKey: "phone", header: "Phone", cell: ({ row }) => <span className="tabular-nums text-muted-foreground">{row.original.phone || "—"}</span> },
     { 
       accessorKey: "role", 
       header: "Role",
@@ -158,7 +161,7 @@ function UsersList() {
     <div className="flex flex-col md:h-full">
       {views.switcher}
       <PageActions>
-        <button type="button" onClick={() => router.push("/users/new")} className={headerPrimaryClass}>
+        <button type="button" onClick={() => setCreating(true)} className={headerPrimaryClass}>
           <Plus className="size-4" />
           Add User
         </button>
@@ -167,9 +170,6 @@ function UsersList() {
       <ListFrame>
         <ListToolbar>
           {deptFilter && <span className="text-[14px] font-medium">{deptFilter} users</span>}
-          <span className="hidden items-center gap-1.5 text-[13px] text-muted-foreground md:flex">
-            <ShieldAlert className="size-4" strokeWidth={1.75} /> Only administrators can manage users.
-          </span>
           <ToolbarEnd>
             {views.picker}
             <ToolbarSearch value={search} onChange={setSearch} placeholder="Search name or email" />
@@ -189,20 +189,12 @@ function UsersList() {
                 showToolbar={true}
                 showDeleteAction={isAdmin({ role })}
                 onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
-                renderToolbarActions={(selectedRows) => {
-                  if (selectedRows.length !== 1) return null;
-                  const row = selectedRows[0];
-                  return (
-                    <Button variant="outline" size="sm" onClick={() => router.push("/users/new?edit=" + row.id)}>
-                      <Edit size={15} className="mr-1.5" /> Edit
-                    </Button>
-                  );
-                }}
+                onRowClick={(u) => router.push(`/users/${u.id}`)}
               />
               }
               getKey={(u) => u.id}
-              onOpen={(u) => router.push(`/users/new?edit=${u.id}`)}
-              card={(u) => ({ title: u.name, id: u.id, href: `/users/new?edit=${u.id}`, subtitle: u.email, footer: u.department?.name, tag: u.role?.name })}
+              onOpen={(u) => router.push(`/users/${u.id}`)}
+              card={(u) => ({ title: u.name, id: u.id, href: `/users/${u.id}`, subtitle: u.email, footer: u.department?.name, tag: u.role?.name })}
               noun="users"
             />
           )}
@@ -228,6 +220,8 @@ function UsersList() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {creating && <UserForm onClose={() => setCreating(false)} onCreated={(id) => router.push(`/users/${id}`)} />}
     </div>
   );
 }

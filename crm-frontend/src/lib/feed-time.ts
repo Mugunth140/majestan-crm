@@ -22,3 +22,13 @@ export function feedDay(at: Date, now = new Date()): string {
 
 /** The full date and time, for the hover title. */
 export const feedFullTime = (at: Date) => format(at, "EEE, d MMM yyyy, h:mm a");
+
+/**
+ * A moment shown on its own, outside a day-grouped feed (a device's last
+ * check-in): "40 mins ago", "4:50 PM" today, "Yesterday, 4:50 PM", "26th Oct, 4:50 PM".
+ */
+export function feedStamp(at: Date, now = new Date()): string {
+  const day = feedDay(at, now);
+  const time = feedTime(at, now);
+  return day === "Today" ? time : `${day}, ${format(at, "h:mm a")}`;
+}
