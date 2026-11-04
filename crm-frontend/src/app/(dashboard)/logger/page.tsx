@@ -5,9 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { EmptyState as IllustratedEmpty } from "@/components/shared/empty-state";
-import { PageActions } from "@/components/layout/page-actions";
-import { headerButtonClass } from "@/components/layout/list-page";
-import { AlertTriangle, CheckCircle2, CircleHelp, Loader2, RefreshCw, ShieldAlert, Smartphone, WifiOff } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CircleHelp, Loader2, ShieldAlert, Smartphone, WifiOff } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -81,11 +79,11 @@ function normalizeDevice(value: LegacyLoggerDevice): LoggerDevice {
 export default function LoggerPage() {
   const [devices, setDevices] = useState<LoggerDevice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
 
   const load = useCallback(async (refresh = false) => {
-    refresh ? setIsRefreshing(true) : setIsLoading(true);
+    // The minute-by-minute refresh updates quietly, without the skeleton.
+    if (!refresh) setIsLoading(true);
     try {
       const response = await apiFetch(`${API_URL}/contact-logs/devices`);
       if (response.status === 403) return setIsAllowed(false);
@@ -96,7 +94,6 @@ export default function LoggerPage() {
       }
     } finally {
       setIsLoading(false);
-      setIsRefreshing(false);
     }
   }, []);
 
@@ -116,7 +113,6 @@ export default function LoggerPage() {
     <>
       <MobileHeader title="Logger devices" />
       <main className="flex w-full flex-col gap-6 pt-4 lg:p-0 md:h-full">
-        <PageActions><button type="button" className={headerButtonClass} disabled={isRefreshing} onClick={() => load(true)}><RefreshCw className={`size-4 text-muted-foreground ${isRefreshing ? "animate-spin" : ""}`} />Refresh</button></PageActions>
 
         {isAllowed === false ? <AccessDenied /> : <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

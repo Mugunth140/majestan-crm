@@ -25,6 +25,23 @@ export class CreateAssetDto {
   @IsString()
   remarks?: string;
 
+  // The site visit. Empty clears a value.
+  @IsOptional()
+  @IsString()
+  visited_date?: string | null;
+
+  @IsOptional()
+  @IsString()
+  site_visited_done?: string | null;
+
+  @IsOptional()
+  @IsString()
+  checked_by?: string | null;
+
+  @IsOptional()
+  @IsString()
+  approved_by?: string | null;
+
   @IsOptional()
   @IsObject()
   location?: any;

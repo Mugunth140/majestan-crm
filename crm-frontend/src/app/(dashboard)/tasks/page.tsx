@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Target, RefreshCw, Search, X } from "lucide-react";
+import { Plus, Target, Search, X } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { EmptyState as IllustratedEmpty } from "@/components/shared/empty-state";
@@ -288,7 +288,7 @@ export default function TasksPage() {
           )}
         </PageActions>
 
-        {/* Mobile header sub-row (month + refresh) */}
+        {/* Mobile header sub-row (month) */}
         <Device
           desktop={null}
           mobile={
@@ -296,12 +296,6 @@ export default function TasksPage() {
               <Badge className="bg-[#0052FF]/10 text-[#0052FF] border-[#0052FF]/20 text-[11px] font-semibold">
                 {monthDisplay}
               </Badge>
-              <button
-                onClick={loadTasks}
-                className="p-2 rounded-xl bg-muted active:scale-95 transition-transform"
-              >
-                <RefreshCw className={cn("w-4 h-4 text-muted-foreground", loading && "animate-spin")} />
-              </button>
             </div>
           }
         />

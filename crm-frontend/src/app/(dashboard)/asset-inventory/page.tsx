@@ -10,11 +10,10 @@ import { IdCell, StatusCell, statusDot } from "@/components/tables/cells";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Edit, Plus, Eye, Search, X, Filter } from "lucide-react";
+import { Plus, Eye, Search, X, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { MobileHeader } from "@/components/layout/mobile-header";
@@ -24,6 +23,7 @@ import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FormSelect } from "@/components/shared/form-select";
+import { AssetForm } from "./_components/AssetForm";
 
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -42,6 +42,7 @@ export default function AssetInventoryPage() {
   const [searchQuery, setSearchQuery] = usePersistedState("assets:search", "");
   const [filters, setFilters] = usePersistedState("assets:filters", { status: "" });
 
+  const [creating, setCreating] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
@@ -286,9 +287,6 @@ export default function AssetInventoryPage() {
           <Button variant="outline" size="sm" onClick={() => router.push("/asset-inventory/" + row.id)}>
             <Eye size={15} className="mr-1.5" /> View
           </Button>
-          <Button variant="outline" size="sm" onClick={() => router.push("/asset-inventory/new?edit=" + row.id)}>
-            <Edit size={15} className="mr-1.5" /> Edit
-          </Button>
         </>
       );
     },
@@ -356,10 +354,10 @@ export default function AssetInventoryPage() {
       <div className="flex flex-col space-y-4 md:space-y-0 md:h-full">
         {/* Desktop page header */}
         <PageActions>
-          <Link href="/asset-inventory/new" className={headerPrimaryClass}>
+          <button type="button" onClick={() => setCreating(true)} className={headerPrimaryClass}>
             <Plus className="size-4" />
             Add Asset
-          </Link>
+          </button>
         </PageActions>
 
         {/* Filters + Table */}
@@ -377,6 +375,8 @@ export default function AssetInventoryPage() {
           }
         />
       </div>
+
+      {creating && <AssetForm onClose={() => setCreating(false)} onCreated={(id) => router.push(`/asset-inventory/${id}`)} />}
 
       <Dialog open={deleteId !== null || bulkDeleteIds !== null} onOpenChange={(open) => {
         if (!open) { setDeleteId(null); setBulkDeleteIds(null); }

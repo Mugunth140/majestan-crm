@@ -39,7 +39,6 @@ import {
   Home,
   Image as ImageIcon,
   MapPin,
-  RefreshCw,
   ChevronLeft,
   ChevronRight,
   X,
@@ -736,9 +735,6 @@ export default function PropertyViewPage() {
       <PageActions>
         <div className="flex items-center gap-2">
           {statusMenu("h-8")}
-          <button type="button" onClick={fetchProperty} className={HEADER_BUTTON} title="Refresh" aria-label="Refresh">
-            <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />
-          </button>
           {visibilityButton(isLive ? HEADER_BUTTON : HEADER_PRIMARY)}
           <button type="button" onClick={() => setEditing(true)} className={HEADER_BUTTON}>
             <Edit className="h-3.5 w-3.5 text-muted-foreground" /> Edit
@@ -753,14 +749,9 @@ export default function PropertyViewPage() {
           {property.propertyCode && <span>{property.propertyCode}</span>}
           <span>{price}</span>
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <button type="button" onClick={() => setEditing(true)} className="flex h-10 items-center justify-center gap-2 rounded-xl bg-foreground/[0.06] px-3 text-[15px] font-medium text-foreground">
-            <Edit className="h-4 w-4 text-muted-foreground" /> Edit
-          </button>
-          <button type="button" onClick={fetchProperty} className="flex h-10 items-center justify-center gap-2 rounded-xl bg-foreground/[0.06] px-3 text-[15px] font-medium text-foreground">
-            <RefreshCw className="h-4 w-4 text-muted-foreground" /> Refresh
-          </button>
-        </div>
+        <button type="button" onClick={() => setEditing(true)} className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-foreground/[0.06] px-3 text-[15px] font-medium text-foreground">
+          <Edit className="h-4 w-4 text-muted-foreground" /> Edit
+        </button>
         {visibilityButton("flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-foreground px-3 text-[15px] font-medium text-background disabled:opacity-50")}
       </div>
 

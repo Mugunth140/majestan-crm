@@ -8,6 +8,7 @@ import { AssetFeature } from '../../database/entities/asset-feature.entity';
 import { AssetDocument } from '../../database/entities/asset-document.entity';
 import { AssetLayout } from '../../database/entities/asset-layout.entity';
 import { UpdateAssetDto } from './dto/update-asset.dto';
+import { visitFields } from './asset-visit';
 import { CreateAssetDto } from './dto/create-asset.dto';
 import { fetchWatermarkedImage } from '../../common/imgproxy-watermark';
 
@@ -42,7 +43,8 @@ export class AssetsService {
         source: dto.source,
         mediator_name: dto.mediator_name,
         cp_reference_name: dto.cp_reference_name,
-        remarks: dto.remarks
+        remarks: dto.remarks,
+        ...visitFields(dto),
       });
       const savedAsset = await queryRunner.manager.save(asset);
       
@@ -127,6 +129,7 @@ export class AssetsService {
       if (dto.mediator_name !== undefined) asset.mediator_name = dto.mediator_name;
       if (dto.cp_reference_name !== undefined) asset.cp_reference_name = dto.cp_reference_name;
       if (dto.remarks !== undefined) asset.remarks = dto.remarks;
+      Object.assign(asset, visitFields(dto));
 
       await queryRunner.manager.save(asset);
 
