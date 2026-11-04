@@ -16,3 +16,7 @@ export const searchProjects = async (query: string): Promise<SearchOption[]> => 
     hint: [p.builderName, p.city].filter(Boolean).join(" · ") || undefined,
   }));
 };
+
+/** A lead's projects are stored as one "A, B" string, as the old form saved them. */
+export const splitProjects = (value?: string | null) => (value ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+export const joinProjects = (names: string[]) => names.map((s) => s.trim()).filter(Boolean).join(", ") || null;

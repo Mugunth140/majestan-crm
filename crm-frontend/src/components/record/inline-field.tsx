@@ -434,6 +434,148 @@ export function InlineMulti({
   );
 }
 
+/**
+ * Pick several values from a searched list (e.g. projects from the site); a
+ * name that isn't listed can be added as typed. Saves when the list closes.
+ */
+export function InlineSearchMulti({
+  label,
+  values,
+  search,
+  onSave,
+  disabled,
+  placeholder = "Search…",
+}: {
+  label: string;
+  values: string[];
+  search: (query: string) => Promise<Option[]>;
+  onSave: (values: string[]) => Promise<unknown> | void;
+  disabled?: boolean;
+  placeholder?: string;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<string[]>(values);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<Option[] | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    const timer = setTimeout(() => {
+      search(query.trim()).then((r) => { if (live) setResults(r); }, () => { if (live) setResults([]); });
+    }, 200);
+    return () => { live = false; clearTimeout(timer); };
+  }, [open, query, search]);
+
+  const close = async () => {
+    setOpen(false);
+    setQuery("");
+    setResults(null);
+    const same = draft.length === values.length && draft.every((v, i) => v === values[i]);
+    if (same) return;
+    setSaving(true);
+    try {
+      await onSave(draft);
+    } catch {
+      setDraft(values);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const has = (name: string) => draft.some((v) => v.toLowerCase() === name.toLowerCase());
+  const toggle = (name: string) => setDraft((d) => (has(name) ? d.filter((v) => v.toLowerCase() !== name.toLowerCase()) : [...d, name]));
+
+  const chips = values.length ? (
+    <span className="flex min-w-0 flex-1 flex-wrap gap-1 py-1">
+      {values.map((v) => <span key={v} className="rounded bg-foreground/[0.06] px-1.5 py-px text-[13px] text-foreground/85">{v}</span>)}
+    </span>
+  ) : (
+    <span className="min-w-0 flex-1 truncate text-muted-foreground/60">{disabled ? "—" : placeholder}</span>
+  );
+
+  if (disabled) return <FieldRow label={label}><span className="flex min-h-8 w-full items-center px-2 text-[14px]">{chips}</span></FieldRow>;
+
+  const typed = query.trim();
+  const listed = results?.some((r) => r.label.toLowerCase() === typed.toLowerCase());
+
+  return (
+    <FieldRow label={label}>
+      <Popover open={open} onOpenChange={(o) => { if (o) { setDraft(values); setOpen(true); } else void close(); }}>
+        <PopoverTrigger render={<button type="button" aria-label={label} disabled={saving} className={cn(TRIGGER, "h-auto min-h-8")} />}>
+          {chips}
+          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-[min(320px,calc(100vw-2rem))] gap-0 p-0">
+          {draft.length > 0 && (
+            <div className="flex flex-wrap gap-1 border-b p-2">
+              {draft.map((v) => (
+                <span key={v} className="inline-flex items-center gap-1 rounded bg-foreground/[0.06] py-px pl-1.5 pr-0.5 text-[13px] text-foreground/85">
+                  {v}
+                  <button type="button" aria-label={`Remove ${v}`} onClick={() => toggle(v)} className="rounded p-0.5 text-muted-foreground hover:bg-foreground/10 hover:text-foreground">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center gap-2 border-b px-3">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" || !typed) return;
+                e.preventDefault();
+                toggle(results?.find((r) => r.label.toLowerCase() === typed.toLowerCase())?.label ?? results?.[0]?.label ?? typed);
+                setQuery("");
+              }}
+              placeholder={placeholder}
+              aria-label={`Search ${label.toLowerCase()}`}
+              className="h-10 min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          <div className="max-h-64 overflow-y-auto p-1">
+            {results === null ? (
+              <p className="flex items-center gap-2 px-2 py-2 text-[13px] text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching…</p>
+            ) : (
+              <>
+                {results.map((r) => {
+                  const on = has(r.label);
+                  return (
+                    <button key={r.value} type="button" role="checkbox" aria-checked={on} onClick={() => toggle(r.label)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[14px] hover:bg-muted">
+                      <span className={cn("flex h-4 w-4 shrink-0 items-center justify-center rounded border", on && "border-foreground bg-foreground text-background")}>
+                        {on && <Check className="h-3 w-3" />}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate">{r.label}</span>
+                        {r.hint && <span className="block truncate text-[12px] text-muted-foreground">{r.hint}</span>}
+                      </span>
+                    </button>
+                  );
+                })}
+                {!results.length && !typed && <p className="px-2 py-2 text-[13px] text-muted-foreground">Nothing found.</p>}
+                {typed && !listed && !has(typed) && (
+                  <button type="button" onClick={() => { toggle(typed); setQuery(""); }} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[14px] text-muted-foreground hover:bg-muted">
+                    Add “<span className="truncate text-foreground">{typed}</span>”
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+      {saving && <Spinner />}
+    </FieldRow>
+  );
+}
+
+/** A picker shows the current value even when it's no longer one of the options. */
+export const withCurrent = (options: Option[], value?: string | null) =>
+  !value || options.some((o) => o.value === value) ? options : [{ label: value, value }, ...options];
+
 // A value that opens something else to change it (e.g. the reassign dialog).
 export function InlineAction({
   label,

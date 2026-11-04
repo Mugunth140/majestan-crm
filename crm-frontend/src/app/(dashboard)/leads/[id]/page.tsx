@@ -37,13 +37,13 @@ import {
 } from "@/lib/lead-constants";
 import { cn } from "@/lib/utils";
 import { shouldAutoOpenFollowUps, wantsFollowUps } from "@/lib/follow-up-deep-link";
-import { InlineSelect, InlineText, Section, FieldRow, type Option } from "@/components/record/inline-field";
+import { InlineSelect, InlineText, Section, FieldRow, withCurrent, type Option } from "@/components/record/inline-field";
 import { Feed, timelineItems, type TimelineEntry } from "./lead-timeline";
 import { TabHeader } from "@/components/record/feed";
 import { LeadConversation } from "@/components/record/conversation";
 import { FollowUpComposer } from "@/components/record/follow-up-composer";
 import { AttachmentsArt, EmptyState, RequirementsArt } from "@/components/record/empty-state";
-import { RequirementFields } from "./lead-requirement";
+import { RequirementFields, loadCities } from "./lead-requirement";
 import {
   Loader2, ArrowUpRight, History, TrendingUp, Sparkles,
   Plus, Activity, MessagesSquare, Paperclip, Building2, Info,
@@ -192,6 +192,7 @@ function LeadDetail() {
   const [activeTab, setActiveTab] = useState<Tab>("timeline");
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [sources, setSources] = useState<Option[]>([]);
+  const [cities, setCities] = useState<Option[]>([]);
 
   // Modals / Sliders
   const [addingInquiry, setAddingInquiry] = useState(false);
@@ -244,6 +245,13 @@ function LeadDetail() {
       .then((res) => res.json())
       .then((data) => { if (data?.success && Array.isArray(data.data)) setSources(data.data); })
       .catch(() => {});
+  }, []);
+
+  // Cities for the contact City field, stored by name.
+  useEffect(() => {
+    let live = true;
+    loadCities().then((c) => { if (live) setCities(c.map((x) => ({ label: x.city_name, value: x.city_name }))); });
+    return () => { live = false; };
   }, []);
 
   const fetchAutoMatch = async () => {
@@ -665,7 +673,7 @@ function LeadDetail() {
         }} disabled={!canEdit} />
         <InlineText label="WhatsApp" type="tel" value={lead.whatsapp_number} onSave={(v) => saveLead({ whatsapp: v })} disabled={!canEdit} />
         <InlineText label="Email" type="email" value={lead.email} onSave={(v) => saveLead({ email: v })} disabled={!canEdit} />
-        <InlineText label="City" value={lead.city} onSave={(v) => saveLead({ city: v })} disabled={!canEdit} />
+        <InlineSelect searchable label="City" value={lead.city} options={withCurrent(cities, lead.city)} onSave={(v) => saveLead({ city: v })} disabled={!canEdit} />
         <InlineText label="Address" value={lead.address} onSave={(v) => saveLead({ address: v })} disabled={!canEdit} multiline />
       </Section>
 
@@ -684,11 +692,7 @@ function LeadDetail() {
           }}
           disabled={!canEdit}
         />
-        {lead.commission_remarks && (
-          <FieldRow label="Remarks">
-            <span className="whitespace-pre-wrap px-2 py-1.5 text-[14px] text-foreground">{lead.commission_remarks}</span>
-          </FieldRow>
-        )}
+        <InlineText label="Remarks" multiline value={lead.commission_remarks} placeholder="Split, terms…" onSave={(v) => saveLead({ commissionRemarks: v })} disabled={!canEdit} />
       </Section>
 
       <Section title="Referral" defaultOpen={!!lead.is_referral}>

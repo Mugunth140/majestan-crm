@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
 import { useDebounce } from "@/hooks/use-debounce";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,7 @@ import {
   PROPERTY_CATEGORIES, PROPERTY_TYPES_MAP, PURCHASE_TIMELINES, PURCHASE_TYPES, QUALIFICATION_PURPOSES,
 } from "@/lib/lead-constants";
 import { parseIndianCurrency } from "@/lib/indian-currency";
-import { searchProjects } from "@/lib/project-search";
+import { joinProjects, searchProjects } from "@/lib/project-search";
 import type { DuplicateLeadInfo } from "@/lib/lead-import";
 import { cn } from "@/lib/utils";
 
@@ -53,7 +53,7 @@ const EMPTY = {
   source: "", otherSource: "", commission: "", commissionRemarks: "",
   isReferral: false, referredByName: "", referredByContact: "",
   purchaseType: "", category: "", propertyType: "", funder: "",
-  cityId: "", subLocations: [] as string[], project: "",
+  cityId: "", subLocations: [] as string[], projects: [] as string[],
   timeline: "", purpose: "", decisionMaker: "",
   prefs: {} as Prefs,
   followUp: undefined as Date | undefined, priority: "", notes: "",
@@ -273,7 +273,7 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
           city,
           address: form.address.trim(),
           source,
-          project: form.project || null,
+          project: joinProjects(form.projects),
           purchaseType: form.purchaseType,
           propertyCategory: form.category,
           propertyType: form.propertyType,
@@ -439,8 +439,25 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
                 value={form.propertyType || null} options={types} onValueChange={(v) => set("propertyType", v)} />
             </FocusField>
           </FieldRow>
-          <FocusField label="Project" optional hint="Projects listed on the website. Type a name if it isn't there.">
-            <SearchCombobox value={form.project} onChange={(v) => set("project", v)} search={searchProjects} placeholder="Search projects…" className={cn(FOCUS_FIELD, "h-9")} />
+          <FocusField label="Projects" optional hint="Pick one or more projects listed on the website. Type a name if it isn't there.">
+            <div className="space-y-2">
+              {form.projects.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {form.projects.map((p) => (
+                    <span key={p} className="inline-flex h-7 items-center gap-1 rounded-md bg-foreground/[0.06] pl-2.5 pr-1 text-[13px] text-foreground">
+                      {p}
+                      <button type="button" aria-label={`Remove ${p}`} onClick={() => set("projects", form.projects.filter((x) => x !== p))}
+                        className="rounded p-0.5 text-muted-foreground hover:bg-foreground/10 hover:text-foreground">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <SearchCombobox value="" search={searchProjects} className={cn(FOCUS_FIELD, "h-9")}
+                placeholder={form.projects.length ? "Add another project…" : "Search projects…"}
+                onChange={(v) => { if (v && !form.projects.some((x) => x.toLowerCase() === v.toLowerCase())) set("projects", [...form.projects, v]); }} />
+            </div>
           </FocusField>
         </FocusSection>
         <FocusSection title="Location">

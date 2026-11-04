@@ -3,23 +3,25 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import {
-  AREA_CATEGORIES, BHK_OPTIONS as BHK, FACING_OPTIONS as FACING, FUNDERS, FURNISHING_OPTIONS as FURNISHING, PROPERTY_CATEGORIES, PROPERTY_TYPES_MAP, PURCHASE_TIMELINES, PURCHASE_TYPES, QUALIFICATION_PURPOSES,
+  AREA_CATEGORIES, BHK_OPTIONS as BHK, DECISION_MAKERS, FACING_OPTIONS as FACING, FUNDERS, FURNISHING_OPTIONS as FURNISHING, PROPERTY_CATEGORIES, PROPERTY_TYPES_MAP, PURCHASE_TIMELINES, PURCHASE_TYPES, QUALIFICATION_PURPOSES,
 } from "@/lib/lead-constants";
 import { formatIndianCurrencyShort, parseIndianCurrency } from "@/lib/indian-currency";
-import { searchProjects } from "@/lib/project-search";
-import { InlineMulti, InlineSearch, InlineSelect, InlineText, type Option } from "@/components/record/inline-field";
+import { joinProjects, searchProjects, splitProjects } from "@/lib/project-search";
+import { InlineMulti, InlineSearchMulti, InlineSelect, InlineText, withCurrent, type Option } from "@/components/record/inline-field";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 // Every property type once, for requirements without a category yet.
 const ALL_TYPES: Option[] = [...new Map(Object.values(PROPERTY_TYPES_MAP).flat().map((o) => [o.value, o])).values()];
 
-// Cities change rarely: one request per page load, shared by every requirement.
-let citiesRequest: Promise<Option[]> | null = null;
-const loadCities = () =>
+// Cities change rarely: one request per page load, shared by every requirement
+// and the lead's contact city.
+type City = { id: number; city_name: string };
+let citiesRequest: Promise<City[]> | null = null;
+export const loadCities = () =>
   (citiesRequest ??= apiFetch(`${API_URL}/leads/cities`)
     .then((r) => r.json())
-    .then((d) => (d.success ? d.data.map((c: { id: number; city_name: string }) => ({ label: c.city_name, value: String(c.id) })) : []))
+    .then((d) => (d.success ? (d.data as City[]) : []))
     .catch(() => { citiesRequest = null; return []; }));
 
 type Inquiry = {
@@ -63,7 +65,7 @@ export function RequirementFields({ inquiry, canEdit, save }: {
 
   useEffect(() => {
     let live = true;
-    loadCities().then((c) => { if (live) setCities(c); });
+    loadCities().then((c) => { if (live) setCities(c.map((x) => ({ label: x.city_name, value: String(x.id) }))); });
     return () => { live = false; };
   }, []);
 
@@ -91,8 +93,8 @@ export function RequirementFields({ inquiry, canEdit, save }: {
     <div>
       <Group title="Property">
         <InlineSelect label="Purchase type" value={inquiry.purchase_type} options={PURCHASE_TYPES} disabled={off} onSave={(v) => save({ purchaseType: v })} />
-        <InlineSearch label="Project" value={inquiry.project_list} search={searchProjects} placeholder="Search projects…" disabled={off}
-          onSave={(v) => save({ project: v || null })} />
+        <InlineSearchMulti label="Projects" values={splitProjects(inquiry.project_list)} search={searchProjects} placeholder="Search projects…" disabled={off}
+          onSave={(v) => save({ project: joinProjects(v) })} />
         <InlineSelect label="Category" value={category} options={PROPERTY_CATEGORIES} disabled={off} onSave={(v) => save({ propertyCategory: v, propertyType: null })} />
         <InlineSelect label="Property type" value={inquiry.property_type} options={(category && PROPERTY_TYPES_MAP[category]) || ALL_TYPES} disabled={off}
           onSave={(v) => save({ propertyType: v })} />
@@ -107,7 +109,8 @@ export function RequirementFields({ inquiry, canEdit, save }: {
           onSave={(v) => save({ subLocations: v.length ? v : null })} />
         <InlineSelect label="Timeline" value={inquiry.purchase_timeline} options={PURCHASE_TIMELINES} disabled={off} onSave={(v) => save({ purchaseTimeline: v })} />
         <InlineSelect label="Purpose" value={inquiry.qualification_purpose} options={QUALIFICATION_PURPOSES} disabled={off} onSave={(v) => save({ qualificationPurpose: v })} />
-        <InlineText label="Decision maker" value={inquiry.decision_maker} placeholder="e.g. Self, Spouse" disabled={off} onSave={(v) => save({ decisionMaker: v || null })} />
+        <InlineSelect label="Decision maker" value={inquiry.decision_maker} options={withCurrent(DECISION_MAKERS, inquiry.decision_maker)} disabled={off}
+          onSave={(v) => save({ decisionMaker: v || null })} />
       </Group>
 
       <Group title="Preferences">

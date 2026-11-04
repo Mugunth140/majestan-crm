@@ -44,7 +44,7 @@ export function pickPropertyLink(inquiries?: Array<{ id: number; property_id?: n
 // Edits to these show on the lead Timeline (entity column names).
 const LEAD_TRACKED_FIELDS = [
   'name', 'mobile_number', 'whatsapp_number', 'email', 'city', 'address', 'lead_source',
-  'commission', 'is_referral', 'referred_by_name', 'referred_by_contact',
+  'commission', 'commission_remarks', 'is_referral', 'referred_by_name', 'referred_by_contact',
 ];
 const INQUIRY_TRACKED_FIELDS = [
   'purchase_type', 'property_category', 'property_type', 'funder', 'project_list', 'city_id',
@@ -414,6 +414,7 @@ export class LeadsService {
       if (body.address !== undefined) existingLead.address = body.address || null;
       if (body.source !== undefined) existingLead.lead_source = body.source || null;
       existingLead.commission = body.commission !== undefined ? body.commission : existingLead.commission;
+      if (body.commissionRemarks !== undefined) existingLead.commission_remarks = body.commissionRemarks?.trim() || null;
       if (body.isReferral !== undefined) existingLead.is_referral = body.isReferral;
       if (body.referredByName !== undefined) existingLead.referred_by_name = body.referredByName;
       if (body.referredByContact !== undefined) existingLead.referred_by_contact = body.referredByContact;
@@ -907,6 +908,7 @@ export class LeadsService {
         status: normalised.intent === 'site_visit' ? 'Site Visit Scheduled' : 'New Lead',
         assigned_staff_id: assignedStaffId,
         commission: normalised.commission || null,
+        commission_remarks: normalised.commissionRemarks?.trim() || null,
         is_referral: normalised.isReferral || false,
         referred_by_name: normalised.referredByName || null,
         referred_by_contact: normalised.referredByContact || null,

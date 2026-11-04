@@ -116,4 +116,18 @@ describe('LeadsService.updateLead data preservation', () => {
       .rejects.toBeInstanceOf(ConflictException);
     expect(savedLead).toBeNull();
   });
+
+  it('saves, trims and clears commission remarks', async () => {
+    findOneImpl.mockResolvedValueOnce(existing());
+    await service.updateLead(1, { commissionRemarks: '  Split with co-broker ' });
+    expect(savedLead.commission_remarks).toBe('Split with co-broker');
+
+    findOneImpl.mockResolvedValueOnce({ ...existing(), commission_remarks: 'Old' });
+    await service.updateLead(1, { commissionRemarks: '' });
+    expect(savedLead.commission_remarks).toBeNull();
+
+    findOneImpl.mockResolvedValueOnce({ ...existing(), commission_remarks: 'Keep' });
+    await service.updateLead(1, { email: 'x@example.com' });
+    expect(savedLead.commission_remarks).toBe('Keep');
+  });
 });
