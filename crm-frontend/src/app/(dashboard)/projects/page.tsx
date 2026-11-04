@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ProjectForm } from "./_components/ProjectForm";
 import { DataTable } from "@/components/tables/data-table";
 import { IdCell, NameCell, StatusCell, statusDot } from "@/components/tables/cells";
 import { BOARD_PAGE, ModuleMobileRows, ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
@@ -58,6 +58,7 @@ export default function ProjectsPage() {
   const [activeTab, setActiveTab] = usePersistedState<string>("projects:tab", "All", { allowed: PROJECT_TABS });
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   const [searchQuery, setSearchQuery] = usePersistedState("projects:search", "");
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
@@ -100,6 +101,7 @@ export default function ProjectsPage() {
   useEffect(() => {
     fetchProjects({ pagination: views.isBoard ? BOARD_PAGE : pagination, debouncedSearchQuery, activeTab, filters });
   }, [fetchProjects, pagination, debouncedSearchQuery, activeTab, filters, views.isBoard]);
+  const reloadProjects = () => fetchProjects({ pagination: views.isBoard ? BOARD_PAGE : pagination, debouncedSearchQuery, activeTab, filters });
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -418,10 +420,10 @@ export default function ProjectsPage() {
       {views.switcher}
       <div className="w-full flex flex-col space-y-6 pt-4 md:space-y-0 md:pt-0 md:h-full">
         <PageActions>
-          <Link href="/projects/new" className={headerPrimaryClass}>
+          <button type="button" onClick={() => setCreating(true)} className={headerPrimaryClass}>
             <Plus className="size-4" />
             Add Project
-          </Link>
+          </button>
         </PageActions>
 
         <Device mobile={mobileFilters} desktop={desktopFilters} />
@@ -452,6 +454,9 @@ export default function ProjectsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {creating && (
+        <ProjectForm mode="create" onClose={() => setCreating(false)} onSuccess={() => { setCreating(false); reloadProjects(); }} />
+      )}
     </>
   );
 }

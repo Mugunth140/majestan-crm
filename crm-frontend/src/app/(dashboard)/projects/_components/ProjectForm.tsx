@@ -16,9 +16,8 @@ import { FormSelect } from "@/components/shared/form-select";
 import { IconPicker } from "@/components/shared/icon-picker";
 import { DatePicker } from "@/components/shared/date-picker";
 import { PriceInput } from "@/components/shared/price-input";
-import { MobileHeader } from "@/components/layout/mobile-header";
+import { FOCUS_BUTTON, FOCUS_FIELD, FocusModal, stepStatus } from "@/components/shared/focus-modal";
 import {
-  ArrowLeft,
   ChevronDown,
   ImagePlus,
   Loader2,
@@ -28,6 +27,7 @@ import {
   X,
 } from "lucide-react";
 import { projectsApi } from "@/lib/projects-api";
+import { cn } from "@/lib/utils";
 import { propertiesApi } from "@/lib/properties-api";
 import { apiFetch } from "@/lib/api-fetch";
 import {
@@ -53,11 +53,12 @@ import {
   type ProjectFloorPlanDraft,
 } from "@/lib/project-floor-plans";
 
-const labelClass =
-  "text-xs font-bold uppercase tracking-wider text-muted-foreground";
-const inputClass = "h-12 rounded-xl bg-muted/30";
+// Field styles shared with every create form (see FocusModal).
+const labelClass = "text-[14px] font-medium text-foreground";
+const inputClass = cn(FOCUS_FIELD, "h-9");
 /* Matches the Room select beside it: same height, fill, border and text size. */
-const roomInputClass = "h-12 rounded-xl bg-muted/30 border-border/60 text-[15px]";
+const roomInputClass = cn(FOCUS_FIELD, "h-9");
+const selectClass = cn(FOCUS_FIELD, "h-9! rounded-md! border-border! text-[14px]!");
 const unitSectionTitle =
   "text-[11px] font-bold uppercase tracking-wider text-muted-foreground border-b border-border/40 pb-2";
 
@@ -413,6 +414,20 @@ function moveListItem<T>(list: T[], from: number, to: number): T[] {
 // to localStorage (debounced) so a refresh never loses entered data. The
 // snapshot only ever holds plain JSON (keys, not object URLs or Files).
 const DRAFT_VERSION = PROJECT_DRAFT_VERSION_REBASABLE;
+
+// The form's steps in the full-screen form; each shows some of the sections below.
+const PROJECT_STEPS = [
+  { key: "basics", label: "Basics" },
+  { key: "location", label: "Location" },
+  { key: "about", label: "About" },
+  { key: "structure", label: "Structure" },
+  { key: "units", label: "Units" },
+  { key: "media", label: "Media" },
+  { key: "faqs", label: "FAQs" },
+] as const;
+type ProjectStep = (typeof PROJECT_STEPS)[number]["key"];
+/** Which step each form section (in page order) belongs to. */
+const SECTION_STEPS: ProjectStep[] = ["basics", "location", "basics", "basics", "about", "structure", "structure", "about", "media", "media", "location", "units", "faqs"];
 const draftKeyFor = (mode: "create" | "edit", id: unknown) =>
   mode === "edit" && id != null
     ? `project-form-draft:edit:${id}`
@@ -423,15 +438,20 @@ interface ProjectFormProps {
   mode: "create" | "edit";
   initialData?: any;
   onSuccess?: () => void;
+  /** Closing without saving; defaults to the projects list (or the project). */
+  onClose?: () => void;
 }
 
 export function ProjectForm({
   mode,
   initialData,
   onSuccess,
+  onClose,
 }: ProjectFormProps) {
   const router = useRouter();
   const d = initialData as any;
+  const [step, setStep] = useState<ProjectStep>("basics");
+  const [visited, setVisited] = useState<Set<ProjectStep>>(() => new Set(["basics"]));
   // Draft key is stable for this mount (edit page only renders once data
   // loads; create mode has no id). The snapshot is read exactly once.
   const legacyDraftKey = draftKeyFor(mode, d?.id);
@@ -1712,11 +1732,6 @@ export function ProjectForm({
     return payload;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    void submit();
-  };
-
   /** Validate and save; `after` replaces the default redirect ("Save & leave"). True when saved. */
   const submit = async (opts: { after?: () => void } = {}): Promise<boolean> => {
     if (uploadingFloorPlanRef.current !== null) {
@@ -1830,42 +1845,98 @@ export function ProjectForm({
     }
   };
 
+  // ── Steps ──
+  const stepIndex = PROJECT_STEPS.findIndex((x) => x.key === step);
+  const lastStep = stepIndex === PROJECT_STEPS.length - 1;
+  const stepValid = (key: ProjectStep) =>
+    key === "basics" ? !!name.trim() && !!projectType : key === "location" ? !!city.trim() && !!sublocation.trim() : true;
+  const steps = PROJECT_STEPS.map((x, i) => ({ ...x, status: stepStatus(i, stepIndex, visited.has(x.key) && stepValid(x.key)) }));
+  const goStep = (key: ProjectStep) => {
+    setStep(key);
+    setVisited((v) => new Set(v).add(key));
+  };
+  // A new project can't skip past a step that's missing its required fields.
+  const jumpStep = (key: ProjectStep) => {
+    const target = PROJECT_STEPS.findIndex((x) => x.key === key);
+    const blocked = mode === "create" ? PROJECT_STEPS.slice(0, target).find((x) => !stepValid(x.key)) : undefined;
+    if (blocked && target > stepIndex) {
+      toast.error(blocked.key === "basics" ? "Give the project a name first." : "Pick the city and locality first.");
+      return goStep(blocked.key);
+    }
+    goStep(key);
+  };
+  const nextStep = () => {
+    if (!stepValid(step)) {
+      toast.error(step === "basics" ? "Project name is required." : "City and locality are required.");
+      return;
+    }
+    if (!lastStep) goStep(PROJECT_STEPS[stepIndex + 1].key);
+  };
+  const save = () => {
+    const missing = PROJECT_STEPS.find((x) => !stepValid(x.key));
+    if (missing) goStep(missing.key);
+    void submit();
+  };
+  const close = () =>
+    guardNavigation(() => (onClose ? onClose() : router.push(mode === "edit" && d?.id ? `/projects/${d.id}` : "/projects")));
+  const firstOfStep = (index: number, key: ProjectStep) => SECTION_STEPS.indexOf(key) === index;
+  /** A form section: shown on its own step, ruled off from the one above. */
+  const sectionClass = (index: number, key: ProjectStep) =>
+    cn(!firstOfStep(index, key) && "mt-10 border-t pt-10", key !== step && "hidden");
+  const busy = isLoading || uploadingFloorPlanId !== null;
+
   return (
     <>
-      <MobileHeader
-        title={mode === "create" ? "New Project" : "Edit Project"}
-        showBack
-      />
-      <form
-        onSubmit={handleSubmit}
-        className="max-w-5xl mx-auto w-full flex flex-col gap-6 pb-10 px-2.5 md:px-0 mt-2 md:mt-0 mb-20 md:mb-0"
+      <FocusModal
+        open
+        onOpenChange={(o) => { if (!o && !isLoading) close(); }}
+        title={mode === "create" ? "New project" : "Edit project"}
+        steps={steps}
+        active={step}
+        onStepChange={(k) => jumpStep(k as ProjectStep)}
+        footer={
+          <>
+            <button type="button" className={FOCUS_BUTTON.secondary} onClick={close} disabled={isLoading}>Cancel</button>
+            {stepIndex > 0 && (
+              <button type="button" className={FOCUS_BUTTON.secondary} onClick={() => goStep(PROJECT_STEPS[stepIndex - 1].key)} disabled={isLoading}>Back</button>
+            )}
+            {!lastStep && (
+              <button type="button" onClick={nextStep} disabled={isLoading}
+                className={cn(mode === "create" ? FOCUS_BUTTON.primary : FOCUS_BUTTON.secondary, !stepValid(step) && "cursor-not-allowed opacity-50")}>
+                Continue
+              </button>
+            )}
+            {(mode === "edit" || lastStep) && (
+              <button type="button" onClick={save} disabled={busy} className={FOCUS_BUTTON.primary}>
+                {isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                {mode === "create" ? (isLoading ? "Creating…" : "Create project") : (isLoading ? "Saving…" : "Save changes")}
+              </button>
+            )}
+          </>
+        }
       >
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => guardNavigation(() => router.push("/projects"))}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border/60 text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
-            aria-label="Back to projects"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <h1 className="text-[28px] font-bold tracking-tight">
-            {mode === "create" ? "Add New Project" : "Edit Project"}
-          </h1>
-        </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          // Enter moves on while creating; editing saves straight away.
+          if (mode === "create" && !lastStep) nextStep();
+          else save();
+        }}
+        className="flex w-full flex-col"
+      >
         {preview.unitsCount > 0 && (
-          <p className="text-muted-foreground text-sm">
+          <p className="mb-8 text-[14px] text-muted-foreground">
             {`${formatPriceRange(preview.minPrice, preview.maxPrice)} · ${preview.bhk.length ? preview.bhk.map((b) => `${b}BHK`).join(", ") : "No BHK"} · ${preview.unitsCount} unit${preview.unitsCount > 1 ? "s" : ""}`}
           </p>
         )}
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+        <div className={sectionClass(0, "basics")}>
+          <h3 className="mb-6 text-[20px] font-medium tracking-[-0.01em] text-foreground">
             Basic Info
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className={labelClass}>Project Name *</label>
+              <label className={labelClass}>Project Name <span className="text-red-500">*</span></label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -1874,8 +1945,8 @@ export function ProjectForm({
               />
             </div>
             <div className="space-y-2">
-              <label className={labelClass}>Project Type *</label>
-              <FormSelect
+              <label className={labelClass}>Project Type <span className="text-red-500">*</span></label>
+              <FormSelect className={selectClass}
                 name="projectType"
                 options={PROJECT_TYPE_OPTIONS}
                 value={projectType}
@@ -1885,7 +1956,7 @@ export function ProjectForm({
             </div>
             <div className="space-y-2">
               <label className={labelClass}>Status</label>
-              <FormSelect
+              <FormSelect className={selectClass}
                 name="status"
                 options={STATUS_OPTIONS}
                 value={status}
@@ -1896,14 +1967,14 @@ export function ProjectForm({
           </div>
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+        <div className={sectionClass(1, "location")}>
+          <h3 className="mb-6 text-[20px] font-medium tracking-[-0.01em] text-foreground">
             Location
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className={labelClass}>City *</label>
-              <FormSelect
+              <label className={labelClass}>City <span className="text-red-500">*</span></label>
+              <FormSelect className={selectClass}
                 name="city"
                 options={formData.cities.map((c: any) => {
                   const n = c.cityName ?? c.city_name ?? "";
@@ -1924,7 +1995,7 @@ export function ProjectForm({
             </div>
             <div className="space-y-2">
               <label className={labelClass}>State</label>
-              <FormSelect
+              <FormSelect className={selectClass}
                 name="state"
                 options={stateOptions}
                 value={state}
@@ -1937,8 +2008,8 @@ export function ProjectForm({
               />
             </div>
             <div className="space-y-2">
-              <label className={labelClass}>Sublocation / Locality *</label>
-              <FormSelect
+              <label className={labelClass}>Sublocation / Locality <span className="text-red-500">*</span></label>
+              <FormSelect className={selectClass}
                 name="sublocation"
                 options={formData.sublocations
                   .filter((s: any) => {
@@ -2019,20 +2090,20 @@ export function ProjectForm({
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder="Site address"
-                className="rounded-xl bg-muted/30 min-h-[90px]"
+                className="rounded-md border-border bg-muted/40 text-[14px] min-h-[90px] dark:bg-white/[0.04]"
               />
             </div>
           </div>
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+        <div className={sectionClass(2, "basics")}>
+          <h3 className="mb-6 text-[20px] font-medium tracking-[-0.01em] text-foreground">
             Possession
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
               <label className={labelClass}>Possession Status</label>
-              <FormSelect
+              <FormSelect className={selectClass}
                 name="possessionStatus"
                 options={POSSESSION_OPTIONS}
                 value={possessionStatus}
@@ -2058,14 +2129,14 @@ export function ProjectForm({
           </div>
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+        <div className={sectionClass(3, "basics")}>
+          <h3 className="mb-6 text-[20px] font-medium tracking-[-0.01em] text-foreground">
             Builder
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
               <label className={labelClass}>Select Builder</label>
-              <FormSelect
+              <FormSelect className={selectClass}
                 name="builderId"
                 placeholder="Select a registered builder"
                 options={[
@@ -2123,8 +2194,8 @@ export function ProjectForm({
           </div>
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+        <div className={sectionClass(4, "about")}>
+          <h3 className="mb-6 text-[20px] font-medium tracking-[-0.01em] text-foreground">
             About
           </h3>
           <div className="grid grid-cols-1 gap-5">
@@ -2342,8 +2413,8 @@ export function ProjectForm({
           </div>
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+        <div className={sectionClass(5, "structure")}>
+          <h3 className="mb-6 text-[20px] font-medium tracking-[-0.01em] text-foreground">
             Structure &amp; Layout
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -2529,8 +2600,8 @@ export function ProjectForm({
           )}
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-            <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+        <div className={sectionClass(6, "structure")}>
+            <h3 className="mb-6 text-[20px] font-medium tracking-[-0.01em] text-foreground">
               Amenities
             </h3>
             {formData.amenities.length === 0 ? (
@@ -2577,8 +2648,8 @@ export function ProjectForm({
           </div>
 
         {projectType !== "plot" && (
-          <div className="bg-card border rounded-2xl p-8 shadow-sm">
-            <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+          <div className={sectionClass(7, "about")}>
+            <h3 className="mb-6 text-[20px] font-medium tracking-[-0.01em] text-foreground">
               Highlights &amp; Specifications
             </h3>
             <div className="grid grid-cols-1 gap-5">
@@ -2588,7 +2659,7 @@ export function ProjectForm({
                   value={highlights}
                   onChange={(e) => setHighlights(e.target.value)}
                   placeholder="Key selling points of this project..."
-                  className="rounded-xl bg-muted/30 min-h-[90px]"
+                  className="rounded-md border-border bg-muted/40 text-[14px] min-h-[90px] dark:bg-white/[0.04]"
                 />
               </div>
               <div className="space-y-4">
@@ -2617,7 +2688,7 @@ export function ProjectForm({
                   >
                     <div className="space-y-2">
                       <label className={labelClass}>Label</label>
-                      <FormSelect
+                      <FormSelect className={selectClass}
                         name={`specLabel-${i}`}
                         options={withLegacyOption(
                           formData.specifications.map((sp) => ({
@@ -2741,9 +2812,9 @@ export function ProjectForm({
           </div>
         )}
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <div className="flex items-center justify-between border-b pb-3 mb-6">
-            <h3 className="text-lg font-bold text-foreground">
+        <div className={sectionClass(8, "media")}>
+          <div className="mb-6 flex items-center justify-between gap-3">
+            <h3 className="text-[20px] font-medium tracking-[-0.01em] text-foreground">
               Gallery ({gallery.length})
             </h3>
             <Button
@@ -2820,10 +2891,10 @@ export function ProjectForm({
           )}
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <div className="flex items-center justify-between border-b pb-3 mb-6">
+        <div className={sectionClass(9, "media")}>
+          <div className="mb-6 flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-lg font-bold text-foreground">Videos</h3>
+              <h3 className="text-[20px] font-medium tracking-[-0.01em] text-foreground">Videos</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 YouTube links with a title. Shown on the overview and the
                 photos page.
@@ -2912,9 +2983,9 @@ export function ProjectForm({
           </div>
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <div className="flex items-center justify-between border-b pb-3 mb-6">
-            <h3 className="text-lg font-bold text-foreground">
+        <div className={sectionClass(10, "location")}>
+          <div className="mb-6 flex items-center justify-between gap-3">
+            <h3 className="text-[20px] font-medium tracking-[-0.01em] text-foreground">
               Connectivity & Nearby
             </h3>
             <Button
@@ -3055,9 +3126,9 @@ export function ProjectForm({
           </div>
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <div className="flex items-center justify-between border-b pb-3 mb-6">
-            <h3 className="text-lg font-bold text-foreground">
+        <div className={sectionClass(11, "units")}>
+          <div className="mb-6 flex items-center justify-between gap-3">
+            <h3 className="text-[20px] font-medium tracking-[-0.01em] text-foreground">
               Units ({units.filter((u) => u.unitCode.trim()).length})
             </h3>
             <div className="flex items-center gap-3">
@@ -3165,7 +3236,7 @@ export function ProjectForm({
                         <p className={unitSectionTitle}>Identity</p>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           <div className="space-y-2">
-                            <label className={labelClass}>Unit Code *</label>
+                            <label className={labelClass}>Unit Code <span className="text-red-500">*</span></label>
                             <Input
                               value={unit.unitCode}
                               onChange={(e) =>
@@ -3196,7 +3267,7 @@ export function ProjectForm({
                           </div>
                           <div className="space-y-2">
                             <label className={labelClass}>Unit Type</label>
-                            <FormSelect
+                            <FormSelect className={selectClass}
                               name={`unitType-${idx}`}
                               options={
                                 isPlotProject(projectType)
@@ -3212,7 +3283,7 @@ export function ProjectForm({
                           </div>
                           <div className="space-y-2">
                             <label className={labelClass}>Unit Status</label>
-                            <FormSelect
+                            <FormSelect className={selectClass}
                               name={`unitStatus-${idx}`}
                               options={UNIT_STATUS_OPTIONS}
                               value={unit.status}
@@ -3278,7 +3349,7 @@ export function ProjectForm({
                             <label className={labelClass}>
                               {isPlotProject(projectType) ? "Plot Facing" : "Facing"}
                             </label>
-                            <FormSelect
+                            <FormSelect className={selectClass}
                               name={`facing-${idx}`}
                               options={FACING_OPTIONS}
                               value={unit.facing}
@@ -3292,7 +3363,7 @@ export function ProjectForm({
                             <>
                               <div className="space-y-2">
                                 <label className={labelClass}>Furnishing</label>
-                                <FormSelect
+                                <FormSelect className={selectClass}
                                   name={`furnished-${idx}`}
                                   options={FURNISHED_OPTIONS}
                                   value={unit.furnishedStatus}
@@ -3468,7 +3539,7 @@ export function ProjectForm({
                                   <label className={labelClass}>
                                     Plot Dimensions
                                   </label>
-                                  <FormSelect
+                                  <FormSelect className={selectClass}
                                     name={`plotDims-${idx}`}
                                     options={withLegacyOption(
                                       formData.roomDimensions.map((rd) => {
@@ -3649,7 +3720,7 @@ export function ProjectForm({
                                 <label className={labelClass}>
                                   Parking Type
                                 </label>
-                                <FormSelect
+                                <FormSelect className={selectClass}
                                   name={`parkingType-${idx}`}
                                   options={PARKING_TYPE_OPTIONS}
                                   value={unit.parkingType}
@@ -3807,7 +3878,7 @@ export function ProjectForm({
                             >
                               <div className="space-y-2">
                                 <label className={labelClass}>Room</label>
-                                <FormSelect
+                                <FormSelect className={selectClass}
                                   name={`roomName-${idx}-${rIdx}`}
                                   options={withLegacyOption(
                                     formData.roomNames.map((rn) => ({
@@ -3907,9 +3978,9 @@ export function ProjectForm({
           </div>
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <div className="flex items-center justify-between border-b pb-3 mb-6">
-            <h3 className="text-lg font-bold text-foreground">FAQs</h3>
+        <div className={sectionClass(12, "faqs")}>
+          <div className="mb-6 flex items-center justify-between gap-3">
+            <h3 className="text-[20px] font-medium tracking-[-0.01em] text-foreground">FAQs</h3>
             <Button
               type="button"
               variant="outline"
@@ -4002,7 +4073,7 @@ export function ProjectForm({
                         )
                       }
                       placeholder="Type the answer here..."
-                      className="rounded-xl bg-muted/30 min-h-[90px]"
+                      className="rounded-md border-border bg-muted/40 text-[14px] min-h-[90px] dark:bg-white/[0.04]"
                     />
                   </div>
                 </div>
@@ -4011,25 +4082,8 @@ export function ProjectForm({
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-11 rounded-full px-5"
-            onClick={() => guardNavigation(() => router.push("/projects"))}
-          >
-            <X className="h-4 w-4 mr-2" /> Cancel
-          </Button>
-          <Button
-            type="submit"
-            disabled={isLoading || uploadingFloorPlanId !== null}
-            className="h-11 rounded-full bg-[#0052FF] px-6 text-white hover:bg-[#0052FF]/90"
-          >
-            {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {mode === "create" ? "Create Project" : "Save Changes"}
-          </Button>
-        </div>
       </form>
+      </FocusModal>
 
       {/* Unsaved draft of the CURRENT version found when opening (outdated
           drafts are discarded before this). The saved version is the default. */}

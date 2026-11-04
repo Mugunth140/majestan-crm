@@ -53,7 +53,7 @@ function ProjectFormPage() {
   if (isLoading) return <ProjectFormLoader />;
   if (editId && !initialData) return null;
 
-  return <ProjectForm key={editId ?? "create"} mode={editId ? "edit" : "create"} initialData={initialData ?? undefined} />;
+  return <ProjectForm key={editId ?? "create"} mode={editId ? "edit" : "create"} initialData={initialData ?? undefined} onClose={() => router.push("/projects")} />;
 }
 
 export default function NewProjectPage() {
