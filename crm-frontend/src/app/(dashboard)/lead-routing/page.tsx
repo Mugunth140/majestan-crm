@@ -25,7 +25,7 @@ import { AssignLeadModal } from "@/components/shared/assign-lead-modal";
 import { FormSelect } from "@/components/shared/form-select";
 import { DatePicker } from "@/components/shared/date-picker";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { SegmentTabs, toolbarButtonClass } from "@/components/layout/list-page";
+import { SegmentTabs, ToolbarSelect, toolbarButtonClass } from "@/components/layout/list-page";
 import { canTakeLeadFromQueue, canConvertEnquiry, assignRoutingLeads } from "@/lib/lead-routing";
 import { timeAgo } from "@/lib/time-ago";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -109,7 +109,7 @@ interface HistoryEntry {
 }
 
 const EVENT_TYPE_OPTIONS = [
-  { label: "All Events", value: "" },
+  { label: "All events", value: "" },
   { label: "Assigned", value: "Assigned" },
   { label: "Auto-transferred", value: "Auto-transferred" },
   { label: "Auto-unassigned", value: "Auto-unassigned" },
@@ -1345,40 +1345,35 @@ export default function LeadRoutingPage() {
         {/* History Tab */}
         {mainTab === "history" && (
           <div className="w-full md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col p-4 md:p-0">
-            {/* Filters */}
-            <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide pb-2 md:pb-0 md:flex-wrap md:px-6 md:pt-4">
-              <div className="flex items-center gap-2">
+            <div role="group" aria-label="Routing history filters" className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 pb-2 md:px-6 md:pt-4">
+              <div role="group" aria-label="Date range" className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:w-auto sm:grid-cols-[9rem_auto_9rem]">
                 <DatePicker
                   value={historyDateFrom}
                   onChange={(d) => { setHistoryDateFrom(d); setHistoryPage(1); }}
                   placeholder="From date"
-                  className="w-40"
+                  className="h-8 min-w-0 gap-2 rounded-md border-transparent bg-muted/70 px-2 text-sm shadow-none hover:bg-muted [&_svg]:mr-0"
                 />
-                <span className="text-muted-foreground text-sm">to</span>
+                <span aria-hidden className="text-xs text-muted-foreground">to</span>
                 <DatePicker
                   value={historyDateTo}
                   onChange={(d) => { setHistoryDateTo(d); setHistoryPage(1); }}
                   placeholder="To date"
-                  className="w-40"
+                  className="h-8 min-w-0 gap-2 rounded-md border-transparent bg-muted/70 px-2 text-sm shadow-none hover:bg-muted [&_svg]:mr-0"
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <div className="w-44">
-                  <FormSelect
-                    name="eventType"
-                    options={EVENT_TYPE_OPTIONS}
-                    value={historyEventFilter}
-                    onValueChange={(v) => { setHistoryEventFilter(v || ""); setHistoryPage(1); }}
-                    placeholder="All Events"
-                  />
-                </div>
-              </div>
+              <ToolbarSelect
+                label="Event"
+                options={EVENT_TYPE_OPTIONS}
+                closeOnSelect
+                value={historyEventFilter}
+                onChange={(value) => { setHistoryEventFilter(value); setHistoryPage(1); }}
+              />
               {(historyDateFrom !== undefined || historyDateTo !== undefined || historyEventFilter) && (
                 <Button
+                  type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-9 text-muted-foreground hover:text-red-500"
+                  className="h-8 rounded-md px-2 text-muted-foreground hover:text-foreground"
                   onClick={() => {
                     setHistoryDateFrom(undefined);
                     setHistoryDateTo(undefined);
@@ -1386,7 +1381,8 @@ export default function LeadRoutingPage() {
                     setHistoryPage(1);
                   }}
                 >
-                  Clear
+                  <X aria-hidden className="size-4" />
+                  Clear filters
                 </Button>
               )}
             </div>

@@ -98,12 +98,14 @@ export function ToolbarSelect<T extends string>({
   options,
   onChange,
   disabled,
+  closeOnSelect,
 }: {
   label: string;
   value: T;
   options: readonly { value: T; label: string; count?: number }[];
   onChange: (value: T) => void;
   disabled?: boolean;
+  closeOnSelect?: boolean;
 }) {
   const current = options.find((o) => o.value === value);
   return (
@@ -120,7 +122,7 @@ export function ToolbarSelect<T extends string>({
       <DropdownMenuContent align="start" className="min-w-52">
         <DropdownMenuRadioGroup value={value} onValueChange={(v) => onChange(v as T)}>
           {options.map((o) => (
-            <DropdownMenuRadioItem key={o.value} value={o.value} className="text-[13px]">
+            <DropdownMenuRadioItem key={o.value} value={o.value} closeOnClick={closeOnSelect} className="text-[13px]">
               <span className="flex-1">{o.label}</span>
               {o.count !== undefined && <span className="ml-3 tabular-nums text-muted-foreground">{o.count}</span>}
             </DropdownMenuRadioItem>

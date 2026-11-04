@@ -70,7 +70,8 @@ export function DatePicker({ value, onChange, placeholder = "Pick a date", class
           {value ? format(value, "MMM d, yyyy") : <span>{placeholder}</span>}
         </Button>
         <input 
-          type="date" 
+          type="date"
+          aria-label={placeholder}
           value={value ? format(value, "yyyy-MM-dd") : ""}
           onChange={(e) => {
             if (e.target.value) {
