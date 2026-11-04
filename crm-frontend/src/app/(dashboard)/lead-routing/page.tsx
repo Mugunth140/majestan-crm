@@ -102,10 +102,10 @@ interface HistoryEntry {
   created_at: string;
   lead?: { id: number; name: string };
   event_type?: string;
-  from_staff?: { name: string };
-  to_staff?: { name: string };
-  department?: { name: string };
-  feedback?: string;
+  from_user?: { name: string } | null;
+  to_user?: { name: string } | null;
+  department?: string | null;
+  feedback?: string | null;
 }
 
 const EVENT_TYPE_OPTIONS = [
@@ -137,8 +137,8 @@ const ENQUIRY_FIELDS: ViewField<EnquiryLead>[] = [
 
 const HISTORY_FIELDS: ViewField<HistoryEntry>[] = [
   { id: "event", label: "Event type", get: (h) => h.event_type, dot: (v) => statusDot(v, EVENT_TONES[v.toLowerCase()] ?? "gray"), capitalize: true },
-  { id: "to_staff", label: "To staff", get: (h) => h.to_staff?.name },
-  { id: "department", label: "Department", get: (h) => h.department?.name, capitalize: true },
+  { id: "to_staff", label: "To staff", get: (h) => h.to_user?.name },
+  { id: "department", label: "Department", get: (h) => h.department, capitalize: true },
 ];
 
 type PaginationUpdate = PaginationState | ((old: PaginationState) => PaginationState);
@@ -424,8 +424,8 @@ export default function LeadRoutingPage() {
         limit: String(historyView.isBoard ? BOARD_PAGE.pageSize : LIMIT),
       });
       if (historyEventFilter) params.set("event_type", historyEventFilter);
-      if (historyDateFrom) params.set("date_from", format(historyDateFrom, "yyyy-MM-dd"));
-      if (historyDateTo) params.set("date_to", format(historyDateTo, "yyyy-MM-dd"));
+      if (historyDateFrom) params.set("from_date", format(historyDateFrom, "yyyy-MM-dd"));
+      if (historyDateTo) params.set("to_date", format(historyDateTo, "yyyy-MM-dd"));
       const res = await apiFetch(`${API_URL}/lead-routing/history?${params}`);
       const data = await res.json();
       if (data.success) {
@@ -986,18 +986,18 @@ export default function LeadRoutingPage() {
     {
       id: "from_staff",
       header: "From Staff",
-      cell: ({ row }) => <span>{row.original.from_staff?.name || "—"}</span>,
+      cell: ({ row }) => <span>{row.original.from_user?.name || "—"}</span>,
     },
     {
       id: "to_staff",
       header: "To Staff",
-      cell: ({ row }) => <span>{row.original.to_staff?.name || "—"}</span>,
+      cell: ({ row }) => <span>{row.original.to_user?.name || "—"}</span>,
     },
     {
       id: "department",
       header: "Department",
       cell: ({ row }) => (
-        <span className="capitalize">{row.original.department?.name || "—"}</span>
+        <span className="capitalize">{row.original.department || "—"}</span>
       ),
     },
     {
@@ -1417,7 +1417,7 @@ export default function LeadRoutingPage() {
                     }
                     getKey={(h) => h.id}
                     onOpen={(h) => { if (h.lead?.id) router.push(`/leads/${h.lead.id}`); }}
-                    card={(h) => ({ title: h.lead?.name || "—", id: formatTableDate(h.created_at), href: h.lead?.id ? `/leads/${h.lead.id}` : undefined, subtitle: [h.from_staff?.name, h.to_staff?.name].filter(Boolean).join(" → ") || undefined, tag: h.event_type })}
+                    card={(h) => ({ title: h.lead?.name || "—", id: formatTableDate(h.created_at), href: h.lead?.id ? `/leads/${h.lead.id}` : undefined, subtitle: [h.from_user?.name, h.to_user?.name].filter(Boolean).join(" → ") || undefined, tag: h.event_type })}
                     totalCount={historyTotal}
                     noun="events"
                   />
