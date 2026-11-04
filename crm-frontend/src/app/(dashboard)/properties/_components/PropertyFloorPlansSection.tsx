@@ -1,5 +1,7 @@
 "use client";
 
+import { cn } from "@/lib/utils";
+import { PROPERTY_FIELD } from "./property-form-styles";
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { ArrowLeft, ArrowRight, FileText, Loader2, Plus, Trash2, UploadCloud } from "lucide-react";
@@ -222,19 +224,19 @@ export default function PropertyFloorPlansSection({
   };
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-8" aria-labelledby="property-floor-plans-title">
+    <section aria-labelledby="property-floor-plans-title">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 id="property-floor-plans-title" className="text-lg font-semibold text-foreground">{children ? "Floor plans & room dimensions" : planHeading}</h2>
+          <h2 id="property-floor-plans-title" className="text-[20px] font-medium tracking-[-0.01em] text-foreground">{children ? "Floor plans & room dimensions" : planHeading}</h2>
           <p className="mt-1 text-sm text-muted-foreground">Add up to five plans and name each {planKind === "ground" ? "ground plan" : "floor"}. PDF, JPG, PNG, or WebP, up to 15 MB each.</p>
         </div>
-        <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground" aria-live="polite">
+        <span className="rounded-md bg-muted px-2 py-0.5 text-[12px] font-medium text-muted-foreground" aria-live="polite">
           {plans.length} of {MAX_FLOOR_PLANS}
         </span>
       </div>
 
       {plans.length > 0 ? (
-        <ul className="mt-6 divide-y divide-border rounded-xl border border-border" aria-label={`Uploaded ${planLabel}s`}>
+        <ul className="mt-6 divide-y divide-border rounded-lg border border-border" aria-label={`Uploaded ${planLabel}s`}>
           {plans.map((plan, index) => (
             <li key={`${plan.fileKey}-${index}`} className="flex items-center gap-3 p-4">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
@@ -251,7 +253,7 @@ export default function PropertyFloorPlansSection({
                   maxLength={255}
                   required
                   disabled={disabled || uploading}
-                  className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                  className={cn(PROPERTY_FIELD, "mt-1 w-full border outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50")}
                 />
                 <p className="mt-1 truncate text-xs text-muted-foreground" title={plan.fileName}>{plan.fileName} · {formatFileSize(plan.fileSize)}</p>
               </div>
@@ -274,8 +276,8 @@ export default function PropertyFloorPlansSection({
           ))}
         </ul>
       ) : (
-        <div className="mt-6 rounded-xl border border-dashed border-border bg-muted/30 px-6 py-8 text-center">
-          <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+        <div className="mt-6 rounded-lg border-2 border-dashed border-border/60 px-6 py-8 text-center">
+          <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
             <UploadCloud className="h-5 w-5" aria-hidden="true" />
           </span>
           <p className="mt-3 text-sm font-medium text-foreground">No {planLabel}s added</p>

@@ -1,4 +1,6 @@
 "use client";
+import { cn } from "@/lib/utils";
+import { PROPERTY_FIELD, PROPERTY_LABEL } from "./property-form-styles";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -30,7 +32,7 @@ function ContactRow({ label, value, onChange, role }: ContactRowProps) {
   const fieldId = label.toLowerCase().replace(/\s+/g, "-");
   return (
     <fieldset className="space-y-3">
-      <legend className="mb-3 text-sm font-semibold">{label}</legend>
+      <legend className="mb-3 text-[14px] font-medium text-foreground">{label}</legend>
       <div
         className={`grid gap-4 ${role ? "md:grid-cols-3" : "md:grid-cols-2"}`}
       >
@@ -55,7 +57,7 @@ function ContactRow({ label, value, onChange, role }: ContactRowProps) {
               {key}
             </label>
             <Input
-              className="h-12 rounded-xl bg-muted/30"
+              className={PROPERTY_FIELD}
               id={`${fieldId}-${key}`}
               aria-label={`${label} ${key}`}
               type={key === "phone" ? "tel" : "text"}
@@ -117,7 +119,7 @@ export function AgentContactFields({
             Agent Name
           </label>
           <Input
-            className="h-12 rounded-xl bg-muted/30"
+            className={PROPERTY_FIELD}
             id="agentName"
             value={name}
             onChange={(event) => onNameChange(event.target.value)}
@@ -128,7 +130,7 @@ export function AgentContactFields({
             Agent Phone
           </label>
           <Input
-            className="h-12 rounded-xl bg-muted/30"
+            className={PROPERTY_FIELD}
             id="agentPhone"
             type="tel"
             value={value.agentPhone}
@@ -142,7 +144,7 @@ export function AgentContactFields({
             Agent Email
           </label>
           <Input
-            className="h-12 rounded-xl bg-muted/30"
+            className={PROPERTY_FIELD}
             id="agentEmail"
             type="email"
             value={value.agentEmail}
@@ -183,11 +185,11 @@ export function PortionFields({
       className="space-y-4 md:col-span-2 lg:col-span-3"
       id="pf-numberOfPortions"
     >
-      <label htmlFor="portion-count" className="text-sm font-semibold">
+      <label htmlFor="portion-count" className={PROPERTY_LABEL}>
         No of Portions
       </label>
       <Input
-        className="h-12 rounded-xl bg-muted/30"
+        className={PROPERTY_FIELD}
         id="portion-count"
         type="number"
         min={0}
@@ -221,7 +223,7 @@ export function PortionFields({
           <span aria-hidden>×</span>
           <Input
             aria-label={`Portion configuration ${index + 1} count`}
-            className="h-12 w-24 rounded-xl bg-muted/30"
+            className={cn(PROPERTY_FIELD, "w-24")}
             type="number"
             min={1}
             step={1}
@@ -284,7 +286,7 @@ export function ParkingFields({
 }) {
   return (
     <fieldset className="space-y-4 md:col-span-2 lg:col-span-3">
-      <legend className="mb-3 text-sm font-semibold">Parking spaces</legend>
+      <legend className="mb-3 text-[14px] font-medium text-foreground">Parking spaces</legend>
       {!value.parkingRecorded && value.parkingSpaces.length === 0 && (legacyParkingCount || legacyParkingType) && (
         <p className="text-sm text-muted-foreground">
           Existing parking: {legacyParkingCount ? `${legacyParkingCount} spaces` : "count not recorded"}{legacyParkingType ? ` (${legacyParkingType})` : ""}. Breakdown not yet recorded. Existing values are kept until you add combinations or select No parking.
@@ -326,7 +328,7 @@ export function ParkingFields({
             }
           />
           <Input
-            className="h-12 rounded-xl bg-muted/30"
+            className={PROPERTY_FIELD}
             aria-label={`Parking combination ${index + 1} count`}
             type="number"
             min={1}
@@ -361,6 +363,7 @@ export function ParkingFields({
       ))}
       {value.parkingSpaces.length < 4 && (
         <Button
+          className="mr-2"
           type="button"
           variant="outline"
           onClick={() => {
@@ -439,11 +442,11 @@ export function AdditionalCurationFields({
           visible(key) &&
           (key !== "restroomCount" || hasRestroom) && (
             <div key={key} className="space-y-2">
-              <label htmlFor={key} className="text-sm font-semibold">
+              <label htmlFor={key} className={PROPERTY_LABEL}>
                 {label}
               </label>
               <Input
-                className="h-12 rounded-xl bg-muted/30"
+                className={PROPERTY_FIELD}
                 id={key}
                 type="number"
                 min={0}
@@ -465,7 +468,7 @@ export function AdditionalCurationFields({
         ([key, label, options]) =>
           visible(key) && (
             <div key={key} className="space-y-2">
-              <label htmlFor={key} className="text-sm font-semibold">
+              <label htmlFor={key} className={PROPERTY_LABEL}>
                 {label}
               </label>
               <Select
@@ -483,12 +486,12 @@ export function AdditionalCurationFields({
         <div className="space-y-2">
           <label
             htmlFor="availableFloorNumbers"
-            className="text-sm font-semibold"
+            className={PROPERTY_LABEL}
           >
             Available Floor Numbers
           </label>
           <Input
-            className="h-12 rounded-xl bg-muted/30"
+            className={PROPERTY_FIELD}
             id="availableFloorNumbers"
             value={value.availableFloorNumbers}
             placeholder="e.g. Ground, 1, 2"
@@ -505,10 +508,10 @@ export function AdditionalCurationFields({
         ([key, label]) =>
           visible(key) && (
             <div key={key} className="space-y-2">
-              <label htmlFor={key} className="text-sm font-semibold">
+              <label htmlFor={key} className={PROPERTY_LABEL}>
                 {label}
               </label>
-              <PriceInput
+              <PriceInput className={PROPERTY_FIELD}
                 id={key}
                 value={value[key]}
                 onChange={(next) => change(key, next)}
@@ -546,7 +549,7 @@ export function AdditionalCurationFields({
         ([key, label, options]) =>
           visible(key) && (
             <div key={key} className="space-y-2">
-              <label className="text-sm font-semibold">{label}</label>
+              <label className={PROPERTY_LABEL}>{label}</label>
               <PropertyMultiSelect
                 serializeAsJson
                 name={label}

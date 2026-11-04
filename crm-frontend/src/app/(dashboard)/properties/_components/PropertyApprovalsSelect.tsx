@@ -30,14 +30,14 @@ export function PropertyApprovalsSelect({
     ...selected.filter((item) => !APPROVAL_OPTIONS.includes(item)),
   ];
   return (
-    <details className="relative rounded-xl border border-border bg-muted/30">
-      <summary className="min-h-12 cursor-pointer px-3 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+    <details className="relative rounded-md border border-border bg-muted/40 shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:bg-white/[0.04]">
+      <summary className="min-h-9 cursor-pointer px-2.5 py-2 text-[14px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         {selected.length ? selected.join(", ") : "Select approvals"}
       </summary>
       <div
         role="group"
         aria-label="Approvals"
-        className="absolute z-20 mt-1 w-full rounded-xl border bg-popover p-2 shadow-md"
+        className="absolute z-20 mt-1 w-full rounded-lg border bg-popover p-2 shadow-md"
       >
         {options.map((option) => (
           <label

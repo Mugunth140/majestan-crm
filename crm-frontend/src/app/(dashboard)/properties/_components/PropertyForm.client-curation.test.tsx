@@ -14,6 +14,12 @@ const mock = vi.hoisted(() => ({
   formData: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => mock.router }));
+// The form's full-screen modal renders through a portal; render its body inline.
+vi.mock("@/components/shared/focus-modal", async (original) => {
+  const actual = await original<typeof import("@/components/shared/focus-modal")>();
+  const { createElement: h } = await import("react");
+  return { ...actual, FocusModal: ({ title, children, footer }: { title: unknown; children: unknown; footer: unknown }) => h("div", null, h("h1", null, title as never), children as never, footer as never) };
+});
 vi.mock("@/components/layout/mobile-header", () => ({
   MobileHeader: () => null,
 }));
@@ -67,7 +73,7 @@ afterEach(() => {
 });
 async function open() {
   const result = render(createElement(PropertyForm, { mode: "create" }));
-  await screen.findByText("Add New Property");
+  await screen.findByText("New property");
   return result;
 }
 async function choose(container: HTMLElement, text: string) {

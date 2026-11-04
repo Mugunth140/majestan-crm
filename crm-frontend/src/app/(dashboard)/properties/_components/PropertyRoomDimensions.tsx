@@ -1,4 +1,6 @@
 "use client";
+import { cn } from "@/lib/utils";
+import { PROPERTY_FIELD } from "./property-form-styles";
 import { Input } from "@/components/ui/input";
 
 export function roomSides(
@@ -28,7 +30,7 @@ export function PropertyRoomDimensions({
     <div className="space-y-2">
       <div className="flex items-center gap-2">
         <Input
-          className="h-12 min-w-0 rounded-xl bg-muted/30"
+          className={cn(PROPERTY_FIELD, "min-w-0")}
           aria-label="Room length in feet"
           type="number"
           min={0}
@@ -39,7 +41,7 @@ export function PropertyRoomDimensions({
         />
         <span aria-hidden>×</span>
         <Input
-          className="h-12 min-w-0 rounded-xl bg-muted/30"
+          className={cn(PROPERTY_FIELD, "min-w-0")}
           aria-label="Room width in feet"
           type="number"
           min={0}

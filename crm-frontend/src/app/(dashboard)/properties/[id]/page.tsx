@@ -8,83 +8,111 @@ import { parseMultiValue } from "../_components/PropertyMultiSelect";
 import { convertRate, rateLabel, initialArea, areaInSqft, restorePlotArea } from "../_components/property-measurements";
 import { calculateRentPerSqft } from "@/lib/rental-pricing";
 import { isPropertyFieldVisible } from "../_components/property-form-fields";
+import { PropertyForm } from "../_components/PropertyForm";
 
 import { propertyStatusLabel } from "@/lib/property-status";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { lightboxStep } from "@/lib/image-lightbox";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { PageActions } from "@/components/layout/page-actions";
+import { Section } from "@/components/record/inline-field";
+import { TabHeader } from "@/components/record/feed";
+import { AttachmentsArt, EmptyState } from "@/components/record/empty-state";
+import { HEADER_BUTTON, HEADER_PRIMARY, StatusMenu } from "@/components/record/header-actions";
+import { statusDot, statusPillClass, type StatusTone } from "@/components/tables/cells";
 import { propertiesApi } from "@/lib/properties-api";
 import { canViewPropertyContacts } from "@/lib/permissions";
 import { LockedField } from "@/components/shared/locked-field";
+import { cn } from "@/lib/utils";
 import {
-  ArrowLeft,
-  Edit,
-  Home,
-  MapPin,
-  Map,
-  Ruler,
-  User,
-  Image as ImageIcon,
-  FileText,
-  Hash,
-  RefreshCw,
-  IndianRupee,
   Building2,
-  ShieldCheck,
+  Edit,
   Eye,
   EyeOff,
-  TrendingUp,
-  HelpCircle,
-  Sparkles,
-  Layers,
+  FileQuestion,
+  FileText,
+  Home,
+  Image as ImageIcon,
+  MapPin,
+  RefreshCw,
   ChevronLeft,
   ChevronRight,
   X,
 } from "lucide-react";
 
+type Tab = "overview" | "location" | "media" | "faqs";
+
 function PageSkeleton() {
   return (
-    <div className="animate-in fade-in duration-500 h-full flex flex-col space-y-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Skeleton className="h-9 w-9 rounded-full" />
-        <Skeleton className="h-8 w-48" />
+    <div className="flex flex-col md:h-full md:flex-row lg:-mx-6 lg:-mb-8 lg:-mt-6 lg:h-[calc(100%+3.5rem)]">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="hidden h-11 items-center gap-5 border-b px-5 md:flex">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-4 w-20" />)}
+        </div>
+        <div className="space-y-5 p-4 md:p-10">
+          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-40 w-full rounded-xl" />)}
+        </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Skeleton className="h-64 rounded-2xl" />
-        <Skeleton className="h-64 rounded-2xl" />
-        <Skeleton className="h-64 rounded-2xl" />
-        <Skeleton className="h-64 rounded-2xl" />
+      <div className="hidden w-[340px] shrink-0 border-l md:block xl:w-[360px]">
+        <div className="flex items-center gap-3 border-b p-4">
+          <Skeleton className="h-12 w-16 rounded-lg" />
+          <div className="space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-24" /></div>
+        </div>
+        <div className="space-y-3 p-4">{[...Array(7)].map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}</div>
       </div>
     </div>
   );
 }
 
+/** A read-only row; like before, a field with no value is left out. */
 function SectionField({ label, value }: { label: string; value: any }) {
   if (value === null || value === undefined || value === "") return null;
   return (
-    <div className="flex flex-col gap-1 py-2 border-b border-border/30 last:border-0">
-      <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">{label}</span>
-      <span className="font-medium text-[14px] text-foreground">{String(value)}</span>
+    <div className="flex min-h-9 items-start gap-3 py-1.5">
+      <span className="w-[140px] shrink-0 pt-px text-[13px] text-muted-foreground" title={label}>{label}</span>
+      <span className="min-w-0 flex-1 break-words text-[14px] text-foreground">{String(value)}</span>
     </div>
   );
 }
 
-function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+/** One group of facts on a tab, two columns wide on desktop. */
+function DataCard({ title, children, columns = true }: { title: string; children: ReactNode; columns?: boolean }) {
   return (
-    <div className="bg-card border rounded-2xl p-6 shadow-sm">
-      <h3 className="text-base font-bold text-foreground border-b pb-3 mb-4 flex items-center gap-2">
-        {icon}
-        {title}
-      </h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">{children}</div>
-    </div>
+    <section className="overflow-hidden rounded-xl border bg-card">
+      <h3 className="flex h-11 items-center border-b px-4 text-[14px] font-semibold text-foreground">{title}</h3>
+      <div className={cn("px-3 py-2 md:px-4", columns && "grid gap-x-8 md:grid-cols-2")}>{children}</div>
+    </section>
+  );
+}
+
+function TabButton({ active, onClick, icon: Icon, label, count }: {
+  active: boolean; onClick: () => void; icon: typeof Home; label: string; count?: number;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={cn(
+        "relative flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[14px] font-medium transition-colors md:h-11 md:rounded-none md:px-0.5",
+        active
+          ? "bg-[#017D58] text-white dark:bg-[#2FB585] dark:text-black md:bg-transparent md:text-foreground md:dark:bg-transparent md:dark:text-foreground"
+          : "bg-foreground/[0.06] text-foreground/80 md:bg-transparent md:text-muted-foreground md:hover:text-foreground",
+      )}
+    >
+      <Icon className="hidden h-4 w-4 md:block" />
+      {label}
+      {count ? (
+        <span className={cn("rounded-full px-1.5 text-[11px] leading-[18px] tabular-nums", active ? "bg-white/20 md:bg-foreground/[0.08]" : "bg-foreground/[0.08]")}>{count}</span>
+      ) : null}
+      {active && <span aria-hidden className="absolute inset-x-0 -bottom-px hidden h-0.5 rounded-full bg-foreground md:block" />}
+    </button>
   );
 }
 
@@ -106,12 +134,11 @@ function formatDate(v: any): string | undefined {
   return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString("en-GB");
 }
 
-const STATUS_BADGE: Record<string, string> = {
-  available: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
-  archived: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400",
-  sold: "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400",
-  rented: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
-};
+/** Colour for the status pill; the shared table colours, plus the property-only words. */
+function statusToneOf(label: string): StatusTone | undefined {
+  const key = label.toLowerCase();
+  return key === "rented" ? "violet" : key === "pending review" ? "amber" : undefined;
+}
 
 export default function PropertyViewPage() {
   const params = useParams();
@@ -124,6 +151,8 @@ export default function PropertyViewPage() {
   const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
   // Gallery lightbox: index into images, null when closed.
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     if (lightboxIndex === null || !property) return;
@@ -192,7 +221,7 @@ export default function PropertyViewPage() {
     fetchProperty();
   }, [fetchProperty]);
 
-  if (isLoading) return <PageSkeleton />;
+  if (isLoading) return <><MobileHeader title="Property" showBack /><PageSkeleton /></>;
   if (!property) return null;
 
   const statusKey = (property.status || "").toLowerCase();
@@ -236,80 +265,39 @@ export default function PropertyViewPage() {
   const isApartmentLike = ["apartment", "villa", "individual_portion", "investment_property", "pg_service_apartment", "farm_house"].includes(type);
   const isPlotLike = ["plot", "farmland"].includes(type);
 
-  return (
-    <div className="flex flex-col md:h-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
-      <MobileHeader title={property.title || `Property #${property.id}`} showBack />
+  const title = property.title || `Property #${property.id}`;
+  const statusLabel = propertyStatusLabel(property.status, property.approvalStatus);
+  const tone = statusToneOf(statusLabel);
+  const place = [property.locality, property.city].filter(Boolean).join(", ");
+  const price = formatPrice(Number(type === "coworking" ? det.rentPerSeat ?? property.price : property.price));
+  const listing = property.listingType === "Sell" ? "Buy" : property.listingType;
+  const cover = images.find((img) => img.isPrimary) ?? images[0];
+  const shownDocuments = isFieldVisible("documentUploads") ? documents : [];
 
-      {/* ── Header (desktop only) ── */}
-      <div className="hidden md:flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shrink-0" onClick={() => router.push("/properties")}>
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </Button>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              {property.title || `Property #${property.id}`}
-            </h1>
-            <Badge className={`capitalize ${STATUS_BADGE[statusKey] ?? STATUS_BADGE["archived"]}`}>
-              {propertyStatusLabel(property.status, property.approvalStatus)}
-            </Badge>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full" onClick={fetchProperty} title="Refresh">
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          {canApprove && !isTerminalStatus && (
-            isLive ? (
-              <Button variant="outline" onClick={handleVisibility} disabled={isTogglingVisibility} className="rounded-full px-8 py-5" title="Hide this property from the public site">
-                <EyeOff className="h-4 w-4 mr-2" />
-                {isTogglingVisibility ? "Updating…" : "Unpublish"}
-              </Button>
-            ) : (
-              <Button onClick={handleVisibility} disabled={isTogglingVisibility} className="rounded-full px-8 py-5 bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md" title="Show this property on the public site">
-                <Eye className="h-4 w-4 mr-2" />
-                {isTogglingVisibility ? "Updating…" : isOwnerReview ? "Approve & Publish" : "Publish"}
-              </Button>
-            )
-          )}
-          <Button onClick={() => router.push(`/properties/new?edit=${property.id}`)} className="rounded-full px-8 py-5 bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md">
-            <Edit className="h-4 w-4 mr-2" />
-            Edit Property
-          </Button>
-        </div>
-      </div>
+  // Status changes go through the edit form as before; the pill shows where it stands.
+  const statusMenu = (size: "h-7" | "h-8", align: "start" | "end" = "end") => (
+    <StatusMenu status={statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1)} options={[]} pillClass={statusPillClass(statusLabel, tone)} size={size} align={align} />
+  );
+  const visibilityButton = (className: string) => (canApprove && !isTerminalStatus ? (
+    <button type="button" onClick={handleVisibility} disabled={isTogglingVisibility} className={className}
+      title={isLive ? "Hide this property from the public site" : "Show this property on the public site"}>
+      {isLive ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+      {isTogglingVisibility ? "Updating…" : isLive ? "Unpublish" : isOwnerReview ? "Approve & Publish" : "Publish"}
+    </button>
+  ) : null);
 
-      {/* ── Mobile Summary Strip ── */}
-      <div className="md:hidden flex flex-col gap-3 px-4 pb-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge className={`capitalize ${STATUS_BADGE[statusKey] ?? STATUS_BADGE["archived"]}`}>{propertyStatusLabel(property.status, property.approvalStatus)}</Badge>
-          <span className="text-sm font-semibold text-muted-foreground">{formatPrice(Number(property.price))}</span>
-        </div>
-        {canApprove && !isTerminalStatus && (
-          <Button
-            onClick={handleVisibility}
-            disabled={isTogglingVisibility}
-            className={isLive ? "h-11 rounded-xl font-semibold" : "h-11 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC] font-semibold"}
-            variant={isLive ? "outline" : undefined}
-          >
-            {isLive ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />} {isTogglingVisibility ? "Updating…" : isLive ? "Unpublish" : isOwnerReview ? "Approve & Publish" : "Publish"}
-          </Button>
-        )}
-        <div className="grid grid-cols-2 gap-3">
-          <Button variant="outline" onClick={() => router.push(`/properties/new?edit=${property.id}`)} className="h-11 rounded-xl text-foreground font-semibold border-border/60">
-            <Edit className="w-4 h-4 mr-2 text-muted-foreground" /> Edit
-          </Button>
-          <Button variant="outline" onClick={fetchProperty} className="h-11 rounded-xl border-border/60 font-semibold text-foreground">
-            <RefreshCw className="w-4 h-4 mr-2 text-muted-foreground" /> Refresh
-          </Button>
-        </div>
-      </div>
+  const tabs: { key: Tab; label: string; icon: typeof Home; count?: number }[] = [
+    { key: "overview", label: "Overview", icon: Home },
+    { key: "location", label: "Location", icon: MapPin },
+    { key: "media", label: "Media", icon: ImageIcon, count: images.length + shownDocuments.length },
+    { key: "faqs", label: "FAQs", icon: FileQuestion, count: faqs.length },
+  ];
 
-      <div className="flex-1 overflow-y-auto space-y-6 px-4 lg:px-0 lg:pr-2">
-
-        {/* Core Details + Location */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Section title="Core Details" icon={<Home className="h-4 w-4 text-[#0052FF]" />}>
+  const overview = (
+    <div className="pb-6">
+      <TabHeader title="Overview" />
+      <div className="space-y-5 px-3 sm:px-10">
+          <DataCard title="Core Details">
             <SectionField label="Property Code" value={property.propertyCode} />
             <SectionField label="Legacy Source Id" value={property.legacySourceId} />
             <SectionField label="Property Type" value={formatPropertyType(property.propertyType)} />
@@ -331,34 +319,8 @@ export default function PropertyViewPage() {
             <SectionField label="Sale Type" value={property.saleType} />
             {isFieldVisible("availableFrom") && (<SectionField label="Available From" value={formatDate(property.availableFrom)} />)}
             <SectionField label="Available Until" value={formatDate(property.availableUntil)} />
-          </Section>
-
-          <Section title="Location" icon={<MapPin className="h-4 w-4 text-orange-500" />}>
-            <SectionField label="City" value={property.city} />
-            <SectionField label="State" value={property.state} />
-            <SectionField label="Locality" value={property.locality} />
-            <div className="sm:col-span-2">
-              <SectionField label="Address" value={loc.address} />
-            </div>
-            <SectionField label="Pincode" value={loc.pincode} />
-            <SectionField label="Latitude" value={loc.latitude} />
-            <SectionField label="Longitude" value={loc.longitude} />
-            <SectionField label="Road Access" value={property.roadAccess} />
-            <SectionField label="Road Name" value={property.roadName} />
-            {mapsUrl && (
-              <div className="flex flex-col gap-1 py-2 border-b border-border/30 last:border-0 sm:col-span-2">
-                <span className="text-muted-foreground text-xs font-bold uppercase tracking-wide">Map</span>
-                <a href={mapsUrl} target="_blank" rel="noreferrer" className="font-medium text-[14px] text-[#0052FF] hover:underline flex items-center gap-1">
-                  <Map className="h-3 w-3" /> View on Map
-                </a>
-              </div>
-            )}
-          </Section>
-        </div>
-
-        {/* Pricing + Owner */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Section title="Pricing & Commercials" icon={<IndianRupee className="h-4 w-4 text-emerald-600" />}>
+          </DataCard>
+          <DataCard title="Pricing & Commercials">
             {isFieldVisible("rentPerSqft") && (
               <SectionField label="Rent per sqft" value={rentPerSqft === null ? undefined : `₹${rentPerSqft.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / sqft / month`} />
             )}
@@ -381,35 +343,11 @@ export default function PropertyViewPage() {
             <SectionField label="Registration Charge" value={property.registrationCharge} />
             <SectionField label="Mode of Payment" value={property.modeOfPayment} />
             <SectionField label="Time for Registration" value={property.timeForRegistration} />
-          </Section>
-
-          <Section title="Owner & Agent" icon={<User className="h-4 w-4 text-teal-500" />}>
-            {!canViewPropertyContacts() ? (
-              <LockedField wide label="Contact details" />
-            ) : (
-              <>
-                <SectionField label="Owner Name" value={property.ownerName} />
-                <SectionField label="Owner Phone" value={property.ownerPhone} />
-                <SectionField label="Owner Email" value={property.ownerEmail} />
-                {isFieldVisible("tenantOccupied") && <SectionField label="Tenant Occupied" value={property.tenantOccupied} />}
-                {(property.contactDetails?.ownerAlternatives ?? [{ name: property.alternateName, phone: property.alternatePhone, email: property.alternateEmail }]).map((contact: any, index: number) => <div className="contents" key={index}><SectionField label={`Alternative ${index + 1} Role`} value={contact.role} /><SectionField label={`Alternative ${index + 1} Name`} value={contact.name} /><SectionField label={`Alternative ${index + 1} Phone`} value={contact.phone} /><SectionField label={`Alternative ${index + 1} Email`} value={contact.email} /></div>)}
-                <SectionField label="Agent Name" value={property.agentName} />
-                <SectionField label="Agent Phone" value={contacts.agentPhone} /><SectionField label="Agent Email" value={contacts.agentEmail} />
-                <SectionField label="Alternative Agent Name" value={contacts.agentAlternative.name} /><SectionField label="Alternative Agent Phone" value={contacts.agentAlternative.phone} /><SectionField label="Alternative Agent Email" value={contacts.agentAlternative.email} />
-                <SectionField label="Agency" value={property.agencyName} />
-                <SectionField label="Commission Terms" value={property.commissionTerms} />
-
-              </>
-            )}
-          </Section>
-        </div>
-
-        {/* Common Specs + Type Specs */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Section title="Specifications" icon={<Ruler className="h-4 w-4 text-purple-500" />}>
+          </DataCard>
+          <DataCard title="Specifications">
             {curationRows.map(row => <SectionField key={row.label} label={row.label} value={row.value} />)}
             {isFieldVisible("landArea") && <SectionField label={type === "plot" && property.listingType !== "Rent" ? "Total Project Area" : "Land Area"} value={det.areaSqft ? `${initialArea(areaInSqft(det.areaSqft, det.areaUnit || "Sq Ft"), "landArea", det.measurementUnits ?? {})} ${det.measurementUnits?.landArea || "Sq Ft"}` : undefined} />}
-            {isFieldVisible("plotBoundaries") && boundarySides.some(side => side.length) && <div className="sm:col-span-2"><PropertyPlotBoundaries value={boundarySides} facing={det.plotFacing || (type === "commercial" ? det.propertyFacing : "")} readOnly /></div>}
+            {isFieldVisible("plotBoundaries") && boundarySides.some(side => side.length) && <div className="md:col-span-2"><PropertyPlotBoundaries value={boundarySides} facing={det.plotFacing || (type === "commercial" ? det.propertyFacing : "")} readOnly /></div>}
             {!isPlotLike && (<>
             {isFieldVisible("bedrooms") && (<SectionField label="Bedrooms" value={det.bedrooms} />)}
             {isFieldVisible("bathrooms") && (<SectionField label="Bathrooms" value={det.bathrooms} />)}
@@ -449,10 +387,9 @@ export default function PropertyViewPage() {
             <SectionField label="Water Supply" value={det.waterSupply} />
             </>)}
             <SectionField label="Road Width" value={det.roadWidth} />
-          </Section>
-
+          </DataCard>
           {(isApartmentLike || isPlotLike || type === "commercial" || type === "coworking" || type === "industrial") && (
-            <Section title={`${formatPropertyType(type)} Details`} icon={<Building2 className="h-4 w-4 text-indigo-500" />}>
+            <DataCard title={`${formatPropertyType(type)} Details`}>
               {isApartmentLike && (<>
                 <SectionField label="Unit Type" value={det.unitType} />
                 <SectionField label="Unit Number" value={det.unitNumber} />
@@ -577,66 +514,61 @@ export default function PropertyViewPage() {
                 <SectionField label="Other Legal Details" value={det.otherLegalDetails} />
 
               </>)}
-            </Section>
+            </DataCard>
           )}
-        </div>
-
-        {/* Amenities + Connectivity */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {!isPlotLike && (
-          <Section title="Amenities" icon={<Sparkles className="h-4 w-4 text-yellow-500" />}>
+          <DataCard title="Amenities" columns={false}>
             {amenitiesList.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic sm:col-span-2">No amenities tagged.</p>
+              <p className="py-2 text-[14px] text-muted-foreground">No amenities tagged.</p>
             ) : (
-              <div className="sm:col-span-2 flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5 py-2">
                 {amenitiesList.map((a: any, i: number) => (
-                  <Badge key={a.id ?? i} variant="outline" className="font-medium">
+                  <span key={a.id ?? i} className="inline-flex h-7 items-center rounded-md bg-foreground/[0.06] px-2.5 text-[13px] font-medium text-foreground">
                     {a.name || `Amenity #${a.id}`}
-                  </Badge>
+                  </span>
                 ))}
               </div>
             )}
-          </Section>
+          </DataCard>
           )}
-
-          <Section title="Connectivity" icon={<Map className="h-4 w-4 text-sky-500" />}>
-            {connectivity.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic sm:col-span-2">No connectivity highlights.</p>
-            ) : (
-              connectivity.map((c: any, i: number) => (
-                <SectionField key={i} label={c.label || c.icon || `Point ${i + 1}`} value={c.detail} />
-              ))
-            )}
-          </Section>
-        </div>
-
-        {/* Room Dimensions + Units — building-only, never land */}
-        {!isPlotLike && (roomDimensions.length > 0 || units.length > 0) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {!isPlotLike && roomDimensions.length > 0 && (
-              <Section title="Room Dimensions" icon={<Layers className="h-4 w-4 text-cyan-500" />}>
-                {roomDimensions.map((r: any, i: number) => (
-                  <SectionField key={i} label={r.name || `Room ${i + 1}`} value={r.dimensions} />
-                ))}
-              </Section>
-            )}
-            {!isPlotLike && units.length > 0 && (
-              <Section title="Units" icon={<Building2 className="h-4 w-4 text-indigo-500" />}>
-                {units.map((u: any, i: number) => (
-                  <SectionField
-                    key={u.id ?? i}
-                    label={u.title || u.unitType || `Unit ${i + 1}`}
-                    value={[u.unitType, u.price ? formatPrice(Number(u.price)) : null, u.status].filter(Boolean).join(" · ")}
-                  />
-                ))}
-              </Section>
-            )}
-          </div>
+        {!isPlotLike && roomDimensions.length > 0 && (
+          <DataCard title="Room Dimensions">
+            {roomDimensions.map((r: any, i: number) => (
+              <SectionField key={i} label={r.name || `Room ${i + 1}`} value={r.dimensions} />
+            ))}
+          </DataCard>
         )}
+        {!isPlotLike && units.length > 0 && (
+          <DataCard title="Units">
+            {units.map((u: any, i: number) => (
+              <SectionField
+                key={u.id ?? i}
+                label={u.title || u.unitType || `Unit ${i + 1}`}
+                value={[u.unitType, u.price ? formatPrice(Number(u.price)) : null, u.status].filter(Boolean).join(" · ")}
+              />
+            ))}
+          </DataCard>
+        )}
+          <DataCard title="Owner & Agent">
+            {!canViewPropertyContacts() ? (
+              <LockedField wide label="Contact details" />
+            ) : (
+              <>
+                <SectionField label="Owner Name" value={property.ownerName} />
+                <SectionField label="Owner Phone" value={property.ownerPhone} />
+                <SectionField label="Owner Email" value={property.ownerEmail} />
+                {isFieldVisible("tenantOccupied") && <SectionField label="Tenant Occupied" value={property.tenantOccupied} />}
+                {(property.contactDetails?.ownerAlternatives ?? [{ name: property.alternateName, phone: property.alternatePhone, email: property.alternateEmail }]).map((contact: any, index: number) => <div className="contents" key={index}><SectionField label={`Alternative ${index + 1} Role`} value={contact.role} /><SectionField label={`Alternative ${index + 1} Name`} value={contact.name} /><SectionField label={`Alternative ${index + 1} Phone`} value={contact.phone} /><SectionField label={`Alternative ${index + 1} Email`} value={contact.email} /></div>)}
+                <SectionField label="Agent Name" value={property.agentName} />
+                <SectionField label="Agent Phone" value={contacts.agentPhone} /><SectionField label="Agent Email" value={contacts.agentEmail} />
+                <SectionField label="Alternative Agent Name" value={contacts.agentAlternative.name} /><SectionField label="Alternative Agent Phone" value={contacts.agentAlternative.phone} /><SectionField label="Alternative Agent Email" value={contacts.agentAlternative.email} />
+                <SectionField label="Agency" value={property.agencyName} />
+                <SectionField label="Commission Terms" value={property.commissionTerms} />
 
-        {/* Verification + Market */}
-        <div className={`grid grid-cols-1 ${isFieldVisible("documentsVerification") ? "md:grid-cols-2" : ""} gap-6`}>
-          {isFieldVisible("documentsVerification") && (<Section title="Documents & Verification" icon={<ShieldCheck className="h-4 w-4 text-green-600" />}>
+              </>
+            )}
+          </DataCard>
+          {isFieldVisible("documentsVerification") && (<DataCard title="Documents & Verification">
             <SectionField label="Ownership Title" value={property.ownershipTitleVerified} />
             <SectionField label="Encumbrance Cert." value={property.encumbranceCertificate} />
             {!isPlotLike && isFieldVisible("rentalAgreementDraft") && (
@@ -653,78 +585,230 @@ export default function PropertyViewPage() {
             {isFieldVisible("fundedBy") && hypothecated && <SectionField label="Funded By" value={det.fundedBy} />}
             {isFieldVisible("hypothecation") && (<SectionField label="Hypothecation" value={property.hypothecation} />)}
             {isFieldVisible("deviation") && (<SectionField label="Deviation" value={property.deviation} />)}
-          </Section>)}
-
-          <Section title="Market Analysis" icon={<TrendingUp className="h-4 w-4 text-rose-500" />}>
+          </DataCard>)}
+          <DataCard title="Market Analysis">
             <SectionField label="Comparative Price" value={property.comparativePrice} />
             {!isPlotLike && (
             <SectionField label="Rental Yield" value={property.rentalYield} />
             )}
             <SectionField label="Market Price" value={property.marketPrice} />
             <SectionField label="Demand Area" value={property.demandArea} />
-            <div className="sm:col-span-2">
+            <div className="md:col-span-2">
               <SectionField label="Remark" value={property.remark} />
             </div>
-          </Section>
-        </div>
-
-        {/* Description */}
+          </DataCard>
         {property.description && (
-          <div className="bg-card border rounded-2xl p-6 shadow-sm">
-            <h3 className="text-base font-bold text-foreground border-b pb-3 mb-4 flex items-center gap-2">
-              <FileText className="h-4 w-4 text-blue-500" /> Description
-            </h3>
-            <p className="text-[14px] text-foreground leading-relaxed whitespace-pre-wrap">
-              {property.description}
-            </p>
-          </div>
+          <DataCard title="Description" columns={false}>
+            <p className="whitespace-pre-wrap break-words px-1 py-2 text-[14px] leading-6 text-foreground">{property.description}</p>
+          </DataCard>
         )}
+        <DataCard title="Record">
+            <SectionField label="ID" value={property.id} />
+            <SectionField label="Slug" value={property.slug} />
+            {isFieldVisible("verificationStatus") && (<SectionField label="Verification" value={property.verificationStatus} />)}
+            <SectionField label="Approval" value={property.approvalStatus} />
+            <SectionField label="Created At" value={formatDate(property.createdAt)} />
+            <SectionField label="Updated At" value={formatDate(property.updatedAt)} />
+        </DataCard>
+      </div>
+    </div>
+  );
 
-        {/* FAQs */}
-        {faqs.length > 0 && (
-          <div className="bg-card border rounded-2xl p-6 shadow-sm">
-            <h3 className="text-base font-bold text-foreground border-b pb-3 mb-4 flex items-center gap-2">
-              <HelpCircle className="h-4 w-4 text-violet-500" /> FAQs
-            </h3>
-            <div className="space-y-3">
-              {faqs.map((f: any, i: number) => (
-                <div key={i} className="border border-border/40 rounded-xl p-4">
-                  <p className="font-semibold text-[14px]">Q: {f.question}</p>
-                  <p className="text-[14px] text-muted-foreground mt-1">A: {f.answer}</p>
+  const location = (
+    <div className="pb-6">
+      <TabHeader title="Location" action={mapsUrl ? (
+        <a href={mapsUrl} target="_blank" rel="noreferrer" className={HEADER_BUTTON}>
+          <MapPin className="h-3.5 w-3.5 text-muted-foreground" /> Open in Maps
+        </a>
+      ) : null} />
+      <div className="space-y-5 px-3 sm:px-10">
+          <DataCard title="Location">
+            <SectionField label="City" value={property.city} />
+            <SectionField label="State" value={property.state} />
+            <SectionField label="Locality" value={property.locality} />
+            <SectionField label="Address" value={loc.address} />
+            <SectionField label="Pincode" value={loc.pincode} />
+            <SectionField label="Latitude" value={loc.latitude} />
+            <SectionField label="Longitude" value={loc.longitude} />
+            <SectionField label="Road Access" value={property.roadAccess} />
+            <SectionField label="Road Name" value={property.roadName} />
+          </DataCard>
+          <DataCard title="Connectivity">
+            {connectivity.length === 0 ? (
+              <p className="py-2 text-[14px] text-muted-foreground md:col-span-2">No connectivity highlights.</p>
+            ) : (
+              connectivity.map((c: any, i: number) => (
+                <SectionField key={i} label={c.label || c.icon || `Point ${i + 1}`} value={c.detail} />
+              ))
+            )}
+          </DataCard>
+      </div>
+    </div>
+  );
+
+  const media = (
+    <div className="pb-6">
+      <TabHeader title="Media" />
+      <div className="space-y-5 px-3 sm:px-10">
+        {images.length === 0 && shownDocuments.length === 0 ? (
+          <EmptyState art={<AttachmentsArt />} title="No photos or documents yet" hint="Photos, floor plans and documents are added from Edit → Media & documents." />
+        ) : (
+          <>
+            <DataCard title={`Photos (${images.length})`} columns={false}>
+              {images.length === 0 ? (
+                <p className="py-2 text-[14px] text-muted-foreground">No images uploaded.</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 py-2 sm:grid-cols-3 md:grid-cols-4">
+                  {images.map((img: any, idx: number) => (
+                    <button
+                      key={img.id ?? idx}
+                      type="button"
+                      onClick={() => setLightboxIndex(idx)}
+                      className="relative block aspect-video cursor-pointer overflow-hidden rounded-lg border transition-opacity hover:opacity-90"
+                      aria-label={`View image ${idx + 1}`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- CDN images */}
+                      <img src={img.imageUrl} alt={`Property image ${idx + 1}`} className="h-full w-full object-cover" />
+                      {img.isPrimary && (
+                        <span className="absolute left-1.5 top-1.5 rounded-md bg-foreground px-1.5 py-0.5 text-[10px] font-medium text-background">
+                          Primary
+                        </span>
+                      )}
+                    </button>
+                  ))}
                 </div>
-              ))}
+              )}
+            </DataCard>
+            {shownDocuments.length > 0 && (
+              <DataCard title={`Documents (${shownDocuments.length})`} columns={false}>
+                <div className="divide-y">
+                  {shownDocuments.map((doc: any, idx: number) => (
+                    <a
+                      key={doc.id ?? idx}
+                      href={doc.fileUrl || "#"}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-between gap-3 px-1 py-2.5 transition-colors hover:bg-muted/40"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0">
+                          <p className="truncate text-[14px] font-medium text-foreground">{doc.fileName || doc.title || "Document"}</p>
+                          <p className="text-[12px] capitalize text-muted-foreground">{(doc.documentType || "other").replace(/_/g, " ")}</p>
+                        </div>
+                      </div>
+                      <span className="shrink-0 text-[13px] font-medium text-muted-foreground">View</span>
+                    </a>
+                  ))}
+                </div>
+              </DataCard>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+
+  const faqTab = (
+    <div className="pb-6">
+      <TabHeader title="FAQs" />
+      <div className="px-3 sm:px-10">
+        {faqs.length === 0 ? (
+          <EmptyState art={<AttachmentsArt />} title="No FAQs yet" hint="Questions buyers ask, answered once. Add them from Edit → FAQs." />
+        ) : (
+          <section className="divide-y overflow-hidden rounded-xl border bg-card">
+            {faqs.map((f: any, i: number) => (
+              <div key={f.id ?? i} className="px-4 py-3.5">
+                <p className="text-[14px] font-medium text-foreground">{f.question}</p>
+                <p className="mt-1 whitespace-pre-wrap text-[14px] leading-6 text-muted-foreground">{f.answer}</p>
+              </div>
+            ))}
+          </section>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col md:h-full lg:-mx-6 lg:-mb-8 lg:-mt-6 lg:h-[calc(100%+3.5rem)]">
+      <MobileHeader title={title} showBack />
+
+      <PageActions>
+        <div className="flex items-center gap-2">
+          {statusMenu("h-8")}
+          <button type="button" onClick={fetchProperty} className={HEADER_BUTTON} title="Refresh" aria-label="Refresh">
+            <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+          {visibilityButton(isLive ? HEADER_BUTTON : HEADER_PRIMARY)}
+          <button type="button" onClick={() => setEditing(true)} className={HEADER_BUTTON}>
+            <Edit className="h-3.5 w-3.5 text-muted-foreground" /> Edit
+          </button>
+        </div>
+      </PageActions>
+
+      {/* ── Phone summary ── */}
+      <div className="space-y-3 px-4 pb-4 pt-1 md:hidden">
+        <div className="flex flex-wrap items-center gap-2 text-[14px] text-muted-foreground">
+          {statusMenu("h-7", "start")}
+          {property.propertyCode && <span>{property.propertyCode}</span>}
+          <span>{price}</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" onClick={() => setEditing(true)} className="flex h-10 items-center justify-center gap-2 rounded-xl bg-foreground/[0.06] px-3 text-[15px] font-medium text-foreground">
+            <Edit className="h-4 w-4 text-muted-foreground" /> Edit
+          </button>
+          <button type="button" onClick={fetchProperty} className="flex h-10 items-center justify-center gap-2 rounded-xl bg-foreground/[0.06] px-3 text-[15px] font-medium text-foreground">
+            <RefreshCw className="h-4 w-4 text-muted-foreground" /> Refresh
+          </button>
+        </div>
+        {visibilityButton("flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-foreground px-3 text-[15px] font-medium text-background disabled:opacity-50")}
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        <div className="flex min-w-0 flex-1 flex-col md:min-h-0">
+          <div role="tablist" aria-label="Property sections"
+            className="sticky top-[calc(env(safe-area-inset-top)+2.75rem)] z-20 flex shrink-0 gap-1.5 overflow-x-auto bg-background px-4 py-2 scrollbar-hide md:static md:gap-5 md:border-b md:px-5 md:py-0">
+            {tabs.map((t) => (
+              <TabButton key={t.key} active={activeTab === t.key} onClick={() => setActiveTab(t.key)} icon={t.icon} label={t.label} count={t.count} />
+            ))}
+          </div>
+          <div className="md:min-h-0 md:flex-1 md:overflow-y-auto">
+            {activeTab === "overview" && overview}
+            {activeTab === "location" && location}
+            {activeTab === "media" && media}
+            {activeTab === "faqs" && faqTab}
+          </div>
+        </div>
+
+        <aside className="hidden w-[340px] shrink-0 flex-col overflow-y-auto border-l md:flex xl:w-[360px]">
+          <div className="flex items-center gap-3 border-b p-4">
+            {cover?.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- CDN cover thumbnail
+              <img src={cover.imageUrl} alt="" className="h-12 w-16 shrink-0 rounded-lg border object-cover" />
+            ) : (
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-foreground/[0.06] text-muted-foreground"><Building2 className="h-5 w-5" /></span>
+            )}
+            <div className="min-w-0">
+              <p className="truncate text-[17px] font-semibold leading-6 text-foreground" title={title}>{title}</p>
+              <p className="truncate text-[13px] text-muted-foreground">{[property.propertyCode, place].filter(Boolean).join(" · ")}</p>
             </div>
           </div>
-        )}
-
-        {/* Images */}
-        <div className="bg-card border rounded-2xl p-6 shadow-sm">
-          <h3 className="text-base font-bold text-foreground border-b pb-3 mb-4 flex items-center gap-2">
-            <ImageIcon className="h-4 w-4 text-pink-500" /> Images
-          </h3>
-          {images.length === 0 ? (
-            <p className="text-sm text-muted-foreground italic">No images uploaded.</p>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-              {images.map((img: any, idx: number) => (
-                <button
-                  key={img.id ?? idx}
-                  type="button"
-                  onClick={() => setLightboxIndex(idx)}
-                  className="block relative aspect-video border rounded-xl overflow-hidden hover:opacity-90 transition-opacity cursor-pointer"
-                  aria-label={`View image ${idx + 1}`}
-                >
-                  <img src={img.imageUrl} alt={`Property image ${idx + 1}`} className="w-full h-full object-cover" />
-                  {img.isPrimary && (
-                    <span className="absolute top-1.5 left-1.5 bg-[#0052FF] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                      Primary
-                    </span>
-                  )}
-                </button>
-              ))}
+          <Section title="Details">
+            <div className="px-1">
+              <div className="flex min-h-9 items-center gap-3 py-1.5">
+                <span className="w-[140px] shrink-0 text-[13px] text-muted-foreground">Status</span>
+                <span className="inline-flex items-center gap-2 text-[14px] capitalize text-foreground"><span className={cn("h-2 w-2 rounded-full", statusDot(statusLabel, tone))} />{statusLabel}</span>
+              </div>
+              <SectionField label="Type" value={formatPropertyType(type)} />
+              <SectionField label="Listing" value={listing} />
+              <SectionField label={type === "coworking" ? "Rent per seat" : "Price"} value={price} />
+              <SectionField label="Locality" value={place} />
+              <SectionField label="Approval" value={property.approvalStatus} />
+              <SectionField label="Updated" value={formatDate(property.updatedAt)} />
             </div>
-          )}
-        </div>
+          </Section>
+        </aside>
+      </div>
 
         {/* Image lightbox */}
         <Dialog open={lightboxIndex !== null} onOpenChange={(o) => !o && setLightboxIndex(null)}>
@@ -734,6 +818,7 @@ export default function PropertyViewPage() {
           >
             {lightboxIndex !== null && images[lightboxIndex] && (
               <div className="relative w-full h-full">
+                {/* eslint-disable-next-line @next/next/no-img-element -- CDN images */}
                 <img
                   src={images[lightboxIndex].imageUrl}
                   alt={`Property image ${lightboxIndex + 1}`}
@@ -775,50 +860,17 @@ export default function PropertyViewPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Documents */}
-        {isFieldVisible("documentUploads") && documents.length > 0 && (
-          <div className="bg-card border rounded-2xl p-6 shadow-sm">
-            <h3 className="text-base font-bold text-foreground border-b pb-3 mb-4 flex items-center gap-2">
-              <FileText className="h-4 w-4 text-emerald-500" /> Documents
-            </h3>
-            <div className="space-y-2">
-              {documents.map((doc: any, idx: number) => (
-                <a
-                  key={doc.id ?? idx}
-                  href={doc.fileUrl || "#"}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center justify-between gap-3 p-3 border rounded-xl bg-muted/10 hover:bg-muted/30 transition-colors"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{doc.fileName || doc.title || "Document"}</p>
-                      <p className="text-xs text-muted-foreground capitalize">{(doc.documentType || "other").replace(/_/g, " ")}</p>
-                    </div>
-                  </div>
-                  <span className="text-sm font-medium text-[#0052FF] shrink-0">View</span>
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Meta */}
-        <div className="bg-card border rounded-2xl p-6 shadow-sm">
-          <h3 className="text-base font-bold text-foreground border-b pb-3 mb-4 flex items-center gap-2">
-            <Hash className="h-4 w-4 text-muted-foreground" /> Meta
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-            <SectionField label="ID" value={property.id} />
-            <SectionField label="Slug" value={property.slug} />
-            {isFieldVisible("verificationStatus") && (<SectionField label="Verification" value={property.verificationStatus} />)}
-            <SectionField label="Approval" value={property.approvalStatus} />
-            <SectionField label="Created At" value={formatDate(property.createdAt)} />
-            <SectionField label="Updated At" value={formatDate(property.updatedAt)} />
-          </div>
-        </div>
-      </div>
+      {editing && (
+        <PropertyForm
+          mode="edit"
+          initialData={property}
+          onClose={() => setEditing(false)}
+          onSuccess={() => {
+            setEditing(false);
+            void fetchProperty();
+          }}
+        />
+      )}
     </div>
   );
 }

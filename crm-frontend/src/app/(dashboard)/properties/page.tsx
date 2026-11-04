@@ -1,10 +1,10 @@
 "use client";
 
+import { PropertyForm } from "./_components/PropertyForm";
 import { EMPTY_PROPERTY_FILTERS, propertyUploaderLabel } from "@/lib/property-list-filters";
 import { propertyStatusLabel } from "@/lib/property-status";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DataTable } from "@/components/tables/data-table";
@@ -83,6 +83,7 @@ export default function PropertiesPage() {
   const [role, setRole] = useState("");
 
   const { properties, totalCount, isLoading, staff, cities, sublocations, roadNames, propertyTypes, fetchProperties, toggleVisibility, deleteBulk } = usePropertiesList();
+  const [creating, setCreating] = useState(false);
   useClampedPage(pagination, setPagination, totalCount, isLoading);
 
   useEffect(() => {
@@ -99,6 +100,7 @@ export default function PropertiesPage() {
   useEffect(() => {
     fetchProperties({ pagination: views.isBoard ? BOARD_PAGE : pagination, debouncedSearchQuery, activeTab, filters });
   }, [fetchProperties, pagination, debouncedSearchQuery, activeTab, filters, views.isBoard]);
+  const reloadProperties = () => fetchProperties({ pagination: views.isBoard ? BOARD_PAGE : pagination, debouncedSearchQuery, activeTab, filters });
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -488,16 +490,19 @@ export default function PropertiesPage() {
       {views.switcher}
       <div className="w-full flex flex-col space-y-6 pt-4 md:space-y-0 md:pt-0 md:h-full">
         <PageActions>
-          <Link href="/properties/new" className={headerPrimaryClass}>
+          <button type="button" onClick={() => setCreating(true)} className={headerPrimaryClass}>
             <Plus className="size-4" />
             Add Property
-          </Link>
+          </button>
         </PageActions>
 
         <Device mobile={mobileFilters} desktop={desktopFilters} />
         <Device desktop={null} mobile={<div className="w-full">{tableSection}</div>} />
 
       </div>
+      {creating && (
+        <PropertyForm mode="create" onClose={() => setCreating(false)} onSuccess={() => { setCreating(false); reloadProperties(); }} />
+      )}
 
       <Dialog open={bulkDeleteIds !== null} onOpenChange={(open) => { if (!open) setBulkDeleteIds(null); }}>
         <DialogContent className="sm:max-w-[425px]">

@@ -2,6 +2,8 @@
 
 import type { ComponentProps } from "react";
 import { FormSelect } from "@/components/shared/form-select";
+import { cn } from "@/lib/utils";
+import { PROPERTY_SELECT } from "./property-form-styles";
 
 const ABBREVIATIONS = new Set([
   "BPO", "ATM", "RC", "PEB", "VDF", "IPS", "TNPCB", "EIA", "CEIG", "PESO", "CTE", "CTO", "CC", "OC", "CLU", "NOC", "R", "D", "AC", "BHK", "CMDA", "DTCP", "EB", "FMB", "GST", "HP", "HT", "INR",
@@ -25,5 +27,5 @@ export function PropertyFormSelect(props: ComponentProps<typeof FormSelect>) {
   if (current && !options.some((option) => option.value === current)) {
     options.push({ value: current, label: propertyOptionLabel(current) });
   }
-  return <FormSelect {...props} options={options} />;
+  return <FormSelect {...props} className={cn(PROPERTY_SELECT, props.className)} options={options} />;
 }

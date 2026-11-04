@@ -13,6 +13,12 @@ vi.mock("react", async (original) => {
   };
 });
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+// The form's full-screen modal renders through a portal; render its body inline.
+vi.mock("@/components/shared/focus-modal", async (original) => {
+  const actual = await original<typeof import("@/components/shared/focus-modal")>();
+  const { createElement: h } = await import("react");
+  return { ...actual, FocusModal: ({ title, children, footer }: { title: unknown; children: unknown; footer: unknown }) => h("div", null, h("h1", null, title as never), children as never, footer as never) };
+});
 vi.mock("@/components/layout/mobile-header", () => ({ MobileHeader: () => null }));
 vi.mock("@/lib/permissions", () => ({ canViewPropertyContacts: () => state.contacts }));
 
@@ -31,7 +37,7 @@ beforeEach(() => { state.calls = 0; state.contacts = false; });
 describe("Rendered property type forms", () => {
   it.each(["apartment", "villa", "individual_portion", "plot", "farmland", "commercial", "coworking", "industrial"])("renders the existing fields for %s", (type) => {
     const markup = render(type, type === "coworking" ? "Rent" : "Sell");
-    expect(markup).toContain(type === "coworking" ? "Rent per Seat" : "Sale price *");
+    expect(markup).toContain(type === "coworking" ? "Rent per Seat" : "Sale price <span class=\"text-red-500\">*</span>");
     expect(markup).toContain(type === "coworking" ? "Rent per Seat" : "Documents");
     expect(markup).not.toContain("Loading property");
   });
@@ -73,7 +79,7 @@ describe("Rendered property type forms", () => {
 
   it("shows one rental deposit and rent field without sale pricing", () => {
     const markup = render("apartment", "Rent");
-    expect(markup).toContain("Monthly rent *");
+    expect(markup).toContain("Monthly rent <span class=\"text-red-500\">*</span>");
     expect(markup.match(/>Security Deposit<\/label>/g)).toHaveLength(1);
     expect(markup).not.toContain(">Monthly Rent</label>");
     expect(markup).not.toContain(">Booking Amount</label>");
@@ -110,7 +116,7 @@ describe("Investment Property form", () => {
     expect(investment).toContain("Investment Property details");
     expect(investment).toContain("Available Portion");
     expect(investment).toContain("Plot Area");
-    expect(investment).toContain("Sale price *");
+    expect(investment).toContain("Sale price <span class=\"text-red-500\">*</span>");
   });
 });
 
@@ -123,9 +129,9 @@ describe("PG / Service Apartment form", () => {
     expect(pg).toContain("Food availability");
     expect(pg).not.toContain("No of Lifts");
     expect(pg).toContain("PG / Service Apartment details");
-    expect(pg).toContain("Monthly rent per bed *");
+    expect(pg).toContain("Monthly rent per bed <span class=\"text-red-500\">*</span>");
     expect(pg).toContain("Security deposit");
-    expect(pg).not.toContain("Sale price *");
+    expect(pg).not.toContain("Sale price <span class=\"text-red-500\">*</span>");
     expect(pg).not.toContain("Expected Sale Price");
   });
 });
@@ -160,7 +166,7 @@ describe("Rental form fields", () => {
     expect(markup.includes(">Builder Name</label>")).toBe(["apartment", "villa"].includes(type));
     expect(markup.includes(">Project Name</label>")).toBe(["apartment", "villa"].includes(type));
     if (type === "pg_service_apartment") {
-      expect(markup).toContain("Monthly rent per bed *");
+      expect(markup).toContain("Monthly rent per bed <span class=\"text-red-500\">*</span>");
       expect(markup).not.toContain("Rent per sqft");
     } else if (type === "coworking") {
       expect(markup).toContain("Rent per Seat");

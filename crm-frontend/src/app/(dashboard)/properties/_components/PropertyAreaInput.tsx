@@ -1,4 +1,6 @@
 "use client";
+import { cn } from "@/lib/utils";
+import { PROPERTY_FIELD } from "./property-form-styles";
 import { Input } from "@/components/ui/input";
 import { PropertyFormSelect } from "./PropertyFormSelect";
 import { AREA_UNIT_OPTIONS, convertArea } from "./property-measurements";
@@ -26,7 +28,7 @@ export function PropertyAreaInput({
         step="any"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-12 min-w-0 flex-1 rounded-xl bg-muted/30"
+        className={cn(PROPERTY_FIELD, "min-w-0 flex-1")}
       />
       <PropertyFormSelect
         name={`${name}Unit`}
