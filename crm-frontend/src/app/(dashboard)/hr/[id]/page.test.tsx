@@ -7,13 +7,12 @@ vi.mock('react', async (original) => {
   const react = await original<typeof import('react')>();
   return { ...react, useState: (initial: unknown) => {
     const index = state.calls++;
-    return react.useState(index === 0 ? { id: 7, name: 'Nandini Rao', status: 'New Application' } : index === 6 ? state.form : initial);
+    return react.useState(index === 0 ? { id: 7, name: 'Nandini Rao', status: 'New Application' } : index === 5 ? state.form : initial);
   } };
 });
 vi.mock('next/navigation', () => ({ useParams: () => ({ id: '7' }), useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('next/dynamic', () => ({ default: () => () => null }));
 vi.mock('@/components/layout/mobile-header', () => ({ MobileHeader: () => null }));
-vi.mock('@/components/hr/hr-assignment-dialog', () => ({ HrAssignmentDialog: () => null }));
 vi.mock('@/components/mail/mail-panel', () => ({ MailPanel: () => null }));
 vi.mock('@/components/shared/form-select', () => ({ FormSelect: (props: { name: string; value?: string | null }) => {
   state.selects.push(props);

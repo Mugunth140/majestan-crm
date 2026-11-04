@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
-  ChevronDown, Database, ExternalLink, History, ImageIcon, Info, Loader2, Lock, MapPin, MessagesSquare, Plus, Upload, Wallet, X,
+  Database, ExternalLink, History, ImageIcon, Info, Loader2, Lock, MapPin, MessagesSquare, Plus, Upload, Wallet, X,
 } from "lucide-react";
 import { apiFetch, apiJson } from "@/lib/api-fetch";
 import { canViewInboundContacts } from "@/lib/permissions";
@@ -19,12 +19,11 @@ import {
 import { statusDot, statusPillClass } from "@/components/tables/cells";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { PageActions } from "@/components/layout/page-actions";
 import { FieldRow, InlineMulti, InlineSelect, InlineText, Section, type Option } from "@/components/record/inline-field";
 import { Feed, TabHeader } from "@/components/record/feed";
-import { AssigneePicker } from "@/components/record/assignee-picker";
+import { AssigneeButton, HEADER_BUTTON, StatusMenu, type StatusOption } from "@/components/record/header-actions";
 import { ScoreRing } from "@/components/record/score-ring";
 import { activityItems, type ActivityEntry } from "@/components/record/activity";
 import { INBOUND_ACTIVITY } from "@/components/inbound/inbound-activity";
@@ -41,13 +40,6 @@ type Patch = Record<string, unknown>;
 
 const YES_NO: Option[] = [{ label: "Yes", value: "yes" }, { label: "No", value: "no" }];
 const yesNo = (v: unknown) => (v ? "yes" : "no");
-
-const HEADER_BUTTON =
-  "inline-flex h-8 items-center gap-1.5 rounded-md border bg-background px-3 text-[14px] font-medium text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors hover:bg-muted disabled:opacity-50";
-
-// The assignee field in the side panel, styled like the other inline fields.
-const FIELD_TRIGGER =
-  "flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[14px] text-foreground transition-colors hover:bg-foreground/[0.05] data-[popup-open]:bg-foreground/[0.05]";
 
 const inboundCode = (i: Inbound) => i.property_id || `IN${String(i.id).padStart(5, "0")}`;
 const rupees = (v: unknown) => (v == null || v === "" ? "" : formatIndianCurrencyShort(Number(v)));
@@ -259,7 +251,6 @@ function InboundDetail() {
   const status: string = inbound.status || "New Inbound";
   const statusOptions: Option[] = [...(INBOUND_STATUSES.includes(status) ? [] : [status]), ...INBOUND_STATUSES]
     .map((s) => ({ label: s, value: s, dot: statusDot(s, INBOUND_STATUS_TONES[s]) }));
-  const pill = cn("inline-flex items-center gap-1 whitespace-nowrap rounded-md font-medium", statusPillClass(status, INBOUND_STATUS_TONES[status]));
   const assignee = staff.people.find((p) => p.id === inbound.assigned_staff_id)?.name;
   const title: string = inbound.property_title || [typeLabel(type), inbound.locality || inbound.area, inbound.city].filter(Boolean).join(", ") || `Inbound ${inboundCode(inbound)}`;
   const rent = inbound.purpose === "Rent";
@@ -273,32 +264,11 @@ function InboundDetail() {
   const units: { floor_label: string; area?: string | null; price?: number | null; notes?: string | null }[] = inbound.units ?? [];
   const saveUnits = (next: typeof units) => save({ units: next.map((u) => ({ floor_label: u.floor_label, area: u.area || null, price: u.price ?? null, notes: u.notes || null })) });
 
-  const statusMenu = (size: "h-7" | "h-8") => (
-    <DropdownMenu>
-      <DropdownMenuTrigger render={<button type="button" className={cn(pill, size, "pl-3 pr-2 text-[13px] transition-[filter] hover:brightness-[0.97] dark:hover:brightness-110")} aria-label={`Status: ${status}. Change status`} />}>
-        {status}
-        <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        {statusOptions.map((o) => (
-          <DropdownMenuItem key={o.value} onClick={() => { if (o.value !== status) void save({ status: o.value }).catch(() => {}); }} className="gap-2 text-[14px]">
-            <span className={cn("h-2 w-2 rounded-full", o.dot)} />
-            <span className="flex-1">{o.label}</span>
-            {o.value === status && <span className="text-[12px] text-muted-foreground">Current</span>}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+  const statusMenu = (size: "h-7" | "h-8", align: "start" | "end" = "end") => (
+    <StatusMenu status={status} options={statusOptions as StatusOption[]} pillClass={statusPillClass(status, INBOUND_STATUS_TONES[status])}
+      onChange={(v) => void save({ status: v }).catch(() => {})} size={size} align={align} />
   );
 
-  const assigneeLabel = (
-    <>
-      <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold", assignee ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" : "bg-foreground/[0.08] text-muted-foreground")}>
-        {assignee ? assignee.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase() : "?"}
-      </span>
-      <span className="truncate">{assignee ?? (inbound.is_queued ? "In the queue" : "Unassigned")}</span>
-    </>
-  );
   const assign = async (staffId: number | null) => {
     try {
       await apiJson(`${API_URL}/inbounds/assign`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ inboundIds: [inbound.id], staffId }) });
@@ -310,10 +280,9 @@ function InboundDetail() {
       throw reason;
     }
   };
-  const assignPicker = (trigger: React.ReactElement, content: ReactNode, align: "start" | "end" = "end") => (
-    <AssigneePicker people={staff.people} value={inbound.assigned_staff_id} onPick={assign} trigger={trigger} align={align} clearLabel="Return to the queue">
-      {content}
-    </AssigneePicker>
+  const assigneeButton = (variant: "header" | "field" | "phone") => (
+    <AssigneeButton name={assignee} empty={inbound.is_queued ? "In the queue" : "Unassigned"} variant={variant}
+      people={staff.people} value={inbound.assigned_staff_id} onPick={staff.canAssign ? assign : undefined} clearLabel="Return to the queue" />
   );
 
   /** Latitude and longitude, checked before saving. */
@@ -354,13 +323,7 @@ function InboundDetail() {
       ? <InlineText label={label} type={kind === "text" ? "text" : kind} value={inbound[key]} placeholder={placeholder} onSave={saveText(key)} />
       : <Restricted label={label} />;
   const added = new Date(inbound.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
-  const assigneeField = (
-    <FieldRow label="Assigned to">
-      {staff.canAssign
-        ? assignPicker(<button type="button" aria-label={`Assigned to ${assignee ?? "nobody"}. Reassign`} className={FIELD_TRIGGER} />, assigneeLabel, "start")
-        : <span className="flex h-8 items-center gap-2 px-2 text-[14px] text-foreground">{assigneeLabel}</span>}
-    </FieldRow>
-  );
+  const assigneeField = <FieldRow label="Assigned to">{assigneeButton("field")}</FieldRow>;
   // A picker shows the current value even when it's no longer one of the options.
   const withCurrent = (options: Option[], value?: string | null) =>
     !value || options.some((o) => o.value === value) ? options : [{ label: value, value }, ...options];
@@ -577,14 +540,7 @@ function InboundDetail() {
       <PageActions>
         <div className="flex items-center gap-2">
           {statusMenu("h-8")}
-          {staff.canAssign ? (
-            assignPicker(
-              <button type="button" aria-label={`Assigned to ${assignee ?? "nobody"}. Reassign`} className={cn(HEADER_BUTTON, "pl-1.5 pr-2")} />,
-              <>{assigneeLabel}<ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /></>,
-            )
-          ) : (
-            <span className={cn(HEADER_BUTTON, "pl-1.5 hover:bg-background")}>{assigneeLabel}</span>
-          )}
+          {assigneeButton("header")}
         </div>
       </PageActions>
 
@@ -593,20 +549,11 @@ function InboundDetail() {
         <div className="flex items-center gap-3">
           <ScoreRing score={Number(inbound.quality_score) || 0} size={40} />
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-[14px] text-muted-foreground">
-            {statusMenu("h-7")}
+            {statusMenu("h-7", "start")}
             <span>{inboundCode(inbound)}</span>
           </div>
         </div>
-        {staff.canAssign ? (
-          assignPicker(
-            <button type="button" aria-label={`Assigned to ${assignee ?? "nobody"}. Reassign`}
-              className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-foreground/[0.06] px-3 text-[15px] font-medium text-foreground" />,
-            <>{assigneeLabel}<ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /></>,
-            "start",
-          )
-        ) : (
-          <span className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-foreground/[0.04] px-3 text-[15px] font-medium text-foreground">{assigneeLabel}</span>
-        )}
+        {assigneeButton("phone")}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">

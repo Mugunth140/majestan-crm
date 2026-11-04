@@ -1,6 +1,12 @@
 "use client";
 
-import { HrAssignmentDialog } from "@/components/hr/hr-assignment-dialog";
+import { AssigneeButton, HEADER_BUTTON, StatusMenu } from "@/components/record/header-actions";
+import type { Person } from "@/components/record/assignee-picker";
+import { PageActions } from "@/components/layout/page-actions";
+import { statusDot, statusPillClass } from "@/components/tables/cells";
+import { HR_STATUS_TONES } from "@/lib/hr-status";
+import type { HrStaff } from "@/lib/hr-import";
+import { cn } from "@/lib/utils";
 import { MailPanel } from "@/components/mail/mail-panel";
 import { INTERVIEW_MODE_LABELS, formatInterviewTime } from "@/lib/hr-interview";
 import { downloadHrDocument, isHrDocumentAvailable, HR_DOCUMENT_ACCEPT } from "@/lib/hr-documents";
@@ -9,7 +15,6 @@ import { apiFetch, apiJson } from "@/lib/api-fetch";
 
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,7 +22,7 @@ import { FormSelect } from "@/components/shared/form-select";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { ArrowLeft, User, Phone, PhoneIncoming, Mail, MapPin, Plus, FileText, Briefcase, Clock, Calendar, RefreshCw, Save, History, Shield, Loader2, CheckCircle, Edit, ChevronLeft, MessageSquare } from "lucide-react";
+import { User, Phone, PhoneIncoming, Mail, MapPin, Plus, FileText, Briefcase, Clock, Calendar, RefreshCw, Save, History, Shield, Loader2, CheckCircle, Edit, ChevronLeft, MessageSquare } from "lucide-react";
 import dynamic from "next/dynamic";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { MobileHeader } from "@/components/layout/mobile-header";
@@ -116,19 +121,26 @@ export default function HrDetail() {
   const params = useParams();
   const id = params?.id as string;
   const [candidate, setCandidate] = useState<any>(null);
-  const [assignmentOpen, setAssignmentOpen] = useState(false);
-  const [isAssigning, setIsAssigning] = useState(false);
+  // HR staff to assign to, loaded when the list first opens.
+  const [staff, setStaff] = useState<Person[] | null>(null);
   const [canAssign, setCanAssign] = useState(false);
   useEffect(() => {
     try { const user = JSON.parse(localStorage.getItem("crm_user") || "{}"); setCanAssign(["Super Admin", "Admin", "Manager", "Team Lead"].includes(user.role?.name || user.role)); } catch {}
   }, []);
+  const loadStaff = () => {
+    if (staff) return;
+    apiJson<{ data: HrStaff[] }>(`${API_URL}/hr/staff-list`)
+      .then((r) => setStaff(r.data.map((p) => ({ id: p.id, name: p.name, hint: p.department?.name }))))
+      .catch(() => { setStaff([]); toast.error("Could not load HR staff."); });
+  };
   const assignCandidate = async (staffId: number | null) => {
-    setIsAssigning(true);
     try {
       await apiJson(`${API_URL}/hr/assign`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ candidateIds: [Number(id)], assignedStaffId: staffId }) });
-      setAssignmentOpen(false); toast.success("Candidate assignment updated."); await fetchCandidate();
-    } catch (reason) { toast.error(reason instanceof Error ? reason.message : "Assignment failed"); }
-    finally { setIsAssigning(false); }
+      toast.success("Candidate assignment updated."); await fetchCandidate();
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : "Assignment failed");
+      throw reason;
+    }
   };
   
   const [isFollowUpOpen, setIsFollowUpOpen] = useState(false);
@@ -256,7 +268,16 @@ export default function HrDetail() {
   if (!candidate && loadError) return <div role="alert" className="space-y-4 rounded-xl border p-6"><h1 className="text-xl font-semibold">Could not load candidate</h1><p>{loadError}</p><Button variant="outline" onClick={() => fetchCandidate()}>Try again</Button></div>;
   if (!candidate) return <PageSkeleton />;
 
-  const badgeCls = STATUS_STYLES[selectedStatus || candidate.status] ?? "bg-gray-100 text-gray-800 border-gray-200";
+  const status: string = selectedStatus || candidate.status || "New Application";
+  const statusOptions = [...(STATUS_STYLES[status] ? [] : [status]), ...Object.keys(STATUS_STYLES)].map((s) => ({ value: s, dot: statusDot(s, HR_STATUS_TONES[s]) }));
+  const statusMenu = (size: "h-7" | "h-8", align: "start" | "end" = "end") => (
+    <StatusMenu status={status} options={statusOptions} pillClass={statusPillClass(status, HR_STATUS_TONES[status])} size={size} align={align}
+      onChange={(v) => { setSelectedStatus(v); void handleDirectStatusUpdate(v); }} />
+  );
+  const assigneeButton = (variant: "header" | "field" | "phone") => (
+    <AssigneeButton name={candidate.assignedStaff?.name} variant={variant} people={staff ?? []} value={candidate.assignedStaff?.id ?? candidate.assigned_staff_id}
+      onPick={canAssign ? assignCandidate : undefined} loading={staff === null} onOpen={loadStaff} />
+  );
   const formattedId = "HRC" + String(candidate.id).padStart(4, "0");
   const followUps = candidate.follow_ups || [];
   // Device-synced call history (prismark call logger) + manual logs —
@@ -269,40 +290,30 @@ export default function HrDetail() {
     <div className="flex flex-col md:h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
       {loadError && <div role="alert" className="space-y-2 rounded-xl border p-4"><p>{loadError}</p><Button variant="outline" onClick={() => fetchCandidate()}>Try again</Button></div>}
       
-      <HrAssignmentDialog open={assignmentOpen} count={1} busy={isAssigning} onClose={() => setAssignmentOpen(false)} onConfirm={assignCandidate} />
       {/* ── Mobile Header ── */}
       <MobileHeader title={candidate.name || "Candidate"} showBack />
 
-      {/* ── Header (desktop only) ── */}
-      <div className="hidden md:flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shrink-0" onClick={() => router.push("/hr")}>
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </Button>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">{candidate.name}</h1>
-            <Badge className={`font-medium px-2.5 py-0.5 shadow-sm border ${badgeCls}`}>{selectedStatus || candidate.status}</Badge>
-            <span className="text-sm font-semibold text-muted-foreground ml-2">{formattedId}</span>
-          </div>
-        </div>
+      {/* ── Header actions (desktop page header) ── */}
+      <PageActions>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full" onClick={fetchCandidate} title="Refresh">
-            <RefreshCw size={14} className="text-muted-foreground" />
-          </Button>
-          
-          {canAssign && <Button variant="outline" className="rounded-full" onClick={() => setAssignmentOpen(true)}>Assign Candidate</Button>}
-          <Button onClick={() => router.push(`/hr/new?edit=${candidate.id}`)} className="rounded-full px-8 py-5 bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md">
-            Edit Candidate
-          </Button>
+          {statusMenu("h-8")}
+          {assigneeButton("header")}
+          <button type="button" onClick={fetchCandidate} title="Refresh" aria-label="Refresh" className={cn(HEADER_BUTTON, "w-8 justify-center px-0")}>
+            <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+          <button type="button" onClick={() => router.push(`/hr/new?edit=${candidate.id}`)} className={HEADER_BUTTON}>
+            <Edit className="h-3.5 w-3.5 text-muted-foreground" /> Edit
+          </button>
         </div>
-      </div>
+      </PageActions>
 
       {/* ── Mobile Summary Strip ── */}
       <div className="md:hidden flex flex-col gap-3 px-4 pb-4">
         <div className="flex items-center gap-2 flex-wrap">
-          <Badge className={`font-medium px-2.5 py-0.5 shadow-sm border ${badgeCls}`}>{selectedStatus || candidate.status}</Badge>
+          {statusMenu("h-7", "start")}
           <span className="text-sm font-semibold text-muted-foreground">{formattedId}</span>
         </div>
+        {assigneeButton("phone")}
         <div className="grid grid-cols-2 gap-3">
           <Button variant="outline" onClick={() => router.push(`/hr/new?edit=${candidate.id}`)} className="h-11 rounded-xl text-foreground font-semibold border-border/60">
             <Edit className="w-4 h-4 mr-2 text-muted-foreground" /> Edit
@@ -348,7 +359,7 @@ export default function HrDetail() {
                 </div>
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Assigned staff</p>
-                  <button type="button" disabled={!canAssign} onClick={() => setAssignmentOpen(true)} className="text-sm font-medium enabled:text-[#0052FF] enabled:hover:underline">{candidate.assignedStaff?.name || "Unassigned"}</button>
+                  <div className="-mx-2">{assigneeButton("field")}</div>
                 </div>
               </div>
             </div>

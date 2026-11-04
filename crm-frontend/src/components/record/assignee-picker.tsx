@@ -12,7 +12,7 @@ export type Person = { id: number; name: string; hint?: string };
  * "Assign to" as a searchable list under its trigger, like Frappe CRM's, in
  * place of a dialog. Picking someone saves straight away.
  */
-export function AssigneePicker({ people, value, onPick, trigger, children, align = "end", clearLabel = "Unassign" }: {
+export function AssigneePicker({ people, value, onPick, trigger, children, align = "end", clearLabel = "Unassign", allowClear = true, loading, onOpen }: {
   people: Person[];
   value: number | null | undefined;
   /** Resolves when saved; the list stays open (showing a spinner) until then. */
@@ -23,6 +23,12 @@ export function AssigneePicker({ people, value, onPick, trigger, children, align
   children: ReactNode;
   align?: "start" | "end";
   clearLabel?: string;
+  /** False when the record must always have someone (leads). */
+  allowClear?: boolean;
+  /** While the list is still being fetched. */
+  loading?: boolean;
+  /** Called when the list opens, e.g. to fetch it the first time. */
+  onOpen?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -47,7 +53,7 @@ export function AssigneePicker({ people, value, onPick, trigger, children, align
   };
 
   return (
-    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setQuery(""); }}>
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) onOpen?.(); else setQuery(""); }}>
       <PopoverTrigger render={trigger}>{children}</PopoverTrigger>
       <PopoverContent align={align} className="w-[min(280px,calc(100vw-2rem))] gap-0 p-0">
         <div className="flex items-center gap-2 border-b px-3">
@@ -81,9 +87,13 @@ export function AssigneePicker({ people, value, onPick, trigger, children, align
                 : p.id === value && <Check className="h-4 w-4 shrink-0 text-muted-foreground" />}
             </button>
           ))}
-          {!shown.length && <p className="px-2 py-2 text-[13px] text-muted-foreground">No one matches “{query.trim()}”.</p>}
+          {loading && !people.length ? (
+            <p className="flex items-center gap-2 px-2 py-2 text-[13px] text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading people…</p>
+          ) : !shown.length && (
+            <p className="px-2 py-2 text-[13px] text-muted-foreground">{query.trim() ? <>No one matches “{query.trim()}”.</> : "No one to assign yet."}</p>
+          )}
         </div>
-        {value != null && (
+        {allowClear && value != null && (
           <button type="button" onClick={() => void pick(null)} className="flex w-full items-center gap-2 border-t px-3 py-2 text-left text-[13px] text-muted-foreground hover:bg-muted">
             {busy === "none" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserMinus className="h-3.5 w-3.5" />} {clearLabel}
           </button>

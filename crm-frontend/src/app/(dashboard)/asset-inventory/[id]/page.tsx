@@ -5,9 +5,12 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { PageActions } from "@/components/layout/page-actions";
+import { HEADER_BUTTON, StatusMenu } from "@/components/record/header-actions";
+import { statusPillClass } from "@/components/tables/cells";
+import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Loader2, MapPin, Building2, Briefcase, FileText, IndianRupee, Image as ImageIcon, Map, Layers, RefreshCw, FileImage, Edit } from "lucide-react";
+import { Loader2, MapPin, Building2, Briefcase, FileText, IndianRupee, Image as ImageIcon, Map, Layers, RefreshCw, FileImage, Edit } from "lucide-react";
 import { MobileHeader } from "@/components/layout/mobile-header";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -78,35 +81,23 @@ export default function AssetViewPage() {
       {/* ── Mobile Header ── */}
       <MobileHeader title={`Asset #${asset.id}`} showBack />
 
-      {/* ── Header (desktop only) ── */}
-      <div className="hidden md:flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shrink-0" onClick={() => router.push("/asset-inventory")}>
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </Button>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              Asset #{asset.id} - {asset.owner_name}
-            </h1>
-            <Badge className="bg-blue-100 text-blue-800 border-blue-200">
-              {asset.status || "New"}
-            </Badge>
-          </div>
-        </div>
+      {/* ── Header actions (desktop page header) ── */}
+      <PageActions>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full" onClick={fetchAsset} title="Refresh">
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          <Button onClick={() => router.push(`/asset-inventory/new?edit=${asset.id}`)} className="rounded-full px-8 py-5 bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md">
-            Edit Asset
-          </Button>
+          <StatusMenu status={asset.status || "New"} options={[]} pillClass={statusPillClass(asset.status || "New")} />
+          <button type="button" onClick={fetchAsset} title="Refresh" aria-label="Refresh" className={cn(HEADER_BUTTON, "w-8 justify-center px-0")}>
+            <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+          <button type="button" onClick={() => router.push(`/asset-inventory/new?edit=${asset.id}`)} className={HEADER_BUTTON}>
+            <Edit className="h-3.5 w-3.5 text-muted-foreground" /> Edit
+          </button>
         </div>
-      </div>
+      </PageActions>
 
       {/* ── Mobile Summary Strip ── */}
       <div className="md:hidden flex flex-col gap-3 px-4 pb-4">
         <div className="flex items-center gap-2 flex-wrap">
-          <Badge className="bg-blue-100 text-blue-800 border-blue-200">{asset.status || "New"}</Badge>
+          <StatusMenu status={asset.status || "New"} options={[]} pillClass={statusPillClass(asset.status || "New")} size="h-7" />
           <span className="text-sm font-semibold text-muted-foreground">{asset.owner_name}</span>
         </div>
         <div className="grid grid-cols-2 gap-3">

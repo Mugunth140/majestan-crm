@@ -21,18 +21,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { PageActions } from "@/components/layout/page-actions";
 import { useIsMobile } from "@/hooks/use-device";
 import dynamic from "next/dynamic";
 
 const LeadAttachments = dynamic(() => import("@/components/shared/lead-attachments").then(mod => mod.LeadAttachments), { ssr: false });
-import { AssignLeadModal } from "@/components/shared/assign-lead-modal";
+import { AssigneeButton, HEADER_BUTTON, HEADER_PRIMARY, StatusMenu } from "@/components/record/header-actions";
+import type { Person } from "@/components/record/assignee-picker";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { sortContactLogs } from "@/lib/contact-log-utils";
 import {
@@ -42,7 +37,7 @@ import {
 } from "@/lib/lead-constants";
 import { cn } from "@/lib/utils";
 import { shouldAutoOpenFollowUps, wantsFollowUps } from "@/lib/follow-up-deep-link";
-import { InlineAction, InlineSelect, InlineText, Section, FieldRow, type Option } from "@/components/record/inline-field";
+import { InlineSelect, InlineText, Section, FieldRow, type Option } from "@/components/record/inline-field";
 import { Feed, timelineItems, type TimelineEntry } from "./lead-timeline";
 import { TabHeader } from "@/components/record/feed";
 import { LeadConversation } from "@/components/record/conversation";
@@ -50,7 +45,7 @@ import { FollowUpComposer } from "@/components/record/follow-up-composer";
 import { AttachmentsArt, EmptyState, RequirementsArt } from "@/components/record/empty-state";
 import { RequirementFields } from "./lead-requirement";
 import {
-  Loader2, ArrowUpRight, History, TrendingUp, Sparkles, ChevronDown,
+  Loader2, ArrowUpRight, History, TrendingUp, Sparkles,
   Plus, Activity, MessagesSquare, Paperclip, Building2, Info,
 } from "lucide-react";
 
@@ -90,11 +85,6 @@ function avatarTone(name: string) {
 const leadCode = (id: number | string) => `L${String(id).padStart(5, "0")}`;
 
 
-// The header actions share the leads list's toolbar buttons.
-const HEADER_BUTTON =
-  "inline-flex h-8 items-center gap-1.5 rounded-md border bg-background px-3 text-[14px] font-medium text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors hover:bg-muted disabled:opacity-50";
-const HEADER_PRIMARY =
-  "inline-flex h-8 items-center gap-1.5 rounded-md bg-foreground px-3 text-[14px] font-medium text-background transition-colors hover:bg-foreground/85";
 
 // ── Loading Skeleton ─────────────────────────────────────────────────────────
 function PageSkeleton() {
@@ -221,8 +211,8 @@ function LeadDetail() {
   const [isConverting, setIsConverting] = useState(false);
 
   // Assign Lead state
-  const [isAssignOpen, setIsAssignOpen] = useState(false);
-  const [isAssigning, setIsAssigning] = useState(false);
+  // Who the lead can go to: loaded when the assignee list first opens.
+  const [staff, setStaff] = useState<Person[] | null>(null);
 
   // Dropped Reason Modal
   const [isDroppedOpen, setIsDroppedOpen] = useState(false);
@@ -299,8 +289,22 @@ function LeadDetail() {
     }
   };
 
-  const handleAssignLead = async (toUserId: number) => {
-    setIsAssigning(true);
+  const loadStaff = () => {
+    if (staff) return;
+    const params = role === "Team Lead" && userDept ? `?department=${encodeURIComponent(userDept.toLowerCase())}` : "?department=all";
+    apiFetch(`${API_URL}/lead-routing/staff-list${params}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d.success) throw new Error();
+        setStaff((d.data as { id: number; name: string; department?: { name: string }; current_lead_count?: number }[]).map((p) => ({
+          id: p.id, name: p.name, hint: [p.department?.name, `${p.current_lead_count ?? 0} leads`].filter(Boolean).join(" · "),
+        })));
+      })
+      .catch(() => { setStaff([]); toast.error("Failed to load staff list"); });
+  };
+
+  const handleAssignLead = async (toUserId: number | null) => {
+    if (toUserId === null) return;
     try {
       const res = await apiFetch(`${API_URL}/lead-routing/assign/${id}`, {
         method: "POST",
@@ -309,12 +313,10 @@ function LeadDetail() {
       });
       if (!res.ok) throw new Error("Failed to assign lead");
       toast.success("Lead reassigned successfully");
-      setIsAssignOpen(false);
       fetchLead(true);
-    } catch {
+    } catch (reason) {
       toast.error("Failed to assign lead");
-    } finally {
-      setIsAssigning(false);
+      throw reason;
     }
   };
 
@@ -591,6 +593,15 @@ function LeadDetail() {
   const canReassign =
     isManagerOrAdmin || (role === "Team Lead" && inDeptPurview);
   const showReassign = canReassign && (role === "Admin" || role === "Manager" || role === "Team Lead") && !lead.is_converted;
+
+  // The status and assignee buttons, shared with every record page.
+  const statusMenu = (size: "h-7" | "h-8", align: "start" | "end" = "end") => (
+    <StatusMenu status={statusName} options={STATUS_OPTIONS} pillClass={leadStatusPill(statusName)} onChange={canEdit ? changeStatus : undefined} size={size} align={align} />
+  );
+  const assigneeButton = (variant: "header" | "field" | "phone") => (
+    <AssigneeButton name={lead.assigned_staff?.name} variant={variant} people={staff ?? []} value={lead.assigned_staff_id ?? lead.assigned_staff?.id}
+      onPick={showReassign ? handleAssignLead : undefined} allowClear={false} loading={staff === null} onOpen={loadStaff} />
+  );
   const showConvert = canEdit && !lead.is_converted &&
     (role === "Admin" || role === "Manager" || ((role === "Staff" || role === "Team Lead") && userDept === "telecalling"));
   const openConvert = () => { setConvertTo(""); setConvertFeedback(""); setIsConvertOpen(true); };
@@ -625,18 +636,7 @@ function LeadDetail() {
           onSave={(v) => saveLead({ source: v })}
           disabled={!canEdit}
         />
-        <InlineAction label="Assigned to" onClick={showReassign ? () => setIsAssignOpen(true) : undefined}>
-          {lead.assigned_staff?.name ? (
-            <>
-              <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold", avatarTone(lead.assigned_staff.name))}>
-                {initials(lead.assigned_staff.name)}
-              </span>
-              <span className="truncate">{lead.assigned_staff.name}</span>
-            </>
-          ) : (
-            <span className="text-muted-foreground">Unassigned</span>
-          )}
-        </InlineAction>
+        <FieldRow label="Assigned to">{assigneeButton("field")}</FieldRow>
         <FieldRow label="Unqualified">
           <div className="flex h-8 items-center px-2">
             <Switch
@@ -713,19 +713,6 @@ function LeadDetail() {
   );
 
   // The status pill and the assignee, as the leads table shows them.
-  const statusPill = cn("inline-flex items-center gap-1 whitespace-nowrap rounded-md font-medium transition-[filter] hover:brightness-[0.97] dark:hover:brightness-110", leadStatusPill(statusName));
-  const assignee = lead.assigned_staff?.name as string | undefined;
-  const assigneeLabel = (
-    <>
-      {assignee ? (
-        <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold", avatarTone(assignee))}>{initials(assignee)}</span>
-      ) : (
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-dashed border-muted-foreground/50" />
-      )}
-      <span className="max-w-[160px] truncate">{assignee ?? "Unassigned"}</span>
-    </>
-  );
-
   // Requirements added by hand on this page are not repeat enquiries.
   const enquiries = inquiries.filter((i) => i.source !== "manual").length;
   const repeatBadge = enquiries > 1 && (
@@ -781,33 +768,8 @@ function LeadDetail() {
       {/* ── Header actions (desktop page header) ── */}
       <PageActions>
         <div className="flex items-center gap-2">
-          {canEdit ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<button type="button" className={cn(statusPill, "h-8 pl-3 pr-2 text-[13px]")} aria-label={`Status: ${statusName}. Change status`} />}>
-                {statusName}
-                <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="max-h-[360px] w-56">
-                {STATUS_OPTIONS.map((opt) => (
-                  <DropdownMenuItem key={opt.value} onClick={() => changeStatus(opt.value)} className="gap-2 text-[14px]">
-                    <span className={cn("h-2 w-2 rounded-full", opt.dot)} />
-                    <span className="flex-1">{opt.label}</span>
-                    {opt.value === statusName && <span className="text-[12px] text-muted-foreground">Current</span>}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <span className={cn(statusPill, "h-8 px-3 text-[13px] hover:brightness-100")}>{statusName}</span>
-          )}
-          {showReassign ? (
-            <button type="button" onClick={() => setIsAssignOpen(true)} title="Reassign" aria-label={`Assigned to ${assignee ?? "nobody"}. Reassign`} className={cn(HEADER_BUTTON, "pl-1.5 pr-2")}>
-              {assigneeLabel}
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-            </button>
-          ) : (
-            <span title="Assigned to" className={cn(HEADER_BUTTON, "pl-1.5 hover:bg-background")}>{assigneeLabel}</span>
-          )}
+          {statusMenu("h-8")}
+          {assigneeButton("header")}
           {showConvert && (
             <button type="button" onClick={openConvert} className={HEADER_PRIMARY}>
               <TrendingUp className="h-3.5 w-3.5" />
@@ -820,36 +782,12 @@ function LeadDetail() {
       {/* ── Phone summary ── */}
       <div className="space-y-4 px-4 pb-4 pt-1 md:hidden">
         <div className="flex flex-wrap items-center gap-2 text-[14px] text-muted-foreground">
-          {canEdit ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<button type="button" className={cn(statusPill, "h-7 pl-3 pr-2 text-[13px]")} aria-label={`Status: ${statusName}. Change status`} />}>
-                {statusName}
-                <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="max-h-[360px] w-56">
-                {STATUS_OPTIONS.map((opt) => (
-                  <DropdownMenuItem key={opt.value} onClick={() => changeStatus(opt.value)} className="gap-2 text-[15px]">
-                    <span className={cn("h-2 w-2 rounded-full", opt.dot)} />
-                    {opt.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <span className={cn(statusPill, "h-7 px-3 text-[13px] hover:brightness-100")}>{statusName}</span>
-          )}
+          {statusMenu("h-7", "start")}
           {repeatBadge}
           <span>{leadCode(lead.id)}</span>
         </div>
         <div className="flex gap-2">
-            {showReassign ? (
-              <button type="button" onClick={() => setIsAssignOpen(true)} aria-label={`Assigned to ${assignee ?? "nobody"}. Reassign`} className="flex h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-foreground/[0.06] px-3 text-[15px] font-medium text-foreground">
-                {assigneeLabel}
-                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-              </button>
-            ) : (
-              <span className="flex h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-foreground/[0.04] px-3 text-[15px] font-medium text-foreground">{assigneeLabel}</span>
-            )}
+            <div className="min-w-0 flex-1">{assigneeButton("phone")}</div>
             {showConvert && (
               <button type="button" onClick={openConvert} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-[#017D58] text-[15px] font-semibold text-white dark:bg-[#2FB585] dark:text-black">
                 <TrendingUp className="h-4 w-4" /> Convert
@@ -1216,14 +1154,6 @@ function LeadDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Assign Lead Modal ── */}
-      <AssignLeadModal
-        open={isAssignOpen}
-        onClose={() => setIsAssignOpen(false)}
-        onConfirm={handleAssignLead}
-        department={role === "Team Lead" ? userDept : "all"}
-        isLoading={isAssigning}
-      />
     </div>
   );
 }

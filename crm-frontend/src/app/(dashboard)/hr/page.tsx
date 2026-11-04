@@ -3,7 +3,8 @@ import { useState, useEffect, useMemo } from "react";
 import { DataTable } from "@/components/tables/data-table";
 import { ModuleMobileRows, ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
 import { moveRow } from "@/lib/move-row";
-import { IdCell, NameCell, StatusCell, statusDot, type StatusTone } from "@/components/tables/cells";
+import { IdCell, NameCell, StatusCell, statusDot } from "@/components/tables/cells";
+import { HR_STATUS_TONES } from "@/lib/hr-status";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -31,17 +32,7 @@ import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
-const STATUS_TONES: Record<string, StatusTone> = {
-  "New Application": "gray",
-  "Resume Shortlisted": "blue",
-  "Interview Scheduled": "violet",
-  "Interview Completed": "violet",
-  "Selected": "green",
-  "Offer Sent": "blue",
-  "Joined": "green",
-  "Rejected": "red",
-  "Hold": "amber",
-};
+const STATUS_TONES = HR_STATUS_TONES;
 
 const HR_FIELDS: ViewField[] = [
   { id: "status", label: "Status", get: (c) => c.status, order: Object.keys(STATUS_TONES), dot: (v) => statusDot(v, STATUS_TONES[v]) },
