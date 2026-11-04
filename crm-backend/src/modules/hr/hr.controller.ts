@@ -57,6 +57,16 @@ export class HrController {
   @Post('bulk')
   bulkImport(@Body() body: BulkImportHrDto, @Request() req: any) { return this.hrService.bulkImport(body.candidates, req.user); }
 
+  @Get(':id/activity')
+  async activity(@Param('id', ParseIntPipe) id: number) {
+    return { success: true, data: await this.hrService.activity(id) };
+  }
+
+  @Post(':id/contact-log')
+  async addContactLog(@Param('id', ParseIntPipe) id: number, @Body() body: any, @Request() req: any) {
+    return { success: true, data: await this.hrService.addContactLog(id, body, req.user?.id ?? null) };
+  }
+
   @Get(':id') findOne(@Param('id', ParseIntPipe) id: number) { return this.hrService.findOne(+id); }
   
   @Post() create(@Body() createDto: CreateHrCandidateDto, @Request() req: any) { return this.hrService.create(createDto, req.user); }
@@ -74,13 +84,14 @@ export class HrController {
   async uploadDocument(
     @Param('id', ParseIntPipe) id: number,
     @Param('docType', new ParseEnumPipe(HrDocumentType)) docType: HrDocumentType,
-    @UploadedFile() file: Express.Multer.File
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req?: any,
   ) {
     if (!file) throw new BadRequestException('No file provided');
     await this.hrService.findOne(+id);
     const reference = await this.documents.upload(+id, docType, file);
     try {
-      return await this.hrService.saveDocument(+id, docType, reference);
+      return await this.hrService.saveDocument(+id, docType, reference, req?.user);
     } catch (error) {
       // A lost database acknowledgement can still mean the write committed.
       // Keep the object when its persisted reference cannot be ruled out.

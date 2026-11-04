@@ -12,6 +12,24 @@ import { HrContactLog } from '../../database/entities/hr-contact-log.entity';
 import { CreateHrCandidateDto } from './dto/create-hr-candidate.dto';
 import { UpdateHrCandidateDto } from './dto/update-hr-candidate.dto';
 import { toDateOnly, toTimeOnly } from './mail/candidate-mail-data';
+import { RecordEventsService } from '../record-events/record-events.service';
+
+type Actor = { id?: number; role?: string };
+
+/** Candidate columns whose edits show on the Activity tab. */
+const TRACKED = [
+  'name', 'mobile', 'whatsapp', 'email', 'city', 'state', 'department', 'position', 'experience',
+  'currentSalary', 'expectedSalary', 'noticePeriod', 'recruitmentSource',
+  'interviewDate', 'interviewTime', 'interviewMode', 'interviewLocation', 'interviewLink', 'interviewer', 'interviewRound', 'interviewFeedback',
+] as const;
+
+/** The tracked columns as plain text, so dates and times compare by value. */
+function snapshot(c: HrCandidate): Record<string, unknown> {
+  const row: Record<string, unknown> = Object.fromEntries(TRACKED.map(f => [f, (c as any)[f]]));
+  row.interviewDate = toDateOnly(c.interviewDate);
+  row.interviewTime = toTimeOnly(c.interviewTime);
+  return row;
+}
 
 /** What makes an interview invitation different: used to detect a reschedule. */
 function interviewSignature(c: Partial<HrCandidate>) {
@@ -31,7 +49,14 @@ export class HrService {
     @InjectRepository(User) private readonly users: Repository<User>,
     // Domain events for the central mail service (docs/mail-service-design.md).
     @Optional() private readonly events?: EventEmitter2,
+    @Optional() private readonly recordEvents?: RecordEventsService,
   ) {}
+
+  /** The candidate's Activity history, newest first. */
+  async activity(id: number) {
+    if (!(await this.repo.existsBy({ id }))) throw new NotFoundException('Candidate not found');
+    return this.recordEvents?.activity('hr', id) ?? [];
+  }
 
   async findAll() { 
     const candidates = await this.repo.find({ order: { createdAt: 'DESC' } });
@@ -113,10 +138,21 @@ export class HrService {
     if (target !== null && !(await this.getAssignableStaff()).some(staff => staff.id === target)) {
       throw new BadRequestException('Choose an active staff member from the HR department');
     }
-    const candidates = await this.repo.find({ where: { id: In(ids) }, select: { id: true } });
+    const candidates = await this.repo.find({ where: { id: In(ids) }, select: { id: true, assignedStaffId: true } });
     if (candidates.length !== new Set(ids).size) throw new NotFoundException('One or more candidates were not found');
     await this.repo.update({ id: In(ids) }, { assignedStaffId: target });
+    await this.recordAssignments(candidates.filter(c => (c.assignedStaffId ?? null) !== target).map(c => ({ id: c.id, from: c.assignedStaffId ?? null })), target, actor);
     return { success: true, assigned: ids.length };
+  }
+
+  private async recordAssignments(changes: { id: number; from: number | null }[], to: number | null, actor?: Actor) {
+    if (!changes.length || !this.recordEvents) return;
+    const names = await this.assigneeNames([to, ...changes.map(c => c.from)]);
+    const name = (id: number | null) => (id ? names.get(id)?.name ?? null : null);
+    await this.recordEvents.record(changes.map(c => ({
+      entity: 'hr' as const, entityId: c.id, actorId: actor?.id ?? null,
+      type: to === null ? 'unassigned' : 'assigned', from: name(c.from), to: name(to),
+    })));
   }
 
   private async resolveReferences<T extends Partial<CreateHrCandidateDto>>(data: T, current?: HrCandidate, actor?: { id?: number; role?: string }): Promise<T> {
@@ -143,6 +179,7 @@ export class HrService {
   async create(data: CreateHrCandidateDto, actor?: { id?: number; role?: string }) {
     const { interviewDate, ...rest } = await this.resolveReferences(data, undefined, actor);
     const saved = await this.repo.save(this.repo.create({ ...rest, ...this.interviewFields(rest), interviewDate: interviewDate ? new Date(interviewDate) : null } as Partial<HrCandidate>));
+    await this.recordEvents?.record({ entity: 'hr', entityId: saved.id, actorId: actor?.id ?? null, type: 'created', to: saved.status });
     await this.events?.emitAsync('hr.candidate.created', { entityId: saved.id, actorId: actor?.id ?? null });
     return saved;
   }
@@ -155,6 +192,7 @@ export class HrService {
       ...(interviewDate !== undefined ? { interviewDate: interviewDate ? new Date(interviewDate) : null } : {}),
     } as Partial<HrCandidate>);
     const updated = await this.findOne(id);
+    await this.recordUpdate(current, updated, actor);
     await this.emitChanges(current, updated, actor);
     return updated;
   }
@@ -167,6 +205,18 @@ export class HrService {
     if (data.interviewLocation !== undefined) fields.interviewLocation = data.interviewLocation?.trim() || null;
     if (data.interviewLink !== undefined) fields.interviewLink = data.interviewLink?.trim() || null;
     return fields;
+  }
+
+  private async recordUpdate(before: HrCandidate, after: HrCandidate, actor?: Actor) {
+    if (!this.recordEvents) return;
+    const actorId = actor?.id ?? null;
+    await this.recordEvents.recordChanges('hr', after.id, actorId, snapshot(before), snapshot(after), [...TRACKED]);
+    const from = before.assignedStaffId ?? null;
+    const to = after.assignedStaffId ?? null;
+    if (from !== to) await this.recordAssignments([{ id: after.id, from }], to, actor);
+    if (before.status !== after.status) {
+      await this.recordEvents.record({ entity: 'hr', entityId: after.id, actorId, type: 'status_changed', field: 'status', from: before.status, to: after.status });
+    }
   }
 
   private async emitChanges(before: HrCandidate, after: HrCandidate, actor?: { id?: number }) {
@@ -216,10 +266,20 @@ export class HrService {
     await this.repo.delete(id);
   }
 
-  async saveDocument(id: number, type: string, reference: string) {
+  async saveDocument(id: number, type: string, reference: string, actor?: Actor) {
     const result = await this.repo.update(id, { [`${type}Url`]: reference });
     if (!result.affected) throw new NotFoundException('Candidate not found');
+    await this.recordEvents?.record({ entity: 'hr', entityId: id, actorId: actor?.id ?? null, type: 'document_uploaded', field: type });
     return { success: true };
+  }
+
+  /** A WhatsApp or SMS sent from the candidate page, logged with who sent it. */
+  async addContactLog(id: number, body: { contact_type?: string; subject?: string; message?: string }, actorId: number | null) {
+    if (!(await this.repo.existsBy({ id }))) throw new NotFoundException('Candidate not found');
+    if (!['call', 'whatsapp', 'sms', 'email'].includes(body.contact_type ?? '')) throw new BadRequestException('Choose call, WhatsApp, SMS or email');
+    return this.contactLogRepo.save(this.contactLogRepo.create({
+      hr_candidate_id: id, contact_type: body.contact_type, subject: body.subject ?? null, message: body.message ?? null, sent_by_id: actorId ?? undefined,
+    }));
   }
   async addFollowUp(id: number, data: Partial<HrFollowUp>) {
     if (!(await this.repo.existsBy({ id }))) throw new NotFoundException('Candidate not found');

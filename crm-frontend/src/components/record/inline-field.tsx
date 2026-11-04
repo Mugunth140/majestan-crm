@@ -55,7 +55,7 @@ export function InlineText({
   onSave: Save;
   disabled?: boolean;
   placeholder?: string;
-  type?: "text" | "tel" | "email" | "number";
+  type?: "text" | "tel" | "email" | "number" | "date" | "time" | "url";
   multiline?: boolean;
 }) {
   const stored = value == null ? "" : String(value);

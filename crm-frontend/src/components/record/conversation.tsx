@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { CalendarClock, CalendarDays, ChevronDown, Plus, Flag, Loader2, Mail, MessageCircle, MoreHorizontal, NotebookPen, Phone, PhoneIncoming, PhoneMissed, PhoneOutgoing, Reply, ReplyAll, RotateCcw, Send, Smartphone, StickyNote, Timer, X } from "lucide-react";
+import { toHrFollowUpPayload } from "@/lib/hr-follow-up";
 import { apiFetch } from "@/lib/api-fetch";
 import { mailApi, MAIL_STATUS, newDraftIds, type MailCatalog, type MailSummary, type MailTarget } from "@/lib/mail-api";
 import { contactLogAuthor, formatDuration } from "@/lib/contact-log-utils";
@@ -86,10 +87,18 @@ const dateTime = (d?: string | null, t?: string | null) => {
 };
 
 /** Which record the conversation belongs to: its API path and mail entity. */
-export type ConversationEntity = { api: "leads" | "inbounds" | "agents"; mail: "lead" | "inbound" | "agent"; noun: string; editMethod: "PUT" | "PATCH" };
+export type ConversationEntity = {
+  api: "leads" | "inbounds" | "agents" | "hr";
+  mail: "lead" | "inbound" | "agent" | "hr_candidate";
+  noun: string;
+  editMethod: "PUT" | "PATCH";
+  /** Reshapes a follow-up body for APIs that don't take the camelCase one (HR). */
+  followUpBody?: (body: Record<string, string>) => Record<string, unknown>;
+};
 export const LEAD_ENTITY: ConversationEntity = { api: "leads", mail: "lead", noun: "lead", editMethod: "PUT" };
 export const INBOUND_ENTITY: ConversationEntity = { api: "inbounds", mail: "inbound", noun: "inbound", editMethod: "PATCH" };
 export const AGENT_ENTITY: ConversationEntity = { api: "agents", mail: "agent", noun: "agent", editMethod: "PUT" };
+export const HR_ENTITY: ConversationEntity = { api: "hr", mail: "hr_candidate", noun: "candidate", editMethod: "PUT", followUpBody: toHrFollowUpPayload };
 
 export type ComposeMode = "followup" | "email" | "whatsapp" | "sms";
 type Mode = ComposeMode;
@@ -625,7 +634,7 @@ function EditFollowUpDialog({ leadId, entity, followUp, onClose, onSaved }: {
       const res = await apiFetch(`${API_URL}/${entity.api}/${leadId}/follow-ups/${followUp.id}`, {
         method: entity.editMethod,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify((entity.followUpBody ?? ((b) => b))({
           followUpDate: followUp.follow_up_date ?? "",
           followUpTime: followUp.follow_up_time ?? "",
           contactedVia: followUp.contacted_via ?? "",
@@ -634,7 +643,7 @@ function EditFollowUpDialog({ leadId, entity, followUp, onClose, onSaved }: {
           priority,
           nextFollowUpDate: next ? format(next, "yyyy-MM-dd") : "",
           nextFollowUpTime: next ? format(next, "HH:mm") : "",
-        }),
+        })),
       });
       const data = await res.json();
       if (!data.success) throw new Error();

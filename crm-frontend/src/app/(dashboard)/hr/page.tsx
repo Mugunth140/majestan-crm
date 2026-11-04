@@ -9,8 +9,7 @@ import { HR_STATUS_TONES } from "@/lib/hr-status";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { Plus, Eye, Edit, Search, Filter, X, FileSpreadsheet } from "lucide-react";
-import Link from "next/link";
+import { Plus, Eye, Search, Filter, X, FileSpreadsheet } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { motion } from "motion/react";
@@ -18,6 +17,7 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FormSelect } from "@/components/shared/form-select";
+import { CandidateForm } from "./_components/CandidateForm";
 import { HrAssignmentDialog } from "@/components/hr/hr-assignment-dialog";
 import { HrBulkImportDialog, HrImportReview } from "@/components/hr/hr-bulk-import";
 import type { HrImportRow } from "@/lib/hr-import";
@@ -49,6 +49,7 @@ export default function HrPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [pendingImports, setPendingImports] = useState<HrImportRow[]>([]);
+  const [creating, setCreating] = useState(false);
 
   const [activeTab, setActiveTab] = usePersistedState<string>("hr:tab", "All Candidates", { allowed: ["All Candidates", "Action Required", "Rejected"] });
   const [actionFilter, setActionFilter] = usePersistedState<string>("hr:actionFilter", "Today", { allowed: ACTION_FILTERS });
@@ -466,7 +467,6 @@ export default function HrPage() {
                   {canAssign && <Button variant="outline" size="sm" onClick={() => setAssignmentIds(selectedRows.map(item => item.id))}>Assign Selected</Button>}
                   {selectedRows.length === 1 && <>
                     <Button variant="outline" size="sm" onClick={() => router.push("/hr/" + row.id)}><Eye size={15} className="mr-1.5" /> View</Button>
-                    <Button variant="outline" size="sm" onClick={() => router.push("/hr/new?edit=" + row.id)}><Edit size={15} className="mr-1.5" /> Edit</Button>
                   </>}
                 </>;
               }}
@@ -497,10 +497,10 @@ export default function HrPage() {
             <FileSpreadsheet className="size-[15px] text-muted-foreground" />
             Bulk Import
           </button>
-          <Link href="/hr/new" className={headerPrimaryClass}>
+          <button type="button" onClick={() => setCreating(true)} className={headerPrimaryClass}>
             <Plus className="size-4" />
             Add Candidate
-          </Link>
+          </button>
         </PageActions>
 
         <Device desktop={null} mobile={
@@ -535,7 +535,6 @@ export default function HrPage() {
                 {canAssign && <Button variant="outline" size="sm" onClick={() => setAssignmentIds(selectedRows.map(item => item.id))}>Assign Selected</Button>}
                 {selectedRows.length === 1 && <>
                   <Button variant="outline" size="sm" onClick={() => router.push("/hr/" + row.id)}><Eye size={15} className="mr-1.5" /> View</Button>
-                  <Button variant="outline" size="sm" onClick={() => router.push("/hr/new?edit=" + row.id)}><Edit size={15} className="mr-1.5" /> Edit</Button>
                 </>}
               </>;
             }}
@@ -547,6 +546,7 @@ export default function HrPage() {
         />
         </>)}
       </div>
+      {creating && <CandidateForm onClose={() => setCreating(false)} onCreated={(id) => router.push(id ? `/hr/${id}` : "/hr")} />}
       <HrAssignmentDialog open={assignmentIds !== null} count={assignmentIds?.length || 0} busy={isAssigning} onClose={() => setAssignmentIds(null)} onConfirm={assignCandidates} />
       <HrBulkImportDialog open={isImportOpen} onOpenChange={setIsImportOpen} onParsed={setPendingImports} />
 

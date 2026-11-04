@@ -64,13 +64,15 @@ export function latestRnr(followUps: FollowUpLike[]) {
  * contact happened, the next follow-up, priority and RNR, logged in one row.
  * Shared by leads and inbounds (`api` is the record's API path).
  */
-export function FollowUpComposer({ api, entityId, noun, followUps, onSaved }: {
-  api: "leads" | "inbounds" | "agents";
+export function FollowUpComposer({ api, entityId, noun, followUps, onSaved, toBody }: {
+  api: "leads" | "inbounds" | "agents" | "hr";
   entityId: number | string;
   /** "lead", "owner"… for the messages. */
   noun: string;
   followUps: FollowUpLike[];
   onSaved: () => void;
+  /** Reshapes the body for APIs that don't take the camelCase one (HR). */
+  toBody?: (body: Record<string, string>) => Record<string, unknown>;
 }) {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
@@ -97,7 +99,7 @@ export function FollowUpComposer({ api, entityId, noun, followUps, onSaved }: {
       const res = await apiFetch(`${API_URL}/${api}/${entityId}/follow-ups`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, followUpDate: format(now, "yyyy-MM-dd"), followUpTime: format(now, "HH:mm") }),
+        body: JSON.stringify((toBody ?? ((b) => b))({ ...form, followUpDate: format(now, "yyyy-MM-dd"), followUpTime: format(now, "HH:mm") })),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.message);

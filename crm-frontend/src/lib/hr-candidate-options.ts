@@ -14,3 +14,13 @@ export async function loadHrStates(): Promise<string[]> {
   const result = await apiJson<{ data: { state_name: string; is_active: number }[] }>(`${process.env.NEXT_PUBLIC_API_URL || '/api/v1'}/master/all-cities`);
   return [...new Set(result.data.filter(city => Number(city.is_active) === 1).map(city => city.state_name).filter(Boolean))].sort();
 }
+
+/** The departments a candidate can apply to. */
+export const HR_DEPARTMENTS = ['Sales', 'Telecalling', 'Sourcing', 'Channel Partner', 'Digital Marketing', 'HR', 'Admin', 'Accounts']
+  .map(name => ({ label: name, value: name }));
+
+/** Every status a candidate moves through, in order. */
+export const HR_STATUSES = [
+  'New Application', 'Resume Shortlisted', 'Interview Scheduled', 'Interview Completed',
+  'Selected', 'Offer Sent', 'Joined', 'Rejected', 'Hold',
+];
