@@ -77,7 +77,7 @@ export function BlogPostList({
       accessorKey: "id",
       header: "ID",
       meta: { hideOnMobile: true },
-      cell: ({ row }) => <IdCell>{row.original.id}</IdCell>,
+      cell: ({ row }) => <IdCell href={`/blog/${row.original.id}`}>{row.original.id}</IdCell>,
     },
     {
       accessorKey: "title",

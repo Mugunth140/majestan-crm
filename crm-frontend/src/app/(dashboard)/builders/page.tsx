@@ -171,7 +171,7 @@ export default function BuildersPage() {
     {
       accessorKey: "id",
       header: "ID",
-      cell: ({ row }) => <IdCell>{row.original.id}</IdCell>,
+      cell: ({ row }) => <IdCell href={`/builders/${row.original.id}`}>{row.original.id}</IdCell>,
     },
     {
       accessorKey: "name",

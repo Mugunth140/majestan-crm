@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { Filter, Search, X } from "lucide-react";
+import { ChevronDown, Filter, Search, X } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 // Building blocks for module list pages, matching the Leads page: the page's
@@ -87,6 +88,46 @@ export function SegmentTabs<T extends string>({
         );
       })}
     </div>
+  );
+}
+
+/** A toolbar dropdown for one choice (a placement, a status): "Label: Value ▾". */
+export function ToolbarSelect<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  value: T;
+  options: readonly { value: T; label: string; count?: number }[];
+  onChange: (value: T) => void;
+  disabled?: boolean;
+}) {
+  const current = options.find((o) => o.value === value);
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        disabled={disabled}
+        render={<button type="button" aria-label={`${label}: ${current?.label ?? value}`} className={cn(toolbarButtonClass, "disabled:opacity-60")} />}
+      >
+        <span className="text-muted-foreground">{label}:</span>
+        <span className="font-medium">{current?.label ?? value}</span>
+        {current?.count !== undefined && <span className="tabular-nums text-muted-foreground">{current.count}</span>}
+        <ChevronDown className="size-3.5 text-muted-foreground" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-52">
+        <DropdownMenuRadioGroup value={value} onValueChange={(v) => onChange(v as T)}>
+          {options.map((o) => (
+            <DropdownMenuRadioItem key={o.value} value={o.value} className="text-[13px]">
+              <span className="flex-1">{o.label}</span>
+              {o.count !== undefined && <span className="ml-3 tabular-nums text-muted-foreground">{o.count}</span>}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

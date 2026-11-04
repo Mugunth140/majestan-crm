@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { EmptyState as IllustratedEmpty } from "@/components/shared/empty-state";
-import { ListBody, ListFrame, ListToolbar, SegmentTabs, ToolbarClear, ToolbarEnd, ToolbarSearch, headerPrimaryClass, headerButtonClass } from "@/components/layout/list-page";
+import { ListBody, ListFrame, ListToolbar, ToolbarClear, ToolbarEnd, ToolbarSearch, ToolbarSelect, headerPrimaryClass, headerButtonClass } from "@/components/layout/list-page";
 import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
@@ -209,7 +209,7 @@ export default function AdsPage() {
     {
       accessorKey: "id",
       header: "ID",
-      cell: ({ row }) => <IdCell>{row.original.id}</IdCell>,
+      cell: ({ row }) => <IdCell href={`/ads/${row.original.id}`}>{row.original.id}</IdCell>,
     },
     {
       id: "thumbnail",
@@ -321,18 +321,6 @@ export default function AdsPage() {
       header: "Updated",
       cell: ({ row }) => <DateCell value={row.original.updatedAt} />,
     },
-    {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }) => (
-        <div className="flex items-center justify-center">
-          <Link href={`/ads/new?edit=${row.original.id}`} onClick={(e) => e.stopPropagation()} title="Edit" aria-label={`Edit ${row.original.title || "ad"}`}
-            className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-blue-50 hover:text-[#0052FF] focus-visible:outline-2 focus-visible:outline-ring">
-            <Edit size={15} />
-          </Link>
-        </div>
-      ),
-    },
   ];
 
   const tableProps = {
@@ -427,7 +415,7 @@ export default function AdsPage() {
       <IllustratedEmpty
         kind={loadError ? "error" : searchQuery.trim() ? "search" : "records"}
         title={loadError ? "Couldn't load advertisements" : searchQuery.trim() ? "No matching advertisements" : `No ${activeTab.toLowerCase()} advertisements`}
-        description={loadError || (searchQuery.trim() ? "Try a different title or clear your search." : `Advertisements in ${placementSpec.label.toLowerCase()} will appear here. Add one or check the ${activeTab === "Active" ? "inactive" : "active"} tab.`)}
+        description={loadError || (searchQuery.trim() ? "Try a different title or clear your search." : `Advertisements in ${placementSpec.label.toLowerCase()} will appear here. Add one or set Status to ${activeTab === "Active" ? "Inactive" : "Active"}.`)}
         action={
           loadError ? (
             <button type="button" className={headerButtonClass} onClick={() => fetchAds()}>Try again</button>
@@ -491,30 +479,22 @@ export default function AdsPage() {
   const desktopFilters = (
     <ListFrame>
       <ListToolbar>
-        <SegmentTabs
+        <ToolbarSelect
           label="Placement"
           disabled={isBusy}
           value={placement}
           onChange={setPlacement}
-          tabs={ADS_PLACEMENTS.map((p) => ({ value: p.value, label: p.label, title: p.description }))}
+          options={ADS_PLACEMENTS.map((p) => ({ value: p.value, label: p.label }))}
         />
-        <SegmentTabs
+        <ToolbarSelect
           label="Status"
           disabled={isBusy}
           value={activeTab}
           onChange={setActiveTab}
-          tabs={tabs.map((tab) => ({
-            value: tab,
-            label: (
-              <>
-                {tab} <span className="ml-1 tabular-nums text-muted-foreground">{isLoading ? "…" : tab === "Active" ? activeCount : ads.length - activeCount}</span>
-              </>
-            ),
-          }))}
+          options={tabs.map((tab) => ({ value: tab, label: tab, count: isLoading ? undefined : tab === "Active" ? activeCount : ads.length - activeCount }))}
         />
         <ToolbarEnd>
           {views.picker}
-          <p className="hidden max-w-xs truncate text-xs text-muted-foreground xl:block" title={placementSpec.description}>{placementSpec.description}</p>
           <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search ads by title" />
           {searchQuery && <ToolbarClear onClick={() => setSearchQuery("")} title="Clear search" />}
         </ToolbarEnd>
@@ -533,7 +513,6 @@ export default function AdsPage() {
         Add Advertisement
       </button>
       {placementPicker(true)}
-      <p className="text-xs text-muted-foreground">{placementSpec.description}</p>
       {pillTabs}
     </div>
   );

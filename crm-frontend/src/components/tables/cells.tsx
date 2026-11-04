@@ -8,14 +8,25 @@ import { NameAvatar } from "@/components/shared/name-avatar";
 // and dates in one format at the end.
 
 /** Record ID, muted; links to the record when `href` is given. */
-export function IdCell({ href, children }: { href?: string; children: ReactNode }) {
+/** The record's ID: opens its page (`href`), or its edit form (`onClick`) where there's no page. */
+export function IdCell({ href, onClick, children }: { href?: string; onClick?: () => void; children: ReactNode }) {
   const cls = "tabular-nums text-muted-foreground";
-  if (!href) return <span className={cls}>{children}</span>;
-  return (
-    <Link href={href} onClick={(e) => e.stopPropagation()} className={cn(cls, "hover:text-foreground hover:underline")}>
-      {children}
-    </Link>
-  );
+  const link = cn(cls, "hover:text-foreground hover:underline");
+  if (href) {
+    return (
+      <Link href={href} onClick={(e) => e.stopPropagation()} className={link}>
+        {children}
+      </Link>
+    );
+  }
+  if (onClick) {
+    return (
+      <button type="button" onClick={(e) => { e.stopPropagation(); onClick(); }} className={link}>
+        {children}
+      </button>
+    );
+  }
+  return <span className={cls}>{children}</span>;
 }
 
 /** Primary column: the record's name, optionally with a letter avatar. */

@@ -202,7 +202,7 @@ export default function FurnishingItemsMasterPage() {
         </div>
       ),
     },
-    { accessorKey: "id", header: "ID", cell: ({ row }) => <IdCell>{row.original.id}</IdCell> },
+    { accessorKey: "id", header: "ID", cell: ({ row }) => <IdCell onClick={() => openEdit(row.original)}>{row.original.id}</IdCell> },
     {
       accessorKey: "name",
       header: "Item",

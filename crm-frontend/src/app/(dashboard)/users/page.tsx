@@ -130,7 +130,7 @@ function UsersList() {
       enableSorting: false,
       enableHiding: false,
     },
-    { accessorKey: "id", header: "ID", cell: ({ row }) => <IdCell>{row.original.id}</IdCell> },
+    { accessorKey: "id", header: "ID", cell: ({ row }) => <IdCell href={`/users/${row.original.id}`}>{row.original.id}</IdCell> },
     { accessorKey: "name", header: "Name", cell: ({ row }) => <NameCell name={row.original.name} avatar /> },
     { accessorKey: "email", header: "Email", cell: ({ row }) => <span className="text-muted-foreground">{row.original.email}</span> },
     { 
