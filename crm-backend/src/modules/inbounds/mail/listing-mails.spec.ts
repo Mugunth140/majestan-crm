@@ -41,7 +41,7 @@ describe('listings@ mail events', () => {
 
   it('renders the received email with the details card and escaped owner name', () => {
     const mail = render(listingReceivedMail, inbound());
-    expect(mail.subject).toBe('We have received your property details – I00042');
+    expect(mail.subject).toBe('Property details received – I00042');
     expect(mail.html).toContain('Dear Lakshmi,');
     expect(mail.html).toContain('3 BHK Apartment');
     expect(mail.html).toContain('For rent');
@@ -62,7 +62,7 @@ describe('listings@ mail events', () => {
   it('falls back without an owner name or advisor', () => {
     const mail = render(listingApprovedMail, inbound({ ownerName: '', advisor: null }));
     expect(mail.html).toContain('Dear Sir/Madam,');
-    expect(mail.html).toContain('Our listings team');
+    expect(mail.html).toContain('you will hear from our listings team');
   });
 
   it('approval email needs the Approved status', () => {

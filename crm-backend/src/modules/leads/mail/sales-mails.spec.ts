@@ -43,7 +43,7 @@ describe('sales@ mail events', () => {
 
   it('renders the visit confirmation with card, maps button and escaped name', () => {
     const mail = render(siteVisitConfirmedMail, lead());
-    expect(mail.subject).toBe('Your site visit is confirmed – Saturday, 7 November 2099');
+    expect(mail.subject).toBe('Site visit confirmed – Saturday, 7 November 2099');
     expect(mail.html).toContain('Dear Karthik,');
     expect(mail.html).toContain('10:30 AM (IST)');
     expect(mail.html).toContain('Kgisl Campus, Coimbatore');
@@ -55,7 +55,7 @@ describe('sales@ mail events', () => {
   it('falls back gracefully without a project or advisor', () => {
     const mail = render(enquiryReceivedMail, lead({ project: null, projectText: null, advisor: null }));
     expect(mail.html).toContain('your interest in our properties');
-    expect(mail.html).toContain('Our property advisor');
+    expect(mail.html).toContain('and a member of our sales team will call you shortly');
     expect(mail.html).not.toContain('View ');
   });
 

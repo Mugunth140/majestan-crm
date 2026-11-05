@@ -55,7 +55,7 @@ describe('HR mail events', () => {
 
   it('renders the invitation with escaped data, details card and join button', () => {
     const mail = render(interviewScheduledMail, candidate());
-    expect(mail.subject).toBe('Interview invitation – Sales Executive at Majestan Realty');
+    expect(mail.subject).toBe('Interview invitation – Sales Executive');
     expect(mail.html).toContain('Dear Priya,');
     expect(mail.html).toContain('11:30 AM (IST)');
     expect(mail.html).toContain('Join the interview');

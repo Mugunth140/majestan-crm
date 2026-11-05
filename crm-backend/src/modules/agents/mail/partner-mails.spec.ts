@@ -53,7 +53,7 @@ describe('partners@ mail events', () => {
   it('introduction falls back without a name or contact person', () => {
     const mail = render(partnerIntroductionMail, partner({ name: '', manager: null }));
     expect(mail.html).toContain('Dear Sir/Madam,');
-    expect(mail.html).toContain('Our partnerships team');
+    expect(mail.html).toContain('Your point of contact will be our partnerships team');
   });
 });
 

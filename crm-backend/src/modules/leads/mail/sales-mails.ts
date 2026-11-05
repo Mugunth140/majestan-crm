@@ -32,17 +32,17 @@ export const enquiryReceivedMail = defineMailEvent({
   label: 'Enquiry received',
   description: 'Thanks a new lead for their enquiry and introduces their advisor.',
   mode: 'confirm',
-  version: 1,
+  version: 2,
   // A lead who booked a visit gets the visit confirmation instead.
   triggers: [{ on: 'leads.lead.created', when: (p) => !p.withVisit }],
   idempotencyKey: (_d, id) => `sales.enquiry_received:${id}`,
   template: {
-    subject: 'Thank you for contacting Majestan Realty',
-    preheader: 'Thank you for {{project.interest}}.',
+    subject: 'Thank you for your enquiry – Majestan Realty',
+    preheader: 'We have received your enquiry and will call you shortly.',
     body: `<p>Dear {{lead.first_name}},</p>
-<p>Thank you for {{project.interest}}. We have received your enquiry, and <strong>{{advisor.name}}</strong> from our team will call you shortly to understand what you are looking for.</p>
+<p>Thank you for {{project.interest}}. We have received your enquiry, and {{advisor.name}} will call you shortly to understand your requirements.</p>
 <p>{{project_button}}</p>
-<p>If you would like to talk sooner, call us on {{advisor.phone}} or simply reply to this email.</p>`,
+<p>If you would like to speak with us sooner, reply to this email or call {{advisor.phone}}.</p>`,
   },
 });
 
@@ -52,18 +52,18 @@ export const siteVisitConfirmedMail = defineMailEvent({
   label: 'Site visit confirmation',
   description: 'Confirms the date, time and meeting point of a site visit. Created again when the visit is moved.',
   mode: 'confirm',
-  version: 1,
+  version: 2,
   triggers: [{ on: 'leads.site_visit.scheduled' }],
   check: visitIssues,
   idempotencyKey: (d, id) => `sales.site_visit_confirmed:${id}:${visitKey(d)}`.slice(0, 255),
   template: {
-    subject: 'Your site visit is confirmed – {{visit.date}}',
+    subject: 'Site visit confirmed – {{visit.date}}',
     preheader: '{{visit.date}}, {{visit.time}} · {{project.title}}',
     body: `<p>Dear {{lead.first_name}},</p>
-<p>Thank you for scheduling a site visit with Majestan Realty. Here are the details:</p>
+<p>Thank you for scheduling a site visit with Majestan Realty. Your visit is confirmed for the date and time below.</p>
 <p>{{visit_details}}</p>
 <p>{{map_button}}</p>
-<p>{{advisor.name}} will meet you there. If you need to change the time, reply to this email or call {{advisor.phone}}.</p>`,
+<p>You will be met at the location by {{advisor.name}}. If you need to reschedule, reply to this email or call {{advisor.phone}}.</p>`,
   },
 });
 
@@ -73,7 +73,7 @@ export const siteVisitReminderMail = defineMailEvent({
   label: 'Site visit reminder (automatic)',
   description: 'Sent automatically on the morning before a scheduled site visit.',
   mode: 'auto',
-  version: 1,
+  version: 2,
   schedule: {
     everyMinutes: 60,
     expiresAfterHours: 12,
@@ -98,13 +98,13 @@ export const siteVisitReminderMail = defineMailEvent({
   },
   idempotencyKey: (d, id) => `sales.site_visit_reminder:${id}:${d.visit?.date}`,
   template: {
-    subject: 'Reminder: your site visit tomorrow at {{visit.time}}',
+    subject: 'Site visit reminder – tomorrow at {{visit.time}}',
     preheader: '{{project.title}} · {{visit.location}}',
     body: `<p>Dear {{lead.first_name}},</p>
-<p>This is a quick reminder of your site visit tomorrow.</p>
+<p>This is a reminder of your site visit tomorrow. The details are below.</p>
 <p>{{visit_details}}</p>
 <p>{{map_button}}</p>
-<p>We look forward to seeing you. If your plans change, just reply to this email or call {{advisor.phone}}.</p>`,
+<p>We look forward to meeting you. If your plans change, reply to this email or call {{advisor.phone}}.</p>`,
   },
 });
 
@@ -114,17 +114,17 @@ export const visitThankYouMail = defineMailEvent({
   label: 'Thank you for visiting',
   description: 'Thanks the customer after a site visit, with the brochure and project page.',
   mode: 'confirm',
-  version: 1,
+  version: 2,
   triggers: [{ on: 'leads.lead.status_changed', when: (p) => VISIT_DONE_STATUSES.includes(String(p.to)) }],
   idempotencyKey: (d, id) => `sales.visit_thank_you:${id}:${d.visit?.date ?? d.status}`,
   template: {
     subject: 'Thank you for visiting – {{project.title}}',
-    preheader: 'It was great to meet you.',
+    preheader: 'It was a pleasure to meet you.',
     body: `<p>Dear {{lead.first_name}},</p>
-<p>Thank you for taking the time to visit {{project.title}}. It was a pleasure to show you around.</p>
+<p>Thank you for visiting {{project.title}}. It was a pleasure to show you around, and we hope the visit was useful.</p>
 <p>{{brochure_button}}</p>
 <p>{{project_button}}</p>
-<p>{{advisor.name}} will be in touch to answer any questions and help with the next steps. You can also reach us on {{advisor.phone}}.</p>`,
+<p>You will hear from {{advisor.name}} shortly to answer any questions and help with the next steps. In the meantime, reply to this email or call {{advisor.phone}}.</p>`,
   },
 });
 
@@ -135,16 +135,16 @@ export const bookingConfirmedMail = defineMailEvent({
   label: 'Booking congratulations',
   description: 'Congratulates the customer on their booking and explains the next steps.',
   mode: 'confirm',
-  version: 1,
+  version: 2,
   triggers: [{ on: 'leads.lead.status_changed', when: (p) => p.to === 'Booking Advance' }],
   check: (d) => (d.status === 'Booking Advance' ? [] : ['Lead status is not "Booking Advance"']),
   idempotencyKey: (_d, id) => `sales.booking_confirmed:${id}`,
   template: {
-    subject: 'Congratulations on your booking – {{project.title}}',
-    preheader: 'Welcome to the Majestan Realty family.',
+    subject: 'Booking confirmed – {{project.title}}',
+    preheader: 'Thank you for choosing Majestan Realty.',
     body: `<p>Dear {{lead.first_name}},</p>
-<p>Congratulations, and thank you for choosing Majestan Realty! We are delighted to confirm your booking at <strong>{{project.title}}</strong>.</p>
-<p>{{advisor.name}} will share your booking receipt and guide you through the next steps for documentation and the agreement.</p>
+<p>Congratulations, and thank you for choosing Majestan Realty. We are pleased to confirm your booking at <strong>{{project.title}}</strong>.</p>
+<p>Your booking receipt will follow separately, and {{advisor.name}} will guide you through the documentation and agreement.</p>
 <p>If you have any questions, reply to this email or call {{advisor.phone}}.</p>`,
   },
 });

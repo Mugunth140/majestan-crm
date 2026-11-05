@@ -150,7 +150,7 @@ export class LeadShareService {
     const body = `<p>Dear {{lead.first_name}},</p>
 <p>As discussed, here ${one ? 'is a property' : 'are a few options'} that match${one ? 'es' : ''} what you are looking for:</p>
 <ul>${rows}</ul>
-<p>The attached PDF${one ? ' has' : 's have'} the photos and full details. Reply to this email or call me if you would like to know more or arrange a site visit.</p>`;
+<p>The attached PDF${one ? ' has' : 's have'} the photos and full details. If you would like to know more or arrange a site visit, reply to this email or call {{sender.phone}}.</p>`;
     return { attachments, subject, body };
   }
 
