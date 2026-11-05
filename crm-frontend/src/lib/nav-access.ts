@@ -9,19 +9,26 @@ export const NAV_KEYS = [
 ] as const;
 export type NavKey = (typeof NAV_KEYS)[number];
 
-/** Oversight modules a Team Lead doesn't get by default. */
-const MANAGEMENT: NavKey[] = ["logger", "activity-logs", "users", "master"];
-/** Every Staff member has these, whatever their department. */
-const STAFF_BASE: NavKey[] = ["scheduler", "tasks"];
+/** Only Admins and Managers get these, whatever is ticked; the Team Lead may also have the Logger. */
+const MANAGEMENT_ONLY: Record<string, NavKey[]> = {
+  "Team Lead": ["users", "tasks", "activity-logs"],
+  Staff: ["users", "tasks", "activity-logs", "logger"],
+};
+/** Everyone below Manager starts with these, whatever their department. */
+const BASE: NavKey[] = ["scheduler"];
+const INVENTORY: NavKey[] = ["agent-network", "builders", "projects", "properties", "asset-inventory"];
 const DEPARTMENT_MODULES: [RegExp, NavKey[]][] = [
-  [/telecall/i, ["leads", "routing"]],
-  [/sales/i, ["leads", "routing", "agent-network", "projects", "properties", "builders"]],
-  [/collection/i, ["leads", "projects", "properties"]],
-  [/design/i, ["ads", "showcases"]],
-  [/digital/i, ["leads", "ads", "blog", "showcases"]],
-  [/\bhr\b/i, ["hr", "asset-inventory"]],
-  [/sourcing/i, ["routing", "inbound", "agent-network", "projects", "properties", "builders"]],
+  [/telecall/i, ["leads", "routing", ...INVENTORY]],
+  [/sales/i, ["leads", "routing", "inbound", ...INVENTORY]],
+  [/sourcing/i, ["inbound", "routing", "agent-network", "projects", "properties", "asset-inventory"]],
+  [/collection/i, ["leads", "projects", "properties", "agent-network", "asset-inventory"]],
+  [/design/i, ["ads", "showcases", "blog"]],
+  [/digital/i, ["blog"]],
+  [/\bhr\b/i, ["hr"]],
 ];
+
+/** Modules this role can never be given (Admins and Managers have none). */
+export const lockedFor = (role: string): NavKey[] => MANAGEMENT_ONLY[role] ?? (isAdminRole(role) || role === "Manager" ? [] : MANAGEMENT_ONLY.Staff);
 
 export const isAdminRole = (role?: string | null) => role === "Admin" || role === "Super Admin";
 
@@ -37,8 +44,8 @@ export interface NavAccessViewer {
 /** What a user sees before an admin picks for them. */
 export function defaultNavAccess(role: string, department: string, blogAccess = false): NavKey[] {
   if (isAdminRole(role) || role === "Manager") return [...NAV_KEYS];
-  if (role === "Team Lead") return NAV_KEYS.filter((k) => !MANAGEMENT.includes(k));
-  const keys = new Set<NavKey>(STAFF_BASE);
+  if (role === "Team Lead") return NAV_KEYS.filter((k) => k !== "master" && !lockedFor(role).includes(k));
+  const keys = new Set<NavKey>(BASE);
   for (const [match, modules] of DEPARTMENT_MODULES) if (match.test(department)) modules.forEach((k) => keys.add(k));
   if (blogAccess) keys.add("blog");
   return NAV_KEYS.filter((k) => keys.has(k));
@@ -48,5 +55,7 @@ export function defaultNavAccess(role: string, department: string, blogAccess = 
 export function visibleNav(viewer: NavAccessViewer | null): Set<string> {
   if (!viewer) return new Set();
   if (isAdminRole(viewer.role)) return new Set(NAV_KEYS);
-  return new Set(viewer.navAccess ?? defaultNavAccess(viewer.role, viewer.department, viewer.blogAccess));
+  const locked = lockedFor(viewer.role);
+  const picked = viewer.navAccess ?? defaultNavAccess(viewer.role, viewer.department, viewer.blogAccess);
+  return new Set(picked.filter((k) => !locked.includes(k as NavKey)));
 }

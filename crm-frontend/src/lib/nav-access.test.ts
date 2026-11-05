@@ -3,6 +3,7 @@ import { NAV_KEYS, defaultNavAccess, visibleNav } from "./nav-access";
 import { canOpen } from "@/components/layout/nav-items";
 
 const viewer = (role: string, department = "", navAccess: string[] | null = null) => ({ role, department, navAccess });
+const sorted = (keys: string[]) => [...keys].sort();
 
 describe("sidebar access", () => {
   it("shows admins everything, whatever is saved", () => {
@@ -13,18 +14,22 @@ describe("sidebar access", () => {
     expect(defaultNavAccess("Manager", "")).toEqual([...NAV_KEYS]);
   });
 
-  it("keeps oversight modules from team leads by default", () => {
+  it("gives team leads the logger but not users, tasks or activity logs", () => {
     const tl = defaultNavAccess("Team Lead", "Sales Department");
     expect(tl).toContain("leads");
-    expect(tl).not.toContain("users");
-    expect(tl).not.toContain("master");
+    expect(tl).toContain("logger");
+    for (const k of ["users", "tasks", "activity-logs", "master"]) expect(tl).not.toContain(k);
   });
 
   it("gives staff their department's modules", () => {
-    expect(defaultNavAccess("Staff", "Telecalling Department")).toEqual(["scheduler", "leads", "routing", "tasks"]);
-    expect(defaultNavAccess("Staff", "HR Department")).toEqual(["asset-inventory", "hr", "scheduler", "tasks"].sort((a, b) => NAV_KEYS.indexOf(a as never) - NAV_KEYS.indexOf(b as never)));
-    expect(defaultNavAccess("Staff", "Sourcing Department")).toContain("inbound");
-    expect(defaultNavAccess("Staff", "Telecalling Department")).not.toContain("users");
+    const inventory = ["agent-network", "builders", "projects", "properties", "asset-inventory"];
+    expect(sorted(defaultNavAccess("Staff", "Telecalling Department"))).toEqual(sorted(["scheduler", "leads", "routing", ...inventory]));
+    expect(sorted(defaultNavAccess("Staff", "Sales Department"))).toEqual(sorted(["scheduler", "leads", "routing", "inbound", ...inventory]));
+    expect(sorted(defaultNavAccess("Staff", "Sourcing Department"))).toEqual(sorted(["scheduler", "inbound", "routing", "agent-network", "projects", "properties", "asset-inventory"]));
+    expect(sorted(defaultNavAccess("Staff", "Collection Department"))).toEqual(sorted(["scheduler", "leads", "projects", "properties", "agent-network", "asset-inventory"]));
+    expect(sorted(defaultNavAccess("Staff", "Designing Department"))).toEqual(sorted(["scheduler", "ads", "showcases", "blog"]));
+    expect(sorted(defaultNavAccess("Staff", "Digital Department"))).toEqual(sorted(["scheduler", "blog"]));
+    expect(sorted(defaultNavAccess("Staff", "HR Department"))).toEqual(sorted(["scheduler", "hr"]));
   });
 
   it("keeps blog for staff who write it", () => {
@@ -32,12 +37,20 @@ describe("sidebar access", () => {
   });
 
   it("uses the admin's pick over the defaults", () => {
-    expect([...visibleNav(viewer("Staff", "Sales Department", ["tasks"]))]).toEqual(["tasks"]);
+    expect([...visibleNav(viewer("Staff", "Sales Department", ["hr"]))]).toEqual(["hr"]);
+  });
+
+  it("never gives staff or team leads the management modules, even if ticked", () => {
+    const ticked = ["leads", "users", "tasks", "activity-logs", "logger"];
+    expect([...visibleNav(viewer("Staff", "Sales Department", ticked))]).toEqual(["leads"]);
+    expect([...visibleNav(viewer("Team Lead", "Sales Department", ticked))]).toEqual(["leads", "logger"]);
+    expect(visibleNav(viewer("Manager", "", ticked)).has("users")).toBe(true);
   });
 
   it("guards pages by module, leaving the rest open", () => {
     const staff = viewer("Staff", "Telecalling Department");
     expect(canOpen("/leads/12", staff)).toBe(true);
+    expect(canOpen("/tasks", staff)).toBe(false);
     expect(canOpen("/users", staff)).toBe(false);
     expect(canOpen("/master/cities", staff)).toBe(false);
     expect(canOpen("/", staff)).toBe(true);

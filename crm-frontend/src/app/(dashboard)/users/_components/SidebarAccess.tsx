@@ -1,19 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, RotateCcw } from "lucide-react";
+import { Loader2, Lock, RotateCcw } from "lucide-react";
 import { NAVIGATION } from "@/components/layout/nav-items";
-import { MODULE_GROUPS } from "@/components/mobile/app-modules";
 import { Checkbox } from "@/components/ui/checkbox";
-import { defaultNavAccess, NAV_KEYS, type NavKey } from "@/lib/nav-access";
+import { defaultNavAccess, lockedFor, NAV_KEYS, type NavKey } from "@/lib/nav-access";
 import { cn } from "@/lib/utils";
 
-const GROUPS = MODULE_GROUPS.map((g) => ({
-  title: g.title,
-  items: g.hrefs
-    .map((href) => NAVIGATION.find((n) => (n.href ?? "/master") === href))
-    .filter((n): n is (typeof NAVIGATION)[number] & { key: NavKey } => !!n?.key),
-}));
+/** Every module that can be shown or hidden, in sidebar order. */
+const MODULES = NAVIGATION.filter((n): n is (typeof NAVIGATION)[number] & { key: NavKey } => !!n.key);
 
 /**
  * One checkbox per sidebar module. Until an admin ticks anything the user has
@@ -38,13 +33,12 @@ export function SidebarAccess({ role, department, blogAccess, value, disabled, o
     setBusy(true);
     try { await onChange(next); } catch { /* toast shown */ } finally { setBusy(false); }
   };
-  const set = (keys: string[], on: boolean) => {
+  const locked = lockedFor(role);
+  const toggle = (key: NavKey, on: boolean) => {
     const next = new Set(shown);
-    for (const k of keys) {
-      if (on) next.add(k);
-      else next.delete(k);
-    }
-    void commit(NAV_KEYS.filter((k) => next.has(k)));
+    if (on) next.add(key);
+    else next.delete(key);
+    void commit(NAV_KEYS.filter((k) => next.has(k) && !locked.includes(k)));
   };
 
   return (
@@ -68,36 +62,26 @@ export function SidebarAccess({ role, department, blogAccess, value, disabled, o
         </span>
       </div>
 
-      <div className="divide-y">
-        {GROUPS.map((g) => {
-          const keys = g.items.map((i) => i.key);
-          const all = keys.every((k) => shown.has(k));
+      <div className="grid grid-cols-1 gap-0.5 p-2 sm:grid-cols-2">
+        {MODULES.map((item) => {
+          const Icon = item.icon;
+          const lockedOut = locked.includes(item.key);
+          const on = !lockedOut && shown.has(item.key);
           return (
-            <div key={g.title} className="px-4 py-3">
-              <div className="mb-1.5 flex h-6 items-center justify-between">
-                <span className="text-[12px] font-medium uppercase tracking-wide text-muted-foreground">{g.title}</span>
-                {!disabled && (
-                  <button type="button" disabled={busy} onClick={() => set(keys, !all)}
-                    className="rounded px-1.5 text-[12px] text-muted-foreground hover:text-foreground disabled:opacity-50">
-                    {all ? "Clear" : "Select all"}
-                  </button>
-                )}
-              </div>
-              <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-2">
-                {g.items.map((item) => {
-                  const Icon = item.icon;
-                  const on = shown.has(item.key);
-                  return (
-                    <label key={item.key}
-                      className={cn("-mx-2 flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 transition-colors hover:bg-accent/60", disabled && "cursor-default hover:bg-transparent")}>
-                      <Checkbox checked={on} disabled={disabled || busy} onCheckedChange={(v) => set([item.key], !!v)} />
-                      <Icon className={cn("size-4 shrink-0 transition-opacity", item.color, !on && "opacity-40")} strokeWidth={1.75} />
-                      <span className={cn("truncate text-[14px]", on ? "text-foreground" : "text-muted-foreground")}>{item.name}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
+            <label key={item.key}
+              className={cn(
+                "flex h-10 items-center gap-3 rounded-md px-2 transition-colors",
+                lockedOut || disabled ? "cursor-default" : "cursor-pointer hover:bg-accent/60",
+              )}>
+              <Checkbox checked={on} disabled={disabled || busy || lockedOut} onCheckedChange={(v) => toggle(item.key, !!v)} />
+              <Icon className={cn("size-4 shrink-0 transition-opacity", item.color, !on && "opacity-40")} strokeWidth={1.75} />
+              <span className={cn("min-w-0 flex-1 truncate text-[14px]", on ? "text-foreground" : "text-muted-foreground")}>{item.name}</span>
+              {lockedOut && (
+                <span className="flex shrink-0 items-center gap-1 text-[12px] text-muted-foreground">
+                  <Lock className="size-3" /> {item.key === "logger" ? "Team Lead and up" : "Admin &amp; manager"}
+                </span>
+              )}
+            </label>
           );
         })}
       </div>
