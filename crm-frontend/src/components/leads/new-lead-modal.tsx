@@ -568,7 +568,7 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
           <FieldRow>
             <FocusField required name="assignee" label="Assign to" error={errors.assignee}>
               {!isStaff && staff === null ? loading : (
-                <FormSelect name="assignee" placeholder="Select" className={SELECT}
+                <FormSelect name="assignee" placeholder="Select" className={SELECT} staff
                   value={form.assignee || (isStaff ? "me" : null)} options={assigneeOptions} onValueChange={(v) => set("assignee", v)} />
               )}
             </FocusField>

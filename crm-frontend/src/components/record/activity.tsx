@@ -87,5 +87,6 @@ function toItem(e: ActivityEntry, w: ActivityWords): FeedItem {
 }
 
 export function activityItems(entries: ActivityEntry[], words: ActivityWords): FeedItem[] {
-  return sortNewestFirst(entries.map((e) => toItem(e, words)));
+  // The actor's photo (or initials) leads each entry they made.
+  return sortNewestFirst(entries.map((e) => ({ ...toItem(e, words), ...(e.actor && { who: e.actor.name, whoId: e.actor.id }) })));
 }

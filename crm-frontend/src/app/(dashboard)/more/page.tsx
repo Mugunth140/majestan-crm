@@ -40,7 +40,7 @@ export default function MorePage() {
       <div className="mx-auto max-w-2xl space-y-7 pt-3 md:pt-0">
         {user && (
           <div className="mx-4 flex items-center gap-3.5 rounded-[14px] bg-[color-mix(in_oklab,var(--muted)_70%,var(--background))] p-3.5 dark:bg-[oklch(0.205_0_0)]">
-            <NameAvatar name={user.name} className="size-14 text-[22px]" />
+            <NameAvatar name={user.name} src={user.avatar} className="size-14 text-[22px]" />
             <div className="min-w-0">
               <div className="truncate text-[19px] font-semibold tracking-tight">{user.name}</div>
               <div className="truncate text-[14px] text-muted-foreground">{[user.role, user.department].filter(Boolean).join(" · ")}</div>

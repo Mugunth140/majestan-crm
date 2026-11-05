@@ -35,6 +35,7 @@ import { Device } from "@/components/shared/device";
 import { cn } from "@/lib/utils";
 import { canViewInboundContacts, isAdmin } from "@/lib/permissions";
 import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
+import { StaffName } from "@/components/shared/name-avatar";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -292,8 +293,8 @@ export default function InboundPage() {
     { id: "uploaded_by", header: "Uploaded by", cell: ({ row }) => row.original.uploaded_by?.name || "Unknown" },
     { id: "assigned", header: "Assigned", cell: ({ row }) => (
       <button type="button" disabled={!canAssign} onClick={() => setAssignmentIds([row.original.id])}
-        className="enabled:text-[#0052FF] enabled:hover:underline disabled:cursor-default">
-        {row.original.assigned?.name || "Unassigned"}
+        className="enabled:hover:underline disabled:cursor-default">
+        <StaffName name={row.original.assigned?.name} userId={row.original.assigned?.id} />
       </button>
     ) },
     {

@@ -609,7 +609,7 @@ export default function LeadsPage() {
         if (assignedStaff && assignedStaff !== "Unassigned") {
           return (
             <span className="inline-flex items-center gap-1.5" title={preAssignee ? "Assigned on insert" : undefined}>
-              <NameAvatar name={assignedStaff} className="size-5 text-[10px]" />
+              <NameAvatar name={assignedStaff} staff className="size-5 text-[10px]" />
               <span>{assignedStaff}</span>
             </span>
           );

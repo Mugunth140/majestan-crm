@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+import { useStaffPhoto } from "@/lib/staff-photos";
 import { cn } from "@/lib/utils";
 
 // Soft tint + strong letter, each readable in light and dark.
@@ -23,10 +27,19 @@ export function avatarColor(name?: string) {
   return PALETTE[Math.abs(h) % PALETTE.length];
 }
 
-// Round first-letter avatar.
-export function NameAvatar({ name, src, className }: { name?: string; src?: string | null; className?: string }) {
-  // eslint-disable-next-line @next/next/no-img-element -- CDN photo, already small
-  if (src) return <img src={src} alt="" aria-hidden className={cn("size-6 shrink-0 rounded-full bg-muted object-cover", className)} />;
+/**
+ * Round first-letter avatar, or a photo. With `staff`, a missing photo is
+ * looked up from the staff directory (by `userId`, else by name); a photo that
+ * fails to load falls back to the letter.
+ */
+export function NameAvatar({ name, src, staff, userId, className }: { name?: string; src?: string | null; staff?: boolean; userId?: number | null; className?: string }) {
+  const found = useStaffPhoto(name, userId, !!staff && !src);
+  const photo = src || found;
+  const [broken, setBroken] = useState<string | null>(null);
+  if (photo && broken !== photo) {
+    // eslint-disable-next-line @next/next/no-img-element -- CDN photo, already small
+    return <img src={photo} alt="" aria-hidden onError={() => setBroken(photo)} className={cn("size-6 shrink-0 rounded-full bg-muted object-cover", className)} />;
+  }
   return (
     <span
       aria-hidden
@@ -37,6 +50,17 @@ export function NameAvatar({ name, src, className }: { name?: string; src?: stri
       )}
     >
       {(name?.trim().charAt(0) || "?").toUpperCase()}
+    </span>
+  );
+}
+
+/** A staff member's photo (or letter) and name, for "Assigned" columns. */
+export function StaffName({ name, userId, empty = "Unassigned" }: { name?: string | null; userId?: number | null; empty?: string }) {
+  if (!name) return <span className="text-muted-foreground">{empty}</span>;
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1.5">
+      <NameAvatar name={name} userId={userId} staff className="size-5 text-[10px]" />
+      <span className="truncate">{name}</span>
     </span>
   );
 }

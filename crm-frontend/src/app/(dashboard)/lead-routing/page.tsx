@@ -29,6 +29,7 @@ import { SegmentTabs, ToolbarSelect, toolbarButtonClass } from "@/components/lay
 import { canTakeLeadFromQueue, canConvertEnquiry, assignRoutingLeads } from "@/lib/lead-routing";
 import { timeAgo } from "@/lib/time-ago";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { StaffName } from "@/components/shared/name-avatar";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -891,11 +892,7 @@ export default function LeadRoutingPage() {
       header: "Assigned",
       cell: ({ row }) => {
         const ev = row.original;
-        return ev.assigned_staff_name ? (
-          <span className="truncate">{ev.assigned_staff_name}</span>
-        ) : (
-          <span className="text-muted-foreground">Unassigned</span>
-        );
+        return <StaffName name={ev.assigned_staff_name} />;
       },
     },
     {

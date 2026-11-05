@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { User, fullUser } from '../../database/entities/user.entity';
 import * as bcrypt from 'bcrypt';
 import { PermissionsService } from '../permissions/permissions.service';
@@ -40,6 +40,12 @@ export class UsersService {
         permissions: await this.permissionsService.listUserPermissions(u.id),
       })),
     );
+  }
+
+  /** Just id, name and photo for the users who have one: cheap enough for every page. */
+  async photos() {
+    const users = await this.userRepository.find({ select: { id: true, name: true, avatar_url: true }, where: { avatar_url: Not(IsNull()) } });
+    return users.map((u) => ({ id: u.id, name: u.name, avatar_url: u.avatar_url }));
   }
 
   async findOne(id: number) {

@@ -63,7 +63,7 @@ export function StatusMenu({ status, options, pillClass, onChange, size = "h-8",
 export function AssigneeLabel({ name, empty = "Unassigned" }: { name?: string | null; empty?: string }) {
   return (
     <>
-      {name ? <Avatar name={name} className="h-5 w-5" /> : <span className="h-5 w-5 shrink-0 rounded-full border border-dashed border-muted-foreground/50" />}
+      {name ? <Avatar name={name} staff className="h-5 w-5" /> : <span className="h-5 w-5 shrink-0 rounded-full border border-dashed border-muted-foreground/50" />}
       <span className="max-w-[160px] truncate">{name ?? empty}</span>
     </>
   );

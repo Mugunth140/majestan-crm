@@ -6,6 +6,7 @@ import { Camera, Loader2, Trash2, Upload } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar } from "@/components/record/feed";
 import { apiFetch } from "@/lib/api-fetch";
+import { refreshStaffPhotos } from "@/lib/staff-photos";
 import { cn } from "@/lib/utils";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -52,6 +53,7 @@ export function ProfilePhoto({ userId, name, src, editable, onChange, className 
       if (!res.ok || !result?.success) throw new Error((Array.isArray(result?.message) ? result.message.join(", ") : result?.message ?? result?.error) || "Couldn't change the photo");
       const url: string | null = result.data?.avatar_url ?? null;
       rememberOwnPhoto(userId, url);
+      refreshStaffPhotos();
       onChange?.(url);
       toast.success(url ? "Photo updated" : "Photo removed");
     } catch (reason) {

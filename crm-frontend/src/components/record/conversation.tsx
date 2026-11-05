@@ -35,7 +35,7 @@ type FollowUp = {
   outcome?: string | null;
   priority?: string | null;
   rnr?: string | null;
-  created_by?: { name?: string } | null;
+  created_by?: { id?: number; name?: string } | null;
 };
 
 type ContactLog = {
@@ -235,6 +235,7 @@ export function LeadConversation({
         at: followUpTime(fu, entity.api === "inbounds"),
         icon: <Icon />,
         who,
+        whoId: fu.created_by?.id,
         title: <><Who>{who}</Who> logged {via ? (via.label === "SMS" ? "an SMS" : `a ${via.label}`) : "a"} follow-up</>,
         body: fu.notes,
         chips: [
@@ -283,7 +284,7 @@ export function LeadConversation({
                 <p className="flex-1 text-[14px] font-medium text-foreground">{incoming ? "Inbound call" : "Outbound call"}</p>
                 {/* Who was on the call: the staff member, then the lead. */}
                 <span className="flex -space-x-1">
-                  <Avatar name={who} className="ring-2 ring-card" />
+                  <Avatar name={who} staff className="ring-2 ring-card" />
                   {leadName && <Avatar name={leadName} className="ring-2 ring-card" />}
                 </span>
               </div>

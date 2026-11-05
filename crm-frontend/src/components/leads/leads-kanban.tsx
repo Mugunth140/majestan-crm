@@ -37,7 +37,7 @@ export const leadCard = (lead: KanbanLead): KanbanCardData => ({
     footer:
       lead.staff && lead.staff !== "Unassigned" ? (
         <>
-          <NameAvatar name={lead.staff} className="size-5 text-[10px]" />
+          <NameAvatar name={lead.staff} staff className="size-5 text-[10px]" />
           <span className="truncate">{lead.staff}</span>
         </>
       ) : (

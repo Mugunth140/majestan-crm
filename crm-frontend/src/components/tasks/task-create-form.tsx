@@ -216,6 +216,7 @@ export function TaskCreateForm({ userRole, userDeptId }: { userRole: string; use
             ) : (
               <FormSelect
                 name="staff"
+                staff
                 placeholder="Select staff member..."
                 options={staffList.map((s: any) => ({ label: s.name, value: String(s.id) }))}
                 value={selectedStaff || null}

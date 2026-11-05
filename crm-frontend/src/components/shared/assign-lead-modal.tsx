@@ -5,7 +5,8 @@ import { apiFetch } from "@/lib/api-fetch";
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, User } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { Avatar } from "@/components/record/feed";
 import { toast } from "sonner";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -92,9 +93,7 @@ export function AssignLeadModal({ open, onClose, onConfirm, department, isLoadin
                     : "border-border hover:bg-muted/50",
                 ].join(" ")}
               >
-                <div className="h-8 w-8 rounded-full bg-foreground/[0.06] flex items-center justify-center shrink-0">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                </div>
+                <Avatar name={s.name} userId={s.id} staff className="h-8 w-8 text-[11px]" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-foreground truncate">
                     <span className="text-muted-foreground font-medium">#{s.id}</span> {s.name}

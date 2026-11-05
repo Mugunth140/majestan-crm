@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import {
-  ArrowRightLeft, CalendarCheck, ClipboardPlus, FilePlus2, FileX2, Inbox, PencilLine, ShieldAlert, Sparkles, TrendingUp, UserCheck, UserMinus, UserPlus,
+  ArrowRightLeft, CalendarCheck, ClipboardPlus, ClipboardX, FilePlus2, FileX2, Inbox, PencilLine, ShieldAlert, Sparkles, TrendingUp, UserCheck, UserMinus, UserPlus,
 } from "lucide-react";
 import { LEAD_STATUS_DOTS } from "@/lib/lead-constants";
 import { cn } from "@/lib/utils";
@@ -68,6 +68,8 @@ function toItem(e: TimelineEntry): FeedItem {
       };
     case "requirement_added":
       return { ...base, icon: <ClipboardPlus />, title: <>{actor} added a requirement</> };
+    case "requirement_removed":
+      return { ...base, icon: <ClipboardX />, title: <>{actor} deleted a requirement{e.from ? <> (<Value>{e.from}</Value>)</> : null}</> };
     case "qualification_changed":
       return {
         ...base, icon: <ShieldAlert />, iconClass: e.to === "Unqualified" ? "text-red-600 dark:text-red-400" : undefined,
@@ -123,7 +125,8 @@ function routingItem(e: TimelineEntry, actor: ReactNode, base: Pick<FeedItem, "k
 }
 
 export function timelineItems(entries: TimelineEntry[]): FeedItem[] {
-  return sortNewestFirst(entries.map(toItem));
+  // The actor's photo (or initials) leads each entry they made.
+  return sortNewestFirst(entries.map((e) => ({ ...toItem(e), ...(e.actor && { who: e.actor.name, whoId: e.actor.id }) })));
 }
 
 export { Feed };

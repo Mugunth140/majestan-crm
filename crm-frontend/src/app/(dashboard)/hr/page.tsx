@@ -30,6 +30,7 @@ import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { matchesHrActionFilter, formatHrFollowUp } from "@/lib/hr-action-required";
 import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
+import { StaffName } from "@/components/shared/name-avatar";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -225,8 +226,8 @@ export default function HrPage() {
     { accessorKey: "mobile", header: "Mobile", cell: ({ row }: any) => <span className="tabular-nums">{row.original.mobile}</span> },
     { id: "assignee", header: "Assigned staff", cell: ({ row }: any) => (
       <button type="button" disabled={!canAssign} onClick={() => setAssignmentIds([row.original.id])}
-        className="text-left text-sm disabled:cursor-default enabled:text-[#0052FF] enabled:hover:underline">
-        {row.original.assignedStaff ? `#${row.original.assignedStaff.id} ${row.original.assignedStaff.name}` : "Unassigned"}
+        className="text-left text-sm disabled:cursor-default enabled:hover:underline">
+        <StaffName name={row.original.assignedStaff?.name} userId={row.original.assignedStaff?.id} />
       </button>
     ) },
     { accessorKey: "department", header: "Department" },

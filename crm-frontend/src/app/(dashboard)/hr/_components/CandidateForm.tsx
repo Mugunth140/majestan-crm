@@ -198,7 +198,7 @@ export function CandidateForm({ onClose, onCreated }: {
             </FocusField>
             {canAssign && (
               <FocusField label="Assigned to" htmlFor="hc-staff" optional>
-                <FormSelect id="hc-staff" name="assignedStaffId" value={form.assignedStaffId || "unassigned"} options={staffOptions}
+                <FormSelect id="hc-staff" name="assignedStaffId" staff value={form.assignedStaffId || "unassigned"} options={staffOptions}
                   onValueChange={(v) => set("assignedStaffId", v === "unassigned" ? "" : v || "")}
                   placeholder="Select HR staff" disabled={loadingMasters || !!masterError} className={FOCUS_SELECT} />
               </FocusField>

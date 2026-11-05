@@ -26,6 +26,13 @@ export class UsersController {
     return { success: true, data };
   }
 
+  /** Everyone's photo, so names across the CRM can show a face. */
+  @Get('photos')
+  async photos() {
+    const data = await this.service.photos();
+    return { success: true, data };
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string) {
     const data = await this.service.findOne(Number(id));

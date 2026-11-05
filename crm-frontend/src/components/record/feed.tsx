@@ -1,6 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { useStaffPhoto } from "@/lib/staff-photos";
 import { cn } from "@/lib/utils";
 import { feedDay, feedFullTime, feedTime } from "@/lib/feed-time";
 
@@ -15,8 +16,9 @@ export type FeedItem = {
   icon: ReactNode;
   /** Colour for the rail icon when it should stand out (a missed call). */
   iconClass?: string;
-  /** Shows this person's initials before the sentence. */
+  /** The staff member behind the entry: their photo (or initials) before the sentence. */
   who?: string;
+  whoId?: number | null;
   /** Omitted when `extra` carries its own header (an email card). */
   title?: ReactNode;
   /** Plain text in a soft box, like a comment. */
@@ -37,12 +39,21 @@ const TONES = [
   "bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300",
 ];
 
-/** A person's photo, or their initials on a colour picked from the name. */
-export function Avatar({ name, src, className }: { name: string; src?: string | null; className?: string }) {
+/**
+ * A person's photo, or their initials on a colour picked from the name. With
+ * `staff`, a missing photo is looked up from the staff directory (by `userId`,
+ * else by name). A photo that fails to load falls back to the initials.
+ */
+export function Avatar({ name, src, staff, userId, className }: { name: string; src?: string | null; staff?: boolean; userId?: number | null; className?: string }) {
+  const found = useStaffPhoto(name, userId, !!staff && !src);
+  const photo = src || found;
+  const [broken, setBroken] = useState<string | null>(null);
   const hash = [...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("") || "?";
-  // eslint-disable-next-line @next/next/no-img-element -- CDN photo, already small
-  if (src) return <img src={src} alt="" className={cn("h-6 w-6 shrink-0 rounded-full bg-muted object-cover", className)} />;
+  if (photo && broken !== photo) {
+    // eslint-disable-next-line @next/next/no-img-element -- CDN photo, already small
+    return <img src={photo} alt="" onError={() => setBroken(photo)} className={cn("h-6 w-6 shrink-0 rounded-full bg-muted object-cover", className)} />;
+  }
   return (
     <span className={cn("inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold", TONES[hash % TONES.length], className)}>
       {initials}
@@ -122,7 +133,7 @@ export function Feed({ items }: { items: FeedItem[] }) {
                   {item.title !== undefined && (
                     <div className="mb-1 flex items-center gap-2 py-1">
                       <div className="inline-flex min-w-0 flex-wrap items-center gap-1 text-muted-foreground">
-                        {item.who && <Avatar name={item.who} className="mr-1" />}
+                        {item.who && <Avatar name={item.who} userId={item.whoId} staff className="mr-1" />}
                         {item.title}
                       </div>
                       <div className="ml-auto flex shrink-0 items-center gap-1 whitespace-nowrap">

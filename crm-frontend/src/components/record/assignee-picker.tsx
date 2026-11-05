@@ -12,7 +12,7 @@ export type Person = { id: number; name: string; hint?: string };
  * "Assign to" as a searchable list under its trigger, like Frappe CRM's, in
  * place of a dialog. Picking someone saves straight away.
  */
-export function AssigneePicker({ people, value, onPick, trigger, children, align = "end", clearLabel = "Unassign", allowClear = true, loading, onOpen }: {
+export function AssigneePicker({ people, value, onPick, trigger, children, align = "end", clearLabel = "Unassign", allowClear = true, loading, onOpen, placeholder = "Assign to…" }: {
   people: Person[];
   value: number | null | undefined;
   /** Resolves when saved; the list stays open (showing a spinner) until then. */
@@ -29,6 +29,8 @@ export function AssigneePicker({ people, value, onPick, trigger, children, align
   loading?: boolean;
   /** Called when the list opens, e.g. to fetch it the first time. */
   onOpen?: () => void;
+  /** The search box's prompt. */
+  placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -63,7 +65,7 @@ export function AssigneePicker({ people, value, onPick, trigger, children, align
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && shown.length === 1) void pick(shown[0].id); }}
-            placeholder="Assign to…"
+            placeholder={placeholder}
             aria-label="Search people"
             className="h-10 min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-muted-foreground"
           />
@@ -78,7 +80,7 @@ export function AssigneePicker({ people, value, onPick, trigger, children, align
               onClick={() => void pick(p.id)}
               className={cn("flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[14px] hover:bg-muted", busy !== null && busy !== p.id && "opacity-60")}
             >
-              <Avatar name={p.name} className="h-5 w-5 text-[10px]" />
+              <Avatar name={p.name} userId={p.id} staff className="h-5 w-5 text-[10px]" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate">{p.name}</span>
                 {p.hint && <span className="block truncate text-[12px] text-muted-foreground">{p.hint}</span>}
