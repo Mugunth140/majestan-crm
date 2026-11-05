@@ -1,5 +1,6 @@
 import { IsString, IsOptional, IsInt, IsBoolean, IsNumber, IsArray, ValidateNested, MaxLength, IsIn, IsNotEmpty, Matches, IsLatitude, IsLongitude, IsEmail, ValidateIf, Min } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+import { INBOUND_AVAILABILITY } from '../inbound-availability';
 
 export class InboundUnitDto {
   @IsString()
@@ -126,7 +127,7 @@ export class CreateInboundDto {
   status?: string;
 
   @IsOptional()
-  @IsIn(['available', 'not_available', 'fixed_verification'])
+  @IsIn(INBOUND_AVAILABILITY)
   inbound_status?: string;
 
   // ── Owner ─────────────────────────────────────────────────────────

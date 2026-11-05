@@ -27,6 +27,7 @@ import { DatePicker } from "@/components/shared/date-picker";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { SegmentTabs, ToolbarSelect, toolbarButtonClass } from "@/components/layout/list-page";
 import { canTakeLeadFromQueue, canConvertEnquiry, assignRoutingLeads } from "@/lib/lead-routing";
+import { VerificationQueue } from "./verification-queue";
 import { timeAgo } from "@/lib/time-ago";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { StaffName } from "@/components/shared/name-avatar";
@@ -34,7 +35,7 @@ import { StaffName } from "@/components/shared/name-avatar";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 type MainTab = "queue" | "enquiry" | "history";
-type DeptTab = "telecalling" | "sales";
+type DeptTab = "telecalling" | "sales" | "verification";
 
 interface QueueLead {
   id: number;
@@ -284,6 +285,7 @@ export default function LeadRoutingPage() {
   const router = useRouter();
   const [role, setRole] = useState<string>("");
   const [userDept, setUserDept] = useState<string>("");
+  const [sourcing, setSourcing] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
   const [mainTab, setMainTab] = usePersistedState<MainTab>("routing:tab", "queue", { allowed: ["queue", "enquiry", "history"] });
@@ -291,7 +293,7 @@ export default function LeadRoutingPage() {
   const enquiryView = useModuleView("routing-enquiry", ENQUIRY_FIELDS);
   const historyView = useModuleView("routing-history", HISTORY_FIELDS);
   const activeView = mainTab === "queue" ? queueView : mainTab === "enquiry" ? enquiryView : historyView;
-  const [deptTab, setDeptTab] = usePersistedState<DeptTab>("routing:dept", "telecalling", { allowed: ["telecalling", "sales"] });
+  const [deptTab, setDeptTab] = usePersistedState<DeptTab>("routing:dept", "telecalling", { allowed: ["telecalling", "sales", "verification"] });
 
   // Queue state
   const [queue, setQueue] = useState<QueueLead[]>([]);
@@ -354,12 +356,15 @@ export default function LeadRoutingPage() {
       try {
         const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
         const roleName = user?.role?.name || user?.role || "";
-        const deptName = normalizeDepartment(user?.department?.name || user?.department);
+        const rawDept = user?.department?.name || user?.department;
+        const deptName = normalizeDepartment(rawDept);
+        const isSourcing = /sourcing/i.test(String(rawDept ?? ""));
         if (user?.id != null) setCurrentUserId(Number(user.id));
         setRole(roleName);
         setUserDept(deptName);
-        if (roleName === "Staff") {
-          setDeptTab(deptName);
+        setSourcing(isSourcing);
+        if (roleName === "Staff" || isSourcing) {
+          setDeptTab(isSourcing ? "verification" : deptName);
         }
       } catch {
         // ignore
@@ -443,8 +448,8 @@ export default function LeadRoutingPage() {
   }, [historyPage, historyEventFilter, historyDateFrom, historyDateTo, historyView.isBoard]);
 
   useEffect(() => {
-    if (mainTab === "queue") fetchQueue();
-  }, [mainTab, fetchQueue]);
+    if (mainTab === "queue" && deptTab !== "verification") fetchQueue();
+  }, [mainTab, deptTab, fetchQueue]);
 
   useEffect(() => {
     if (mainTab === "enquiry") fetchEnquiry();
@@ -1016,11 +1021,21 @@ export default function LeadRoutingPage() {
   const deptTabs: { label: string; value: DeptTab }[] = [
     { label: "Telecalling Queue", value: "telecalling" },
     { label: "Sales Queue", value: "sales" },
+    { label: "Verification Queue", value: "verification" },
   ];
 
-  const visibleDeptTabs = role === "Staff"
-    ? deptTabs.filter((d) => d.value === (userDept || "telecalling"))
-    : deptTabs;
+  // The sourcing team only works the Verification Queue; admins and managers see every queue.
+  const seesAll = ["Admin", "Super Admin", "Manager"].includes(role);
+  const visibleDeptTabs = sourcing
+    ? deptTabs.filter((d) => d.value === "verification")
+    : role === "Staff"
+      ? deptTabs.filter((d) => d.value === (userDept || "telecalling"))
+      : deptTabs.filter((d) => d.value !== "verification" || seesAll);
+  const verifying = mainTab === "queue" && deptTab === "verification";
+  // A remembered tab this person can't see (say, after a department change) falls back to one they can.
+  useEffect(() => {
+    if (role && !visibleDeptTabs.some((d) => d.value === deptTab)) setDeptTab(visibleDeptTabs[0].value);
+  }, [role, deptTab, visibleDeptTabs, setDeptTab]);
 
   const totalQueuePages = Math.max(1, Math.ceil(queueTotal / LIMIT));
   const totalEnquiryPages = Math.max(1, Math.ceil(enquiryTotal / LIMIT));
@@ -1028,8 +1043,8 @@ export default function LeadRoutingPage() {
 
   return (
     <>
-      <MobileHeader title="Lead Routing" />
-      {activeView.switcher}
+      <MobileHeader title="Routing" />
+      {!verifying && activeView.switcher}
       <div className="w-full flex flex-col space-y-4 pt-4 md:space-y-0 md:pt-0 md:h-full">
         <div className="flex flex-col md:min-h-0 md:flex-1 lg:-mx-6 lg:-mb-8 lg:-mt-6">
         <div className="flex flex-wrap items-center gap-2 px-4 pb-2 pt-3 md:px-5">
@@ -1048,7 +1063,7 @@ export default function LeadRoutingPage() {
             <SegmentTabs label="Pipeline" value={deptTab} onChange={setDeptTab} tabs={visibleDeptTabs.map((d) => ({ value: d.value, label: d.label }))} />
           )}
 
-          {activeView.picker && <div className={mainTab === "history" ? undefined : "ml-auto"}>{activeView.picker}</div>}
+          {activeView.picker && !verifying && <div className={mainTab === "history" ? undefined : "ml-auto"}>{activeView.picker}</div>}
 
           {mainTab === "history" && (
             <div role="group" aria-label="Routing history filters" className="ml-auto flex w-full min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-2 md:w-auto">
@@ -1209,7 +1224,13 @@ export default function LeadRoutingPage() {
         </div>
 
         {/* Queue Tab */}
-        {mainTab === "queue" && (
+        {verifying && (
+          <div className="w-full md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col p-4 md:p-0 pt-2">
+            <VerificationQueue />
+          </div>
+        )}
+
+        {mainTab === "queue" && !verifying && (
           <div className="w-full md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col p-4 md:p-0">
             {queueLoading ? (
               <TableSkeleton />

@@ -14,6 +14,7 @@ import { extname } from 'path';
 import { readInboundPhotoCoordinates, submissionStatuses } from './inbound-submissions';
 import { buildWatermarkedImageUrl } from '../../common/imgproxy-watermark';
 import { RecordEventsService } from '../record-events/record-events.service';
+import { availabilityRoute, isSourcingDepartment } from './inbound-availability';
 
 // Sensitive contact values masked for Team Lead / Staff without the
 // `inbounds.call_tracking` grant. Names, roles and the property address stay
@@ -164,7 +165,8 @@ export class InboundsService {
       rest.assigned_staff_id = null as any;
       if (!rest.property_type) throw new BadRequestException('Select a property type');
     }
-    const newInbound = this.inboundsRepository.create({ ...rest, uploaded_by_id: actorId, is_queued: !!quick_capture });
+    const route = availabilityRoute(rest.inbound_status, { status: rest.status, assigned_staff_id: rest.assigned_staff_id });
+    const newInbound = this.inboundsRepository.create({ ...rest, uploaded_by_id: actorId, is_queued: !!quick_capture, ...route });
     
     // Save to get the auto-incremented ID
     let savedInbound = await this.inboundsRepository.save(newInbound);
@@ -219,6 +221,36 @@ export class InboundsService {
     if (!user?.id) return false;
     const person = await this.userRepository().findOne({ where: { id: Number(user.id), is_active: true }, relations: { department: true } });
     return !!person?.department?.name?.toLowerCase().replace(/[^a-z]/g, '').startsWith('inbound');
+  }
+
+  /** Admins, managers and the sourcing department work the Verification Queue. */
+  async canVerify(user?: any): Promise<boolean> {
+    if (['Admin', 'Super Admin', 'Manager'].includes(user?.role?.name || user?.role)) return true;
+    if (!user?.id) return false;
+    const person = await this.userRepository().findOne({ where: { id: Number(user.id), is_active: true }, relations: { department: true } });
+    return isSourcingDepartment(person?.department?.name);
+  }
+
+  /** Inbounds waiting for a fixed verification, oldest first. */
+  async verificationQueue(user: any, page = 1, limit = 25) {
+    if (!(await this.canVerify(user))) throw new ForbiddenException('Only the sourcing team and managers can see the Verification Queue');
+    const take = Math.min(Math.max(Number(limit) || 25, 1), 100);
+    const [rows, total] = await this.inboundsRepository.findAndCount({
+      where: { inbound_status: 'fixed_verification' },
+      order: { updated_at: 'ASC', id: 'ASC' },
+      skip: (Math.max(Number(page) || 1, 1) - 1) * take,
+      take,
+    });
+    const personIds = [...new Set(rows.flatMap(r => [r.uploaded_by_id, r.assigned_staff_id]).filter((id): id is number => !!id))];
+    const people = personIds.length ? await this.userRepository().find({ where: { id: In(personIds) }, select: { id: true, name: true } }) : [];
+    const name = (id: number | null) => people.find(p => p.id === id)?.name ?? null;
+    const canSee = await this.canSeeContacts(user);
+    const items = rows.map(r => ({
+      ...(canSee ? r : this.stripContacts(r)),
+      uploaded_by_name: name(r.uploaded_by_id),
+      assigned_staff_name: name(r.assigned_staff_id),
+    }));
+    return { items, total, page: Number(page) || 1, limit: take };
   }
 
   async assignableStaff() {
@@ -329,7 +361,8 @@ export class InboundsService {
   async findOne(id: number, user?: any): Promise<Inbound> {
     const inbound = await this.mustFindOne(id);
 
-    if (user && user.role === 'Staff' && inbound.assigned_staff_id !== user.id && inbound.uploaded_by_id !== user.id && !(inbound.is_queued && await this.canManageQueue(user))) {
+    if (user && user.role === 'Staff' && inbound.assigned_staff_id !== user.id && inbound.uploaded_by_id !== user.id && !(inbound.is_queued && await this.canManageQueue(user))
+      && !(inbound.inbound_status === 'fixed_verification' && await this.canVerify(user))) {
       throw new NotFoundException(`Inbound with ID ${id} not found`);
     }
 
@@ -393,7 +426,10 @@ export class InboundsService {
     const previousUnits = units !== undefined ? await this.unitsRepository.find({ where: { inbound_id: id }, order: { id: 'ASC' } }) : [];
 
     // update properties (TypeORM hooks will trigger on save)
+    const availabilityChanged = rest.inbound_status !== undefined && rest.inbound_status !== inbound.inbound_status;
     Object.assign(inbound, rest);
+    // A new availability moves the inbound: to the Queue, Closed, or the Verification Queue.
+    if (availabilityChanged) Object.assign(inbound, availabilityRoute(inbound.inbound_status, inbound));
 
     const saved = await this.inboundsRepository.save(inbound);
     const changed = Object.keys(rest).filter((k) => !UNTRACKED.has(k) && k !== 'status');

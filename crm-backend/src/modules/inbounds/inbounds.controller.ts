@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException, UseGuards, Request, Query } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { InboundsService } from './inbounds.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -61,6 +61,11 @@ export class InboundsController {
   @Post('assign')
   assign(@Body() body: AssignInboundsDto, @Request() req: any) {
     return this.inboundsService.assign(body.inboundIds, body.staffId, req.user);
+  }
+
+  @Get('verification-queue')
+  async verificationQueue(@Request() req: any, @Query('page') page = '1', @Query('limit') limit = '25') {
+    return { success: true, data: await this.inboundsService.verificationQueue(req.user, Number(page), Number(limit)) };
   }
 
   @Get(':id/activity')

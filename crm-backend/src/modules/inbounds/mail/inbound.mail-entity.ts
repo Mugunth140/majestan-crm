@@ -14,7 +14,7 @@ export interface InboundMailData {
   ownerName: string;
   email: string | null;
   status: string;
-  /** available | not_available | fixed_verification | null */
+  /** available | not_available | fixed_verification | verification_done | null */
   availability: string | null;
   property: string;
   purpose: string | null;

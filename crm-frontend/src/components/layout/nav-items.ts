@@ -41,7 +41,7 @@ export const NAVIGATION: NavItem[] = [
   { name: "Dashboard", href: "/", icon: Gauge, color: "text-blue-600 dark:text-blue-400" },
   { name: "Scheduler", href: "/scheduler", icon: CalendarClock, color: "text-sky-600 dark:text-sky-400" },
   { name: "Leads", href: "/leads", icon: TrendingUp, color: "text-emerald-600 dark:text-emerald-400" },
-  { name: "Lead Routing", href: "/lead-routing", icon: Route, color: "text-violet-600 dark:text-violet-400" },
+  { name: "Routing", href: "/lead-routing", icon: Route, color: "text-violet-600 dark:text-violet-400" },
   { name: "Inbound", href: "/inbound", icon: Inbox, color: "text-cyan-600 dark:text-cyan-400" },
   { name: "Agent Network", href: "/agent-network", icon: Network, color: "text-indigo-600 dark:text-indigo-400" },
   { name: "Projects", href: "/projects", icon: Briefcase, color: "text-amber-600 dark:text-amber-400" },

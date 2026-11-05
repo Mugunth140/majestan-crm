@@ -1,6 +1,6 @@
 "use client";
 
-import { inboundStatusLabel } from "@/lib/inbound-status";
+import { inboundStatusLabel, inboundStatusTone } from "@/lib/inbound-status";
 import { InboundAssignmentDialog } from "@/components/inbound/inbound-assignment-dialog";
 import { NewInboundModal, showQueueNext } from "@/components/inbound/new-inbound-modal";
 import { useIsMobile } from "@/hooks/use-device";
@@ -49,7 +49,7 @@ const STATUS_TONES: Record<string, StatusTone> = {
 
 const INBOUND_FIELDS: ViewField[] = [
   { id: "status", label: "Status", get: (i) => i.status || "New Inbound", order: Object.keys(STATUS_TONES), dot: (v) => statusDot(v, STATUS_TONES[v]) },
-  { id: "inbound_status", label: "Inbound status", get: (i) => (i.inbound_status ? inboundStatusLabel(i.inbound_status) : ""), dot: (v) => statusDot(v, v === "Available" ? "green" : v === "Not available" ? "red" : "amber") },
+  { id: "inbound_status", label: "Inbound status", get: (i) => (i.inbound_status ? inboundStatusLabel(i.inbound_status) : ""), dot: (v) => statusDot(v, inboundStatusTone(v)) },
   { id: "category", label: "Category", get: (i) => i.property_category || i.propertyCategory, capitalize: true },
   { id: "assigned", label: "Assigned", get: (i) => i.assigned?.name || "Unassigned" },
   { id: "uploaded_by", label: "Uploaded by", get: (i) => i.uploaded_by?.name },
@@ -316,8 +316,7 @@ export default function InboundPage() {
       cell: ({ row }) => {
         const value = row.original.inbound_status;
         if (!value) return <span>—</span>;
-        const tone = value === "available" ? "green" : value === "not_available" ? "red" : "amber";
-        return <StatusCell status={inboundStatusLabel(value)} tone={tone} />;
+        return <StatusCell status={inboundStatusLabel(value)} tone={inboundStatusTone(value)} />;
       },
     },
     {

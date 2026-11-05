@@ -56,9 +56,13 @@ export function WorkspaceMenu({
         aria-label="Workspace menu"
         className={cn(
           "flex h-12 w-full items-center gap-2.5 rounded-lg text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#017D58]/40",
-          "bg-background shadow-[0_0_0_1px_rgba(0,0,0,0.08),0_1px_2px_rgba(0,0,0,0.05)] hover:shadow-[0_0_0_1px_rgba(0,0,0,0.13),0_1px_2px_rgba(0,0,0,0.06)]",
-          "dark:bg-white/[0.06] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.1)] dark:hover:bg-white/[0.09]",
-          collapsed ? "justify-center px-0" : "px-2.5",
+          // Collapsed, the mark stands on its own: no card outline around it.
+          collapsed
+            ? "justify-center px-0 hover:bg-black/[0.045] dark:hover:bg-white/[0.06]"
+            : cn(
+                "px-2.5 bg-background shadow-[0_0_0_1px_rgba(0,0,0,0.08),0_1px_2px_rgba(0,0,0,0.05)] hover:shadow-[0_0_0_1px_rgba(0,0,0,0.13),0_1px_2px_rgba(0,0,0,0.06)]",
+                "dark:bg-white/[0.06] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.1)] dark:hover:bg-white/[0.09]",
+              ),
         )}
       >
         <PrismarkMark className="size-6 shrink-0 text-[#017D58] dark:text-[#2FB585]" />
