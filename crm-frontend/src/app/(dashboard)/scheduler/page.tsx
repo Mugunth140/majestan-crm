@@ -10,18 +10,12 @@ import { DataTable } from "@/components/tables/data-table";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { IdCell, NameCell, StatusCell } from "@/components/tables/cells";
 import { EmptyState } from "@/components/shared/empty-state";
-import { FormSelect } from "@/components/shared/form-select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import {
   ListBody,
   ListFrame,
   ToolbarClear,
-  toolbarFilterButton,
+  ToolbarSelect,
 } from "@/components/layout/list-page";
 import { ACTION_FILTERS, type ActionFilter } from "@/lib/action-filters";
 import {
@@ -46,26 +40,24 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 // Leads are paged on the server; one view rarely holds more than this.
 const LEAD_LIMIT = 500;
 
-/** Each bucket as a tile: what it holds, and its accent. */
+/** Each bucket as a tile: what it holds; Overdue's count turns red. */
 const BUCKETS: Record<
   ActionFilter,
-  { label: string; hint: string; dot: string; count?: string }
+  { label: string; hint: string; count?: string }
 > = {
   Overdue: {
     label: "Overdue",
     hint: "Past their date",
-    dot: "bg-rose-500",
     count: "text-rose-600 dark:text-rose-400",
   },
-  Yesterday: { label: "Yesterday", hint: "Followed up", dot: "bg-slate-400" },
-  Today: { label: "Today", hint: "Due today", dot: "bg-amber-500" },
-  Tomorrow: { label: "Tomorrow", hint: "Due tomorrow", dot: "bg-sky-500" },
-  "All Scheduled": {
-    label: "Later",
-    hint: "After tomorrow",
-    dot: "bg-violet-500",
-  },
+  Yesterday: { label: "Yesterday", hint: "Followed up" },
+  Today: { label: "Today", hint: "Due today" },
+  Tomorrow: { label: "Tomorrow", hint: "Due tomorrow" },
+  "All Scheduled": { label: "Later", hint: "After tomorrow" },
 };
+
+// ToolbarSelect needs a value for "no filter".
+const ALL = "all";
 
 type Filters = { module: "" | ScheduleModule; staff: string; status: string };
 const NO_FILTERS: Filters = { module: "", staff: "", status: "" };
@@ -391,64 +383,48 @@ export default function SchedulerPage() {
     />
   );
 
-  const filterPopover = (
-    <Popover>
-      <PopoverTrigger render={toolbarFilterButton(activeFilters)} />
-      <PopoverContent align="end" className="w-[calc(100vw-32px)] p-0 sm:w-72">
-        <div className="flex items-center justify-between border-b px-4 py-3">
-          <h4 className="text-[13px] font-semibold text-foreground">
-            Filter follow-ups
-          </h4>
-          {activeFilters > 0 && (
-            <button
-              type="button"
-              onClick={() => setFilters(NO_FILTERS)}
-              className="text-[12px] text-muted-foreground hover:text-foreground"
-            >
-              Clear all
-            </button>
-          )}
-        </div>
-        <div className="space-y-4 p-4">
-          {seesAll && (
-            <FilterField label="Module">
-              <FormSelect
-                name="schedulerModule"
-                placeholder="All modules"
-                options={SCHEDULE_MODULES.map((m) => ({
-                  label: m.label,
-                  value: m.value,
-                }))}
-                value={filters.module}
-                onValueChange={(v) =>
-                  setFilter({ module: (v || "") as Filters["module"] })
-                }
-              />
-            </FilterField>
-          )}
-          {picksStaff && (
-            <FilterField label="Assigned staff">
-              <FormSelect
-                name="schedulerStaff"
-                placeholder="Anyone"
-                options={options.staff.map((s) => ({ label: s, value: s }))}
-                value={filters.staff}
-                onValueChange={(v) => setFilter({ staff: v || "" })}
-              />
-            </FilterField>
-          )}
-          <FilterField label="Status">
-            <FormSelect
-              name="schedulerStatus"
-              placeholder="Any status"
-              options={options.statuses.map((s) => ({ label: s, value: s }))}
-              value={filters.status}
-              onValueChange={(v) => setFilter({ status: v || "" })}
-            />
-          </FilterField>
-        </div>
-      </PopoverContent>
-    </Popover>
+  const filterBar = (
+    <>
+      {seesAll && (
+        <ToolbarSelect
+          label="Module"
+          closeOnSelect
+          value={filters.module || ALL}
+          onChange={(v) =>
+            setFilter({ module: v === ALL ? "" : (v as ScheduleModule) })
+          }
+          options={[
+            { value: ALL, label: "All" },
+            ...SCHEDULE_MODULES.map((m) => ({
+              value: m.value,
+              label: m.label,
+            })),
+          ]}
+        />
+      )}
+      {picksStaff && (
+        <ToolbarSelect
+          label="Staff"
+          closeOnSelect
+          value={filters.staff || ALL}
+          onChange={(v) => setFilter({ staff: v === ALL ? "" : v })}
+          options={[
+            { value: ALL, label: "Anyone" },
+            ...options.staff.map((s) => ({ value: s, label: s })),
+          ]}
+        />
+      )}
+      <ToolbarSelect
+        label="Status"
+        closeOnSelect
+        value={filters.status || ALL}
+        onChange={(v) => setFilter({ status: v === ALL ? "" : v })}
+        options={[
+          { value: ALL, label: "Any" },
+          ...options.statuses.map((s) => ({ value: s, label: s })),
+        ]}
+      />
+    </>
   );
 
   return (
@@ -475,8 +451,7 @@ export default function SchedulerPage() {
                       : "border-border/70 bg-muted/30 hover:border-border hover:bg-muted/60",
                   )}
                 >
-                  <span className="flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground">
-                    <span className={cn("size-1.5 rounded-full", meta.dot)} />
+                  <span className="block text-[12px] font-medium text-muted-foreground">
                     {meta.label}
                   </span>
                   <span
@@ -530,14 +505,14 @@ export default function SchedulerPage() {
                 </span>
               </p>
             )}
-            <div className="mb-1.5 ml-auto flex items-center gap-1">
+            <div className="mb-1.5 ml-auto flex flex-wrap items-center justify-end gap-1.5">
+              {filterBar}
               {activeFilters > 0 && (
                 <ToolbarClear
                   onClick={() => setFilters(NO_FILTERS)}
                   title="Clear filters"
                 />
               )}
-              {filterPopover}
             </div>
           </div>
 
@@ -562,22 +537,5 @@ export default function SchedulerPage() {
         </ListFrame>
       </div>
     </>
-  );
-}
-
-function FilterField({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <label className="text-[12px] font-medium text-muted-foreground">
-        {label}
-      </label>
-      {children}
-    </div>
   );
 }
