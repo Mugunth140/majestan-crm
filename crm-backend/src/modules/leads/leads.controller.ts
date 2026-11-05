@@ -126,6 +126,14 @@ export class LeadsController {
     return { success: true, data };
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
+  @Delete(':id/inquiries/:inquiryId')
+  async deleteInquiry(@Param('id') id: string, @Param('inquiryId') inquiryId: string, @Request() req: any) {
+    await this.leadsService.deleteInquiry(Number(id), Number(inquiryId), req.user?.id ?? null);
+    return { success: true };
+  }
+
   @Put(':id')
   async updateLead(@Param('id') id: string, @Body() body: UpdateLeadDto, @Request() req: any) {
     const data = await this.leadsService.updateLead(Number(id), body, req.user?.id ?? null);

@@ -504,6 +504,20 @@ export class LeadsService {
     return saved;
   }
 
+  /** Removes one requirement; the timeline keeps a note of what it was. */
+  async deleteInquiry(leadId: number, inquiryId: number, actorId: number | null = null) {
+    const inquiryRepo = this.dataSource.getRepository(LeadInquiry);
+    const inquiry = await inquiryRepo.findOne({ where: { id: inquiryId, lead_id: leadId } });
+    if (!inquiry) throw new NotFoundException('Inquiry not found');
+    const summary = [inquiry.property_type ?? inquiry.property_category, inquiry.project_list].filter(Boolean).join(' · ') || null;
+    await this.dataSource.transaction(async (manager) => {
+      // A website enquiry that became this requirement stops pointing at it.
+      await manager.query('UPDATE website_enquiry_events SET migrated_inquiry_id = NULL WHERE migrated_inquiry_id = ?', [inquiryId]);
+      await manager.delete(LeadInquiry, { id: inquiryId, lead_id: leadId });
+    });
+    await this.leadEvents?.record({ leadId, actorId, type: 'requirement_removed', from: summary, meta: { inquiryId } });
+  }
+
   async bulkCreateLeads(leads: any[], actionedBy?: any) {
     if (!leads || leads.length === 0) return { count: 0, created: 0, existing: 0, assigned: 0 };
 

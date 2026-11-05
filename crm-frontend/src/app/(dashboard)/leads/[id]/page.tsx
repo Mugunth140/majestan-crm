@@ -23,6 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { PageActions } from "@/components/layout/page-actions";
 import { useIsMobile } from "@/hooks/use-device";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 import dynamic from "next/dynamic";
 
 const LeadAttachments = dynamic(() => import("@/components/shared/lead-attachments").then(mod => mod.LeadAttachments), { ssr: false });
@@ -46,7 +47,7 @@ import { AttachmentsArt, EmptyState, RequirementsArt } from "@/components/record
 import { RequirementFields, loadCities } from "./lead-requirement";
 import {
   Loader2, ArrowUpRight, History, TrendingUp, Sparkles,
-  Plus, Activity, MessagesSquare, Paperclip, Building2, Info,
+  Plus, Activity, MessagesSquare, Paperclip, Building2, Info, Trash2,
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -196,6 +197,8 @@ function LeadDetail() {
 
   // Modals / Sliders
   const [addingInquiry, setAddingInquiry] = useState(false);
+  const [removingInquiry, setRemovingInquiry] = useState<number | null>(null);
+  const isAdmin = useIsAdmin();
   const [autoOpenedFollowUps, setAutoOpenedFollowUps] = useState(false);
   const [isAutoMatchOpen, setIsAutoMatchOpen] = useState(false);
   const [autoMatchResults, setAutoMatchResults] = useState<any[]>([]);
@@ -744,6 +747,24 @@ function LeadDetail() {
     }
   };
 
+  // Deleting is for admins, like every delete in the CRM.
+  const removeRequirement = async (inquiryId: number, label: string) => {
+    if (!confirm(`Delete ${label}? Its details can't be brought back.`)) return;
+    setRemovingInquiry(inquiryId);
+    try {
+      const res = await apiFetch(`${API_URL}/leads/${id}/inquiries/${inquiryId}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) throw new Error(data?.message || "Couldn't delete the requirement");
+      toast.success("Requirement deleted");
+      setLead((prev: any) => prev && { ...prev, inquiries: prev.inquiries?.filter((i: any) => i.id !== inquiryId) });
+      refreshTimeline();
+    } catch (reason) {
+      toast.error(reason instanceof Error && reason.message ? reason.message : "Couldn't delete the requirement");
+    } finally {
+      setRemovingInquiry(null);
+    }
+  };
+
   const addRequirementButton = (primary: boolean) => canEdit && (
     <button type="button" onClick={addRequirement} disabled={addingInquiry} className={cn(primary ? HEADER_PRIMARY : HEADER_BUTTON, "h-8 text-[13px] disabled:opacity-60")}>
       {addingInquiry ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className={cn("h-4 w-4", !primary && "text-muted-foreground")} />}
@@ -900,21 +921,35 @@ function LeadDetail() {
                   />
                 )}
 
-                {inquiries.map((inq: any, idx: number) => (
+                {inquiries.map((inq: any, idx: number) => {
+                  const title = inquiries.length > 1 ? `Requirement #${idx + 1}` : "Requirement";
+                  return (
                   <Panel
                     key={inq.id || idx}
                     flush
-                    title={inquiries.length > 1 ? `Requirement #${idx + 1}` : "Requirement"}
-                    action={canEdit && idx === 0 && (
-                      <button type="button" onClick={fetchAutoMatch} disabled={isMatching} className={cn(HEADER_BUTTON, "h-7 text-[13px] disabled:opacity-60")}>
-                        {isMatching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />}
-                        Find matches
-                      </button>
-                    )}
+                    title={title}
+                    action={
+                      <>
+                        {canEdit && idx === 0 && (
+                          <button type="button" onClick={fetchAutoMatch} disabled={isMatching} className={cn(HEADER_BUTTON, "h-7 text-[13px] disabled:opacity-60")}>
+                            {isMatching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />}
+                            Find matches
+                          </button>
+                        )}
+                        {isAdmin && (
+                          <button type="button" onClick={() => void removeRequirement(inq.id, title.toLowerCase())} disabled={removingInquiry === inq.id}
+                            aria-label={`Delete ${title.toLowerCase()}`} title="Delete requirement"
+                            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-60 dark:hover:bg-red-950/40 dark:hover:text-red-400">
+                            {removingInquiry === inq.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                          </button>
+                        )}
+                      </>
+                    }
                   >
                     <RequirementFields inquiry={inq} canEdit={canEdit} save={(patch) => saveInquiry(inq.id, patch)} />
                   </Panel>
-                ))}
+                  );
+                })}
                 </div>
               </div>
             )}

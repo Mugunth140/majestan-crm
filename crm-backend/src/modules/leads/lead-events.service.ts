@@ -10,6 +10,7 @@ export type LeadEventType =
   | 'field_changed'
   | 'requirement_changed'
   | 'requirement_added'
+  | 'requirement_removed'
   | 'qualification_changed'
   | 'visit_scheduled'
   | 'document_added'
