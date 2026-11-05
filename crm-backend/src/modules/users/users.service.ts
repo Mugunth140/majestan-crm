@@ -6,6 +6,7 @@ import * as bcrypt from 'bcrypt';
 import { PermissionsService } from '../permissions/permissions.service';
 import { ContactLogsService } from '../contact-logs/contact-logs.service';
 import { UserAvatarsService } from './user-avatars.service';
+import { cleanNavAccess } from './nav-access';
 
 @Injectable()
 export class UsersService {
@@ -90,6 +91,7 @@ export class UsersService {
       join_date: body.join_date || null,
       qualification: body.qualification || null,
       is_active: body.is_active ?? true,
+      nav_access: cleanNavAccess(body.nav_access),
     });
     const saved = await this.userRepository.save(user);
     if (Array.isArray(body.permissionKeys)) {
@@ -144,6 +146,7 @@ export class UsersService {
     user.join_date = body.join_date !== undefined ? (body.join_date || null) : user.join_date;
     user.qualification = body.qualification !== undefined ? (body.qualification || null) : user.qualification;
     user.is_active = body.is_active ?? user.is_active;
+    if (body.nav_access !== undefined) user.nav_access = cleanNavAccess(body.nav_access);
 
     const saved = await this.userRepository.save(user);
     if (Array.isArray(body.permissionKeys)) {

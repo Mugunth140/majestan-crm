@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
+import { useNavViewer } from "@/hooks/use-nav-viewer";
+import { canOpen } from "./nav-items";
 import { Briefcase, ChevronRight, CircleCheckBig, Home, Inbox, Network, Package, TrendingUp, UserPen, Users, type LucideIcon } from "lucide-react";
 
 interface CreateItem {
@@ -44,6 +46,8 @@ export function createLabelFor(pathname: string) {
 /** Bottom sheet listing everything that can be created. */
 export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
+  const viewer = useNavViewer();
+  const items = ITEMS.filter((i) => canOpen(i.href, viewer));
 
   useEffect(() => {
     if (!open) return;
@@ -79,7 +83,7 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
               </button>
             </div>
             <ul className="m-group mx-4">
-              {ITEMS.map(({ href, label, icon: Icon, tile }) => (
+              {items.map(({ href, label, icon: Icon, tile }) => (
                 <li key={href}>
                   <button
                     type="button"

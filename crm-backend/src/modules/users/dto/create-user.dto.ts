@@ -57,4 +57,10 @@ export class CreateUserDto {
   @IsArray()
   @IsString({ each: true })
   permissionKeys?: string[];
+
+  /** Sidebar modules to show; null goes back to the role defaults. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  nav_access?: string[] | null;
 }

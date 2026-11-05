@@ -49,7 +49,7 @@ export function SearchPalette({
     const pages: Entry[] = [];
     const registry: Entry[] = [];
     for (const item of NAVIGATION) {
-      if (!canSee(item.access, viewer)) continue;
+      if (!canSee(item, viewer)) continue;
       const Icon = item.icon;
       if (item.href) {
         pages.push({ title: item.name, href: item.href, icon: <Icon className={cn("size-4", item.color)} strokeWidth={1.75} /> });

@@ -8,6 +8,8 @@ import { CircleCheckBig, House, Inbox, LayoutGrid, Plus, type LucideIcon } from 
 import { CreateSheet, createLabelFor, createRouteFor } from "./mobile-create";
 import { cn } from "@/lib/utils";
 import { useNotifications } from "@/context/notification-context";
+import { useNavViewer } from "@/hooks/use-nav-viewer";
+import { canOpen } from "./nav-items";
 
 interface Tab {
   href: string;
@@ -45,11 +47,13 @@ export function MobileNavbar() {
   const router = useRouter();
   const pathname = usePathname() ?? "/";
   const { unreadCount } = useNotifications();
+  const viewer = useNavViewer();
   const [createOpen, setCreateOpen] = useState(false);
   if (hidesTabBar(pathname)) return null;
   const current = activeTab(pathname);
   const createRoute = createRouteFor(pathname);
-  const createLabel = createLabelFor(pathname);
+  // No "+" for a module this user can't open.
+  const createLabel = createRoute && !canOpen(createRoute, viewer) ? null : createLabelFor(pathname);
 
   return (
     <>
@@ -60,7 +64,7 @@ export function MobileNavbar() {
       <MotionConfig reducedMotion="user">
         <LayoutGroup>
           <motion.ul layout transition={SPRING} className="m-bar m-dock pointer-events-auto flex h-[60px] items-center gap-1 rounded-full border p-1.5">
-            {TABS.map(({ href, icon: Icon, label }) => {
+            {TABS.filter((t) => canOpen(t.href, viewer)).map(({ href, icon: Icon, label }) => {
               const active = current === href;
               const badge = href === "/inbox" && unreadCount > 0 ? (unreadCount > 99 ? "99+" : String(unreadCount)) : null;
               return (

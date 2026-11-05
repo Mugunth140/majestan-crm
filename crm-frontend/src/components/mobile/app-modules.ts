@@ -31,7 +31,8 @@ const TILES: Record<string, string> = {
   "/master": "bg-stone-500",
 };
 
-const GROUPS: { title: string; hrefs: string[] }[] = [
+/** Modules by area, for More and the Access tab. */
+export const MODULE_GROUPS: { title: string; hrefs: string[] }[] = [
   { title: "Sales", hrefs: ["/scheduler", "/leads", "/lead-routing", "/inbound", "/agent-network", "/logger"] },
   { title: "Inventory", hrefs: ["/projects", "/properties", "/builders", "/asset-inventory"] },
   { title: "Marketing", hrefs: ["/ads", "/blog", "/showcases"] },
@@ -40,7 +41,7 @@ const GROUPS: { title: string; hrefs: string[] }[] = [
 
 /** Every module this user may open, except the dashboard itself. */
 export function appModules(viewer: NavViewer | null): AppModule[] {
-  return NAVIGATION.filter((item) => canSee(item.access, viewer))
+  return NAVIGATION.filter((item) => canSee(item, viewer))
     .map((item) => ({ ...item, href: item.href ?? "/master", tile: TILES[item.href ?? "/master"] ?? "bg-zinc-500" }))
     .filter((m) => m.href !== "/");
 }
@@ -48,7 +49,7 @@ export function appModules(viewer: NavViewer | null): AppModule[] {
 /** The user's modules in titled groups, leaving out the ones already on the tab bar. */
 export function moduleGroups(viewer: NavViewer | null, skip: readonly string[] = []) {
   const modules = appModules(viewer).filter((m) => !skip.includes(m.href));
-  return GROUPS.map((g) => ({
+  return MODULE_GROUPS.map((g) => ({
     title: g.title,
     modules: g.hrefs.map((h) => modules.find((m) => m.href === h)).filter((m): m is AppModule => !!m),
   })).filter((g) => g.modules.length > 0);

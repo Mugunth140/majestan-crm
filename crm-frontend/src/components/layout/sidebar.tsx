@@ -10,7 +10,8 @@ import { cn } from "@/lib/utils";
 import { useSidebar } from "./sidebar-context";
 import { NotificationsPanel } from "./notifications-panel";
 import { UpdateButton } from "./app-update";
-import { NAVIGATION, canSee, readUser, type StoredUser } from "./nav-items";
+import { useNavViewer } from "@/hooks/use-nav-viewer";
+import { NAVIGATION, canSee } from "./nav-items";
 import { SearchPalette, useSearchShortcut } from "./search-palette";
 import { WorkspaceMenu } from "./workspace-menu";
 import "./sidebar.css";
@@ -47,22 +48,12 @@ export function Sidebar() {
   const pathname = usePathname();
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const { unreadCount } = useNotifications();
-  const [user, setUser] = useState<StoredUser | null>(null);
+  const user = useNavViewer();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const closeNotifications = useCallback(() => setNotificationsOpen(false), []);
   const [searchOpen, setSearchOpen] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   useSearchShortcut(setSearchOpen);
-
-  useEffect(() => {
-    // localStorage is client-only; read after mount, and again when the
-    // signed-in user changes their photo.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setUser(readUser());
-    const reread = () => setUser(readUser());
-    window.addEventListener("crm-user-updated", reread);
-    return () => window.removeEventListener("crm-user-updated", reread);
-  }, []);
 
   return (
     <aside
@@ -129,7 +120,7 @@ export function Sidebar() {
       <nav className="sb-scroll mt-2 min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2">
         <div className={cn(entering && "sb-enter", "flex flex-col gap-0.5")} style={{ "--sb-base": 3 } as CSSProperties}>
           {NAVIGATION.map((item) => {
-            if (!canSee(item.access, user)) return null;
+            if (!canSee(item, user)) return null;
             const Icon = item.icon;
 
             if (item.subItems) {

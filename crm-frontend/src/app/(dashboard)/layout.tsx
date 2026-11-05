@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { PageActionsProvider } from "@/components/layout/page-actions";
 import { RefreshPill } from "@/components/layout/refresh-pill";
 import { SidebarProvider } from "@/components/layout/sidebar-context";
+import { NavGuard } from "@/components/layout/nav-guard";
 import { MobileNavbar } from "@/components/layout/mobile-navbar";
 import { MobileGlassHeader } from "@/components/layout/mobile-glass-header";
 import { MobileHeaderProvider } from "@/components/layout/mobile-header-context";
@@ -41,7 +42,7 @@ export default function DashboardLayout({
                 <PageHeader />
                 <MobileGlassHeader />
                 <MainScrollArea>
-                  {isClient ? children : <DashboardLoading />}
+                  {isClient ? <NavGuard>{children}</NavGuard> : <DashboardLoading />}
                 </MainScrollArea>
                 <MobileNavbar />
               </div>

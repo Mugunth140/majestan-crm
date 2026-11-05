@@ -46,6 +46,10 @@ export class User {
   @Column({ type: 'varchar', length: 500, nullable: true })
   avatar_url: string | null;
 
+  /** Sidebar modules this user sees; null means the defaults for their role and department. */
+  @Column({ type: 'json', nullable: true })
+  nav_access: string[] | null;
+
   @Column({ name: 'role_id' })
   role_id: number;
 

@@ -5,7 +5,8 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Database, KeyRound, Loader2, ShieldCheck, Smartphone } from "lucide-react";
 import { apiFetch, apiJson } from "@/lib/api-fetch";
-import { isAdmin as isAdminUser } from "@/lib/permissions";
+import { MANAGE_BLOG, isAdmin as isAdminUser } from "@/lib/permissions";
+import { isAdminRole } from "@/lib/nav-access";
 import { USER_PERMISSIONS, keysForRole, needsDepartment, offeredFor, userCode, withPermission } from "@/lib/user-access";
 import { fetchLoggerDevices, type LoggerDevice } from "@/lib/logger-devices";
 import { InlineSelect, InlineText, Section, withCurrent } from "@/components/record/inline-field";
@@ -22,6 +23,7 @@ import { FOCUS_SELECT } from "@/components/shared/focus-steps";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PasswordInput, useUserMasters } from "../_components/UserForm";
+import { SidebarAccess } from "../_components/SidebarAccess";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -33,6 +35,8 @@ type User = {
   aadhaar_no?: string | null; bank_account_no?: string | null; join_date?: string | null; created_at?: string;
   avatar_url?: string | null;
   permissions?: string[];
+  /** Sidebar modules picked by an admin; null keeps the role defaults. */
+  nav_access?: string[] | null;
 };
 
 const STATUS_OPTIONS = [
@@ -138,19 +142,32 @@ function UserPage() {
       role_id: Number(next),
       department_id: needsDepartment(next) ? u.department_id : null,
       permissionKeys: keysForRole(keys, next),
+      nav_access: null,
     }, "Role changed");
   };
   const confirmRole = async () => {
     if (!pendingRole?.department) return void toast.error("Pick a department");
     setBusy(true);
     try {
-      await save({ role_id: Number(pendingRole.role), department_id: Number(pendingRole.department), permissionKeys: keysForRole(keys, pendingRole.role) }, "Role changed");
+      await save({ role_id: Number(pendingRole.role), department_id: Number(pendingRole.department), permissionKeys: keysForRole(keys, pendingRole.role), nav_access: null }, "Role changed");
       setPendingRole(null);
     } catch { /* toast shown */ } finally { setBusy(false); }
   };
   const togglePermission = async (key: string, on: boolean) => {
     setSavingKey(key);
     try { await save({ permissionKeys: withPermission(keys, key, on) }, on ? "Access granted" : "Access removed"); } catch { /* toast shown */ } finally { setSavingKey(null); }
+  };
+  /** Saves the sidebar picks without reloading, so quick clicks don't flicker. */
+  const saveNav = async (next: string[] | null) => {
+    const before = u.nav_access ?? null;
+    setUser((p) => (p ? { ...p, nav_access: next } : p));
+    const res = await apiFetch(`${API_URL}/users/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nav_access: next }) });
+    if (!res.ok) {
+      setUser((p) => (p ? { ...p, nav_access: before } : p));
+      const message = errorText(await res.json().catch(() => null)) || "Couldn't save the sidebar";
+      toast.error(message);
+      throw new Error(message);
+    }
   };
   const setActive = (next: string) => save({ is_active: next === "Active" }, next === "Active" ? "User activated" : "User deactivated").catch(() => {});
   const setNewPassword = async () => {
@@ -172,7 +189,7 @@ function UserPage() {
           <InlineSelect label="Role" value={roleId} options={withCurrent(roles, roleId)} disabled={!canEdit} onSave={changeRole} />
           {deptNeeded
             ? <InlineSelect label="Department" value={u.department_id ? String(u.department_id) : null} options={departments} disabled={!canEdit}
-                onSave={(v) => save({ department_id: Number(v) })} />
+                onSave={(v) => save({ department_id: Number(v), nav_access: null })} />
             : <Fact label="Department">All departments</Fact>}
         </DataCard>
         <DataCard title="Contact">
@@ -192,15 +209,26 @@ function UserPage() {
   );
 
   const offered = USER_PERMISSIONS.filter((p) => offeredFor(p, roleId));
+  // Admins can do everything, so they have no Access tab.
+  const targetIsAdmin = isAdminRole(u.role?.name);
   const access = (
     <div>
       <TabHeader title="Access" />
       <div className="space-y-5 px-3 pb-8 sm:px-10">
+        <SidebarAccess
+          role={u.role?.name ?? ""}
+          department={u.department?.name ?? ""}
+          blogAccess={keys.includes(MANAGE_BLOG)}
+          value={u.nav_access ?? null}
+          disabled={!canEdit}
+          onChange={saveNav}
+        />
         <section className="overflow-hidden rounded-xl border bg-card">
-          <h3 className="flex h-11 items-center border-b px-4 text-[14px] font-semibold text-foreground">Extra access</h3>
-          {u.role?.name === "Admin" || u.role?.name === "Super Admin" ? (
-            <p className="px-4 py-4 text-[14px] text-muted-foreground">Admins can see and do everything, so there is nothing extra to grant.</p>
-          ) : offered.map((p) => (
+          <div className="border-b px-4 py-2.5">
+            <h3 className="text-[14px] font-semibold text-foreground">Fine-grained access</h3>
+            <p className="text-[13px] text-muted-foreground">What they can see and do inside the modules. Only admins can delete.</p>
+          </div>
+          {offered.map((p) => (
             <label key={p.key} className="flex items-start gap-3 border-b px-4 py-3.5 last:border-b-0">
               <span className="min-w-0 flex-1">
                 <span className="block text-[14px] font-medium text-foreground">{p.title}</span>
@@ -241,7 +269,7 @@ function UserPage() {
 
   const tabs: RecordTab<Tab>[] = [
     { key: "overview", label: "Overview", icon: Database },
-    { key: "access", label: "Access", icon: ShieldCheck },
+    ...(targetIsAdmin ? [] : [{ key: "access" as const, label: "Access", icon: ShieldCheck }]),
     ...(devices ? [{ key: "devices" as const, label: "Devices", icon: Smartphone, count: devices.length }] : []),
   ];
   const statusMenu = (size: "h-7" | "h-8") => (
@@ -289,7 +317,7 @@ function UserPage() {
         }
       >
         {activeTab === "overview" && overview}
-        {activeTab === "access" && access}
+        {activeTab === "access" && !targetIsAdmin && access}
         {activeTab === "devices" && devices && devicesTab}
       </RecordPage>
 
