@@ -1,0 +1,237 @@
+// Finds site listings for a lead requirement. A requirement is written in the
+// CRM's own words (category, type, purchase type, preferences), so it is first
+// read into what the site stores, then matched loosely: budget and area allow
+// some slack, and BHK and locality rank results rather than rule them out.
+
+/** How far outside the stated budget or area a listing may still be shown. */
+export const MATCH_SLACK = 0.2;
+export const MATCH_LIMIT = 20;
+
+/** Site property types (properties.property_type) for each CRM requirement type. */
+const TYPE_MAP: Record<string, string[]> = {
+  apartment: ['apartment'],
+  villa: ['villa'],
+  independent_house: ['villa', 'individual_portion'],
+  builder_floor: ['apartment', 'individual_portion'],
+  plot: ['plot'],
+  farm_house: ['farm_house', 'farmland'],
+  office: ['commercial', 'coworking'],
+  coworking: ['coworking'],
+  commercial_land: ['commercial', 'plot'],
+  warehouse: ['commercial', 'industrial'],
+  factory: ['industrial'],
+  industrial_shed: ['industrial'],
+  industrial_land: ['industrial'],
+  manufacturing_unit: ['industrial'],
+};
+
+/** Used when the type is missing or has no site equivalent. */
+const CATEGORY_MAP: Record<string, string[]> = {
+  residential: [
+    'apartment',
+    'villa',
+    'individual_portion',
+    'plot',
+    'farm_house',
+  ],
+  commercial: ['commercial', 'coworking'],
+  industrial: ['industrial'],
+  agricultural: ['farmland', 'farm_house'],
+  institutional: ['commercial', 'other'],
+};
+
+/** Project types the site has (projects.project_type). */
+const PROJECT_TYPES = ['apartment', 'villa', 'plot'];
+
+export interface MatchCriteria {
+  types: string[] | null;
+  listing: 'Rent' | 'Sell' | null;
+  city: string | null;
+  localities: string[];
+  minBudget: number | null;
+  maxBudget: number | null;
+  bhk: number | null;
+  minArea: number | null;
+  maxArea: number | null;
+}
+
+const num = (v: unknown) => {
+  const n = Number(v);
+  return v !== null &&
+    v !== undefined &&
+    v !== '' &&
+    Number.isFinite(n) &&
+    n > 0
+    ? n
+    : null;
+};
+
+const key = (v?: string | null) =>
+  v
+    ? v
+        .trim()
+        .toLowerCase()
+        .replace(/[\s-]+/g, '_')
+    : '';
+
+/** What a requirement asks for, in the site's terms. */
+export function matchCriteria(
+  inquiry: any,
+  city: string | null,
+): MatchCriteria {
+  const prefs = inquiry.preferences || {};
+  const type = key(inquiry.property_type);
+  const purchase = key(inquiry.purchase_type);
+  let localities: string[] = [];
+  try {
+    const raw =
+      typeof inquiry.sub_locations === 'string'
+        ? JSON.parse(inquiry.sub_locations)
+        : inquiry.sub_locations;
+    if (Array.isArray(raw))
+      localities = raw
+        .filter((s) => typeof s === 'string' && s.trim())
+        .map((s) => s.trim());
+  } catch {
+    // An unreadable locality list just means no locality preference.
+  }
+  return {
+    types:
+      TYPE_MAP[type] ?? CATEGORY_MAP[key(inquiry.property_category)] ?? null,
+    listing:
+      purchase === 'rental'
+        ? 'Rent'
+        : purchase === 'buy' || purchase === 'sale'
+          ? 'Sell'
+          : null,
+    city,
+    localities,
+    minBudget: num(prefs.minBudget),
+    maxBudget: num(prefs.maxBudget),
+    bhk: num(prefs.bhk),
+    minArea: num(prefs.minArea),
+    maxArea: num(prefs.maxArea),
+  };
+}
+
+const placeholders = (list: unknown[]) => list.map(() => '?').join(', ');
+
+/** Ranking terms that apply; a bare `0` would be read as a column position. */
+const order = (...ranks: string[]) =>
+  ranks
+    .filter((r) => r !== '0')
+    .map((r) => `${r}, `)
+    .join('');
+
+/** Available properties, nearest locality and BHK first. */
+export function propertyMatchQuery(c: MatchCriteria) {
+  const where = ["p.status = 'available'"];
+  const params: unknown[] = [];
+  const area =
+    'COALESCE(NULLIF(pd.area_sqft, 0), NULLIF(pd.built_up_area, 0), NULLIF(pd.carpet_area, 0), NULLIF(pd.plot_area, 0))';
+
+  if (c.types) {
+    where.push(`p.property_type IN (${placeholders(c.types)})`);
+    params.push(...c.types);
+  }
+  if (c.listing) {
+    where.push('p.listing_type = ?');
+    params.push(c.listing);
+  }
+  if (c.city) {
+    where.push('p.city = ?');
+    params.push(c.city);
+  }
+  if (c.minBudget) {
+    where.push('p.price >= ?');
+    params.push(c.minBudget * (1 - MATCH_SLACK));
+  }
+  if (c.maxBudget) {
+    where.push('p.price <= ?');
+    params.push(c.maxBudget * (1 + MATCH_SLACK));
+  }
+  if (c.minArea) {
+    where.push(`(${area} IS NULL OR ${area} >= ?)`);
+    params.push(c.minArea * (1 - MATCH_SLACK));
+  }
+  if (c.maxArea) {
+    where.push(`(${area} IS NULL OR ${area} <= ?)`);
+    params.push(c.maxArea * (1 + MATCH_SLACK));
+  }
+
+  const localityRank = c.localities.length
+    ? `CASE WHEN s.locality_name IN (${placeholders(c.localities)}) THEN 0 ELSE 1 END`
+    : '0';
+  const bhkRank = c.bhk ? 'COALESCE(ABS(pd.bedrooms - ?), 99)' : '0';
+  const rankParams = [...c.localities, ...(c.bhk ? [c.bhk] : [])];
+
+  return {
+    sql: `SELECT p.id, p.property_code AS code, p.title, p.price, p.property_type, p.listing_type, p.city,
+                 s.locality_name AS locality, pd.bedrooms, ${area} AS area_sqft, pd.furnished,
+                 ${c.localities.length ? `${localityRank} = 0` : '0'} AS locality_match
+          FROM properties p
+          LEFT JOIN property_details pd ON pd.property_id = p.id
+          LEFT JOIN property_locations pl ON pl.property_id = p.id
+          LEFT JOIN sublocations s ON s.id = pl.location_id
+          WHERE ${where.join(' AND ')}
+          ORDER BY ${order(localityRank, bhkRank)}p.created_at DESC
+          LIMIT ${MATCH_LIMIT}`,
+    params: [...c.localities, ...params, ...rankParams],
+  };
+}
+
+/** Published projects with at least one available unit that fits. */
+export function projectMatchQuery(c: MatchCriteria) {
+  const types = c.types
+    ? c.types.filter((t) => PROJECT_TYPES.includes(t))
+    : PROJECT_TYPES;
+  if (!types.length) return null;
+
+  const where = [
+    "pr.status = 'published'",
+    `pr.project_type IN (${placeholders(types)})`,
+  ];
+  const projectParams: unknown[] = [...types];
+  if (c.city) {
+    where.push('pr.city = ?');
+    projectParams.push(c.city);
+  }
+
+  const rent = c.listing === 'Rent';
+  const unitPrice = rent ? 'u.monthly_rent' : 'u.price';
+  const unit = ['u.project_id = pr.id', "u.status = 'available'"];
+  const unitParams: unknown[] = [];
+  if (c.listing) {
+    unit.push('u.listing_mode = ?');
+    unitParams.push(rent ? 'rent' : 'sale');
+  }
+  if (c.minBudget) {
+    unit.push(`${unitPrice} >= ?`);
+    unitParams.push(c.minBudget * (1 - MATCH_SLACK));
+  }
+  if (c.maxBudget) {
+    unit.push(`${unitPrice} <= ?`);
+    unitParams.push(c.maxBudget * (1 + MATCH_SLACK));
+  }
+
+  const localityRank = c.localities.length
+    ? `CASE WHEN pr.sublocation IN (${placeholders(c.localities)}) THEN 0 ELSE 1 END`
+    : '0';
+  const bhkRank = c.bhk ? 'COALESCE(MIN(ABS(u.bedrooms - ?)), 99)' : '0';
+  const rankParams = [...c.localities, ...(c.bhk ? [c.bhk] : [])];
+
+  return {
+    sql: `SELECT pr.id, pr.project_code AS code, pr.name, pr.project_type, pr.city, pr.sublocation AS locality,
+                 pr.builder_name, pr.possession_status,
+                 COUNT(u.id) AS units, MIN(${unitPrice}) AS min_price, MAX(${unitPrice}) AS max_price,
+                 GROUP_CONCAT(DISTINCT u.bedrooms ORDER BY u.bedrooms) AS bedrooms,
+                 ${c.localities.length ? `${localityRank} = 0` : '0'} AS locality_match
+          FROM projects pr
+          JOIN project_units u ON ${unit.join(' AND ')}
+          WHERE ${where.join(' AND ')}
+          GROUP BY pr.id
+          ORDER BY ${order(localityRank, bhkRank)}pr.created_at DESC
+          LIMIT ${MATCH_LIMIT}`,
+    params: [...c.localities, ...unitParams, ...projectParams, ...rankParams],
+  };
+}

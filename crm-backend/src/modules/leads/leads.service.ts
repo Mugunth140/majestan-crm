@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { isQueuedWebsiteSource } from './website-sources';
+import { matchCriteria, projectMatchQuery, propertyMatchQuery } from './auto-match';
 import { LeadSource } from '../../database/entities/lead-source.entity';
 import { Lead } from '../../database/entities/lead.entity';
 import { LeadFollowUp } from '../../database/entities/lead-follow-up.entity';
@@ -1296,63 +1297,29 @@ export class LeadsService {
     );
   }
 
-  async autoMatchProperties(leadId: number) {
-    const lead = await this.dataSource.getRepository(Lead).findOne({
-      where: { id: leadId },
-      relations: { inquiries: true },
+  /**
+   * Site properties and projects that fit a requirement: the one asked for,
+   * else the lead's latest. Missing preferences only widen the search.
+   */
+  async autoMatchProperties(leadId: number, inquiryId?: number) {
+    const inquiries = await this.dataSource.getRepository(LeadInquiry).find({
+      where: { lead: { id: leadId } },
+      order: { created_at: 'DESC', id: 'DESC' },
     });
-    if (!lead || !lead.inquiries?.length) throw new NotFoundException('Lead or inquiry not found');
+    const inquiry = inquiryId ? inquiries.find((i) => i.id === inquiryId) : inquiries[0];
+    if (!inquiry) throw new NotFoundException('Add a requirement to find matching properties.');
 
-    const inquiry = lead.inquiries[0];
-    const prefs = inquiry.preferences;
-    if (!prefs || Object.keys(prefs).length === 0) {
-      throw new ConflictException('Please define customer preferences (like budget or area) to auto-match properties.');
-    }
-
-    let query = `
-      SELECT p.id, p.title, p.price, p.property_type, p.status, p.slug, p.city, p.listing_type, 
-             pd.bedrooms, pd.bathrooms, pd.area_sqft, pd.furnished
-      FROM properties p
-      LEFT JOIN property_details pd ON p.id = pd.property_id
-      WHERE p.status = 'available'
-    `;
-    const params: any[] = [];
-
-    // Basic map for property type if there is a match in enum
-    // property_type enum: 'apartment','villa','plot','commercial','coworking','farmland','industrial','other','individual_portion'
-    if (inquiry.property_type) {
-      let mappedType = inquiry.property_type.toLowerCase();
-      const validTypes = ['apartment', 'villa', 'plot', 'commercial', 'coworking', 'farmland', 'industrial', 'other', 'individual_portion', 'investment_property', 'pg_service_apartment', 'farm_house'];
-      if (validTypes.includes(mappedType)) {
-        query += ` AND p.property_type = ?`;
-        params.push(mappedType);
-      }
-    }
-
-    if (prefs.minBudget) {
-      query += ` AND p.price >= ?`;
-      params.push(Number(prefs.minBudget));
-    }
-    if (prefs.maxBudget) {
-      query += ` AND p.price <= ?`;
-      params.push(Number(prefs.maxBudget));
-    }
-    if (prefs.bhk) {
-      query += ` AND pd.bedrooms = ?`;
-      params.push(Number(prefs.bhk));
-    }
-    if (prefs.minArea) {
-      query += ` AND pd.area_sqft >= ?`;
-      params.push(Number(prefs.minArea));
-    }
-    if (prefs.maxArea) {
-      query += ` AND pd.area_sqft <= ?`;
-      params.push(Number(prefs.maxArea));
-    }
-
-    query += ` ORDER BY p.created_at DESC LIMIT 20`;
-
-    return this.siteDataSource.query(query, params);
+    const [city] = inquiry.city_id
+      ? await this.siteDataSource.query('SELECT city_name FROM cities WHERE id = ?', [inquiry.city_id])
+      : [];
+    const criteria = matchCriteria(inquiry, city?.city_name ?? null);
+    const properties = propertyMatchQuery(criteria);
+    const projects = projectMatchQuery(criteria);
+    const [propertyRows, projectRows] = await Promise.all([
+      this.siteDataSource.query(properties.sql, properties.params),
+      projects ? this.siteDataSource.query(projects.sql, projects.params) : [],
+    ]);
+    return { inquiryId: inquiry.id, properties: propertyRows, projects: projectRows };
   }
 
   async uploadDocument(leadId: number, file: Express.Multer.File, actorId: number | null = null) {

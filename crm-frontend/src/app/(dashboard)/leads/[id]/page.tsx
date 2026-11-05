@@ -47,8 +47,9 @@ import { LeadConversation } from "@/components/record/conversation";
 import { FollowUpComposer } from "@/components/record/follow-up-composer";
 import { AttachmentsArt, EmptyState, RequirementsArt } from "@/components/record/empty-state";
 import { RequirementFields, loadCities } from "./lead-requirement";
+import { AutoMatchSheet, type AutoMatches } from "./auto-match-sheet";
 import {
-  Loader2, ArrowUpRight, History, TrendingUp, Sparkles,
+  Loader2, ArrowUpRight, History, TrendingUp,
   Plus, Activity, MessagesSquare, Paperclip, Building2, Info, Trash2,
 } from "lucide-react";
 
@@ -185,8 +186,9 @@ function LeadDetail() {
   const isAdmin = useIsAdmin();
   const [autoOpenedFollowUps, setAutoOpenedFollowUps] = useState(false);
   const [isAutoMatchOpen, setIsAutoMatchOpen] = useState(false);
-  const [autoMatchResults, setAutoMatchResults] = useState<any[]>([]);
-  const [isMatching, setIsMatching] = useState(false);
+  const [autoMatches, setAutoMatches] = useState<AutoMatches>({ properties: [], projects: [] });
+  // The requirement whose matches are loading.
+  const [matchingId, setMatchingId] = useState<number | null>(null);
 
   // Convert Lead state
   const [role, setRole] = useState<string>("");
@@ -241,21 +243,21 @@ function LeadDetail() {
     return () => { live = false; };
   }, []);
 
-  const fetchAutoMatch = async () => {
-    setIsMatching(true);
+  const fetchAutoMatch = async (inquiryId: number) => {
+    setMatchingId(inquiryId);
     try {
-      const res = await apiFetch(`${API_URL}/leads/${id}/auto-match`);
+      const res = await apiFetch(`${API_URL}/leads/${id}/auto-match?inquiryId=${inquiryId}`);
       const data = await res.json();
       if (data.success) {
-        setAutoMatchResults(data.data);
+        setAutoMatches({ properties: data.data.properties ?? [], projects: data.data.projects ?? [] });
         setIsAutoMatchOpen(true);
       } else {
-        toast.error(data.message || "Failed to auto-match properties");
+        toast.error(data.error || data.message || "Couldn't find matches");
       }
     } catch {
-      toast.error("Failed to auto-match properties");
+      toast.error("Couldn't find matches");
     } finally {
-      setIsMatching(false);
+      setMatchingId(null);
     }
   };
 
@@ -914,9 +916,9 @@ function LeadDetail() {
                     title={title}
                     action={
                       <>
-                        {canEdit && idx === 0 && (
-                          <button type="button" onClick={fetchAutoMatch} disabled={isMatching} className={cn(HEADER_BUTTON, "h-7 text-[13px] disabled:opacity-60")}>
-                            {isMatching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />}
+                        {canEdit && inq.id && (
+                          <button type="button" onClick={() => void fetchAutoMatch(inq.id)} disabled={matchingId !== null} className={cn(HEADER_BUTTON, "h-7 text-[13px] disabled:opacity-60")}>
+                            {matchingId === inq.id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                             Find matches
                           </button>
                         )}
@@ -981,39 +983,7 @@ function LeadDetail() {
         </aside>
       </div>
 
-      {/* ── Auto Match Slider (Sheet) ── */}
-      <Sheet open={isAutoMatchOpen} onOpenChange={setIsAutoMatchOpen}>
-        <SheetContent side="right" className="w-[450px] !max-w-[450px] p-0 flex flex-col border-l">
-          <SheetHeader className="shrink-0 border-b px-5 py-4">
-            <SheetTitle className="text-[16px]">Matching properties</SheetTitle>
-            <SheetDescription>
-              Properties matching the customer preferences.
-            </SheetDescription>
-          </SheetHeader>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {autoMatchResults.length === 0 ? (
-              <p className="py-10 text-center text-[14px] text-muted-foreground">No properties match this requirement yet.</p>
-            ) : (
-              autoMatchResults.map((prop) => (
-                <div key={prop.id} className="rounded-xl border bg-card p-4 transition-colors hover:bg-muted/40">
-                  <h4 className="mb-1.5 text-[15px] font-semibold">{prop.title}</h4>
-                  <div className="flex gap-2 mb-3">
-                    <Badge variant="secondary" className="text-[11px]">{prop.property_type}</Badge>
-                    <Badge variant="outline" className="text-[11px]">{prop.listing_type}</Badge>
-                    <Badge variant="outline" className="text-[11px]">{prop.status}</Badge>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
-                    <div><span className="font-semibold text-foreground">Price:</span> ₹{Number(prop.price).toLocaleString()}</div>
-                    {prop.bedrooms && <div><span className="font-semibold text-foreground">BHK:</span> {prop.bedrooms}</div>}
-                    {prop.area_sqft && <div><span className="font-semibold text-foreground">Area:</span> {prop.area_sqft} sqft</div>}
-                    {prop.city && <div><span className="font-semibold text-foreground">City:</span> {prop.city}</div>}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
+      <AutoMatchSheet open={isAutoMatchOpen} onOpenChange={setIsAutoMatchOpen} matches={autoMatches} />
 
       {/* ── Dropped Reason Dialog ── */}
       <Dialog open={isDroppedOpen} onOpenChange={(o) => !o && setIsDroppedOpen(false)}>

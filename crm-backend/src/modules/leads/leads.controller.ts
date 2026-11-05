@@ -104,8 +104,8 @@ export class LeadsController {
   }
 
   @Get(':id/auto-match')
-  async autoMatchProperties(@Param('id') id: string) {
-    const data = await this.leadsService.autoMatchProperties(Number(id));
+  async autoMatchProperties(@Param('id') id: string, @Query('inquiryId') inquiryId?: string) {
+    const data = await this.leadsService.autoMatchProperties(Number(id), inquiryId ? Number(inquiryId) : undefined);
     return { success: true, data };
   }
 
