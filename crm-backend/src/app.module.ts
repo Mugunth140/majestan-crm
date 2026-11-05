@@ -33,6 +33,7 @@ import { ContactLogsModule } from './modules/contact-logs/contact-logs.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { SiteAnalyticsModule } from './modules/site-analytics/site-analytics.module';
 import { PropertiesModule } from './modules/properties/properties.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { BuildersModule } from './modules/builders/builders.module';
@@ -173,6 +174,7 @@ import { CommunicationsModule } from './modules/communications/communications.mo
     ContactLogsModule,
     TasksModule,
     AnalyticsModule,
+    SiteAnalyticsModule,
     MetricsModule,
     PropertiesModule,
     ProjectsModule,
