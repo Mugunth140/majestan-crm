@@ -24,6 +24,7 @@ import { LeadsModule } from './modules/leads/leads.module';
 import { AgentsModule } from './modules/agents/agents.module';
 import { InboundsModule } from './modules/inbounds/inbounds.module';
 import { RecordEventsModule } from './modules/record-events/record-events.module';
+import { StaffActivityModule } from './modules/staff-activity/staff-activity.module';
 import { HrModule } from './modules/hr/hr.module';
 import { AssetsModule } from './modules/assets/assets.module';
 import { LeadRoutingModule } from './modules/lead-routing/lead-routing.module';
@@ -162,6 +163,7 @@ import { CommunicationsModule } from './modules/communications/communications.mo
     MasterModule,
     LeadsModule,
     RecordEventsModule,
+    StaffActivityModule,
     AgentsModule,
     InboundsModule,
     HrModule,

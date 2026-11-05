@@ -52,7 +52,7 @@ export const NAVIGATION: NavItem[] = [
   { name: "HR Panel", href: "/hr", icon: UserPen, color: "text-rose-600 dark:text-rose-400" },
   { name: "Tasks", href: "/tasks", icon: Target, color: "text-red-600 dark:text-red-400" },
   { name: "Logger", href: "/logger", icon: PhoneIncoming, color: "text-lime-600 dark:text-lime-400", access: "adminOrManager" },
-  { name: "Activity Logs", href: "/activity-logs", icon: Activity, color: "text-slate-600 dark:text-slate-300", access: "adminOnly" },
+  { name: "Activity Logs", href: "/activity-logs", icon: Activity, color: "text-slate-600 dark:text-slate-300", access: "adminOrManager" },
   { name: "Users", href: "/users", icon: Users, color: "text-purple-600 dark:text-purple-400", access: "adminOnly" },
   {
     name: "Master Registry",
