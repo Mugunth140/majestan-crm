@@ -1,27 +1,22 @@
 "use client";
 
-import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { ChevronLeft, Plus } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { useMobileHeader } from "./mobile-header-context";
-import { CreateSheet, createRouteFor } from "./mobile-create";
 import { guardNavigation } from "@/lib/leave-guard";
 import { cn } from "@/lib/utils";
 
 /**
  * Phone navigation bar. Clear over the large page title, it turns into frosted
- * material with the small title once the page scrolls under it. The trailing
- * "+" creates a record in the current module, or opens the Create sheet on Home.
+ * material with the small title once the page scrolls under it. Creating lives
+ * on the dock's "+".
  */
 export function MobileGlassHeader() {
   const router = useRouter();
   const pathname = usePathname() ?? "/";
   const { resolvedTitle, showBack: overrideBack, isScrolled } = useMobileHeader();
-  const [createOpen, setCreateOpen] = useState(false);
 
   const showBack = overrideBack || pathname.split("/").filter(Boolean).length >= 2;
-  const createRoute = createRouteFor(pathname);
-  const canCreate = !!createRoute || pathname === "/";
 
   return (
     <>
@@ -55,21 +50,8 @@ export function MobileGlassHeader() {
             {resolvedTitle}
           </h1>
 
-          <div className="z-10 flex items-center pr-1">
-            {canCreate && (
-              <button
-                type="button"
-                aria-label="Create"
-                onClick={() => (createRoute ? router.push(createRoute) : setCreateOpen(true))}
-                className="flex size-9 items-center justify-center rounded-full bg-[#017D58] text-white shadow-[0_2px_8px_-2px_rgba(1,125,88,0.5)] transition-transform active:scale-90 dark:bg-[#2FB585] dark:text-black"
-              >
-                <Plus className="size-5" strokeWidth={2.5} />
-              </button>
-            )}
-          </div>
         </div>
       </header>
-      <CreateSheet open={createOpen} onClose={() => setCreateOpen(false)} />
     </>
   );
 }

@@ -33,6 +33,14 @@ export function createRouteFor(pathname: string) {
   return NEW_FORMS.find((href) => pathname === href.replace(/\/new$/, "")) ?? null;
 }
 
+/** What the dock's "+" makes on this page: "New lead", or "Create" on Home. */
+export function createLabelFor(pathname: string) {
+  const route = createRouteFor(pathname);
+  if (!route) return pathname === "/" ? "Create" : null;
+  const label = ITEMS.find((i) => i.href === route)?.label ?? (route === "/builders/new" ? "Builder" : "record");
+  return `New ${label.toLowerCase()}`;
+}
+
 /** Bottom sheet listing everything that can be created. */
 export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();

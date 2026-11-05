@@ -44,7 +44,7 @@ const humanize = (v?: string | null) => (v ? v.replace(/_/g, " ").replace(/\b\w/
 /**
  * Inbounds marked "Fixed verification", waiting for the sourcing team. Setting
  * an outcome moves them on: verified or not available close them, available
- * sends them to the inbound Queue.
+ * sends them to the inbound Queue. Outcomes are set on selected rows.
  */
 export function VerificationQueue() {
   const router = useRouter();
@@ -52,7 +52,7 @@ export function VerificationQueue() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = usePersistedState("routing:verificationPage", 1);
-  const [busy, setBusy] = useState<number | "bulk" | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -72,8 +72,8 @@ export function VerificationQueue() {
   // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount and page change
   useEffect(() => { void load(); }, [load]);
 
-  const settle = useCallback(async (ids: number[], outcome: Outcome, key: number | "bulk") => {
-    setBusy(key);
+  const settle = useCallback(async (ids: number[], outcome: Outcome) => {
+    setBusy(true);
     try {
       const results = await Promise.all(ids.map((id) =>
         apiFetch(`${API_URL}/inbounds/${id}`, {
@@ -87,7 +87,7 @@ export function VerificationQueue() {
     } catch {
       toast.error("Could not update the inbound");
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
   }, [load]);
 
@@ -142,21 +142,7 @@ export function VerificationQueue() {
       header: "Waiting",
       cell: ({ row }) => <span className="whitespace-nowrap text-muted-foreground">{timeAgo(row.original.updated_at)}</span>,
     },
-    {
-      id: "actions",
-      header: "",
-      cell: ({ row }) => (
-        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
-          <Button size="sm" variant="outline" className="h-7 gap-1.5" disabled={busy !== null} onClick={() => settle([row.original.id], "verification_done", row.original.id)}>
-            {busy === row.original.id && <Loader2 className="size-3.5 animate-spin" />}
-            Verification done
-          </Button>
-        </div>
-      ),
-      enableSorting: false,
-      enableHiding: false,
-    },
-  ], [busy, settle]);
+  ], []);
 
   if (loading && !rows.length) return <TableSkeleton />;
   if (!rows.length) {
@@ -180,14 +166,14 @@ export function VerificationQueue() {
       showToolbar
       renderToolbarActions={(selected, clear) => selected.length > 0 && (
         <>
-          <Button size="sm" variant="outline" disabled={busy !== null} onClick={async () => { await settle(selected.map((r) => r.id), "verification_done", "bulk"); clear(); }}>
-            {busy === "bulk" && <Loader2 className="size-3.5 animate-spin" />}
+          <Button size="sm" variant="outline" disabled={busy} onClick={async () => { await settle(selected.map((r) => r.id), "verification_done"); clear(); }}>
+            {busy && <Loader2 className="size-3.5 animate-spin" />}
             Verification done
           </Button>
-          <Button size="sm" variant="outline" disabled={busy !== null} onClick={async () => { await settle(selected.map((r) => r.id), "available", "bulk"); clear(); }}>
+          <Button size="sm" variant="outline" disabled={busy} onClick={async () => { await settle(selected.map((r) => r.id), "available"); clear(); }}>
             Available
           </Button>
-          <Button size="sm" variant="outline" disabled={busy !== null} onClick={async () => { await settle(selected.map((r) => r.id), "not_available", "bulk"); clear(); }}>
+          <Button size="sm" variant="outline" disabled={busy} onClick={async () => { await settle(selected.map((r) => r.id), "not_available"); clear(); }}>
             Not available
           </Button>
         </>
