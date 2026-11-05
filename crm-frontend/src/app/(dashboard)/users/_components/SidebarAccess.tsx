@@ -78,7 +78,7 @@ export function SidebarAccess({ role, department, blogAccess, value, disabled, o
               <span className={cn("min-w-0 flex-1 truncate text-[14px]", on ? "text-foreground" : "text-muted-foreground")}>{item.name}</span>
               {lockedOut && (
                 <span className="flex shrink-0 items-center gap-1 text-[12px] text-muted-foreground">
-                  <Lock className="size-3" /> {item.key === "logger" ? "Team Lead and up" : "Admin &amp; manager"}
+                  <Lock className="size-3" /> {item.key === "logger" ? "Team Lead and up" : "Admin & manager"}
                 </span>
               )}
             </label>
