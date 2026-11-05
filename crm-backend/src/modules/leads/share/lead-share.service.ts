@@ -30,11 +30,11 @@ export const MAX_SHARE_ITEMS = 5;
 
 const IMGPROXY = process.env.IMGPROXY_URL || 'http://imgproxy:8080';
 
-/** Photos are re-encoded small enough that a few brochures fit in one email. */
+/** Photos print as thumbnails, so they are fetched small enough that a few brochures fit in one email. */
 async function fetchPhoto(url: string): Promise<Buffer | null> {
   try {
     const res = await fetch(
-      `${IMGPROXY}/insecure/rs:fit:1100:800:0/q:68/format:jpg/plain/${url}`,
+      `${IMGPROXY}/insecure/rs:fit:640:480:0/q:70/format:jpg/plain/${url}`,
       { signal: AbortSignal.timeout(12_000) },
     );
     return res.ok ? Buffer.from(await res.arrayBuffer()) : null;
@@ -75,12 +75,10 @@ export class LeadShareService {
 
   /** Same rule as opening the lead: staff only reach their own leads. */
   async assertAccess(leadId: number, user: { id: number; role?: string }) {
-    const lead = await this.dataSource
-      .getRepository(Lead)
-      .findOne({
-        where: { id: leadId },
-        select: { id: true, name: true, assigned_staff_id: true },
-      });
+    const lead = await this.dataSource.getRepository(Lead).findOne({
+      where: { id: leadId },
+      select: { id: true, name: true, assigned_staff_id: true },
+    });
     if (!lead) throw new NotFoundException('Lead not found');
     if (user.role === 'Staff' && lead.assigned_staff_id !== user.id)
       throw new ForbiddenException('You can only share with your own leads');
@@ -205,12 +203,10 @@ export class LeadShareService {
   }
 
   private async advisor(actorId: number): Promise<Advisor | null> {
-    const user = await this.dataSource
-      .getRepository(User)
-      .findOne({
-        where: { id: actorId },
-        select: { id: true, name: true, phone: true, email: true },
-      });
+    const user = await this.dataSource.getRepository(User).findOne({
+      where: { id: actorId },
+      select: { id: true, name: true, phone: true, email: true },
+    });
     return user
       ? {
           name: user.name,
