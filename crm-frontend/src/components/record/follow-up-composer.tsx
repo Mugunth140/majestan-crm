@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { Flag, Loader2, Mail, MessageCircle, Phone, PhoneMissed, Smartphone } from "lucide-react";
+import { Flag, Loader2, Mail, MessageCircle, Phone, PhoneMissed } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -22,7 +22,6 @@ const PRIORITIES = [
 const CONTACTED_VIA = [
   { label: "Call", value: "call", icon: Phone },
   { label: "WhatsApp", value: "whatsapp", icon: MessageCircle },
-  { label: "SMS", value: "sms", icon: Smartphone },
   { label: "Email", value: "email", icon: Mail },
 ];
 

@@ -8,7 +8,6 @@ import {
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { Lead } from '../../../database/entities/lead.entity';
-import { User } from '../../../database/entities/user.entity';
 import { ContactLog } from '../../../database/entities/contact-log.entity';
 import { MailAttachmentsService } from '../../mail/attachments/mail-attachments.service';
 import {
@@ -17,7 +16,7 @@ import {
   type Listing,
   type ListingKind,
 } from './listing-data';
-import { renderListingPdf, type Advisor } from './listing-pdf';
+import { renderListingPdf } from './listing-pdf';
 
 export type ShareChannel = 'email' | 'whatsapp';
 export interface ShareItem {
@@ -95,12 +94,9 @@ export class LeadShareService {
     return listing;
   }
 
-  async pdf(item: ShareItem, actorId: number) {
+  async pdf(item: ShareItem) {
     const listing = await this.listing(item);
-    const [photos, advisor] = await Promise.all([
-      Promise.all(listing.photos.map(fetchPhoto)),
-      this.advisor(actorId),
-    ]);
+    const photos = await Promise.all(listing.photos.map(fetchPhoto));
     const missing = photos.filter((p) => !p).length;
     if (missing)
       this.logger.warn(
@@ -109,7 +105,6 @@ export class LeadShareService {
     const buffer = await renderListingPdf(
       listing,
       photos.filter((p): p is Buffer => !!p),
-      advisor,
     );
     return {
       listing,
@@ -129,7 +124,7 @@ export class LeadShareService {
     const attachments = [];
     const listings: Listing[] = [];
     for (const item of list) {
-      const { listing, buffer, filename } = await this.pdf(item, user.id);
+      const { listing, buffer, filename } = await this.pdf(item);
       attachments.push(await this.attachments.store(buffer, filename, user.id));
       listings.push(listing);
     }
@@ -200,19 +195,5 @@ export class LeadShareService {
         `Share at most ${MAX_SHARE_ITEMS} listings at a time`,
       );
     return list;
-  }
-
-  private async advisor(actorId: number): Promise<Advisor | null> {
-    const user = await this.dataSource.getRepository(User).findOne({
-      where: { id: actorId },
-      select: { id: true, name: true, phone: true, email: true },
-    });
-    return user
-      ? {
-          name: user.name,
-          phone: user.phone || null,
-          email: user.email || null,
-        }
-      : null;
   }
 }

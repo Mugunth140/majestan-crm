@@ -122,7 +122,7 @@ export class LeadsController {
     @Request() req: any,
   ) {
     await this.share.assertAccess(id, req.user);
-    const { buffer, filename } = await this.share.pdf({ kind, id: listingId }, req.user.id);
+    const { buffer, filename } = await this.share.pdf({ kind, id: listingId });
     return new StreamableFile(buffer, {
       type: 'application/pdf',
       length: buffer.length,

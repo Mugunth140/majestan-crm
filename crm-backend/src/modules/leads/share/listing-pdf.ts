@@ -20,16 +20,9 @@ const WIDTH = PAGE.width - MARGIN * 2;
 const TOP = 92;
 const BOTTOM = PAGE.height - 64;
 
-export interface Advisor {
-  name: string;
-  phone: string | null;
-  email: string | null;
-}
-
 export function renderListingPdf(
   listing: Listing,
   photos: Buffer[],
-  advisor: Advisor | null,
 ): Promise<Buffer> {
   const doc = new PDFDocument({
     size: 'A4',
@@ -350,38 +343,6 @@ export function renderListingPdf(
     }
   }
 
-  if (advisor) {
-    room(90);
-    y += 18;
-    doc
-      .roundedRect(MARGIN, y, WIDTH, 62, 8)
-      .lineWidth(0.8)
-      .strokeColor(LINE)
-      .stroke();
-    doc
-      .font('regular')
-      .fontSize(8)
-      .fillColor(MUTED)
-      .text('YOUR MAJESTAN ADVISOR', MARGIN + 16, y + 12, {
-        characterSpacing: 0.5,
-      });
-    doc
-      .font('bold')
-      .fontSize(12)
-      .fillColor(INK)
-      .text(advisor.name, MARGIN + 16, y + 25);
-    const reach = [advisor.phone, advisor.email]
-      .filter(Boolean)
-      .join('   ·   ');
-    if (reach)
-      doc
-        .font('regular')
-        .fontSize(9.5)
-        .fillColor(MUTED)
-        .text(reach, MARGIN + 16, y + 42, { width: WIDTH - 32 });
-    y += 62;
-  }
-
   // ── Every page: header, footer, watermark ─────────────────────────────
   const range = doc.bufferedPageRange();
   const today = new Date().toLocaleDateString('en-IN', {
@@ -453,7 +414,7 @@ export function renderListingPdf(
     doc
       .fontSize(6.5)
       .text(
-        'Details are indicative and subject to change. Please confirm with your advisor before deciding.',
+        'Details are indicative and subject to change. Please confirm with Majestan Realty before deciding.',
         MARGIN,
         footer + 12,
         {

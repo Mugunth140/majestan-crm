@@ -161,18 +161,33 @@ export function Sidebar() {
                   </RailTip>
                   <div className={cn("grid transition-[grid-template-rows] duration-200 ease-out", open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
                     <div className="overflow-hidden">
-                      <div className="ml-[15px] mt-0.5 flex flex-col gap-0.5 border-l py-0.5 pl-2">
-                        {item.subItems.map((sub) => {
+                      {/* A tree under the parent's icon: a trunk, and a curved branch into each row */}
+                      <div className="ml-[15px] mt-0.5 flex flex-col gap-0.5 py-0.5">
+                        {item.subItems.map((sub, i) => {
                           const active = isActivePath(pathname, sub.href);
+                          const last = i === item.subItems!.length - 1;
                           return (
-                            <Link
-                              key={sub.href}
-                              href={sub.href}
-                              tabIndex={open ? undefined : -1}
-                              className={cn(rowClass(active, false), "h-7 text-[13px]")}
-                            >
-                              <span className="truncate">{sub.name}</span>
-                            </Link>
+                            <div key={sub.href} className="relative pl-[14px]">
+                              {!last && (
+                                <span aria-hidden className={cn("pointer-events-none absolute -bottom-0.5 left-0 w-px bg-border", i === 0 ? "-top-2" : "-top-0.5")} />
+                              )}
+                              <span
+                                aria-hidden
+                                className={cn(
+                                  "pointer-events-none absolute left-0 w-[11px] rounded-bl-[8px] border-b border-l transition-colors",
+                                  i === 0 ? "-top-2 h-[calc(50%+8px)]" : "-top-0.5 h-[calc(50%+2px)]",
+                                  active ? "border-foreground/35" : "border-border",
+                                )}
+                              />
+                              <Link
+                                href={sub.href}
+                                tabIndex={open ? undefined : -1}
+                                aria-current={active ? "page" : undefined}
+                                className={cn(rowClass(active, false), "h-7 text-[13px]")}
+                              >
+                                <span className="truncate">{sub.name}</span>
+                              </Link>
+                            </div>
                           );
                         })}
                       </div>

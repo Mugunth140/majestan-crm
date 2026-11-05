@@ -113,7 +113,7 @@ export const INBOUND_ENTITY: ConversationEntity = { api: "inbounds", mail: "inbo
 export const AGENT_ENTITY: ConversationEntity = { api: "agents", mail: "agent", noun: "agent", editMethod: "PUT" };
 export const HR_ENTITY: ConversationEntity = { api: "hr", mail: "hr_candidate", noun: "candidate", editMethod: "PUT", followUpBody: toHrFollowUpPayload };
 
-export type ComposeMode = "followup" | "email" | "whatsapp" | "sms";
+export type ComposeMode = "followup" | "email" | "whatsapp";
 /** Opens a composer from outside; `n` changes per request. `mail` starts the email pre-written. */
 export type ComposeRequest = { mode: ComposeMode; n: number; mail?: ComposerStart };
 type Mode = ComposeMode;
@@ -122,10 +122,9 @@ const MODES: { key: Mode; label: string; icon: typeof Phone }[] = [
   { key: "followup", label: "Follow-up", icon: NotebookPen },
   { key: "email", label: "Email", icon: Mail },
   { key: "whatsapp", label: "WhatsApp", icon: MessageCircle },
-  { key: "sms", label: "SMS", icon: Smartphone },
 ];
 
-/** Digits for wa.me / sms: links; bare 10-digit numbers are taken as Indian (+91). */
+/** Digits for wa.me links; bare 10-digit numbers are taken as Indian (+91). */
 const dialable = (n?: string | null) => {
   const digits = (n ?? "").replace(/\D/g, "");
   return digits.length === 10 ? `91${digits}` : digits;
@@ -153,7 +152,7 @@ export function LeadConversation({
   isAdmin: boolean;
   refreshKey: number;
   onRefresh: () => void;
-  /** Opens a composer from outside (the page's Call / WhatsApp / SMS / Email buttons, or sharing listings). */
+  /** Opens a composer from outside (the page's Call / WhatsApp / Email buttons, or sharing listings). */
   request?: ComposeRequest | null;
 }) {
   const [catalog, setCatalog] = useState<MailCatalog | null>(null);
@@ -547,8 +546,8 @@ export function LeadConversation({
               />
             </div>
           )}
-          {(mode === "whatsapp" || mode === "sms") && (
-            <QuickMessage key={mode} kind={mode} leadId={leadId} entity={entity} number={mode === "whatsapp" ? whatsapp || mobile : mobile} onSent={() => { setMode(null); onRefresh(); }} />
+          {mode === "whatsapp" && (
+            <QuickMessage leadId={leadId} entity={entity} number={whatsapp || mobile} onSent={() => { setMode(null); onRefresh(); }} />
           )}
 
           <div role="tablist" aria-label="Compose" className={cn("flex h-12 items-center gap-1 overflow-x-auto px-3 scrollbar-hide md:gap-2 md:px-5", mode && "border-t")}>
@@ -589,12 +588,11 @@ export function LeadConversation({
 }
 
 /**
- * WhatsApp / SMS from the dock. There is no messaging API yet, so the message
- * opens in WhatsApp (or the phone's Messages app) and is logged on the lead.
+ * WhatsApp from the dock. There is no messaging API yet, so the message opens
+ * in WhatsApp and is logged on the lead.
  */
-function QuickMessage({ kind, leadId, entity, number, onSent }: {
+function QuickMessage({ leadId, entity, number, onSent }: {
   entity: ConversationEntity;
-  kind: "whatsapp" | "sms";
   leadId: number;
   number?: string | null;
   onSent: () => void;
@@ -602,17 +600,17 @@ function QuickMessage({ kind, leadId, entity, number, onSent }: {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const to = dialable(number);
-  const label = kind === "whatsapp" ? "WhatsApp" : "SMS";
+  const label = "WhatsApp";
 
   const send = async () => {
     if (!message.trim()) return;
-    if (kind === "whatsapp") window.open(`https://wa.me/${to}?text=${encodeURIComponent(message)}`, "_blank", "noopener");
+    window.open(`https://wa.me/${to}?text=${encodeURIComponent(message)}`, "_blank", "noopener");
     setSending(true);
     try {
       const res = await apiFetch(`${API_URL}/${entity.api}/${leadId}/contact-log`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contact_type: kind, message }),
+        body: JSON.stringify({ contact_type: "whatsapp", message }),
       });
       if (!res.ok) throw new Error();
       toast.success(`${label} logged on the ${entity.noun}.`);
@@ -626,7 +624,7 @@ function QuickMessage({ kind, leadId, entity, number, onSent }: {
   };
 
   if (!to) {
-    return <p className="px-4 py-4 text-[13px] text-muted-foreground md:px-6">Add a {kind === "whatsapp" ? "WhatsApp or mobile" : "mobile"} number to this {entity.noun} to message them.</p>;
+    return <p className="px-4 py-4 text-[13px] text-muted-foreground md:px-6">Add a WhatsApp or mobile number to this {entity.noun} to message them.</p>;
   }
 
   return (
@@ -642,19 +640,11 @@ function QuickMessage({ kind, leadId, entity, number, onSent }: {
       />
       <div className="flex items-center gap-2 px-3 pb-2.5 md:px-5">
         <p className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground max-sm:invisible">
-          {kind === "whatsapp" ? "Opens WhatsApp with this message and logs it here." : "Logged here as a sent SMS."}
+          Opens WhatsApp with this message and logs it here.
         </p>
-        {kind === "sms" && (
-          <a
-            href={`sms:+${to}?body=${encodeURIComponent(message)}`}
-            className="inline-flex h-8 items-center rounded-md border bg-background px-2.5 text-[13px] font-medium text-foreground/80 hover:bg-muted md:hidden"
-          >
-            Open Messages
-          </a>
-        )}
         <Button size="sm" onClick={send} disabled={sending || !message.trim()} className="h-8 gap-1.5 bg-foreground text-background hover:bg-foreground/85">
           {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-          {kind === "whatsapp" ? "Send on WhatsApp" : "Log SMS"}
+          Send on WhatsApp
         </Button>
       </div>
     </div>
