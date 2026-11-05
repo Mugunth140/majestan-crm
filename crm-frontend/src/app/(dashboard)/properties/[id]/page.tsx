@@ -1,4 +1,6 @@
 "use client";
+import { CompletenessRing } from "@/components/record/score-ring";
+import { propertyScoreFields } from "@/lib/record-score";
 import { pgReadFields, isPgFurnished } from "../_components/pg-accommodation";
 
 import { restoreRoomDimensions } from "../_components/PropertyRoomDimensions";
@@ -31,7 +33,6 @@ import { canViewPropertyContacts } from "@/lib/permissions";
 import { LockedField } from "@/components/shared/locked-field";
 import { cn } from "@/lib/utils";
 import {
-  Building2,
   Edit,
   Eye,
   EyeOff,
@@ -283,7 +284,6 @@ export default function PropertyViewPage() {
   const place = [property.locality, property.city].filter(Boolean).join(", ");
   const price = formatPrice(Number(type === "coworking" ? det.rentPerSeat ?? property.price : property.price));
   const listing = property.listingType === "Sell" ? "Buy" : property.listingType;
-  const cover = images.find((img) => img.isPrimary) ?? images[0];
   const shownDocuments = isFieldVisible("documentUploads") ? documents : [];
 
   // Status changes go through the edit form as before; the pill shows where it stands.
@@ -834,12 +834,7 @@ export default function PropertyViewPage() {
 
         <aside className="hidden w-[340px] shrink-0 flex-col overflow-y-auto border-l md:flex xl:w-[360px]">
           <div className="flex items-center gap-3 border-b p-4">
-            {cover?.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- CDN cover thumbnail
-              <img src={cover.imageUrl} alt="" className="h-12 w-16 shrink-0 rounded-lg border object-cover" />
-            ) : (
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-foreground/[0.06] text-muted-foreground"><Building2 className="h-5 w-5" /></span>
-            )}
+            <CompletenessRing fields={propertyScoreFields(property, isFieldVisible)} />
             <div className="min-w-0">
               <p className="truncate text-[17px] font-semibold leading-6 text-foreground" title={title}>{title}</p>
               <p className="truncate text-[13px] text-muted-foreground">{[property.propertyCode, place].filter(Boolean).join(" · ")}</p>

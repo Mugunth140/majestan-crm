@@ -1,5 +1,6 @@
 "use client";
 
+import { builderScoreFields } from "@/lib/record-score";
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -160,7 +161,7 @@ export default function BuilderDetailPage({ params }: { params: Promise<{ id: st
         }
         aside={
           <>
-            <RecordSummary image={builder.logoUrl} icon={Building2} title={builder.name} subtitle={site || builder.email} imageClass="h-12 w-12 object-contain p-1" />
+            <RecordSummary score={builderScoreFields(builder)} icon={Building2} title={builder.name} subtitle={site || builder.email} imageClass="h-12 w-12 object-contain p-1" />
             <Section title="Details">
               <Fact label="Status">
                 <span className="inline-flex items-center gap-2"><span className={cn("h-2 w-2 rounded-full", statusDot(status))} />{status}</span>

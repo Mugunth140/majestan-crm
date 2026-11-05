@@ -1,5 +1,7 @@
 "use client";
 
+import { CompletenessRing } from "@/components/record/score-ring";
+import { projectScoreFields } from "@/lib/record-score";
 import { use, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -714,12 +716,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
         <aside className="hidden w-[340px] shrink-0 flex-col overflow-y-auto border-l md:flex xl:w-[360px]">
           <div className="flex items-center gap-3 border-b p-4">
-            {project.coverImageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- CDN cover thumbnail
-              <img src={project.coverImageUrl} alt="" className="h-12 w-16 shrink-0 rounded-lg border object-cover" />
-            ) : (
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-foreground/[0.06] text-muted-foreground"><Building2 className="h-5 w-5" /></span>
-            )}
+            <CompletenessRing fields={projectScoreFields(project)} />
             <div className="min-w-0">
               <p className="truncate text-[17px] font-semibold leading-6 text-foreground" title={project.name}>{project.name}</p>
               <p className="truncate text-[13px] text-muted-foreground">{[project.projectCode, place].filter(Boolean).join(" · ")}</p>

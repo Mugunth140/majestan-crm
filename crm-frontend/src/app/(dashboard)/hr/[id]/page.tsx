@@ -1,5 +1,7 @@
 "use client";
 
+import { CompletenessRing } from "@/components/record/score-ring";
+import { candidateScoreFields } from "@/lib/record-score";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -15,7 +17,7 @@ import { toHrFollowUpPayload } from "@/lib/hr-follow-up";
 import { isAdmin as isAdminUser } from "@/lib/permissions";
 import { statusDot, statusPillClass } from "@/components/tables/cells";
 import { FieldRow, InlineSelect, InlineText, Section, type Option } from "@/components/record/inline-field";
-import { Avatar, Feed, TabHeader } from "@/components/record/feed";
+import { Feed, TabHeader } from "@/components/record/feed";
 import { type Person } from "@/components/record/assignee-picker";
 import { AssigneeButton, StatusMenu, type StatusOption } from "@/components/record/header-actions";
 import { activityItems, type ActivityEntry } from "@/components/record/activity";
@@ -361,7 +363,7 @@ export default function HrDetail() {
       aside={
         <>
           <div className="flex items-center gap-3 border-b p-4">
-            <Avatar name={c.name} className="h-12 w-12 text-[15px]" />
+            <CompletenessRing fields={candidateScoreFields(c)} />
             <div className="min-w-0">
               <p className="truncate text-[17px] font-semibold leading-6 text-foreground" title={c.name}>{c.name}</p>
               <p className="truncate text-[13px] text-muted-foreground" title={subtitle}>{subtitle}</p>

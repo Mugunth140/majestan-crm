@@ -1,5 +1,6 @@
 "use client";
 
+import { assetScoreFields } from "@/lib/record-score";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -334,7 +335,7 @@ export default function AssetDetailPage() {
       }
       aside={
         <>
-          <RecordSummary image={photos[0]?.file_url} icon={MapPin} title={title} subtitle={subtitle} />
+          <RecordSummary score={assetScoreFields(a)} icon={MapPin} title={title} subtitle={subtitle} />
           <Section title="Details">
             {fact("Owner", a.owner_name)}
             {fact("Mobile", a.mobile_number ? <a href={`tel:${a.mobile_number}`} className="hover:underline">{a.mobile_number}</a> : null)}

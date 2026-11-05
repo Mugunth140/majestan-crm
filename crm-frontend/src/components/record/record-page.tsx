@@ -1,5 +1,7 @@
 "use client";
 
+import { CompletenessRing } from "@/components/record/score-ring";
+import type { ScoreField } from "@/lib/record-score";
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { MobileHeader } from "@/components/layout/mobile-header";
@@ -61,8 +63,10 @@ function TabButton({ active, onClick, icon: Icon, label, count }: { active: bool
 }
 
 /** The top of the side panel: a picture (or icon) with the record's name. */
-export function RecordSummary({ image, icon: Icon, title, subtitle, imageClass = "h-12 w-16 object-cover" }: {
+export function RecordSummary({ image, score, icon: Icon, title, subtitle, imageClass = "h-12 w-16 object-cover" }: {
   image?: string | null;
+  /** Key fields: shows how complete the record is in place of the picture. */
+  score?: ScoreField[];
   icon: LucideIcon;
   title: string;
   subtitle?: ReactNode;
@@ -70,7 +74,7 @@ export function RecordSummary({ image, icon: Icon, title, subtitle, imageClass =
 }) {
   return (
     <div className="flex items-center gap-3 border-b p-4">
-      {image ? (
+      {score ? <CompletenessRing fields={score} /> : image ? (
         // eslint-disable-next-line @next/next/no-img-element -- CDN thumbnail
         <img src={image} alt="" className={cn("shrink-0 rounded-lg border bg-muted", imageClass)} />
       ) : (

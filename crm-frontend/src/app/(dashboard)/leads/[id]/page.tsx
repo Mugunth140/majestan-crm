@@ -1,5 +1,7 @@
 "use client";
 
+import { CompletenessRing } from "@/components/record/score-ring";
+import { leadScoreFields } from "@/lib/record-score";
 import { apiFetch } from "@/lib/api-fetch";
 import { normalizeDepartment, pipelineOf } from "@/lib/department";
 import { recordNotInterested } from "@/lib/not-interested";
@@ -64,24 +66,6 @@ const PREDEFINED_DROP_REASONS = [
 
 type Tab = "timeline" | "conversation" | "details" | "requirements" | "attachments";
 
-const AVATAR_TONES = [
-  "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-  "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-  "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
-  "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
-  "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300",
-];
-
-function initials(name: string) {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join("") || "?";
-}
-
-function avatarTone(name: string) {
-  let h = 0;
-  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return AVATAR_TONES[h % AVATAR_TONES.length];
-}
 
 const leadCode = (id: number | string) => `L${String(id).padStart(5, "0")}`;
 
@@ -978,9 +962,7 @@ function LeadDetail() {
         <aside className="hidden w-[340px] shrink-0 flex-col overflow-y-auto border-l md:flex xl:w-[360px]">
           <div className="space-y-3 border-b p-4">
             <div className="flex items-center gap-3">
-              <span className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-[17px] font-semibold", avatarTone(lead.name || ""))}>
-                {initials(lead.name || "")}
-              </span>
+              <CompletenessRing fields={leadScoreFields(lead)} />
               <div className="min-w-0">
                 <p className="truncate text-[17px] font-semibold leading-6 text-foreground">{lead.name}</p>
                 <p className="flex items-center gap-1.5 text-[13px] text-muted-foreground">

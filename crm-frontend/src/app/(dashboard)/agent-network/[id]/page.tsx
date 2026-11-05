@@ -1,5 +1,7 @@
 "use client";
 
+import { CompletenessRing } from "@/components/record/score-ring";
+import { agentScoreFields } from "@/lib/record-score";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -15,7 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { PageActions } from "@/components/layout/page-actions";
 import { FieldRow, InlineSelect, InlineText, Section, type Option } from "@/components/record/inline-field";
-import { Avatar, Feed, TabHeader } from "@/components/record/feed";
+import { Feed, TabHeader } from "@/components/record/feed";
 import { type Person } from "@/components/record/assignee-picker";
 import { AssigneeButton, StatusMenu, type StatusOption } from "@/components/record/header-actions";
 import { activityItems, type ActivityEntry } from "@/components/record/activity";
@@ -361,7 +363,7 @@ function AgentDetail() {
 
         <aside className="hidden w-[340px] shrink-0 flex-col overflow-y-auto border-l md:flex xl:w-[360px]">
           <div className="flex items-center gap-3 border-b p-4">
-            <Avatar name={agent.name} className="h-12 w-12 text-[15px]" />
+            <CompletenessRing fields={agentScoreFields(agent)} />
             <div className="min-w-0">
               <p className="truncate text-[17px] font-semibold leading-6 text-foreground" title={agent.name}>{agent.name}</p>
               <p className="truncate text-[13px] text-muted-foreground" title={subtitle}>{subtitle}</p>
