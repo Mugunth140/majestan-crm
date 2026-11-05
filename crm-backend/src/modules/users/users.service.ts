@@ -29,11 +29,17 @@ export class UsersService {
     return departmentId;
   }
 
-  async findAll() {
+  /**
+   * Everyone. Admins get the full records (with permissions) for the Users
+   * screens; anyone else gets the public shape only (name, role, team, photo),
+   * never phone, address, Aadhaar or bank details.
+   */
+  async findAll(full = false) {
     const users = await this.userRepository.find({
       relations: { role: true, department: true },
       order: { created_at: 'DESC' },
     });
+    if (!full) return users.map((u) => u.toJSON());
     return Promise.all(
       users.map(async (u) => ({
         ...fullUser(u),
@@ -48,12 +54,14 @@ export class UsersService {
     return users.map((u) => ({ id: u.id, name: u.name, avatar_url: u.avatar_url }));
   }
 
-  async findOne(id: number) {
+  /** One user: the full record for admins and the user themself, else the public shape. */
+  async findOne(id: number, full = true) {
     const user = await this.userRepository.findOne({
       where: { id },
       relations: { role: true, department: true },
     });
     if (!user) throw new NotFoundException('User not found');
+    if (!full) return user.toJSON();
     return {
       ...fullUser(user),
       permissions: await this.permissionsService.listUserPermissions(user.id),

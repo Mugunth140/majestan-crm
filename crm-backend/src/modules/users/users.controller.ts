@@ -8,10 +8,14 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { MAX_AVATAR_BYTES } from './user-avatars.service';
 
+const isAdmin = (req: any) => {
+  const role = req?.user?.role?.name ?? req?.user?.role;
+  return role === 'Admin' || role === 'Super Admin';
+};
+
 /** Admins change anyone's photo; everyone else only their own. */
 function mayChangePhoto(req: any, id: number) {
-  const role = req?.user?.role?.name ?? req?.user?.role;
-  if (role === 'Admin' || role === 'Super Admin' || Number(req?.user?.id) === id) return;
+  if (isAdmin(req) || Number(req?.user?.id) === id) return;
   throw new ForbiddenException('You can only change your own photo');
 }
 
@@ -20,9 +24,11 @@ function mayChangePhoto(req: any, id: number) {
 export class UsersController {
   constructor(private readonly service: UsersService) {}
 
+  // Personal details (phone, address, Aadhaar, bank) are for admins, and for
+  // each person's own record; everyone else sees name, role, team and photo.
   @Get()
-  async findAll() {
-    const data = await this.service.findAll();
+  async findAll(@Request() req: any) {
+    const data = await this.service.findAll(isAdmin(req));
     return { success: true, data };
   }
 
@@ -34,8 +40,8 @@ export class UsersController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string) {
-    const data = await this.service.findOne(Number(id));
+  async findOne(@Param('id') id: string, @Request() req: any) {
+    const data = await this.service.findOne(Number(id), isAdmin(req) || Number(req?.user?.id) === Number(id));
     return { success: true, data };
   }
 
