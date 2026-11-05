@@ -3,18 +3,27 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ColumnDef } from "@tanstack/react-table";
-import { RefreshCw } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
 import { cn } from "@/lib/utils";
-import { useDebounce } from "@/hooks/use-debounce";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { DataTable } from "@/components/tables/data-table";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { IdCell, NameCell, StatusCell } from "@/components/tables/cells";
+import { EmptyState } from "@/components/shared/empty-state";
+import { FormSelect } from "@/components/shared/form-select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { PageActions } from "@/components/layout/page-actions";
-import { ListBody, ListFrame, ListToolbar, SegmentTabs, ToolbarEnd, ToolbarSearch, headerButtonClass } from "@/components/layout/list-page";
-import { ACTION_FILTERS, getActionFilterLabel, type ActionFilter } from "@/lib/action-filters";
+import {
+  ListBody,
+  ListFrame,
+  ToolbarClear,
+  toolbarFilterButton,
+} from "@/components/layout/list-page";
+import { ACTION_FILTERS, type ActionFilter } from "@/lib/action-filters";
 import {
   SCHEDULE_MODULES,
   SCHEDULE_VIEWS,
@@ -37,7 +46,29 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 // Leads are paged on the server; one view rarely holds more than this.
 const LEAD_LIMIT = 500;
 
-type ModuleFilter = "all" | ScheduleModule;
+/** Each bucket as a tile: what it holds, and its accent. */
+const BUCKETS: Record<
+  ActionFilter,
+  { label: string; hint: string; dot: string; count?: string }
+> = {
+  Overdue: {
+    label: "Overdue",
+    hint: "Past their date",
+    dot: "bg-rose-500",
+    count: "text-rose-600 dark:text-rose-400",
+  },
+  Yesterday: { label: "Yesterday", hint: "Followed up", dot: "bg-slate-400" },
+  Today: { label: "Today", hint: "Due today", dot: "bg-amber-500" },
+  Tomorrow: { label: "Tomorrow", hint: "Due tomorrow", dot: "bg-sky-500" },
+  "All Scheduled": {
+    label: "Later",
+    hint: "After tomorrow",
+    dot: "bg-violet-500",
+  },
+};
+
+type Filters = { module: "" | ScheduleModule; staff: string; status: string };
+const NO_FILTERS: Filters = { module: "", staff: "", status: "" };
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- module lists arrive as loose API JSON */
 
@@ -46,102 +77,220 @@ async function getJson(path: string) {
   if (!res.ok) return null;
   return res.json();
 }
+const safe = (path: string) => getJson(path).catch(() => null);
 
-const leadQuery = (view: ScheduleView, limit: number) =>
-  `/leads?${new URLSearchParams({ page: "1", limit: String(limit), tab: "Action Required", actionFilter: view.bucket, todayViewMode: view.mode })}`;
+function leadQuery(view: ScheduleView, limit: number, filters: Filters) {
+  const params = new URLSearchParams({
+    page: "1",
+    limit: String(limit),
+    tab: "Action Required",
+    actionFilter: view.bucket,
+    todayViewMode: view.mode,
+  });
+  if (filters.staff) params.set("staff", filters.staff);
+  if (filters.status) params.set("status", filters.status);
+  return `/leads?${params}`;
+}
+
+/** The signed-in user as this page needs them. */
+function readViewer() {
+  try {
+    const u = JSON.parse(localStorage.getItem("crm_user") || "null");
+    return {
+      id: Number(u?.id) || 0,
+      role: String(u?.role?.name ?? u?.role ?? ""),
+      department: String(u?.department?.name ?? u?.department ?? ""),
+    };
+  } catch {
+    return { id: 0, role: "", department: "" };
+  }
+}
 
 export default function SchedulerPage() {
   const router = useRouter();
-  const [bucket, setBucket] = usePersistedState<ActionFilter>("scheduler:bucket", "Today", { allowed: ACTION_FILTERS });
-  const [mode, setMode] = usePersistedState<ScheduleMode>("scheduler:mode", "pending", { allowed: ["pending", "completed"] });
-  const [moduleFilter, setModuleFilter] = usePersistedState<ModuleFilter>("scheduler:module", "all", {
-    allowed: ["all", ...SCHEDULE_MODULES.map((m) => m.value)],
-  });
-  const [search, setSearch] = useState("");
-  const query = useDebounce(search, 250);
+  const [bucket, setBucket] = usePersistedState<ActionFilter>(
+    "scheduler:bucket",
+    "Today",
+    { allowed: ACTION_FILTERS },
+  );
+  const [mode, setMode] = usePersistedState<ScheduleMode>(
+    "scheduler:mode",
+    "pending",
+    { allowed: ["pending", "completed"] },
+  );
+  const [filters, setFilters] = usePersistedState<Filters>(
+    "scheduler:filters",
+    NO_FILTERS,
+  );
+  const [viewer, setViewer] = useState({ id: 0, role: "", department: "" });
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is client-only
+    setViewer(readViewer());
+  }, []);
+  const seesAll = ["Admin", "Super Admin", "Manager"].includes(viewer.role);
+  const picksStaff = seesAll || viewer.role === "Team Lead";
 
   // Inbound, agents and HR come as whole lists and are bucketed here; leads
   // are bucketed by the server, so we keep its count per view and the rows of the open one.
-  const [records, setRecords] = useState<Record<Exclude<ScheduleModule, "lead">, any[]>>({ inbound: [], agent: [], hr: [] });
+  const [records, setRecords] = useState<
+    Record<Exclude<ScheduleModule, "lead">, any[]>
+  >({ inbound: [], agent: [], hr: [] });
   const [leadCounts, setLeadCounts] = useState<Record<string, number>>({});
-  const [reloadKey, setReloadKey] = useState(0);
-  const view: ScheduleView = { bucket, mode: bucket === "Today" ? mode : "pending" };
+  const [leadOptions, setLeadOptions] = useState<{
+    staff: string[];
+    statuses: string[];
+  }>({ staff: [], statuses: [] });
+  const view: ScheduleView = {
+    bucket,
+    mode: bucket === "Today" ? mode : "pending",
+  };
   const key = viewKey(view);
-  // The open view's leads, tagged with the request they answer, so a stale view shows as loading.
-  const [leads, setLeads] = useState<{ request: string; rows: ScheduleItem[] }>({ request: "", rows: [] });
-  const request = `${key}#${reloadKey}`;
-  const loading = leads.request !== request;
-  const leadRows = leads.rows;
+  const leadsShown = !filters.module || filters.module === "lead";
+  const leadFilterKey = `${filters.staff}|${filters.status}`;
 
   useEffect(() => {
     let live = true;
     (async () => {
-      // A module the user can't open (or a failed request) just contributes nothing.
-      const safe = (path: string) => getJson(path).catch(() => null);
-      const [inbounds, agents, candidates, ...counts] = await Promise.all([
+      const [inbounds, agents, candidates] = await Promise.all([
         safe("/inbounds"),
         safe("/agents"),
         safe("/hr"),
-        ...SCHEDULE_VIEWS.map((v) => safe(leadQuery(v, 1))),
       ]);
       if (!live) return;
-      const list = (data: any) => (Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : []);
-      setRecords({ inbound: list(inbounds).filter((r: any) => !r.is_queued), agent: list(agents), hr: list(candidates) });
-      setLeadCounts(Object.fromEntries(SCHEDULE_VIEWS.map((v, i) => [viewKey(v), counts[i]?.meta?.total ?? 0])));
+      const list = (data: any) =>
+        Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+      setRecords({
+        inbound: list(inbounds).filter((r: any) => !r.is_queued),
+        agent: list(agents),
+        hr: list(candidates),
+      });
     })();
     return () => {
       live = false;
     };
-  }, [reloadKey]);
+  }, []);
 
   useEffect(() => {
     let live = true;
-    getJson(leadQuery(view, LEAD_LIMIT))
-      .catch(() => null)
-      .then((data) => {
-        if (live) setLeads({ request, rows: (data?.data ?? []).map(leadItem) });
-      });
+    (async () => {
+      const counts = await Promise.all(
+        SCHEDULE_VIEWS.map((v) => safe(leadQuery(v, 1, filters))),
+      );
+      if (!live) return;
+      setLeadCounts(
+        Object.fromEntries(
+          SCHEDULE_VIEWS.map((v, i) => [
+            viewKey(v),
+            counts[i]?.meta?.total ?? 0,
+          ]),
+        ),
+      );
+      const options = counts.find((c) => c?.meta?.filterOptions)?.meta
+        .filterOptions;
+      if (options)
+        setLeadOptions({
+          staff: options.staff ?? [],
+          statuses: options.statuses ?? [],
+        });
+    })();
     return () => {
       live = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `request` names the view
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `leadFilterKey` names the filters
+  }, [leadFilterKey]);
+
+  // The open view's leads, tagged with the request they answer, so a stale view shows as loading.
+  const [leads, setLeads] = useState<{ request: string; rows: ScheduleItem[] }>(
+    { request: "", rows: [] },
+  );
+  const request = `${key}#${leadFilterKey}`;
+  const loading = leads.request !== request;
+  useEffect(() => {
+    let live = true;
+    safe(leadQuery(view, LEAD_LIMIT, filters)).then((data) => {
+      if (live) setLeads({ request, rows: (data?.data ?? []).map(leadItem) });
+    });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `request` names the view and filters
   }, [request]);
 
-  const itemsFor = useCallback(
-    (v: ScheduleView): ScheduleItem[] => [
-      ...records.inbound.filter((r) => inView("inbound", r, v)).map(inboundItem),
-      ...records.agent.filter((r) => inView("agent", r, v)).map(agentItem),
-      ...records.hr.filter((r) => inView("hr", r, v)).map(candidateItem),
-    ],
-    [records],
+  // Staff and team leads see their own work: the server already narrows
+  // leads, inbound and agents; HR lists every candidate, so keep HR
+  // follow-ups to the HR department and to candidates assigned to them.
+  const ownHr = useCallback(
+    (c: any) =>
+      seesAll ||
+      /\bhr\b/i.test(viewer.department) ||
+      Number(c.assignedStaff?.id) === viewer.id,
+    [seesAll, viewer],
   );
 
-  const counts = useMemo(() => {
-    const out: Record<string, Record<ModuleFilter, number>> = {};
-    for (const v of SCHEDULE_VIEWS) {
-      const others = itemsFor(v);
-      const lead = leadCounts[viewKey(v)] ?? 0;
-      const per = { all: lead + others.length, lead, inbound: 0, agent: 0, hr: 0 } as Record<ModuleFilter, number>;
-      for (const i of others) per[i.module]++;
-      out[viewKey(v)] = per;
-    }
-    return out;
-  }, [itemsFor, leadCounts]);
+  const matches = useCallback(
+    (i: ScheduleItem) =>
+      (!filters.module || i.module === filters.module) &&
+      (!filters.staff || i.staff === filters.staff) &&
+      (!filters.status || i.status === filters.status),
+    [filters],
+  );
+
+  const othersFor = useCallback(
+    (v: ScheduleView): ScheduleItem[] =>
+      [
+        ...records.inbound
+          .filter((r) => inView("inbound", r, v))
+          .map(inboundItem),
+        ...records.agent.filter((r) => inView("agent", r, v)).map(agentItem),
+        ...records.hr
+          .filter((r) => ownHr(r) && inView("hr", r, v))
+          .map(candidateItem),
+      ].filter(matches),
+    [records, ownHr, matches],
+  );
+
+  const counts = useMemo(
+    () =>
+      Object.fromEntries(
+        SCHEDULE_VIEWS.map((v) => [
+          viewKey(v),
+          (leadsShown ? (leadCounts[viewKey(v)] ?? 0) : 0) +
+            othersFor(v).length,
+        ]),
+      ),
+    [othersFor, leadCounts, leadsShown],
+  );
+  const countOf = (v: ScheduleView) => counts[viewKey(v)] ?? 0;
 
   const done = isDoneView(view);
-  const rows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const all = [...leadRows, ...itemsFor(view)].filter((i) => moduleFilter === "all" || i.module === moduleFilter);
-    const found = q ? all.filter((i) => [i.code, i.name, i.mobile, i.staff].some((v) => v.toLowerCase().includes(q))) : all;
-    return sortItems(found, done);
+  const rows = useMemo(
+    () =>
+      sortItems([...(leadsShown ? leads.rows : []), ...othersFor(view)], done),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` names the view
-  }, [leadRows, itemsFor, key, moduleFilter, query, done]);
-
-  const countOf = (v: ScheduleView) => counts[viewKey(v)]?.[moduleFilter] ?? 0;
-  const bucketCount = (b: ActionFilter) => (b === "Today" ? countOf({ bucket: b, mode }) : countOf({ bucket: b, mode: "pending" }));
-  const tally = (n: number, tone?: string) => (
-    <span className={cn("ml-1.5 tabular-nums text-muted-foreground", n > 0 && tone)}>{n}</span>
+    [leads.rows, leadsShown, othersFor, key, done],
   );
+
+  // Filter choices: what's in the lists this user can see.
+  const options = useMemo(() => {
+    const all = [
+      ...records.inbound.map(inboundItem),
+      ...records.agent.map(agentItem),
+      ...records.hr.filter(ownHr).map(candidateItem),
+    ];
+    const uniq = (values: string[]) =>
+      [...new Set(values.filter((v) => v && v !== "Unassigned"))].sort();
+    return {
+      staff: uniq([...leadOptions.staff, ...all.map((i) => i.staff)]),
+      statuses: uniq([...leadOptions.statuses, ...all.map((i) => i.status)]),
+    };
+  }, [records, ownHr, leadOptions]);
+
+  const activeFilters =
+    (seesAll && filters.module ? 1 : 0) +
+    (picksStaff && filters.staff ? 1 : 0) +
+    (filters.status ? 1 : 0);
+  const setFilter = (patch: Partial<Filters>) =>
+    setFilters((f) => ({ ...f, ...patch }));
 
   const columns: ColumnDef<ScheduleItem>[] = [
     {
@@ -150,8 +299,17 @@ export default function SchedulerPage() {
       cell: ({ row }) => {
         const i = row.original;
         return (
-          <span className={cn("whitespace-nowrap tabular-nums", !done && bucket === "Overdue" && "text-rose-600 dark:text-rose-400")}>
-            {done ? formatWhen(i.doneDate, i.doneTime) : formatWhen(i.nextDate, i.nextTime)}
+          <span
+            className={cn(
+              "whitespace-nowrap tabular-nums",
+              !done &&
+                bucket === "Overdue" &&
+                "text-rose-600 dark:text-rose-400",
+            )}
+          >
+            {done
+              ? formatWhen(i.doneDate, i.doneTime)
+              : formatWhen(i.nextDate, i.nextTime)}
           </span>
         );
       },
@@ -160,7 +318,9 @@ export default function SchedulerPage() {
       id: "module",
       header: "Module",
       cell: ({ row }) => {
-        const m = SCHEDULE_MODULES.find((x) => x.value === row.original.module)!;
+        const m = SCHEDULE_MODULES.find(
+          (x) => x.value === row.original.module,
+        )!;
         return (
           <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-muted-foreground">
             <span className={cn("size-1.5 rounded-full", m.dot)} />
@@ -169,90 +329,255 @@ export default function SchedulerPage() {
         );
       },
     },
-    { id: "code", header: "ID", cell: ({ row }) => <IdCell href={row.original.href}>{row.original.code}</IdCell> },
-    { id: "name", header: "Name", cell: ({ row }) => <NameCell name={row.original.name} avatar /> },
-    { id: "mobile", header: "Mobile", cell: ({ row }) => <span className="tabular-nums">{row.original.mobile || "—"}</span> },
-    { id: "staff", header: "Assigned staff", cell: ({ row }) => row.original.staff },
-    { id: "status", header: "Status", cell: ({ row }) => <StatusCell status={row.original.status} /> },
-    { id: "priority", header: "Priority", cell: ({ row }) => row.original.priority || <span className="text-muted-foreground">—</span> },
+    {
+      id: "code",
+      header: "ID",
+      cell: ({ row }) => (
+        <IdCell href={row.original.href}>{row.original.code}</IdCell>
+      ),
+    },
+    {
+      id: "name",
+      header: "Name",
+      cell: ({ row }) => <NameCell name={row.original.name} avatar />,
+    },
+    {
+      id: "mobile",
+      header: "Mobile",
+      cell: ({ row }) => (
+        <span className="tabular-nums">{row.original.mobile || "—"}</span>
+      ),
+    },
+    {
+      id: "staff",
+      header: "Assigned staff",
+      cell: ({ row }) => row.original.staff,
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: ({ row }) => <StatusCell status={row.original.status} />,
+    },
+    {
+      id: "priority",
+      header: "Priority",
+      cell: ({ row }) =>
+        row.original.priority || (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
   ];
 
   const empty = (
-    <div className="py-16 text-center text-[13px] text-muted-foreground">
-      {done ? "No follow-ups were logged for this day." : "Nothing scheduled here."}
-    </div>
+    <EmptyState
+      className="sticky left-0"
+      kind={done ? "inbox" : "tasks"}
+      title={
+        done
+          ? "No follow-ups logged"
+          : bucket === "Overdue"
+            ? "Nothing overdue"
+            : "Nothing scheduled"
+      }
+      description={
+        activeFilters
+          ? "Try clearing a filter."
+          : done
+            ? "Follow-ups made on this day will show up here."
+            : bucket === "Overdue"
+              ? "Every follow-up is on track."
+              : "Follow-ups scheduled for this day will show up here."
+      }
+    />
   );
 
-  const table = (flush: boolean) =>
-    loading ? (
-      <TableSkeleton columns={7} rows={6} flush={flush} />
-    ) : (
-      <DataTable
-        variant={flush ? "default" : "list"}
-        flush={flush}
-        columns={columns}
-        data={rows}
-        onRowClick={(i) => router.push(i.href)}
-        emptyState={empty}
-        persistKey={false}
-      />
-    );
+  const filterPopover = (
+    <Popover>
+      <PopoverTrigger render={toolbarFilterButton(activeFilters)} />
+      <PopoverContent align="end" className="w-[calc(100vw-32px)] p-0 sm:w-72">
+        <div className="flex items-center justify-between border-b px-4 py-3">
+          <h4 className="text-[13px] font-semibold text-foreground">
+            Filter follow-ups
+          </h4>
+          {activeFilters > 0 && (
+            <button
+              type="button"
+              onClick={() => setFilters(NO_FILTERS)}
+              className="text-[12px] text-muted-foreground hover:text-foreground"
+            >
+              Clear all
+            </button>
+          )}
+        </div>
+        <div className="space-y-4 p-4">
+          {seesAll && (
+            <FilterField label="Module">
+              <FormSelect
+                name="schedulerModule"
+                placeholder="All modules"
+                options={SCHEDULE_MODULES.map((m) => ({
+                  label: m.label,
+                  value: m.value,
+                }))}
+                value={filters.module}
+                onValueChange={(v) =>
+                  setFilter({ module: (v || "") as Filters["module"] })
+                }
+              />
+            </FilterField>
+          )}
+          {picksStaff && (
+            <FilterField label="Assigned staff">
+              <FormSelect
+                name="schedulerStaff"
+                placeholder="Anyone"
+                options={options.staff.map((s) => ({ label: s, value: s }))}
+                value={filters.staff}
+                onValueChange={(v) => setFilter({ staff: v || "" })}
+              />
+            </FilterField>
+          )}
+          <FilterField label="Status">
+            <FormSelect
+              name="schedulerStatus"
+              placeholder="Any status"
+              options={options.statuses.map((s) => ({ label: s, value: s }))}
+              value={filters.status}
+              onValueChange={(v) => setFilter({ status: v || "" })}
+            />
+          </FilterField>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 
   return (
     <>
       <MobileHeader title="Scheduler" />
-      <PageActions>
-        <button type="button" onClick={() => setReloadKey((k) => k + 1)} className={headerButtonClass}>
-          <RefreshCw className="size-4" />
-          Refresh
-        </button>
-      </PageActions>
+      <div className="flex flex-col md:h-full">
+        <ListFrame>
+          {/* When: one tile per bucket, with how many are in it */}
+          <div className="flex gap-2 overflow-x-auto px-4 pt-3 scrollbar-hide md:grid md:grid-cols-5 md:px-5">
+            {ACTION_FILTERS.map((b) => {
+              const meta = BUCKETS[b];
+              const active = bucket === b;
+              const n = countOf({ bucket: b, mode: "pending" });
+              return (
+                <button
+                  key={b}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setBucket(b)}
+                  className={cn(
+                    "min-w-[128px] flex-1 rounded-lg border px-3 py-2.5 text-left transition-[border-color,background-color,box-shadow]",
+                    active
+                      ? "border-foreground/25 bg-background shadow-[0_1px_2px_rgba(0,0,0,0.06)] dark:border-white/25 dark:bg-white/[0.06]"
+                      : "border-border/70 bg-muted/30 hover:border-border hover:bg-muted/60",
+                  )}
+                >
+                  <span className="flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground">
+                    <span className={cn("size-1.5 rounded-full", meta.dot)} />
+                    {meta.label}
+                  </span>
+                  <span
+                    className={cn(
+                      "mt-1 block text-[22px] font-semibold leading-7 tabular-nums text-foreground",
+                      n > 0 && meta.count,
+                    )}
+                  >
+                    {n}
+                  </span>
+                  <span className="block text-[12px] text-muted-foreground">
+                    {b === "Today"
+                      ? `${countOf({ bucket: b, mode: "completed" })} followed up`
+                      : meta.hint}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
 
-      <ListFrame>
-        <ListToolbar>
-          <SegmentTabs
-            label="When"
-            value={bucket}
-            onChange={setBucket}
-            tabs={ACTION_FILTERS.map((b) => ({
-              value: b,
-              label: (
-                <>
-                  {getActionFilterLabel(b)}
-                  {tally(bucketCount(b), b === "Overdue" ? "text-rose-600 dark:text-rose-400" : b === "Today" ? "text-foreground" : undefined)}
-                </>
-              ),
-            }))}
-          />
-          {bucket === "Today" && (
-            <SegmentTabs
-              label="Follow-up state"
-              value={mode}
-              onChange={setMode}
-              tabs={[
-                { value: "pending", label: <>Follow up{tally(countOf({ bucket: "Today", mode: "pending" }))}</> },
-                { value: "completed", label: <>Followed up{tally(countOf({ bucket: "Today", mode: "completed" }))}</> },
-              ]}
-            />
-          )}
-          <ToolbarEnd>
-            <SegmentTabs
-              label="Module"
-              value={moduleFilter}
-              onChange={setModuleFilter}
-              tabs={[{ value: "all" as const, label: "All" }, ...SCHEDULE_MODULES.map((m) => ({ value: m.value, label: m.label }))]}
-            />
-            <ToolbarSearch value={search} onChange={setSearch} placeholder="Search ID, name, phone, staff" className="hidden md:block" />
-          </ToolbarEnd>
-        </ListToolbar>
-        <div className="px-4 pb-2 md:hidden">
-          <ToolbarSearch value={search} onChange={setSearch} placeholder="Search ID, name, phone, staff" />
-        </div>
-        <ListBody>
-          <div className="hidden md:contents">{table(false)}</div>
-          <div className="pb-4 md:hidden">{table(true)}</div>
-        </ListBody>
-      </ListFrame>
+          {/* Under the tiles: Today's to-do / done split, and the filters */}
+          <div className="flex min-h-11 items-end gap-2 border-b px-4 pt-2 md:px-5">
+            {bucket === "Today" ? (
+              <div role="tablist" aria-label="Today" className="flex gap-5">
+                {(["pending", "completed"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === m}
+                    onClick={() => setMode(m)}
+                    className={cn(
+                      "-mb-px border-b-2 pb-2 text-[13px] transition-colors",
+                      mode === m
+                        ? "border-foreground font-medium text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {m === "pending" ? "To follow up" : "Followed up"}
+                    <span className="ml-1.5 tabular-nums text-muted-foreground">
+                      {countOf({ bucket: "Today", mode: m })}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="pb-2 text-[13px] font-medium text-foreground">
+                {BUCKETS[bucket].label}
+                <span className="ml-1.5 font-normal text-muted-foreground">
+                  {BUCKETS[bucket].hint.toLowerCase()}
+                </span>
+              </p>
+            )}
+            <div className="mb-1.5 ml-auto flex items-center gap-1">
+              {activeFilters > 0 && (
+                <ToolbarClear
+                  onClick={() => setFilters(NO_FILTERS)}
+                  title="Clear filters"
+                />
+              )}
+              {filterPopover}
+            </div>
+          </div>
+
+          <ListBody>
+            {loading ? (
+              <div className="px-5 pt-3">
+                <TableSkeleton columns={7} rows={6} />
+              </div>
+            ) : (
+              <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden">
+                <DataTable
+                  variant="list"
+                  columns={columns}
+                  data={rows}
+                  onRowClick={(i) => router.push(i.href)}
+                  emptyState={empty}
+                  persistKey={false}
+                />
+              </div>
+            )}
+          </ListBody>
+        </ListFrame>
+      </div>
     </>
+  );
+}
+
+function FilterField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-[12px] font-medium text-muted-foreground">
+        {label}
+      </label>
+      {children}
+    </div>
   );
 }

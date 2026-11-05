@@ -108,14 +108,14 @@ export function Sidebar() {
             <span className="relative">
               <Bell className={mutedIcon} strokeWidth={1.75} />
               {unreadCount > 0 && isCollapsed && (
-                <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-foreground ring-1 ring-sidebar" />
+                <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-red-500 ring-1 ring-sidebar" />
               )}
             </span>
             {!isCollapsed && (
               <>
                 <span className="flex-1 truncate text-left">Notifications</span>
                 {unreadCount > 0 && (
-                  <span className="min-w-5 rounded bg-foreground/[0.08] px-1.5 text-center text-[11px] font-medium leading-5 text-foreground dark:bg-white/10">
+                  <span className="min-w-5 rounded-full bg-red-500 px-1.5 text-center text-[11px] font-semibold leading-5 text-white">
                     {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
                 )}
