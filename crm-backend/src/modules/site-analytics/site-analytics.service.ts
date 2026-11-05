@@ -138,7 +138,14 @@ export class SiteAnalyticsService {
           );
         }
         const { realtime, ...report } = data;
-        this.live = { at: Date.now(), data: realtime ?? null };
+        // DuckDB's aggregate query is returned as a one-row array by phase 1.
+        // Also accept an object so the adapter remains compatible with either shape.
+        this.live = {
+          at: Date.now(),
+          data: Array.isArray(realtime)
+            ? (realtime[0] ?? null)
+            : (realtime ?? null),
+        };
         const previous = this.cache.get(key);
         const historical =
           previous && Date.now() - previous.at < 60_000

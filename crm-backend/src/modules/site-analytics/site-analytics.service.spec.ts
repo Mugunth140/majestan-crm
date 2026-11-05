@@ -192,4 +192,11 @@ describe('website analytics proxy', () => {
       events: 12,
     });
   });
+  it('normalizes the live totals array returned by the running site API', async () => {
+    fetcher.mockResolvedValueOnce(
+      response({ ...report(), realtime: [{ visitors: '7', pageviews: '11' }] }),
+    );
+    const data = await service.report('2026-11-01', '2026-11-08');
+    expect(data.realtime).toEqual({ visitors: 7, pageviews: 11 });
+  });
 });
