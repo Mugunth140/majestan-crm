@@ -196,7 +196,11 @@ describe("Fine-grained property requirements", () => {
     expect(markup.includes("Parking spaces")).toBe(true);
     expect(markup.includes("Add parking combination")).toBe(true);
     expect(markup.includes(">Details</h3>")).toBe(false);
-    expect(markup.includes("Floor plans &amp; room dimensions")).toBe(true);
+    // Room dimensions sit with the other room details, not under floor plans.
+    const rooms = markup.slice(markup.indexOf('data-detail-group="rooms"'), markup.indexOf('data-detail-group="building"'));
+    expect(rooms.includes("Room dimensions")).toBe(true);
+    expect(rooms.includes(">Bedrooms</label>")).toBe(true);
+    expect(markup.includes("Floor plans &amp; room dimensions")).toBe(false);
     expect(markup.includes('name="builtUpAreaUnit"')).toBe(true);
   });
   it("calculates Villa sale rate from built-up area, not plot area", () => {

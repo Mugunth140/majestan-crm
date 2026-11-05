@@ -412,6 +412,7 @@ export function AdditionalCurationFields({
   hasRestroom,
   utilities,
   onCreateUtility,
+  only,
 }: {
   value: CurationDraft;
   onChange: (value: CurationDraft) => void;
@@ -420,7 +421,11 @@ export function AdditionalCurationFields({
   utilities: string[];
   /** Adds a missing utility to the master list from the search. */
   onCreateUtility?: (query: string) => void;
+  /** Just these fields, so each can sit under its own Details heading. */
+  only?: readonly string[];
 }) {
+  const show = (field: string) =>
+    visible(field) && (!only || only.includes(field));
   const change = <K extends keyof CurationDraft>(
     key: K,
     next: CurationDraft[K],
@@ -442,7 +447,7 @@ export function AdditionalCurationFields({
         ] as const
       ).map(
         ([key, label]) =>
-          visible(key) &&
+          show(key) &&
           (key !== "restroomCount" || hasRestroom) && (
             <div key={key} className="space-y-2">
               <label htmlFor={key} className={PROPERTY_LABEL}>
@@ -469,7 +474,7 @@ export function AdditionalCurationFields({
         ] as const
       ).map(
         ([key, label, options]) =>
-          visible(key) && (
+          show(key) && (
             <div key={key} className="space-y-2">
               <label htmlFor={key} className={PROPERTY_LABEL}>
                 {label}
@@ -485,7 +490,7 @@ export function AdditionalCurationFields({
             </div>
           ),
       )}
-      {visible("availableFloorNumbers") && (
+      {show("availableFloorNumbers") && (
         <div className="space-y-2">
           <label
             htmlFor="availableFloorNumbers"
@@ -509,7 +514,7 @@ export function AdditionalCurationFields({
         ] as const
       ).map(
         ([key, label]) =>
-          visible(key) && (
+          show(key) && (
             <div key={key} className="space-y-2">
               <label htmlFor={key} className={PROPERTY_LABEL}>
                 {label}
@@ -529,7 +534,7 @@ export function AdditionalCurationFields({
         ] as const
       ).map(
         ([key, label]) =>
-          visible(key) && (
+          show(key) && (
             <label
               key={key}
               className="flex items-center gap-3 text-sm font-semibold"
@@ -550,7 +555,7 @@ export function AdditionalCurationFields({
         ] as const
       ).map(
         ([key, label, options]) =>
-          visible(key) && (
+          show(key) && (
             <div key={key} className="space-y-2">
               <label className={PROPERTY_LABEL}>{label}</label>
               <PropertyMultiSelect

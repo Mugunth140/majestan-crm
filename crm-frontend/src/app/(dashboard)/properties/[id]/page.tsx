@@ -8,6 +8,7 @@ import { parseMultiValue } from "../_components/PropertyMultiSelect";
 import { convertRate, rateLabel, initialArea, areaInSqft, restorePlotArea } from "../_components/property-measurements";
 import { calculateRentPerSqft } from "@/lib/rental-pricing";
 import { isPropertyFieldVisible } from "../_components/property-form-fields";
+import { detailGroupsOf, In, type DetailGroup } from "../_components/property-detail-groups";
 import { PropertyForm } from "../_components/PropertyForm";
 
 import { propertyStatusLabel } from "@/lib/property-status";
@@ -68,6 +69,17 @@ function PageSkeleton() {
   );
 }
 
+// Saved curation rows, under the same headings as the form's Details step.
+const CURATION_ROW_GROUP: Record<string, DetailGroup> = {
+  "Individual Bathrooms": "rooms", "Attached Bathrooms": "rooms", "No of Rest Rooms": "rooms", "Portion Configurations": "rooms",
+  "Passenger Lifts": "building", "Service Lifts": "building", "Available Floor Numbers": "building",
+  "Road Approach": "parking", "Parking Spaces": "parking",
+  "Agriculture EB": "services", "Storage Tank Capacity": "services", "Power Supply": "services", "Has Canteen": "services", "Has Free Refreshment": "services", "Utilities Provided": "services",
+  "Property Use": "use", "Special Purpose": "use",
+};
+/** Curation rows that are rent figures; they sit with Pricing. */
+const PRICING_CURATION_ROWS = ["Expected Monthly Rent per Sqft", "Total Rent per Month", "Expected Rent per Month"];
+
 /** A read-only row; like before, a field with no value is left out. */
 function SectionField({ label, value }: { label: string; value: any }) {
   if (value === null || value === undefined || value === "") return null;
@@ -80,9 +92,10 @@ function SectionField({ label, value }: { label: string; value: any }) {
 }
 
 /** One group of facts on a tab, two columns wide on desktop. */
-function DataCard({ title, children, columns = true }: { title: string; children: ReactNode; columns?: boolean }) {
+function DataCard({ title, children, columns = true, hideEmpty }: { title: string; children: ReactNode; columns?: boolean; hideEmpty?: boolean }) {
   return (
-    <section className="@container overflow-hidden rounded-xl border bg-card">
+    // hideEmpty: a card whose fields are all blank is left out, as a blank field is.
+    <section className={cn("@container overflow-hidden rounded-xl border bg-card", hideEmpty && "[&:not(:has(>div>*))]:hidden")}>
       <h3 className="flex h-11 items-center border-b px-4 text-[14px] font-semibold text-foreground">{title}</h3>
       <div className={cn("px-3 py-2 md:px-4", columns && "grid gap-x-8 @xl:grid-cols-2")}>{children}</div>
     </section>
@@ -342,72 +355,198 @@ export default function PropertyViewPage() {
             <SectionField label="Registration Charge" value={property.registrationCharge} />
             <SectionField label="Mode of Payment" value={property.modeOfPayment} />
             <SectionField label="Time for Registration" value={property.timeForRegistration} />
+            {curationRows.filter(row => PRICING_CURATION_ROWS.includes(row.label)).map(row => <SectionField key={row.label} label={row.label} value={row.value} />)}
+            {type === "coworking" && (<>
+              <SectionField label="Min Seats" value={det.minSeats} />
+              <SectionField label="Rent / Seat" value={det.rentPerSeat} />
+              <SectionField label="Advance Rent" value={det.advanceRent} />
+              <SectionField label="Lease Term" value={det.leaseTerm} />
+              <SectionField label="Incremental Rent" value={det.incrementalRent} />
+              <SectionField label="Electricity Charges" value={det.electricityCharges} />
+            </>)}
           </DataCard>
-          <DataCard title="Specifications">
-            {curationRows.map(row => <SectionField key={row.label} label={row.label} value={row.value} />)}
-            {isFieldVisible("landArea") && <SectionField label={type === "plot" && property.listingType !== "Rent" ? "Total Project Area" : "Land Area"} value={det.areaSqft ? `${initialArea(areaInSqft(det.areaSqft, det.areaUnit || "Sq Ft"), "landArea", det.measurementUnits ?? {})} ${det.measurementUnits?.landArea || "Sq Ft"}` : undefined} />}
-            {isFieldVisible("plotBoundaries") && boundarySides.some(side => side.length) && <div className="md:col-span-2"><PropertyPlotBoundaries value={boundarySides} facing={det.plotFacing || (type === "commercial" ? det.propertyFacing : "")} readOnly /></div>}
-            {!isPlotLike && (<>
-            {isFieldVisible("bedrooms") && (<SectionField label="Bedrooms" value={det.bedrooms} />)}
-            {isFieldVisible("bathrooms") && (<SectionField label="Bathrooms" value={det.bathrooms} />)}
-            </>)}
-            {isFieldVisible("areaSqft") && (<SectionField label={type === "plot" ? "Total Project Area" : "Area"} value={det.areaSqft ? `${det.areaSqft} ${det.areaUnit || "Sq Ft"}` : undefined} />)}
-            {!isFieldVisible("landArea") && Number(det.areaSqft) > 0 && <SectionField label="Previously recorded area" value={`${det.areaSqft} ${det.areaUnit || "Sq Ft"}`} />}
-            {!isPlotLike && (<>
-            {isFieldVisible("furnished") && (<SectionField label="Furnished" value={bool(det.furnished)} />)}
-            {isFieldVisible("furnishingStatus") && (<SectionField label="Furnishing Status" value={det.furnishingStatus} />)}
-            </>)}
-            <SectionField label="Facing" value={det.propertyFacing} />
-            {!isPlotLike && (<>
-            <SectionField label="Property Age" value={det.propertyAge} />
-            {isFieldVisible("possessionStatus") && (<SectionField label="Possession Status" value={det.possessionStatus} />)}
-            </>)}
-            {isFieldVisible("openSides") && (<SectionField label="Open Sides" value={det.openSides} />)}
-            {!isPlotLike && (<>
-            <SectionField label="Suitable For" value={det.suitableFor} />
-            <SectionField label={type === "commercial" ? "Available Floor Number" : "Floor No"} value={det.floorNumber} />
-            {["villa", "individual_portion", "investment_property", "farm_house"].includes(type) && <SectionField label="Plot Area" value={measurement("plotArea")} />}
-            <SectionField label="Total Floors" value={det.totalFloors} />
-            {isFieldVisible("hasGroundFloor") && <SectionField label="Includes Ground Floor" value={bool(det.hasGroundFloor)} />}
-            {isFieldVisible("plotFacing") && <SectionField label="Plot Facing" value={det.plotFacing} />}
-            {isFieldVisible("numberOfPortions") && <SectionField label="No of Portions" value={det.numberOfPortions} />}
-            {isFieldVisible("parking") && <SectionField label="No of Parking" value={det.parking} />}
-            {isFieldVisible("noOfLifts") && type !== "commercial" && <SectionField label="No of Lifts" value={det.noOfLifts} />}
-            <SectionField label="Built-up Area" value={measurement("builtUpArea")} />
-            <SectionField label="Carpet Area" value={measurement("carpetArea")} />
-            {isFieldVisible("superBuiltUpArea") && (<SectionField label="Super Built-up" value={measurement("superBuiltUpArea")} />)}
-            <SectionField label="UDS Area" value={measurement("udsArea")} />
-            <SectionField label="Balconies" value={det.balconies} />
-            <SectionField label="Parking" value={det.parking} />
-            <SectionField label="Car Parking" value={det.carParking} />
-            <SectionField label="Bike Parking" value={det.bikeParking} />
-            <SectionField label="Guest Parking" value={bool(det.guestParking)} />
-            <SectionField label="Power Backup" value={bool(det.powerBackup)} />
-            <SectionField label="Water Supply" value={det.waterSupply} />
-            </>)}
-            <SectionField label="Road Width" value={det.roadWidth} />
-          </DataCard>
-          {(isApartmentLike || isPlotLike || type === "commercial" || type === "coworking" || type === "industrial") && (
-            <DataCard title={`${formatPropertyType(type)} Details`}>
+          {detailGroupsOf(<>
+            <In group="area">
+              {isFieldVisible("landArea") && <SectionField label={type === "plot" && property.listingType !== "Rent" ? "Total Project Area" : "Land Area"} value={det.areaSqft ? `${initialArea(areaInSqft(det.areaSqft, det.areaUnit || "Sq Ft"), "landArea", det.measurementUnits ?? {})} ${det.measurementUnits?.landArea || "Sq Ft"}` : undefined} />}
+              {isFieldVisible("areaSqft") && (<SectionField label={type === "plot" ? "Total Project Area" : "Area"} value={det.areaSqft ? `${det.areaSqft} ${det.areaUnit || "Sq Ft"}` : undefined} />)}
+              {!isFieldVisible("landArea") && Number(det.areaSqft) > 0 && <SectionField label="Previously recorded area" value={`${det.areaSqft} ${det.areaUnit || "Sq Ft"}`} />}
+              {!isPlotLike && (<>
+                <SectionField label="Built-up Area" value={measurement("builtUpArea")} />
+                <SectionField label="Carpet Area" value={measurement("carpetArea")} />
+                {isFieldVisible("superBuiltUpArea") && (<SectionField label="Super Built-up" value={measurement("superBuiltUpArea")} />)}
+                <SectionField label="UDS Area" value={measurement("udsArea")} />
+                {["villa", "individual_portion", "investment_property", "farm_house"].includes(type) && <SectionField label="Plot Area" value={measurement("plotArea")} />}
+              </>)}
+              {(isPlotLike || type === "farm_house") && (<>
+                {isFieldVisible("plotSizeCents") && (<SectionField label="Plot Size (Cents)" value={det.plotSizeCents} />)}
+                <SectionField label="No of Plots" value={det.plotNos} />
+                {isFieldVisible("plotLength") && (<SectionField label="Plot Length" value={det.plotLength} />)}
+                {isFieldVisible("plotWidth") && (<SectionField label="Plot Width" value={det.plotWidth} />)}
+              </>)}
+              {type === "commercial" && (<>
+                <SectionField label="Dimension" value={det.dimension} />
+                <SectionField label="Frontage" value={det.frontage} />
+                <SectionField label="Plot Area" value={measurement("plotArea")} />
+              </>)}
+              {type === "industrial" && (<>
+                <SectionField label="Plot Area" value={measurement("plotArea")} />
+                <SectionField label="Covered Area" value={measurement("coveredArea")} />
+                <SectionField label="Open Area" value={measurement("openArea")} />
+              </>)}
+            </In>
+            <In group="rooms">
+              {!isPlotLike && (<>
+                {isFieldVisible("bedrooms") && (<SectionField label="Bedrooms" value={det.bedrooms} />)}
+                {isFieldVisible("bathrooms") && (<SectionField label="Bathrooms" value={det.bathrooms} />)}
+                {isFieldVisible("numberOfPortions") && <SectionField label="No of Portions" value={det.numberOfPortions} />}
+                <SectionField label="Balconies" value={det.balconies} />
+              </>)}
+              {isApartmentLike && (<>
+                <SectionField label="Pooja Room" value={bool(det.poojaRoom)} />
+                <SectionField label="Study Room" value={bool(det.studyRoom)} />
+                <SectionField label="Available Portion" value={det.availablePortion} />
+                <SectionField label="Outdoor Spaces" value={det.outdoorSpaces} />
+              </>)}
+              {type === "commercial" && (<>
+                <SectionField label="Pantry" value={bool(det.hasPantry)} />
+                {isFieldVisible("conferenceRoom") && (<SectionField label={property.listingType === "Rent" ? "No of Conference Hall" : "Conference Rooms"} value={det.conferenceRoom} />)}
+                {isFieldVisible("seater") && (<SectionField label={property.listingType === "Rent" ? "No of Seaters" : "Seater"} value={det.seater} />)}
+                {isFieldVisible("privateCabins") && (<SectionField label={property.listingType === "Rent" ? "No of Cabins" : "Private Cabins"} value={det.privateCabins} />)}
+                <SectionField label="Shared Washrooms" value={det.sharedWashrooms} />
+                <SectionField label="Individual Washrooms" value={det.individualWashrooms} />
+              </>)}
+              {type === "coworking" && (<>
+                <SectionField label="Workstations" value={det.availableWorkstations} />
+                {isFieldVisible("privateCabins") && (<SectionField label="Private Cabins" value={det.privateCabins} />)}
+                <SectionField label="Meeting Rooms" value={det.meetingRooms} />
+                <SectionField label="Restroom" value={bool(det.hasRestroom)} />
+              </>)}
+              {type === "industrial" && (<>
+                <SectionField label="No of Labor Rooms" value={det.laborRooms} />
+                <SectionField label="No of Toilets" value={det.toilets} />
+                <SectionField label="No. of Bays" value={det.numberOfBays} />
+                <SectionField label="No. of Cabins" value={det.numberOfCabins} />
+                <SectionField label="Warehouse Racks" value={det.warehouseRacks} />
+              </>)}
+              {!isPlotLike && roomDimensions.map((r: any, i: number) => (
+                <SectionField key={`room-${i}`} label={r.name || `Room ${i + 1}`} value={r.dimensions} />
+              ))}
+            </In>
+            <In group="building">
+              <SectionField label="Facing" value={det.propertyFacing} />
+              {!isPlotLike && (<>
+                <SectionField label="Property Age" value={det.propertyAge} />
+                {isFieldVisible("possessionStatus") && (<SectionField label="Possession Status" value={det.possessionStatus} />)}
+              </>)}
+              {isFieldVisible("openSides") && (<SectionField label="Open Sides" value={det.openSides} />)}
+              {!isPlotLike && (<>
+                <SectionField label={type === "commercial" ? "Available Floor Number" : "Floor No"} value={det.floorNumber} />
+                <SectionField label="Total Floors" value={det.totalFloors} />
+                {isFieldVisible("hasGroundFloor") && <SectionField label="Includes Ground Floor" value={bool(det.hasGroundFloor)} />}
+                {isFieldVisible("noOfLifts") && type !== "commercial" && <SectionField label="No of Lifts" value={det.noOfLifts} />}
+              </>)}
               {isApartmentLike && (<>
                 <SectionField label="Unit Type" value={det.unitType} />
                 <SectionField label="Unit Number" value={det.unitNumber} />
                 <SectionField label="No. of Flats" value={det.numberOfFlats} />
                 <SectionField label="Tower Nos" value={det.towerNos} />
-                <SectionField label="Pooja Room" value={bool(det.poojaRoom)} />
-                <SectionField label="Study Room" value={bool(det.studyRoom)} />
                 <SectionField label="Architectural Style" value={det.architecturalStyle} />
-                <SectionField label="Available Portion" value={det.availablePortion} />
-                <SectionField label="Outdoor Spaces" value={det.outdoorSpaces} />
-                {!Array.isArray(det.curationDetails?.utilities) && <SectionField label="Utilities Provided" value={det.utilitiesProvided} />}
-                <SectionField label="Neighborhood" value={det.neighborhoodHighlights} />
-                <SectionField label="Community Facilities" value={det.communityFacilities} />
-                <SectionField label="Amenity Notes" value={det.amenities} />
               </>)}
+              {type === "commercial" && (<>
+                <SectionField label="No. of Lifts" value={det.noOfLifts} />
+                <SectionField label="Ceiling Height" value={det.ceilingHeightFt} />
+                <SectionField label="No. of Towers" value={det.towerNos} />
+                <SectionField label="Lift Facility" value={bool(det.elevatorAccess)} />
+                {isFieldVisible("constructionDate") && (<SectionField label="Construction Date" value={det.constructionDate} />)}
+              </>)}
+              {type === "coworking" && <SectionField label="Elevator Access" value={bool(det.elevatorAccess)} />}
+              {type === "industrial" && (<>
+                <SectionField label="Building Type" value={det.buildingType} />
+                <SectionField label="Ceiling Height" value={det.ceilingHeightFt} />
+                <SectionField label="Floor Type" value={det.floorType} />
+              </>)}
+            </In>
+            <In group="parking">
+              {isFieldVisible("parking") && !isPlotLike && <SectionField label="No of Parking" value={det.parking} />}
+              {!isPlotLike && (<>
+                {!isFieldVisible("parking") && <SectionField label="Parking" value={det.parking} />}
+                <SectionField label="Car Parking" value={det.carParking} />
+                <SectionField label="Bike Parking" value={det.bikeParking} />
+                <SectionField label="Guest Parking" value={bool(det.guestParking)} />
+              </>)}
+              <SectionField label="Road Width" value={det.roadWidth} />
+              {type === "commercial" && (<>
+                {property.listingType === "Rent" && <SectionField label="Property Accessibility" value={det.accessibility} />}
+                <SectionField label="Visitors Parking" value={det.visitorsParking} />
+                <SectionField label="Outside Parking" value={bool(det.outsideParking)} />
+              </>)}
+              {type === "coworking" && <SectionField label="Accessibility" value={det.accessibility} />}
+              {type === "industrial" && (<>
+                <SectionField label="Container Access" value={det.containerAccess} />
+                <SectionField label="Truck Parking" value={det.truckParking} />
+                <SectionField label="Loading Bays" value={det.loadingBays} />
+                <SectionField label="Truck/Trailer Access" value={bool(det.truckTrailerAccess)} />
+                <SectionField label="Heavy Vehicle Access" value={bool(det.heavyVehicleAccess)} />
+                <SectionField label="Truck/Trailer Count" value={det.truckTrailerCount} />
+                <SectionField label="Nearest Highway" value={det.nearestHighway} />
+                <SectionField label="Nearest Railway" value={det.nearestRailway} />
+                <SectionField label="Nearest Port" value={det.nearestPort} />
+                <SectionField label="Nearest Airport" value={det.nearestAirport} />
+                <SectionField label="Public Transport Access" value={det.publicTransportAccess} />
+              </>)}
+            </In>
+            <In group="services">
+              {!isPlotLike && (<>
+                <SectionField label="Power Backup" value={bool(det.powerBackup)} />
+                <SectionField label="Water Supply" value={det.waterSupply} />
+              </>)}
+              {isApartmentLike && !Array.isArray(det.curationDetails?.utilities) && <SectionField label="Utilities Provided" value={det.utilitiesProvided} />}
+              {(isPlotLike || type === "farm_house") && <SectionField label="Storage Tank" value={bool(det.storageTank)} />}
+              {type === "commercial" && (<>
+                <SectionField label="Fire Safety" value={bool(det.fireSafety)} />
+                <SectionField label="Electricity" value={det.electricityConnection} />
+                <SectionField label="Central AC" value={bool(det.hasCentralAc)} />
+              </>)}
+              {type === "coworking" && (<>
+                <SectionField label="High-Speed WiFi" value={bool(det.highSpeedWifi)} />
+                <SectionField label="Air Conditioning" value={bool(det.airConditioning)} />
+                <SectionField label="CCTV" value={bool(det.cctvSurveillance)} />
+                <SectionField label="Security Staff" value={bool(det.securityStaff)} />
+              </>)}
+              {type === "industrial" && (<>
+                {!Object.hasOwn(det.curationDetails ?? {}, "powerSupplyCapacity") && <SectionField label="Power Supply (HP)" value={det.powerSupplyHp} />}
+                <SectionField label="Power Supply 2" value={det.powerSupply2} />
+                <SectionField label="Power Supply 3" value={det.powerSupply3} />
+                <SectionField label="Crane Available" value={bool(det.craneAvailable)} />
+                <SectionField label="Worker Facilities" value={det.workerFacilities} />
+              </>)}
+            </In>
+            <In group="furnishing">
+              {!isPlotLike && (<>
+                {isFieldVisible("furnished") && (<SectionField label="Furnished" value={bool(det.furnished)} />)}
+                {isFieldVisible("furnishingStatus") && (<SectionField label="Furnishing Status" value={det.furnishingStatus} />)}
+              </>)}
+              {type === "coworking" && <SectionField label="Furniture Provided" value={det.furnitureProvided} />}
+            </In>
+            <In group="amenities">
+              {!isPlotLike && (
+                amenitiesList.length === 0 ? (
+                  <p className="py-2 text-[14px] text-muted-foreground @xl:col-span-2">No amenities tagged.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5 py-2 @xl:col-span-2">
+                    {amenitiesList.map((a: any, i: number) => (
+                      <span key={a.id ?? i} className="inline-flex h-7 items-center rounded-md bg-foreground/[0.06] px-2.5 text-[13px] font-medium text-foreground">
+                        {a.name || `Amenity #${a.id}`}
+                      </span>
+                    ))}
+                  </div>
+                )
+              )}
+            </In>
+            <In group="land">
+              {isFieldVisible("plotBoundaries") && boundarySides.some(side => side.length) && <div className="@xl:col-span-2"><PropertyPlotBoundaries value={boundarySides} facing={det.plotFacing || (type === "commercial" ? det.propertyFacing : "")} readOnly /></div>}
+              {!isPlotLike && isFieldVisible("plotFacing") && <SectionField label="Plot Facing" value={det.plotFacing} />}
               {(isPlotLike || type === "farm_house") && (<>
-                {isFieldVisible("plotSizeCents") && (<SectionField label="Plot Size (Cents)" value={det.plotSizeCents} />)}
-                <SectionField label="No of Plots" value={det.plotNos} />
-                {isFieldVisible("zoning") && (<SectionField label="Zoning" value={det.zoning} />)}
                 <SectionField label="Plot Type" value={det.plotType} />
                 <SectionField label="SF Number" value={det.sfNumber} />
                 <SectionField label="Land Type" value={det.landType} />
@@ -416,127 +555,41 @@ export default function PropertyViewPage() {
                 <SectionField label="Irrigation" value={det.irrigation} />
                 {isFieldVisible("fencing") && (<SectionField label="Fencing" value={det.fencing} />)}
                 <SectionField label="Boundary Wall" value={bool(det.boundaryWall)} />
-                {isFieldVisible("plotLength") && (<SectionField label="Plot Length" value={det.plotLength} />)}
-                {isFieldVisible("plotWidth") && (<SectionField label="Plot Width" value={det.plotWidth} />)}
                 <SectionField label="Water Sources" value={det.waterSources} />
                 <SectionField label="Crop Suitability" value={det.cropSuitability} />
                 <SectionField label="Existing Plantation" value={det.existingPlantation} />
                 <SectionField label="Bore Well" value={bool(det.boreWell)} />
                 {det.boreWell && <SectionField label="No of Borewells" value={det.boreWellCount} />}
-                <SectionField label="Storage Tank" value={bool(det.storageTank)} />
               </>)}
-
+            </In>
+            <In group="use">
+              {!isPlotLike && <SectionField label="Suitable For" value={det.suitableFor} />}
+              {(isPlotLike || type === "farm_house") && isFieldVisible("zoning") && (<SectionField label="Zoning" value={det.zoning} />)}
+              {isApartmentLike && (<>
+                <SectionField label="Neighborhood" value={det.neighborhoodHighlights} />
+                <SectionField label="Community Facilities" value={det.communityFacilities} />
+              </>)}
               {type === "commercial" && (<>
-                {type === "commercial" && property.listingType === "Rent" && !Array.isArray(det.curationDetails?.specialPurposes) && <SectionField label="Special Purpose" value={det.specialPurpose} />}
-                {property.listingType === "Rent" && <SectionField label="Property Accessibility" value={det.accessibility} />}
+                {property.listingType === "Rent" && !Array.isArray(det.curationDetails?.specialPurposes) && <SectionField label="Special Purpose" value={det.specialPurpose} />}
                 <SectionField label="Property Use" value={det.propertyUse ? parseMultiValue(det.propertyUse).join(", ") : undefined} />
-                <SectionField label="No. of Lifts" value={det.noOfLifts} />
-                <SectionField label="Dimension" value={det.dimension} />
-                <SectionField label="Frontage" value={det.frontage} />
-
-                <SectionField label="Visitors Parking" value={det.visitorsParking} />
-                <SectionField label="Outside Parking" value={bool(det.outsideParking)} />
-                <SectionField label="Fire Safety" value={bool(det.fireSafety)} />
-                <SectionField label="Ceiling Height" value={det.ceilingHeightFt} />
-                <SectionField label="Electricity" value={det.electricityConnection} />
-                <SectionField label="Central AC" value={bool(det.hasCentralAc)} />
-                <SectionField label="Pantry" value={bool(det.hasPantry)} />
-                {isFieldVisible("conferenceRoom") && (<SectionField label={type === "commercial" && property.listingType === "Rent" ? "No of Conference Hall" : "Conference Rooms"} value={det.conferenceRoom} />)}
-                {isFieldVisible("seater") && (<SectionField label={type === "commercial" && property.listingType === "Rent" ? "No of Seaters" : "Seater"} value={det.seater} />)}
                 <SectionField label="Tenant Mix" value={det.tenantMix} />
-                <SectionField label="No. of Towers" value={det.towerNos} />
-                <SectionField label="Plot Area" value={measurement("plotArea")} />
-                <SectionField label="Water Supply" value={det.waterSupply} />
-                <SectionField label="Lift Facility" value={bool(det.elevatorAccess)} />
-                {isFieldVisible("privateCabins") && (<SectionField label={type === "commercial" && property.listingType === "Rent" ? "No of Cabins" : "Private Cabins"} value={det.privateCabins} />)}
-                <SectionField label="Fully Furnished" value={bool(det.furnished)} />
-                <SectionField label="Shared Washrooms" value={det.sharedWashrooms} />
-                <SectionField label="Individual Washrooms" value={det.individualWashrooms} />
-                {isFieldVisible("constructionDate") && (<SectionField label="Construction Date" value={det.constructionDate} />)}
-                {isFieldVisible("documentRequire") && (<SectionField label="Documents Required" value={det.documentRequire} />)}
-              </>)}
-              {type === "coworking" && (<>
-                <SectionField label="Workstations" value={det.availableWorkstations} />
-                {isFieldVisible("privateCabins") && (<SectionField label="Private Cabins" value={det.privateCabins} />)}
-                <SectionField label="Meeting Rooms" value={det.meetingRooms} />
-                <SectionField label="Min Seats" value={det.minSeats} />
-                <SectionField label="Rent / Seat" value={det.rentPerSeat} />
-                <SectionField label="Advance Rent" value={det.advanceRent} />
-                <SectionField label="Lease Term" value={det.leaseTerm} />
-                <SectionField label="Incremental Rent" value={det.incrementalRent} />
-                <SectionField label="Electricity Charges" value={det.electricityCharges} />
-                <SectionField label="High-Speed WiFi" value={bool(det.highSpeedWifi)} />
-                <SectionField label="Air Conditioning" value={bool(det.airConditioning)} />
-                <SectionField label="CCTV" value={bool(det.cctvSurveillance)} />
-                <SectionField label="Elevator Access" value={bool(det.elevatorAccess)} />
-                <SectionField label="Security Staff" value={bool(det.securityStaff)} />
-                <SectionField label="Restroom" value={bool(det.hasRestroom)} />
-                <SectionField label="Furniture Provided" value={det.furnitureProvided} />
-                <SectionField label="Accessibility" value={det.accessibility} />
               </>)}
               {type === "industrial" && (<>
-                <SectionField label="Plot Area" value={measurement("plotArea")} />
-                <SectionField label="Container Access" value={det.containerAccess} />
-                <SectionField label="No of Labor Rooms" value={det.laborRooms} />
-                <SectionField label="No of Toilets" value={det.toilets} />
-                <SectionField label="Building Type" value={det.buildingType} />
                 <SectionField label="Property Use" value={det.propertyUse ? parseMultiValue(det.propertyUse).join(", ") : undefined} />
-                <SectionField label="Covered Area" value={measurement("coveredArea")} />
-                <SectionField label="Open Area" value={measurement("openArea")} />
-                <SectionField label="Ceiling Height" value={det.ceilingHeightFt} />
-                <SectionField label="Floor Type" value={det.floorType} />
-                <SectionField label="No. of Bays" value={det.numberOfBays} />
-                <SectionField label="No. of Cabins" value={det.numberOfCabins} />
-                {!Object.hasOwn(det.curationDetails ?? {}, "powerSupplyCapacity") && <SectionField label="Power Supply (HP)" value={det.powerSupplyHp} />}
-                <SectionField label="Water Supply" value={det.waterSupply} />
-                <SectionField label="Truck Parking" value={det.truckParking} />
-                <SectionField label="Loading Bays" value={det.loadingBays} />
-                <SectionField label="Warehouse Racks" value={det.warehouseRacks} />
-                <SectionField label="Truck/Trailer Access" value={bool(det.truckTrailerAccess)} />
-                <SectionField label="Crane Available" value={bool(det.craneAvailable)} />
-                <SectionField label="Heavy Vehicle Access" value={bool(det.heavyVehicleAccess)} />
-                <SectionField label="Worker Facilities" value={det.workerFacilities} />
-                <SectionField label="Nearest Highway" value={det.nearestHighway} />
-                <SectionField label="Nearest Railway" value={det.nearestRailway} />
-                <SectionField label="Nearest Port" value={det.nearestPort} />
-                <SectionField label="Nearest Airport" value={det.nearestAirport} />
                 <SectionField label="Labour Availability" value={det.labourAvailability} />
-                <SectionField label="Power Supply 2" value={det.powerSupply2} />
-                <SectionField label="Power Supply 3" value={det.powerSupply3} />
-                <SectionField label="Truck/Trailer Count" value={det.truckTrailerCount} />
-                <SectionField label="Public Transport Access" value={det.publicTransportAccess} />
-                <SectionField label="Ownership Proof Verified" value={det.ownershipProofVerified} />
-                <SectionField label="Building Approval Certification" value={det.buildingApprovalCert ? parseMultiValue(det.buildingApprovalCert).join(", ") : undefined} />
-                <SectionField label="Pollution Clearance" value={det.pollutionClearance} />
-
-                <SectionField label="Other Legal Clearance" value={det.otherLegalClearance} />
-                <SectionField label="Other Legal Details" value={det.otherLegalDetails} />
-
               </>)}
-            </DataCard>
-          )}
-          {!isPlotLike && (
-          <DataCard title="Amenities" columns={false}>
-            {amenitiesList.length === 0 ? (
-              <p className="py-2 text-[14px] text-muted-foreground">No amenities tagged.</p>
-            ) : (
-              <div className="flex flex-wrap gap-1.5 py-2">
-                {amenitiesList.map((a: any, i: number) => (
-                  <span key={a.id ?? i} className="inline-flex h-7 items-center rounded-md bg-foreground/[0.06] px-2.5 text-[13px] font-medium text-foreground">
-                    {a.name || `Amenity #${a.id}`}
-                  </span>
-                ))}
-              </div>
-            )}
-          </DataCard>
-          )}
-        {!isPlotLike && roomDimensions.length > 0 && (
-          <DataCard title="Room Dimensions">
-            {roomDimensions.map((r: any, i: number) => (
-              <SectionField key={i} label={r.name || `Room ${i + 1}`} value={r.dimensions} />
+            </In>
+            <In group="notes">
+              {isApartmentLike && <SectionField label="Amenity Notes" value={det.amenities} />}
+            </In>
+            {curationRows.filter(row => !PRICING_CURATION_ROWS.includes(row.label)).map(row => (
+              <In key={row.label} group={CURATION_ROW_GROUP[row.label] ?? (type === "pg_service_apartment" ? "rooms" : "use")}>
+                <SectionField label={row.label} value={row.value} />
+              </In>
             ))}
-          </DataCard>
-        )}
+          </>).map(({ key, title, fields }) => (
+            <DataCard key={key} title={title} hideEmpty>{fields}</DataCard>
+          ))}
         {!isPlotLike && units.length > 0 && (
           <DataCard title="Units">
             {units.map((u: any, i: number) => (
@@ -584,6 +637,14 @@ export default function PropertyViewPage() {
             {isFieldVisible("fundedBy") && hypothecated && <SectionField label="Funded By" value={det.fundedBy} />}
             {isFieldVisible("hypothecation") && (<SectionField label="Hypothecation" value={property.hypothecation} />)}
             {isFieldVisible("deviation") && (<SectionField label="Deviation" value={property.deviation} />)}
+            {type === "commercial" && isFieldVisible("documentRequire") && (<SectionField label="Documents Required" value={det.documentRequire} />)}
+            {type === "industrial" && (<>
+              <SectionField label="Ownership Proof Verified" value={det.ownershipProofVerified} />
+              <SectionField label="Building Approval Certification" value={det.buildingApprovalCert ? parseMultiValue(det.buildingApprovalCert).join(", ") : undefined} />
+              <SectionField label="Pollution Clearance" value={det.pollutionClearance} />
+              <SectionField label="Other Legal Clearance" value={det.otherLegalClearance} />
+              <SectionField label="Other Legal Details" value={det.otherLegalDetails} />
+            </>)}
           </DataCard>)}
           <DataCard title="Market Analysis">
             <SectionField label="Comparative Price" value={property.comparativePrice} />
