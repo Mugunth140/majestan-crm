@@ -19,13 +19,17 @@ import { Input } from "@/components/ui/input";
 import { FormSelect } from "@/components/shared/form-select";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import type { SharedListing } from "@/lib/listing-share";
 import { EmailEditor } from "./email-editor";
 import { VariablePicker } from "./variable-picker";
 
 /** Where the composer starts: a blank email, a saved template, a system email, or an existing draft. */
 export type ComposerStart =
-  /** A reply carries the subject ("Re: …") and, for reply-all, the earlier Cc. */
-  | { kind: "blank"; subject?: string; cc?: string[] }
+  /**
+   * A reply carries the subject ("Re: …") and, for reply-all, the earlier Cc.
+   * A share arrives written, with its brochures already attached.
+   */
+  | { kind: "blank"; subject?: string; cc?: string[]; body?: string; attachments?: MailAttachment[]; share?: SharedListing[] }
   | { kind: "saved"; id: number }
   | { kind: "system"; key: string }
   | { kind: "draft"; id: number; eventKey: string };
@@ -86,6 +90,8 @@ function OpenComposer({ entityType, entityId, start, recipients = [], senders, i
         else if (start.kind === "blank") {
           if (start.subject) setSubject(start.subject);
           if (start.cc?.length) setCcText(start.cc.join(", "));
+          if (start.body) setBody(start.body);
+          if (start.attachments?.length) setFiles(start.attachments);
         }
         setSender(startSender(next, start, senders));
       })

@@ -166,7 +166,8 @@ export function propertyMatchQuery(c: MatchCriteria) {
   const rankParams = [...c.localities, ...(c.bhk ? [c.bhk] : [])];
 
   return {
-    sql: `SELECT p.id, p.property_code AS code, p.title, p.price, p.property_type, p.listing_type, p.city,
+    sql: `SELECT p.id, p.property_code AS code, p.title, p.slug,
+                 (SELECT i.image_url FROM property_images i WHERE i.property_id = p.id ORDER BY i.is_primary DESC, i.id LIMIT 1) AS photo, p.price, p.property_type, p.listing_type, p.city,
                  s.locality_name AS locality, pd.bedrooms, ${area} AS area_sqft, pd.furnished,
                  ${c.localities.length ? `${localityRank} = 0` : '0'} AS locality_match
           FROM properties p
@@ -221,7 +222,7 @@ export function projectMatchQuery(c: MatchCriteria) {
   const rankParams = [...c.localities, ...(c.bhk ? [c.bhk] : [])];
 
   return {
-    sql: `SELECT pr.id, pr.project_code AS code, pr.name, pr.project_type, pr.city, pr.sublocation AS locality,
+    sql: `SELECT pr.id, pr.project_code AS code, pr.name, pr.canonical_slug AS slug, pr.cover_image_url AS photo, pr.project_type, pr.city, pr.sublocation AS locality,
                  pr.builder_name, pr.possession_status,
                  COUNT(u.id) AS units, MIN(${unitPrice}) AS min_price, MAX(${unitPrice}) AS max_price,
                  GROUP_CONCAT(DISTINCT u.bedrooms ORDER BY u.bedrooms) AS bedrooms,

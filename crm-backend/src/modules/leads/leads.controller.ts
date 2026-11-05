@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Put, Delete, Param, Query, UseInterceptors, UploadedFile, BadRequestException, UseGuards, Request } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, Delete, Param, Query, UseInterceptors, UploadedFile, BadRequestException, UseGuards, Request, StreamableFile, Header, ParseIntPipe, ParseEnumPipe } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { LeadsService } from './leads.service';
 import { LeadEventsService } from './lead-events.service';
@@ -15,6 +15,8 @@ import { CreateLeadContactLogDto } from './dto/create-lead-contact-log.dto';
 import { CreateLeadFollowUpDto } from './dto/create-lead-follow-up.dto';
 import { UpdateLeadFollowUpDto } from './dto/update-lead-follow-up.dto';
 import { RolesGuard } from '../auth/roles.guard';
+import { LeadShareService } from './share/lead-share.service';
+import { LogShareDto, ShareListingsDto } from './dto/share-listings.dto';
 import { Roles } from '../auth/roles.decorator';
 
 @Controller('api/v1/leads')
@@ -23,6 +25,7 @@ export class LeadsController {
   constructor(
     private readonly leadsService: LeadsService,
     private readonly leadEvents: LeadEventsService,
+    private readonly share: LeadShareService,
   ) {}
 
   @Get('cities')
@@ -107,6 +110,34 @@ export class LeadsController {
   async autoMatchProperties(@Param('id') id: string, @Query('inquiryId') inquiryId?: string) {
     const data = await this.leadsService.autoMatchProperties(Number(id), inquiryId ? Number(inquiryId) : undefined);
     return { success: true, data };
+  }
+
+  /** A listing's customer brochure, to download or send on WhatsApp. */
+  @Header('Cache-Control', 'private, no-store')
+  @Get(':id/share/pdf/:kind/:listingId')
+  async sharePdf(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('kind', new ParseEnumPipe({ property: 'property', project: 'project' })) kind: 'property' | 'project',
+    @Param('listingId', ParseIntPipe) listingId: number,
+    @Request() req: any,
+  ) {
+    await this.share.assertAccess(id, req.user);
+    const { buffer, filename } = await this.share.pdf({ kind, id: listingId }, req.user.id);
+    return new StreamableFile(buffer, {
+      type: 'application/pdf',
+      length: buffer.length,
+      disposition: `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    });
+  }
+
+  @Post(':id/share/email-draft')
+  async shareEmailDraft(@Param('id', ParseIntPipe) id: number, @Body() body: ShareListingsDto, @Request() req: any) {
+    return { success: true, data: await this.share.emailDraft(id, body.items, req.user) };
+  }
+
+  @Post(':id/share/log')
+  async logShare(@Param('id', ParseIntPipe) id: number, @Body() body: LogShareDto, @Request() req: any) {
+    return { success: true, data: await this.share.log(id, body.channel, body.items, req.user) };
   }
 
   @Post(':id/inquiries')

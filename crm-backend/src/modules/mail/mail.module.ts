@@ -44,7 +44,7 @@ export class MailFeatureModule {}
     MailTemplatesService,
     MailAttachmentsService,
   ],
-  exports: [MailRegistry, MailService, MailTemplatesService],
+  exports: [MailRegistry, MailService, MailTemplatesService, MailAttachmentsService],
 })
 export class MailModule {
   static forFeature(definitions: MailEventDefinition[]): DynamicModule {

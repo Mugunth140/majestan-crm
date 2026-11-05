@@ -4,6 +4,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { isQueuedWebsiteSource } from './website-sources';
 import { matchCriteria, projectMatchQuery, propertyMatchQuery } from './auto-match';
+import { photoUrl } from './share/listing-data';
 import { LeadSource } from '../../database/entities/lead-source.entity';
 import { Lead } from '../../database/entities/lead.entity';
 import { LeadFollowUp } from '../../database/entities/lead-follow-up.entity';
@@ -1319,7 +1320,8 @@ export class LeadsService {
       this.siteDataSource.query(properties.sql, properties.params),
       projects ? this.siteDataSource.query(projects.sql, projects.params) : [],
     ]);
-    return { inquiryId: inquiry.id, properties: propertyRows, projects: projectRows };
+    const withPhoto = (rows: any[]) => rows.map((row) => ({ ...row, photo: photoUrl(row.photo) }));
+    return { inquiryId: inquiry.id, properties: withPhoto(propertyRows), projects: withPhoto(projectRows) };
   }
 
   async uploadDocument(leadId: number, file: Express.Multer.File, actorId: number | null = null) {

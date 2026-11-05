@@ -43,11 +43,12 @@ import { shouldAutoOpenFollowUps, wantsFollowUps } from "@/lib/follow-up-deep-li
 import { InlineSelect, InlineText, Section, FieldRow, withCurrent, type Option } from "@/components/record/inline-field";
 import { Feed, timelineItems, type TimelineEntry } from "./lead-timeline";
 import { TabHeader } from "@/components/record/feed";
-import { LeadConversation } from "@/components/record/conversation";
+import { LeadConversation, type ComposeRequest } from "@/components/record/conversation";
 import { FollowUpComposer } from "@/components/record/follow-up-composer";
 import { AttachmentsArt, EmptyState, RequirementsArt } from "@/components/record/empty-state";
 import { RequirementFields, loadCities } from "./lead-requirement";
-import { AutoMatchSheet, type AutoMatches } from "./auto-match-sheet";
+import { MatchesDialog, type AutoMatches } from "./matches-dialog";
+import { shareApi, whatsappMessage, type SharedListing } from "@/lib/listing-share";
 import {
   Loader2, ArrowUpRight, History, TrendingUp,
   Plus, Activity, MessagesSquare, Paperclip, Building2, Info, Trash2,
@@ -186,7 +187,9 @@ function LeadDetail() {
   const isAdmin = useIsAdmin();
   const [autoOpenedFollowUps, setAutoOpenedFollowUps] = useState(false);
   const [isAutoMatchOpen, setIsAutoMatchOpen] = useState(false);
-  const [autoMatches, setAutoMatches] = useState<AutoMatches>({ properties: [], projects: [] });
+  const [autoMatches, setAutoMatches] = useState<AutoMatches & { n: number; requirement: string }>({ properties: [], projects: [], n: 0, requirement: "" });
+  // Opens the conversation's composer from elsewhere on the page (sharing by email).
+  const [composeRequest, setComposeRequest] = useState<ComposeRequest | null>(null);
   // The requirement whose matches are loading.
   const [matchingId, setMatchingId] = useState<number | null>(null);
 
@@ -243,13 +246,13 @@ function LeadDetail() {
     return () => { live = false; };
   }, []);
 
-  const fetchAutoMatch = async (inquiryId: number) => {
+  const fetchAutoMatch = async (inquiryId: number, requirement: string) => {
     setMatchingId(inquiryId);
     try {
       const res = await apiFetch(`${API_URL}/leads/${id}/auto-match?inquiryId=${inquiryId}`);
       const data = await res.json();
       if (data.success) {
-        setAutoMatches({ properties: data.data.properties ?? [], projects: data.data.projects ?? [] });
+        setAutoMatches((prev) => ({ properties: data.data.properties ?? [], projects: data.data.projects ?? [], n: prev.n + 1, requirement }));
         setIsAutoMatchOpen(true);
       } else {
         toast.error(data.error || data.message || "Couldn't find matches");
@@ -258,6 +261,48 @@ function LeadDetail() {
       toast.error("Couldn't find matches");
     } finally {
       setMatchingId(null);
+    }
+  };
+
+  // ── Sharing matches ──
+  const shareByEmail = async (listings: SharedListing[]) => {
+    try {
+      const draft = await shareApi.emailDraft(Number(id), listings);
+      setIsAutoMatchOpen(false);
+      setActiveTab("conversation");
+      setComposeRequest((prev) => ({
+        mode: "email",
+        n: (prev?.n ?? 0) + 1,
+        mail: { kind: "blank", subject: draft.subject, body: draft.body, attachments: draft.attachments, share: listings },
+      }));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't prepare the email");
+    }
+  };
+
+  const downloadPdfs = async (listings: SharedListing[]) => {
+    try {
+      for (const listing of listings) await shareApi.downloadPdf(Number(id), listing);
+    } catch {
+      toast.error("Couldn't prepare the PDF");
+      throw new Error("download failed");
+    }
+  };
+
+  // WhatsApp isn't connected yet: the chat opens with the message written, the
+  // PDFs download for staff to attach, and the share is logged on the lead.
+  const shareOnWhatsapp = async (listings: SharedListing[]) => {
+    const digits = String(lead?.whatsapp_number || lead?.mobile_number || "").replace(/\D/g, "");
+    const to = digits.length === 10 ? `91${digits}` : digits;
+    window.open(`https://wa.me/${to}?text=${encodeURIComponent(whatsappMessage(lead?.name, listings))}`, "_blank", "noopener");
+    try {
+      await downloadPdfs(listings);
+      await shareApi.log(Number(id), "whatsapp", listings);
+      toast.success(listings.length === 1 ? "PDF downloaded. Attach it in the WhatsApp chat." : "PDFs downloaded. Attach them in the WhatsApp chat.");
+      setIsAutoMatchOpen(false);
+      void fetchLead(true);
+    } catch {
+      // downloadPdfs already explained what went wrong.
     }
   };
 
@@ -854,6 +899,7 @@ function LeadDetail() {
                   canEdit={canEdit}
                   isAdmin={role === "Admin" || role === "Super Admin"}
                   refreshKey={mailRefresh}
+                  request={composeRequest}
                   onRefresh={() => fetchLead(true)}
                 />
             )}
@@ -917,7 +963,7 @@ function LeadDetail() {
                     action={
                       <>
                         {canEdit && inq.id && (
-                          <button type="button" onClick={() => void fetchAutoMatch(inq.id)} disabled={matchingId !== null} className={cn(HEADER_BUTTON, "h-7 text-[13px] disabled:opacity-60")}>
+                          <button type="button" onClick={() => void fetchAutoMatch(inq.id, title)} disabled={matchingId !== null} className={cn(HEADER_BUTTON, "h-7 text-[13px] disabled:opacity-60")}>
                             {matchingId === inq.id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                             Find matches
                           </button>
@@ -983,7 +1029,18 @@ function LeadDetail() {
         </aside>
       </div>
 
-      <AutoMatchSheet open={isAutoMatchOpen} onOpenChange={setIsAutoMatchOpen} matches={autoMatches} />
+      <MatchesDialog
+        key={autoMatches.n}
+        open={isAutoMatchOpen}
+        onOpenChange={setIsAutoMatchOpen}
+        matches={autoMatches}
+        requirement={autoMatches.requirement}
+        canEmail={!!lead?.email}
+        canWhatsapp={!!(lead?.whatsapp_number || lead?.mobile_number)}
+        onEmail={shareByEmail}
+        onWhatsapp={shareOnWhatsapp}
+        onDownload={downloadPdfs}
+      />
 
       {/* ── Dropped Reason Dialog ── */}
       <Dialog open={isDroppedOpen} onOpenChange={(o) => !o && setIsDroppedOpen(false)}>

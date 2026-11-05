@@ -44,8 +44,13 @@ export class MailAttachmentsService {
 
   async upload(file: Express.Multer.File | undefined, actorId: number): Promise<AttachmentMeta> {
     if (!file?.buffer?.length) throw new BadRequestException('Choose a file to attach');
-    if (file.size > MAX_ATTACHMENT_BYTES) throw new BadRequestException('Attachments can be at most 10 MB');
-    const contentType = sniffContentType(file.buffer);
+    return this.store(file.buffer, file.originalname, actorId);
+  }
+
+  /** Keeps a file for the caller's next email, e.g. a brochure the CRM generated. */
+  async store(buffer: Buffer, originalName: string, actorId: number): Promise<AttachmentMeta> {
+    if (buffer.length > MAX_ATTACHMENT_BYTES) throw new BadRequestException('Attachments can be at most 10 MB');
+    const contentType = sniffContentType(buffer);
     if (!contentType) throw new BadRequestException('Only PDF and image files (PNG, JPG, WEBP) can be attached');
     const pending = await this.attachments.count({ where: { uploaded_by: actorId, outbox_id: IsNull() } });
     if (pending >= MAX_PENDING_PER_USER) throw new BadRequestException('Too many unsent attachments. Send or remove some first');
@@ -53,11 +58,11 @@ export class MailAttachmentsService {
       this.attachments.create({
         uploaded_by: actorId,
         outbox_id: null,
-        filename: safeFilename(file.originalname, contentType),
+        filename: safeFilename(originalName, contentType),
         content_type: contentType,
-        size: file.size,
-        sha256: createHash('sha256').update(file.buffer).digest('hex'),
-        data: file.buffer,
+        size: buffer.length,
+        sha256: createHash('sha256').update(buffer).digest('hex'),
+        data: buffer,
       }),
     );
     return this.meta(row);

@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { CalendarClock, CalendarDays, ChevronDown, Plus, Flag, Loader2, Mail, MessageCircle, MoreHorizontal, NotebookPen, Phone, PhoneIncoming, PhoneMissed, PhoneOutgoing, Reply, ReplyAll, RotateCcw, Send, Smartphone, StickyNote, Timer, X } from "lucide-react";
+import { CalendarClock, CalendarDays, ChevronDown, Plus, Flag, Loader2, Mail, MessageCircle, MoreHorizontal, NotebookPen, Phone, PhoneIncoming, PhoneMissed, PhoneOutgoing, Reply, ReplyAll, RotateCcw, Send, Share2, Smartphone, StickyNote, Timer, X } from "lucide-react";
 import { toHrFollowUpPayload } from "@/lib/hr-follow-up";
+import Link from "next/link";
 import { apiFetch } from "@/lib/api-fetch";
+import { listingHref, parseShare, shareApi } from "@/lib/listing-share";
 import { mailApi, MAIL_STATUS, newDraftIds, type MailCatalog, type MailSummary, type MailTarget } from "@/lib/mail-api";
 import { contactLogAuthor, formatDuration } from "@/lib/contact-log-utils";
 import { Button } from "@/components/ui/button";
@@ -112,6 +114,8 @@ export const AGENT_ENTITY: ConversationEntity = { api: "agents", mail: "agent", 
 export const HR_ENTITY: ConversationEntity = { api: "hr", mail: "hr_candidate", noun: "candidate", editMethod: "PUT", followUpBody: toHrFollowUpPayload };
 
 export type ComposeMode = "followup" | "email" | "whatsapp" | "sms";
+/** Opens a composer from outside; `n` changes per request. `mail` starts the email pre-written. */
+export type ComposeRequest = { mode: ComposeMode; n: number; mail?: ComposerStart };
 type Mode = ComposeMode;
 
 const MODES: { key: Mode; label: string; icon: typeof Phone }[] = [
@@ -149,8 +153,8 @@ export function LeadConversation({
   isAdmin: boolean;
   refreshKey: number;
   onRefresh: () => void;
-  /** Opens a composer from outside (the page's Call / WhatsApp / SMS / Email buttons); `n` changes per click. */
-  request?: { mode: ComposeMode; n: number } | null;
+  /** Opens a composer from outside (the page's Call / WhatsApp / SMS / Email buttons, or sharing listings). */
+  request?: ComposeRequest | null;
 }) {
   const [catalog, setCatalog] = useState<MailCatalog | null>(null);
   const [mails, setMails] = useState<MailSummary[]>([]);
@@ -161,7 +165,8 @@ export function LeadConversation({
   if (request && request.n !== handled) {
     setHandled(request.n);
     setMode(request.mode);
-    if (request.mode === "email" && !mailComposer) setMailComposer({ kind: "blank" });
+    if (request.mail) setMailComposer(request.mail);
+    else if (request.mode === "email" && !mailComposer) setMailComposer({ kind: "blank" });
   }
   const end = useRef<HTMLDivElement>(null);
   const [retrying, setRetrying] = useState<number | null>(null);
@@ -297,6 +302,37 @@ export function LeadConversation({
               {log.message && <p className="mt-2.5 whitespace-pre-wrap text-[14px] leading-6 text-foreground/85">{log.message}</p>}
             </div>
           ),
+        });
+        continue;
+      }
+      if (log.contact_type === "share") {
+        const listings = parseShare(log.message);
+        const what = listings.length === 1 ? `a ${listings[0].kind}` : `${listings.length} listings`;
+        list.push({
+          key: `log-${log.id}`,
+          at,
+          icon: <Share2 />,
+          who,
+          title: <><Who>{who}</Who> shared {what} {log.subject === "whatsapp" ? "on WhatsApp" : "by email"}</>,
+          extra: listings.length ? (
+            <div className={cn(CARD, "divide-y divide-border/60 overflow-hidden")}>
+              {listings.map((l) => (
+                <div key={`${l.kind}-${l.id}`} className="flex items-center gap-3 px-3.5 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <Link href={listingHref(l)} className="block truncate text-[14px] font-medium text-foreground hover:underline">{l.title}</Link>
+                    <p className="truncate text-[12px] text-muted-foreground">{[l.code, l.subtitle, l.price].filter(Boolean).join(" · ")}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => shareApi.downloadPdf(leadId, l).catch(() => toast.error("Couldn't prepare the PDF"))}
+                    className="shrink-0 rounded-md px-2 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    PDF
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : undefined,
         });
         continue;
       }
@@ -499,7 +535,15 @@ export function LeadConversation({
                 recipients={email ? [email] : []}
                 senders={writable}
                 onClose={closeEmail}
-                onSent={() => { closeEmail(); void loadMail(); }}
+                onSent={() => {
+                  // A share is recorded once its email has actually gone out.
+                  const shared = mailComposer.kind === "blank" ? mailComposer.share : undefined;
+                  closeEmail();
+                  void loadMail();
+                  if (shared?.length) {
+                    shareApi.log(leadId, "email", shared).then(onRefresh, () => toast.error("The email was sent, but the share couldn't be recorded"));
+                  }
+                }}
               />
             </div>
           )}
