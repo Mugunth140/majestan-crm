@@ -2,10 +2,10 @@
 import { createElement } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-const mocks = vi.hoisted(() => ({ push: vi.fn(), create: vi.fn(), update: vi.fn(), error: vi.fn(), success: vi.fn() }));
+const mocks = vi.hoisted(() => ({ push: vi.fn(), create: vi.fn(), error: vi.fn(), success: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock('sonner', () => ({ toast: { success: mocks.success, error: mocks.error } }));
-vi.mock('@/lib/builders-api', () => ({ buildersApi: { create: mocks.create, update: mocks.update } }));
+vi.mock('@/lib/builders-api', () => ({ buildersApi: { create: mocks.create } }));
 vi.mock('@/lib/properties-api', () => ({ propertiesApi: { uploadImages: vi.fn() } }));
 vi.mock('@/components/shared/focus-modal', async original => ({
   ...await original<typeof import('@/components/shared/focus-modal')>(),
@@ -13,12 +13,12 @@ vi.mock('@/components/shared/focus-modal', async original => ({
     createElement('div', null, createElement('ol', null, p.steps.map(s => createElement('li', { key: s.key }, `${s.key}:${s.status}`))), p.children, p.footer),
 }));
 import { BuilderForm } from './BuilderForm';
-beforeEach(() => { vi.clearAllMocks(); mocks.create.mockResolvedValue({ success: true, data: { id: 42 } }); mocks.update.mockResolvedValue({ success: true }); });
+beforeEach(() => { vi.clearAllMocks(); mocks.create.mockResolvedValue({ success: true, data: { id: 42 } }); });
 afterEach(cleanup);
 const steps = () => screen.getAllByRole('listitem').map(li => li.textContent);
 
 it('needs a name before a new builder moves on, then creates it and opens its page', async () => {
-  render(createElement(BuilderForm, { mode: 'create' }));
+  render(createElement(BuilderForm, {}));
   expect(screen.queryByRole('button', { name: 'Create builder' })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
   expect(mocks.error).toHaveBeenCalledWith('Builder name is required');
@@ -35,11 +35,3 @@ it('needs a name before a new builder moves on, then creates it and opens its pa
   expect(mocks.push).toHaveBeenCalledWith('/builders/42');
 });
 
-it('saves an edit from any step and hands back to the page that opened it', async () => {
-  const onSuccess = vi.fn();
-  render(createElement(BuilderForm, { mode: 'edit', initial: { id: 7, name: 'Godrej', isActive: false, completedProjects: 12 }, onSuccess, onClose: vi.fn() }));
-  fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-  await waitFor(() => expect(mocks.update).toHaveBeenCalledWith(7, expect.objectContaining({ name: 'Godrej', isActive: false, completedProjects: 12 })));
-  expect(onSuccess).toHaveBeenCalledWith(7);
-  expect(mocks.push).not.toHaveBeenCalled();
-});

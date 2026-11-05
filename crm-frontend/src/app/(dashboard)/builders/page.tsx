@@ -24,7 +24,7 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { useClampedPage, usePersistedState } from "@/hooks/use-persisted-state";
 import { apiFetch } from "@/lib/api-fetch";
 import { cn } from "@/lib/utils";
-import { Edit, Filter, Plus, Search } from "lucide-react";
+import { ExternalLink, Filter, Plus, Search } from "lucide-react";
 import type { BuilderRecord } from "@/lib/builders-api";
 import { BuilderForm } from "./_components/BuilderForm";
 
@@ -236,11 +236,11 @@ export default function BuildersPage() {
               variant="outline"
               size="sm"
               onClick={() => {
-                router.push(`/builders/new?edit=${row.id}`);
+                router.push(`/builders/${row.id}`);
                 clearSelection();
               }}
             >
-              <Edit className="h-3.5 w-3.5 mr-1.5" /> Edit
+              <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Open
             </Button>
           )}
         </>
@@ -417,7 +417,6 @@ export default function BuildersPage() {
 
       {creating && (
         <BuilderForm
-          mode="create"
           onClose={() => setCreating(false)}
           onSuccess={(id) => {
             setCreating(false);

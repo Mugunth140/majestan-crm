@@ -12,10 +12,8 @@ import { buildersApi } from "@/lib/builders-api";
 import { propertiesApi } from "@/lib/properties-api";
 import { cn } from "@/lib/utils";
 
+/** Adds a builder. An existing builder is edited in place on its own page. */
 export interface BuilderFormProps {
-  mode: "create" | "edit";
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the builder API's shape
-  initial?: any;
   /** Opened over a page: close back to it. Without it, the form leaves for the list. */
   onClose?: () => void;
   /** Called with the saved builder's id. */
@@ -31,32 +29,30 @@ type BuilderStep = (typeof BUILDER_STEPS)[number]["key"];
 
 const field = cn(FOCUS_FIELD, "h-9");
 
-export function BuilderForm({ mode, initial, onClose, onSuccess }: BuilderFormProps) {
+export function BuilderForm({ onClose, onSuccess }: BuilderFormProps) {
   const router = useRouter();
-  const d = initial;
 
-  const [name, setName] = useState(d?.name ?? "");
-  const [logoKey, setLogoKey] = useState<string>(d?.rawLogoKey ?? d?.logoUrl ?? "");
-  const [logoPreview, setLogoPreview] = useState<string>(d?.logoUrl ?? "");
-  const [phone, setPhone] = useState(d?.phone ?? "");
-  const [email, setEmail] = useState(d?.email ?? "");
-  const [website, setWebsite] = useState(d?.website ?? "");
-  const [experienceYears, setExperienceYears] = useState(d?.experienceYears != null ? String(d.experienceYears) : "");
-  const [completedProjects, setCompletedProjects] = useState(d?.completedProjects != null ? String(d.completedProjects) : "");
-  const [ongoingProjects, setOngoingProjects] = useState(d?.ongoingProjects != null ? String(d.ongoingProjects) : "");
-  const [description, setDescription] = useState(d?.description ?? "");
-  const [isActive, setIsActive] = useState<boolean>(d?.isActive !== false);
+  const [name, setName] = useState("");
+  const [logoKey, setLogoKey] = useState("");
+  const [logoPreview, setLogoPreview] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [website, setWebsite] = useState("");
+  const [experienceYears, setExperienceYears] = useState("");
+  const [completedProjects, setCompletedProjects] = useState("");
+  const [ongoingProjects, setOngoingProjects] = useState("");
+  const [description, setDescription] = useState("");
+  const [isActive, setIsActive] = useState(true);
 
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const create = mode === "create";
   const nav = useFocusSteps<BuilderStep>(BUILDER_STEPS, {
-    create,
+    create: true,
     problem: (key) => (key === "company" && !name.trim() ? "Builder name is required" : null),
   });
 
-  const close = () => (onClose ? onClose() : router.push(d?.id ? `/builders/${d.id}` : "/builders"));
+  const close = () => (onClose ? onClose() : router.push("/builders"));
 
   const handleLogoUpload = async (file: File) => {
     if (file.size > 5 * 1024 * 1024) {
@@ -100,15 +96,9 @@ export function BuilderForm({ mode, initial, onClose, onSuccess }: BuilderFormPr
         isActive,
       };
 
-      let id: number | undefined = d?.id;
-      if (create) {
-        const result = await buildersApi.create(payload);
-        id = (result?.data ?? result)?.id;
-        toast.success("Builder created successfully");
-      } else {
-        await buildersApi.update(d.id, payload);
-        toast.success("Builder updated successfully");
-      }
+      const result = await buildersApi.create(payload);
+      const id: number | undefined = (result?.data ?? result)?.id;
+      toast.success("Builder created successfully");
       if (onSuccess) onSuccess(id);
       else router.push(id ? `/builders/${id}` : "/builders");
     } catch (err) {
@@ -122,18 +112,18 @@ export function BuilderForm({ mode, initial, onClose, onSuccess }: BuilderFormPr
     <FocusModal
       open
       onOpenChange={(o) => { if (!o && !isSaving) close(); }}
-      title={create ? "New builder" : "Edit builder"}
+      title="New builder"
       steps={nav.steps}
       active={nav.step}
       onStepChange={(k) => nav.jump(k as BuilderStep)}
       footer={
-        <StepFooter nav={nav} create={create} saving={isSaving} disabled={isUploadingLogo} onCancel={close} onSave={() => void save()} createLabel="Create builder" />
+        <StepFooter nav={nav} create saving={isSaving} disabled={isUploadingLogo} onCancel={close} onSave={() => void save()} createLabel="Create builder" />
       }
     >
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (create && !nav.last) nav.next();
+          if (!nav.last) nav.next();
           else void save();
         }}
       >
