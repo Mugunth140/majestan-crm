@@ -11,6 +11,7 @@ export interface AppModule extends NavItem {
 
 const TILES: Record<string, string> = {
   "/": "bg-blue-500",
+  "/analytics": "bg-cyan-700",
   "/scheduler": "bg-sky-600",
   "/leads": "bg-emerald-600",
   "/lead-routing": "bg-violet-500",
@@ -35,7 +36,7 @@ const GROUPS: { title: string; hrefs: string[] }[] = [
   { title: "Sales", hrefs: ["/scheduler", "/leads", "/lead-routing", "/inbound", "/agent-network", "/logger"] },
   { title: "Inventory", hrefs: ["/projects", "/properties", "/builders", "/asset-inventory"] },
   { title: "Marketing", hrefs: ["/ads", "/blog", "/showcases"] },
-  { title: "Team", hrefs: ["/tasks", "/hr", "/users", "/activity-logs", "/master"] },
+  { title: "Team", hrefs: ["/analytics", "/tasks", "/hr", "/users", "/activity-logs", "/master"] },
 ];
 
 /** Every module this user may open, except the dashboard itself. */

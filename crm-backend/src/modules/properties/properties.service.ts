@@ -722,9 +722,8 @@ export class PropertiesService {
     if (['investment_property', 'farm_house'].includes(body.propertyType) && body.listingType === 'Rent') {
       throw new BadRequestException('This property type is available for Buy only.');
     }
-    if (!(await this.canSeeContacts(reqUser))) {
-      for (const k of PropertiesService.CONTACT_KEYS) delete body[k];
-    }
+    // Anyone may record the owner and agent on a new property; seeing them
+    // afterwards still needs properties.view_contacts.
     const payload = await this.buildSitePayload(body);
     payload.uploadedByCrmUserId = this.uploaderId(reqUser);
     const created = await this.siteApi.post(`/admin/properties/${payload.propertyType}`, payload);

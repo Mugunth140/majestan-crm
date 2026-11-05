@@ -1,25 +1,20 @@
-import { INBOUND_CALL_TRACKING, MANAGE_BLOG, VIEW_PROPERTY_CONTACTS } from "./permissions";
+import { INBOUND_CALL_TRACKING, VIEW_PROPERTY_CONTACTS } from "./permissions";
 
 // Role ids as seeded: 1 Admin, 2 Manager, 3 Team Lead, 4 Staff.
 /** Team Leads and Staff work inside one department; Admins and Managers see all of them. */
 export const needsDepartment = (roleId?: string | number | null) => ["3", "4"].includes(String(roleId ?? ""));
 
-/** The extra access an admin can switch on per user. Other granted keys are left alone. */
+/** Fine-grained access an admin can switch on per user. Other granted keys are left alone. */
 export const USER_PERMISSIONS = [
   {
     key: VIEW_PROPERTY_CONTACTS,
-    title: "Owner and agent contacts",
-    description: "See property owner and agent phone numbers and emails. Admins always can.",
-  },
-  {
-    key: MANAGE_BLOG,
-    title: "Website blog",
-    description: "Write, schedule and publish website articles. Admins always can.",
+    title: "See property owner and agent contacts",
+    description: "Anyone can enter them on a new property; this lets them see and edit them afterwards. Admins always can.",
   },
   {
     key: INBOUND_CALL_TRACKING,
-    title: "Inbound calls and owner contacts",
-    description: "See inbound owner details and log calls to active inbounds from the call logger. Admins and Managers always can.",
+    title: "See inbound owner contacts",
+    description: "Anyone can enter them on a new inbound; this lets them see them afterwards and logs calls to active inbounds from the call logger. Admins and Managers always can.",
     /** Only offered to these roles; the others have it anyway. */
     roles: ["3", "4"],
   },

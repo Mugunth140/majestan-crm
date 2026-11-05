@@ -1,16 +1,16 @@
 import { BlogAccessGuard } from './blog.module';
 describe('Blog access', () => {
-  it('checks the current user permission on the server', async () => {
-    const hasPermission = jest.fn().mockResolvedValue(false);
-    const guard = new BlogAccessGuard({ hasPermission } as any);
+  it('checks the Blog module on the user sidebar on the server', async () => {
+    const hasNavModule = jest.fn().mockResolvedValue(false);
+    const guard = new BlogAccessGuard({ hasNavModule } as any);
     const context = {
       switchToHttp: () => ({ getRequest: () => ({ user: { id: 42 } }) }),
     } as any;
     await expect(guard.canActivate(context)).rejects.toThrow(
-      'Blog management permission is required',
+      'The Blog module is not turned on for you',
     );
-    expect(hasPermission).toHaveBeenCalledWith(42, 'blog.manage');
-    hasPermission.mockResolvedValue(true);
+    expect(hasNavModule).toHaveBeenCalledWith(42, 'blog');
+    hasNavModule.mockResolvedValue(true);
     await expect(guard.canActivate(context)).resolves.toBe(true);
   });
 });

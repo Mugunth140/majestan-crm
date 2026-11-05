@@ -10,7 +10,9 @@ import { FOCUS_FIELD, FieldRow, FocusField, FocusModal, ToggleCard } from "@/com
 import { FOCUS_INPUT, FOCUS_SELECT, StepFooter, StepSection, useFocusSteps } from "@/components/shared/focus-steps";
 import { apiFetch } from "@/lib/api-fetch";
 import { USER_PERMISSIONS, keysForRole, needsDepartment, offeredFor, withPermission } from "@/lib/user-access";
+import { isAdminRole } from "@/lib/nav-access";
 import { cn } from "@/lib/utils";
+import { SidebarAccess } from "./SidebarAccess";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -69,11 +71,15 @@ export function UserForm({ onClose, onCreated }: { onClose: () => void; onCreate
   const { roles, departments } = useUserMasters();
   const [form, setForm] = useState<Form>(EMPTY);
   const [keys, setKeys] = useState<string[]>([]);
+  // Sidebar modules ticked on the Access step; null keeps the role's defaults.
+  const [navPick, setNavPick] = useState<string[] | null>(null);
   const [saving, setSaving] = useState(false);
 
   const set = (key: keyof Form, value: string) => setForm((f) => ({ ...f, [key]: value }));
   const text = (key: keyof Form) => ({ value: form[key], onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => set(key, e.target.value) });
   const deptNeeded = needsDepartment(form.role_id);
+  const roleName = roles.find((o) => o.value === form.role_id)?.label ?? "";
+  const departmentName = departments.find((o) => o.value === form.department_id)?.label ?? "";
 
   const problemOf = (key: UserStep) => {
     if (key !== "account") return null;
@@ -103,6 +109,7 @@ export function UserForm({ onClose, onCreated }: { onClose: () => void; onCreate
         department_id: deptNeeded ? Number(form.department_id) : null,
         is_active: true,
         permissionKeys: keysForRole(keys, form.role_id),
+        nav_access: isAdminRole(roleName) ? null : navPick,
         phone: blank(form.phone), whatsapp_no: blank(form.whatsapp_no), dob: blank(form.dob), qualification: blank(form.qualification),
         address: blank(form.address), aadhaar_no: blank(form.aadhaar_no), bank_account_no: blank(form.bank_account_no), join_date: blank(form.join_date),
       };
@@ -148,20 +155,31 @@ export function UserForm({ onClose, onCreated }: { onClose: () => void; onCreate
           <FieldRow>
             <FocusField label="Role" required>
               <FormSelect name="role" placeholder="Select role" className={FOCUS_SELECT} options={roles} value={form.role_id || null}
-                onValueChange={(v) => setForm((f) => ({ ...f, role_id: v || "", department_id: needsDepartment(v) ? f.department_id : "" }))} />
+                onValueChange={(v) => { setNavPick(null); setForm((f) => ({ ...f, role_id: v || "", department_id: needsDepartment(v) ? f.department_id : "" })); }} />
             </FocusField>
             <FocusField label="Department" required={deptNeeded} hint={form.role_id && !deptNeeded ? "Admins and Managers work across all departments." : undefined}>
               <FormSelect name="department" placeholder={form.role_id && !deptNeeded ? "All departments" : "Select department"} className={FOCUS_SELECT}
-                options={departments} value={form.department_id || null} disabled={!deptNeeded} onValueChange={(v) => set("department_id", v || "")} />
+                options={departments} value={form.department_id || null} disabled={!deptNeeded} onValueChange={(v) => { setNavPick(null); set("department_id", v || ""); }} />
             </FocusField>
           </FieldRow>
         </>)}
 
-        {section("access", "Access", "Extra access on top of what the role allows.", <>
-          {USER_PERMISSIONS.filter((p) => offeredFor(p, form.role_id)).map((p) => (
-            <ToggleCard key={p.key} title={p.title} description={p.description} checked={keys.includes(p.key)}
-              onCheckedChange={(on) => setKeys((k) => withPermission(k, p.key, on))} />
-          ))}
+        {section("access", "Access", "Which modules they see on the sidebar, and what they can see inside them.", !roleName ? (
+          <p className="text-[14px] text-muted-foreground">Pick a role on the Account step first; the sidebar starts from that role&rsquo;s defaults.</p>
+        ) : isAdminRole(roleName) ? (
+          <p className="text-[14px] text-muted-foreground">Admins see and do everything, so there is nothing to set.</p>
+        ) : <>
+          <SidebarAccess role={roleName} department={departmentName} blogAccess={false} value={navPick} onChange={async (next) => setNavPick(next)} />
+          <div className="space-y-3 pt-2">
+            <div>
+              <h4 className="text-[14px] font-semibold text-foreground">Fine-grained access</h4>
+              <p className="text-[13px] text-muted-foreground">What they can see inside the modules. Only admins can delete.</p>
+            </div>
+            {USER_PERMISSIONS.filter((p) => offeredFor(p, form.role_id)).map((p) => (
+              <ToggleCard key={p.key} title={p.title} description={p.description} checked={keys.includes(p.key)}
+                onCheckedChange={(on) => setKeys((k) => withPermission(k, p.key, on))} />
+            ))}
+          </div>
         </>)}
 
         {section("personal", "Personal", "Contact details and background.", <>

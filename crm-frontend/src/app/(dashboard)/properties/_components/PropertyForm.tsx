@@ -762,6 +762,8 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
   // property asks before restoring it over newer saves by other staff
   // (see property-form-draft.ts). Cleared on successful submit.
   const editReady = mode === "create" || (initialData as any)?.id != null;
+  // Anyone can enter contacts on a new property; editing them needs the permission to see them.
+  const contactsEditable = mode === "create" || canViewPropertyContacts();
   const draftKeyRef = useRef("");
   // The saved form state edits are measured against; null until the form settles.
   const baselineRef = useRef<string | null>(null);
@@ -1791,7 +1793,7 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
             [field, measurementUnits[field] || (field === "plotSizeCents" ? "Cents" : "Sq Ft")],
           )),
         },
-        contactDetails: canViewPropertyContacts() ? ownerContacts : undefined,
+        contactDetails: contactsEditable ? ownerContacts : undefined,
         curationDetails: { ...curationPayload(curation, isFieldVisible), ...(propertyType === "pg_service_apartment" ? { pgDetails: pgPayload(pgDetails, effectiveFurnishingStatus) } : {}), ...(propertyType === "commercial" && listingType === "Buy" ? { expectedMonthlyRentPerSqft } : {}) },
         numberOfPortions: numberOfPortions !== "" ? Number(numberOfPortions) : undefined,
         hasGroundFloor,
@@ -2639,8 +2641,7 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
   </>);
 
   // ── Steps ──
-  const contactsShown = canViewPropertyContacts();
-  const visibleSteps = PROPERTY_STEPS.filter((x) => x.key !== "contacts" || contactsShown);
+  const visibleSteps = PROPERTY_STEPS.filter((x) => x.key !== "contacts" || contactsEditable);
   const stepIndex = Math.max(0, visibleSteps.findIndex((x) => x.key === step));
   const lastStep = stepIndex === visibleSteps.length - 1;
   /** What a step still needs before a new property can move past it (the same rules as saving). */
@@ -4665,7 +4666,7 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
         )}
 
         {/* ---- Owner ---- */}
-        {canViewPropertyContacts() && (
+        {contactsEditable && (
         <div className={sec("contacts")} data-pf-step="contacts">
           <h3 className={sectionTitle}>Owner</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -4706,7 +4707,7 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
         )}
 
         {/* ---- Agent ---- */}
-        {canViewPropertyContacts() && (
+        {contactsEditable && (
         <div className={sec("contacts")} data-pf-step="contacts">
           <h3 className={sectionTitle}>Agent</h3>
           <div className="space-y-6"><AgentContactFields value={contactDetails} onChange={setContactDetails} name={agentName} onNameChange={setAgentName} /></div>

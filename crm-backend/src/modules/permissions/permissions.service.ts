@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { Permission } from '../../database/entities/permission.entity';
 import { UserPermission } from '../../database/entities/user-permission.entity';
 import { User } from '../../database/entities/user.entity';
+import { hasNavAccess, type NavKey } from '../users/nav-access';
 
 export const VIEW_PROPERTY_CONTACTS = 'properties.view_contacts';
 export const INBOUND_CALL_TRACKING = 'inbounds.call_tracking';
@@ -84,6 +85,19 @@ export class PermissionsService {
       .where('up.user_id = :userId', { userId })
       .getCount();
     return count > 0;
+  }
+
+  /** Whether the user's sidebar has this module (their Access tab picks, or their role's defaults). */
+  async hasNavModule(userId: number, key: NavKey): Promise<boolean> {
+    const user = await this.userRepo.findOne({ where: { id: userId }, relations: { role: true, department: true } });
+    if (!user) return false;
+    return hasNavAccess({
+      role: user.role?.name ?? '',
+      department: user.department?.name ?? '',
+      nav_access: user.nav_access ?? null,
+      // Blog writers granted before the sidebar picks keep the blog on their defaults.
+      legacyBlog: key === 'blog' && (await this.hasPermission(userId, 'blog.manage')),
+    }, key);
   }
 
   /** Replace a user's grants. Caller must have verified Admin role. */

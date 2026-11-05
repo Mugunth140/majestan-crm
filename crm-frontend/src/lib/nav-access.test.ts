@@ -51,6 +51,9 @@ describe("sidebar access", () => {
     const staff = viewer("Staff", "Telecalling Department");
     expect(canOpen("/leads/12", staff)).toBe(true);
     expect(canOpen("/tasks", staff)).toBe(false);
+    expect(canOpen("/analytics", staff)).toBe(false);
+    expect(canOpen("/analytics", viewer("Team Lead", "Sales Department", ["analytics"]))).toBe(false);
+    expect(canOpen("/analytics", viewer("Manager"))).toBe(true);
     expect(canOpen("/users", staff)).toBe(false);
     expect(canOpen("/master/cities", staff)).toBe(false);
     expect(canOpen("/", staff)).toBe(true);

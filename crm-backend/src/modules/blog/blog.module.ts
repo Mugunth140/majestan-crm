@@ -34,9 +34,9 @@ export class BlogAccessGuard implements CanActivate {
   constructor(private readonly permissions: PermissionsService) {}
   async canActivate(context: ExecutionContext) {
     const user = context.switchToHttp().getRequest().user;
-    if (await this.permissions.hasPermission(user.id, 'blog.manage'))
-      return true;
-    throw new ForbiddenException('Blog management permission is required');
+    // Blog access follows the Blog module on the user's sidebar.
+    if (await this.permissions.hasNavModule(user.id, 'blog')) return true;
+    throw new ForbiddenException('The Blog module is not turned on for you');
   }
 }
 @Controller('api/v1/blog')

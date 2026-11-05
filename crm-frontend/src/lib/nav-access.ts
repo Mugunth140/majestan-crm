@@ -4,15 +4,15 @@
 // Keep NAV_KEYS in step with crm-backend/src/modules/users/nav-access.ts.
 
 export const NAV_KEYS = [
-  "scheduler", "leads", "routing", "inbound", "agent-network", "projects", "properties", "builders",
+  "analytics", "scheduler", "leads", "routing", "inbound", "agent-network", "projects", "properties", "builders",
   "ads", "blog", "showcases", "asset-inventory", "hr", "tasks", "logger", "activity-logs", "users", "master",
 ] as const;
 export type NavKey = (typeof NAV_KEYS)[number];
 
 /** Only Admins and Managers get these, whatever is ticked; the Team Lead may also have the Logger. */
 const MANAGEMENT_ONLY: Record<string, NavKey[]> = {
-  "Team Lead": ["users", "tasks", "activity-logs"],
-  Staff: ["users", "tasks", "activity-logs", "logger"],
+  "Team Lead": ["analytics", "users", "tasks", "activity-logs"],
+  Staff: ["analytics", "users", "tasks", "activity-logs", "logger"],
 };
 /** Everyone below Manager starts with these, whatever their department. */
 const BASE: NavKey[] = ["scheduler"];
