@@ -135,7 +135,7 @@ describe("Property curation 2", () => {
   });
   it("curates commercial Buy without document requirements or scalar parking", () => {
     const names = labels(form("commercial"));
-    for (const name of ["Expected Monthly Sqft Price", "No of Portions"])
+    for (const name of ["Expected Monthly Sqft Price *", "No of Portions"])
       expect(names).toContain(name);
     for (const name of ["Documents Required", "Car Parking", "Bike Parking"])
       expect(names).not.toContain(name);

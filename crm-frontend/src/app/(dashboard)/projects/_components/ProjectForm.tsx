@@ -1,12 +1,13 @@
 "use client";
 
+import { DecisionDialog, DIALOG_BUTTON, DIALOG_DANGER, DIALOG_PRIMARY } from "@/components/record/decision-dialog";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { PROJECT_DRAFT_VERSION_REBASABLE, canRestoreProjectDraft, draftIsPristine, editRequestBody, projectDraftKey, pruneRecoveryCopies, readProjectDraft, type ProjectDraft, type RebasableDraft } from "./project-form-draft";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useLeaveGuard } from "@/hooks/use-leave-guard";
 import { guardNavigation } from "@/lib/leave-guard";
 import { Input } from "@/components/ui/input";
@@ -4049,75 +4050,44 @@ export function ProjectForm({
 
       {/* Unsaved draft of the CURRENT version found when opening (outdated
           drafts are discarded before this). The saved version is the default. */}
-      <Dialog open={draftOffer !== null} onOpenChange={(open) => { if (!open) keepSavedVersion(); }}>
-        <DialogContent className="sm:max-w-[480px]" showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>Restore your unsaved changes?</DialogTitle>
-            <DialogDescription>
-              You left this {mode === "edit" ? "project" : "new project"} with unsaved changes. Nobody has saved it
-              since, so they can be restored.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="mt-2 gap-2">
-            <Button variant="outline" onClick={restoreDraft}>
-              Restore my changes
-            </Button>
-            <Button onClick={keepSavedVersion} className="bg-foreground text-background hover:bg-foreground/85">
-              Keep saved version
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DecisionDialog
+        open={draftOffer !== null}
+        onDismiss={keepSavedVersion}
+        dismissible={false}
+        title="Restore your unsaved changes?"
+        description={<>You left this {mode === "edit" ? "project" : "new project"} with unsaved changes. Nobody has saved it since, so they can be restored.</>}
+        actions={<>
+          <button type="button" className={DIALOG_BUTTON} onClick={restoreDraft}>Restore my changes</button>
+          <button type="button" className={DIALOG_PRIMARY} onClick={keepSavedVersion}>Keep saved version</button>
+        </>}
+      />
 
       {/* Leaving with unsaved changes. */}
-      <Dialog open={pendingLeave !== null && !isLoading} onOpenChange={(open) => { if (!open) cancelLeave(); }}>
-        <DialogContent className="sm:max-w-[480px]">
-          <DialogHeader>
-            <DialogTitle>Save changes before leaving?</DialogTitle>
-            <DialogDescription>
-              This {mode === "edit" ? "project" : "new project"} has unsaved changes. Save them now, keep them as a
-              draft on this device to finish later, or discard them.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="mt-2 gap-2 sm:justify-between">
-            <Button variant="ghost" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={leaveDiscarding}>
-              Discard
-            </Button>
-            <div className="flex flex-col-reverse gap-2 sm:flex-row">
-              <Button variant="outline" onClick={leaveKeepingDraft}>
-                Keep as draft
-              </Button>
-              <Button onClick={saveAndLeave} className="bg-foreground text-background hover:bg-foreground/85">
-                Save &amp; leave
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DecisionDialog
+        open={pendingLeave !== null && !isLoading}
+        onDismiss={cancelLeave}
+        title="Save changes before leaving?"
+        description={<>This {mode === "edit" ? "project" : "new project"} has unsaved changes. Save them now, keep them as a draft on this device to finish later, or discard them.</>}
+        aside={<button type="button" className={DIALOG_DANGER} onClick={leaveDiscarding}>Discard</button>}
+        actions={<>
+          <button type="button" className={DIALOG_BUTTON} onClick={leaveKeepingDraft}>Keep as draft</button>
+          <button type="button" className={DIALOG_PRIMARY} onClick={saveAndLeave}>Save &amp; leave</button>
+        </>}
+      />
 
       {/* The server refused the save: someone else saved first. */}
-      <Dialog open={saveConflict !== null} onOpenChange={(open) => { if (!open) setSaveConflict(null); }}>
-        <DialogContent className="sm:max-w-[480px]">
-          <DialogHeader>
-            <DialogTitle>This project was changed by someone else</DialogTitle>
-            <DialogDescription>
-              {saveConflict || "Another staff member saved it after you opened it, so your changes were not saved over their version."}
-            </DialogDescription>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Loading the latest version discards your unsaved changes on this page. Note anything you still need before
-            continuing.
-          </p>
-          <DialogFooter className="mt-2 gap-2">
-            <Button variant="outline" onClick={() => setSaveConflict(null)}>
-              Cancel
-            </Button>
-            <Button onClick={loadLatestVersion} className="bg-foreground text-background hover:bg-foreground/85">
-              Load latest version
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DecisionDialog
+        open={saveConflict !== null}
+        onDismiss={() => setSaveConflict(null)}
+        title="This project was changed by someone else"
+        description={saveConflict || "Another staff member saved it after you opened it, so your changes were not saved over their version."}
+        actions={<>
+          <button type="button" className={DIALOG_BUTTON} onClick={() => setSaveConflict(null)}>Cancel</button>
+          <button type="button" className={DIALOG_PRIMARY} onClick={loadLatestVersion}>Load latest version</button>
+        </>}
+      >
+        <p className="text-muted-foreground">Loading the latest version discards your unsaved changes on this page. Note anything you still need before continuing.</p>
+      </DecisionDialog>
     </>
   );
 }

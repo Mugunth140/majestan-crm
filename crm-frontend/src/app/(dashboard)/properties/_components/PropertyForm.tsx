@@ -1,5 +1,7 @@
 "use client";
 
+import { DecisionDialog, FieldChips, DIALOG_BUTTON, DIALOG_DANGER, DIALOG_PRIMARY } from "@/components/record/decision-dialog";
+
 import { PROPERTY_FIELD, PROPERTY_LABEL, PROPERTY_SELECT, PROPERTY_TEXTAREA } from "./property-form-styles";
 import { PgAccommodationFields } from "./PgAccommodationFields";
 import { restorePgDetails, pgPayload, pgErrors } from "./pg-accommodation";
@@ -51,7 +53,7 @@ import { propertiesApi } from "@/lib/properties-api";
 import { reconcilePropertyDocuments, getFloorPlans, getFloorPlanTitle, restoreLegacyFloorPlans, toPropertyDocumentPayload } from "./property-form-documents";
 import {
   PROPERTY_DRAFT_VERSION,
-  fieldList,
+  fieldLabel,
   isDraftOutdated,
   legacyPropertyDraftKey,
   propertyDraftKey,
@@ -64,7 +66,6 @@ import {
 import { useLeaveGuard } from "@/hooks/use-leave-guard";
 import { timeAgo } from "@/lib/time-ago";
 import { guardNavigation } from "@/lib/leave-guard";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import PropertyFloorPlansSection, { type PropertyFloorPlan } from "./PropertyFloorPlansSection";
 import { fetchNearbyCategories, fetchPostalCode, resolveCenterFromText, type LocalityCategory } from "@/lib/nearby-places";
 import { canViewPropertyContacts } from "@/lib/permissions";
@@ -3195,14 +3196,13 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
               </div>
             )}
 
-            {isFieldVisible("pricePerSqft") && <div className="space-y-2" id="pf-pricePerSqft"><label className={labelClass}>{propertyType === "farmland" ? "Price per Area" : propertyType === "plot" ? `Price per ${rateLabel(measurementUnits.pricePerSqft || "Sq Ft")}` : "Price per Sqft"} (auto)</label><Input readOnly aria-label="Calculated price per area" value={automaticPricePerSqft == null ? "" : String(convertRate(automaticPricePerSqft, "Sq Ft", measurementUnits.pricePerSqft || "Sq Ft")?.toFixed(2) ?? "")} placeholder="Calculated automatically" className={inputClass} />{["plot", "farmland"].includes(propertyType) && <FormSelect name="pricePerSqftUnit" placeholder="Rate unit" options={AREA_UNIT_OPTIONS} value={measurementUnits.pricePerSqft || "Sq Ft"} onValueChange={unit => setMeasurementUnits(current => ({ ...current, pricePerSqft: unit }))} />}<p className="text-sm text-muted-foreground">Calculated from sale price and {["plot", "farmland"].includes(propertyType) ? "land area" : "built-up area"}. ₹ per {rateLabel(measurementUnits.pricePerSqft || "Sq Ft")}.</p></div>}
-            {propertyType === "commercial" && listingType === "Buy" && <div className="space-y-2"><label className={labelClass}>Expected Monthly Sqft Price</label><Input readOnly aria-label="Expected Monthly Sqft Price" value={expectedMonthlyRentPerSqft?.toFixed(2) ?? ""} placeholder="Calculated automatically" className={inputClass} /><p className="text-sm text-muted-foreground">Expected monthly rent divided by built-up area in sqft.</p></div>}
+            {isFieldVisible("pricePerSqft") && <div className="space-y-2" id="pf-pricePerSqft"><label className={labelClass}>{propertyType === "farmland" ? "Price per Area" : propertyType === "plot" ? `Price per ${rateLabel(measurementUnits.pricePerSqft || "Sq Ft")}` : "Price per Sqft"} <span aria-hidden="true" className="text-blue-500">*</span></label><Input readOnly aria-label="Calculated price per area" value={automaticPricePerSqft == null ? "" : String(convertRate(automaticPricePerSqft, "Sq Ft", measurementUnits.pricePerSqft || "Sq Ft")?.toFixed(2) ?? "")} className={inputClass} />{["plot", "farmland"].includes(propertyType) && <FormSelect name="pricePerSqftUnit" placeholder="Rate unit" options={AREA_UNIT_OPTIONS} value={measurementUnits.pricePerSqft || "Sq Ft"} onValueChange={unit => setMeasurementUnits(current => ({ ...current, pricePerSqft: unit }))} />}</div>}
+            {propertyType === "commercial" && listingType === "Buy" && <div className="space-y-2"><label className={labelClass}>Expected Monthly Sqft Price <span aria-hidden="true" className="text-blue-500">*</span></label><Input readOnly aria-label="Expected Monthly Sqft Price" value={expectedMonthlyRentPerSqft?.toFixed(2) ?? ""} className={inputClass} /></div>}
 
             {isFieldVisible("rentPerSqft") && (
               <div className="space-y-2">
-                <label htmlFor="rent-per-sqft" className={labelClass}>Rent per sqft</label>
-                <Input id="rent-per-sqft" value={rentPerSqft === null ? "" : rentPerSqft.toFixed(2)} readOnly placeholder="Calculated automatically" aria-describedby="rent-per-sqft-hint" className={inputClass} />
-                <p id="rent-per-sqft-hint" className="text-xs text-muted-foreground">₹ per sqft per month. Calculated from monthly rent and land area or built-up area. Enter both to see the rate.</p>
+                <label htmlFor="rent-per-sqft" className={labelClass}>Rent per sqft <span aria-hidden="true" className="text-blue-500">*</span></label>
+                <Input id="rent-per-sqft" value={rentPerSqft === null ? "" : rentPerSqft.toFixed(2)} readOnly className={inputClass} />
               </div>
             )}
 
@@ -5385,84 +5385,49 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
 
       {/* Unsaved draft of the CURRENT version found when opening (outdated
           drafts are discarded before this). The saved version is the default. */}
-      <Dialog open={draftOffer !== null} onOpenChange={(open) => { if (!open) discardDraft(); }}>
-        <DialogContent className="sm:max-w-[480px]" showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>Restore your unsaved changes?</DialogTitle>
-            <DialogDescription>
-              You left this {mode === "edit" ? "property" : "new property"} with unsaved changes
-              {draftOffer?.draft.savedAt ? ` ${timeAgo(new Date(draftOffer.draft.savedAt).toISOString())}` : ""}.
-            </DialogDescription>
-          </DialogHeader>
-          {draftOffer && (
-            <div className="space-y-3 text-sm">
-              <p>
-                <span className="font-medium">Your changes:</span>{" "}
-                <span className="text-muted-foreground">{fieldList(draftOffer.review.changed)}</span>
-              </p>
-            </div>
-          )}
-          <DialogFooter className="mt-2 gap-2">
-            <Button variant="outline" onClick={restoreDraft}>
-              Restore my changes
-            </Button>
-            <Button onClick={discardDraft}>
-              Keep saved version
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DecisionDialog
+        open={draftOffer !== null}
+        onDismiss={discardDraft}
+        dismissible={false}
+        title="Restore your unsaved changes?"
+        description={<>You left this {mode === "edit" ? "property" : "new property"} with unsaved changes{draftOffer?.draft.savedAt ? ` ${timeAgo(new Date(draftOffer.draft.savedAt).toISOString())}` : ""}.</>}
+        actions={<>
+          <button type="button" className={DIALOG_BUTTON} onClick={restoreDraft}>Restore my changes</button>
+          <button type="button" className={DIALOG_PRIMARY} onClick={discardDraft}>Keep saved version</button>
+        </>}
+      >
+        {draftOffer && (<>
+          <p className="mb-1.5 text-muted-foreground">Your changes</p>
+          <FieldChips fields={draftOffer.review.changed.map(fieldLabel)} />
+        </>)}
+      </DecisionDialog>
 
       {/* Leaving with unsaved changes. */}
-      <Dialog open={pendingLeave !== null && !isLoading} onOpenChange={(open) => { if (!open) cancelLeave(); }}>
-        <DialogContent className="sm:max-w-[480px]">
-          <DialogHeader>
-            <DialogTitle>Save changes before leaving?</DialogTitle>
-            <DialogDescription>
-              This {mode === "edit" ? "property" : "new property"} has unsaved changes. Save them now, keep them as a
-              draft on this device to finish later, or discard them.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="mt-2 gap-2 sm:justify-between">
-            <Button variant="ghost" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={leaveDiscarding}>
-              Discard
-            </Button>
-            <div className="flex flex-col-reverse gap-2 sm:flex-row">
-              <Button variant="outline" onClick={leaveKeepingDraft}>
-                Keep as draft
-              </Button>
-              <Button onClick={saveAndLeave}>
-                <Save className="mr-2 h-4 w-4" />
-                Save &amp; leave
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DecisionDialog
+        open={pendingLeave !== null && !isLoading}
+        onDismiss={cancelLeave}
+        title="Save changes before leaving?"
+        description={<>This {mode === "edit" ? "property" : "new property"} has unsaved changes. Save them now, keep them as a draft on this device to finish later, or discard them.</>}
+        aside={<button type="button" className={DIALOG_DANGER} onClick={leaveDiscarding}>Discard</button>}
+        actions={<>
+          <button type="button" className={DIALOG_BUTTON} onClick={leaveKeepingDraft}>Keep as draft</button>
+          <button type="button" className={DIALOG_PRIMARY} onClick={saveAndLeave}><Save className="h-4 w-4" />Save &amp; leave</button>
+        </>}
+      />
 
       {/* Someone else saved while this was being edited. */}
-      <Dialog open={saveConflict !== null} onOpenChange={(open) => { if (!open) setSaveConflict(null); }}>
-        <DialogContent className="sm:max-w-[480px]">
-          <DialogHeader>
-            <DialogTitle>This property was changed by someone else</DialogTitle>
-            <DialogDescription>
-              Another staff member saved it after you opened it, so your changes were not saved over their version.
-            </DialogDescription>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Loading the latest version discards your unsaved changes on this page. Note anything you still need before
-            continuing.
-          </p>
-          <DialogFooter className="mt-2 gap-2">
-            <Button variant="outline" onClick={() => setSaveConflict(null)}>
-              Cancel
-            </Button>
-            <Button onClick={loadLatestVersion}>
-              Load latest version
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DecisionDialog
+        open={saveConflict !== null}
+        onDismiss={() => setSaveConflict(null)}
+        title="This property was changed by someone else"
+        description="Another staff member saved it after you opened it, so your changes were not saved over their version."
+        actions={<>
+          <button type="button" className={DIALOG_BUTTON} onClick={() => setSaveConflict(null)}>Cancel</button>
+          <button type="button" className={DIALOG_PRIMARY} onClick={loadLatestVersion}>Load latest version</button>
+        </>}
+      >
+        <p className="text-muted-foreground">Loading the latest version discards your unsaved changes on this page. Note anything you still need before continuing.</p>
+      </DecisionDialog>
     </>
   );
 }
