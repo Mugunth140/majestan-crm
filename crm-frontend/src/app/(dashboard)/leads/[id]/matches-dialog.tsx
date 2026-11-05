@@ -47,6 +47,8 @@ interface Row extends SharedListing {
   photo: string | null;
   meta: string[];
   near: boolean;
+  /** Outside the requirement but the closest available. */
+  similar: boolean;
 }
 
 function propertyRow(p: any): Row {
@@ -64,11 +66,12 @@ function propertyRow(p: any): Row {
     url: listingUrl("property", p.slug),
     photo: p.photo,
     near: Number(p.locality_match) === 1,
+    similar: p.match === "similar",
     meta: [
       label(p.property_type),
       rent ? "For rent" : p.listing_type === "Sell" ? "For sale" : "",
       number(p.bedrooms) ? `${p.bedrooms} BHK` : "",
-      number(p.area_sqft)
+      Number(p.area_sqft) >= 50
         ? `${Math.round(Number(p.area_sqft)).toLocaleString("en-IN")} sqft`
         : "",
       p.locality || p.city,
@@ -89,6 +92,7 @@ function projectRow(p: any): Row {
     url: listingUrl("project", p.slug),
     photo: p.photo,
     near: Number(p.locality_match) === 1,
+    similar: p.match === "similar",
     meta: [
       label(p.project_type),
       p.bedrooms ? `${String(p.bedrooms).replace(/,/g, ", ")} BHK` : "",
@@ -246,8 +250,11 @@ export function MatchesDialog({
         <DialogHeader className="shrink-0 gap-1 px-5 pt-5 pb-0">
           <DialogTitle className="text-[16px]">Matches</DialogTitle>
           <DialogDescription>
-            Available listings that fit {requirement.toLowerCase()}. Pick up to{" "}
-            {MAX_SHARE} to send as PDFs.
+            Available listings that fit{" "}
+            {requirement === "Requirement"
+              ? "this requirement"
+              : requirement.toLowerCase()}
+            . Pick up to {MAX_SHARE} to send as PDFs.
           </DialogDescription>
           {!empty && (
             <div
@@ -285,21 +292,41 @@ export function MatchesDialog({
               <EmptyState
                 art={<RequirementsArt />}
                 title="No matches yet"
-                hint="Nothing listed fits this requirement. Widening the budget, area or type usually brings up options."
+                hint="Nothing listed in this city is close to this requirement yet. New listings will show up here as they are added."
               />
             </div>
           ) : rows.length ? (
-            <div className="divide-y divide-border/60">
-              {rows.map((row) => (
-                <MatchRow
-                  key={keyOf(row)}
-                  row={row}
-                  picked={isPicked(row)}
-                  full={full}
-                  onToggle={() => toggle(row)}
-                />
-              ))}
-            </div>
+            [rows.filter((r) => !r.similar), rows.filter((r) => r.similar)].map(
+              (group, i) =>
+                group.length > 0 && (
+                  <section key={i}>
+                    {i === 1 && (
+                      <div className="sticky top-0 z-10 border-y bg-muted/60 px-5 py-2 backdrop-blur first:border-t-0">
+                        <p className="text-[13px] font-medium text-foreground">
+                          {rows.some((r) => !r.similar)
+                            ? "Similar listings"
+                            : "No exact matches · similar listings"}
+                        </p>
+                        <p className="text-[12px] text-muted-foreground">
+                          Close to the requirement, but outside its budget, size
+                          or type.
+                        </p>
+                      </div>
+                    )}
+                    <div className="divide-y divide-border/60">
+                      {group.map((row) => (
+                        <MatchRow
+                          key={keyOf(row)}
+                          row={row}
+                          picked={isPicked(row)}
+                          full={full}
+                          onToggle={() => toggle(row)}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ),
+            )
           ) : (
             <p className="px-5 py-16 text-center text-[14px] text-muted-foreground">
               No {tab === "property" ? "properties" : "projects"} fit this

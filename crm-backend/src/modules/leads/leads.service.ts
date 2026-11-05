@@ -3,7 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { isQueuedWebsiteSource } from './website-sources';
-import { matchCriteria, projectMatchQuery, propertyMatchQuery } from './auto-match';
+import { matchCriteria, projectMatchQuery, propertyMatchQuery, SIMILAR_WHEN, similarCriteria } from './auto-match';
 import { photoUrl } from './share/listing-data';
 import { LeadSource } from '../../database/entities/lead-source.entity';
 import { Lead } from '../../database/entities/lead.entity';
@@ -1314,14 +1314,28 @@ export class LeadsService {
       ? await this.siteDataSource.query('SELECT city_name FROM cities WHERE id = ?', [inquiry.city_id])
       : [];
     const criteria = matchCriteria(inquiry, city?.city_name ?? null);
-    const properties = propertyMatchQuery(criteria);
-    const projects = projectMatchQuery(criteria);
-    const [propertyRows, projectRows] = await Promise.all([
-      this.siteDataSource.query(properties.sql, properties.params),
-      projects ? this.siteDataSource.query(projects.sql, projects.params) : [],
-    ]);
-    const withPhoto = (rows: any[]) => rows.map((row) => ({ ...row, photo: photoUrl(row.photo) }));
-    return { inquiryId: inquiry.id, properties: withPhoto(propertyRows), projects: withPhoto(projectRows) };
+    const wide = similarCriteria(criteria);
+    const run = async (build: typeof propertyMatchQuery | typeof projectMatchQuery) => {
+      const exactQuery = build(criteria);
+      const exact: any[] = exactQuery ? await this.siteDataSource.query(exactQuery.sql, exactQuery.params) : [];
+      // Few exact matches: add the closest listings from the wider search.
+      // Nothing of that kind to rent (or buy) either: offer it the other way.
+      let similar: any[] = [];
+      if (exact.length < SIMILAR_WHEN) {
+        const stages = criteria.listing ? [wide.criteria, { ...wide.criteria, listing: null }] : [wide.criteria];
+        for (const stage of stages) {
+          const query = build(stage, { target: wide.target, exclude: exact.map((r) => r.id) });
+          similar = query ? await this.siteDataSource.query(query.sql, query.params) : [];
+          if (similar.length) break;
+        }
+      }
+      return [...exact.map((row) => ({ ...row, match: 'exact' })), ...similar.map((row) => ({ ...row, match: 'similar' }))].map((row) => ({
+        ...row,
+        photo: photoUrl(row.photo),
+      }));
+    };
+    const [properties, projects] = await Promise.all([run(propertyMatchQuery), run(projectMatchQuery)]);
+    return { inquiryId: inquiry.id, properties, projects };
   }
 
   async uploadDocument(leadId: number, file: Express.Multer.File, actorId: number | null = null) {

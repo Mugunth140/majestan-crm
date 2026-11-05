@@ -2,6 +2,7 @@ import {
   matchCriteria,
   projectMatchQuery,
   propertyMatchQuery,
+  similarCriteria,
 } from './auto-match';
 
 const placeholders = (sql: string) => (sql.match(/\?/g) || []).length;
@@ -81,5 +82,40 @@ describe('auto-match', () => {
       'Peelamedu',
       3,
     ]);
+  });
+
+  it('widens to the whole category and drops budget and area for similar listings', () => {
+    const c = matchCriteria(
+      {
+        property_category: 'residential',
+        property_type: 'apartment',
+        purchase_type: 'rental',
+        preferences: { minBudget: 15000, maxBudget: 25000, minArea: 900 },
+      },
+      'Coimbatore',
+    );
+    const { criteria, target } = similarCriteria(c);
+    expect(criteria.types).toEqual(
+      expect.arrayContaining(['apartment', 'villa', 'plot']),
+    );
+    expect(criteria).toMatchObject({
+      listing: 'Rent',
+      city: 'Coimbatore',
+      minBudget: null,
+      maxBudget: null,
+      minArea: null,
+    });
+    expect(target).toBe(20000);
+
+    const q = propertyMatchQuery(criteria, { target, exclude: [4, 9] });
+    expect(q.sql).toContain('p.id NOT IN (?, ?)');
+    expect(q.sql).toContain('ABS(p.price - ?), 1e15)');
+    expect(q.params).toHaveLength((q.sql.match(/\?/g) || []).length);
+    expect(q.params.slice(-1)).toEqual([20000]);
+
+    const project = projectMatchQuery(criteria, { target, exclude: [5] })!;
+    expect(project.params).toHaveLength(
+      (project.sql.match(/\?/g) || []).length,
+    );
   });
 });

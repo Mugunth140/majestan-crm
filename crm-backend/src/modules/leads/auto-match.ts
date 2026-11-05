@@ -2,10 +2,16 @@
 // CRM's own words (category, type, purchase type, preferences), so it is first
 // read into what the site stores, then matched loosely: budget and area allow
 // some slack, and BHK and locality rank results rather than rule them out.
+// When that finds little, a wider search adds similar listings: the same city
+// and rent/sale, any type in the category, any budget, closest price first.
+// If even that is empty (no rentals of that kind, say), rent/sale is dropped.
 
 /** How far outside the stated budget or area a listing may still be shown. */
 export const MATCH_SLACK = 0.2;
 export const MATCH_LIMIT = 20;
+/** Fewer exact matches than this and similar ones are added. */
+export const SIMILAR_WHEN = 8;
+export const SIMILAR_LIMIT = 12;
 
 /** Site property types (properties.property_type) for each CRM requirement type. */
 const TYPE_MAP: Record<string, string[]> = {
@@ -45,6 +51,8 @@ const PROJECT_TYPES = ['apartment', 'villa', 'plot'];
 
 export interface MatchCriteria {
   types: string[] | null;
+  /** Every type in the requirement's category, for similar listings. */
+  broadTypes: string[] | null;
   listing: 'Rent' | 'Sell' | null;
   city: string | null;
   localities: string[];
@@ -95,9 +103,17 @@ export function matchCriteria(
   } catch {
     // An unreadable locality list just means no locality preference.
   }
+  const types =
+    TYPE_MAP[type] ?? CATEGORY_MAP[key(inquiry.property_category)] ?? null;
+  const category =
+    CATEGORY_MAP[key(inquiry.property_category)] ??
+    Object.values(CATEGORY_MAP).find((list) =>
+      types?.some((t) => list.includes(t)),
+    );
   return {
-    types:
-      TYPE_MAP[type] ?? CATEGORY_MAP[key(inquiry.property_category)] ?? null,
+    types,
+    broadTypes:
+      types && category ? [...new Set([...types, ...category])] : types,
     listing:
       purchase === 'rental'
         ? 'Rent'
@@ -116,6 +132,38 @@ export function matchCriteria(
 
 const placeholders = (list: unknown[]) => list.map(() => '?').join(', ');
 
+/** Options for the wider search: what to rank against and what is already shown. */
+export interface SimilarSearch {
+  /** Price the requirement aims at (middle of the budget), if any. */
+  target: number | null;
+  exclude: number[];
+}
+
+/**
+ * The wider search: same city and rent/sale, any type in the category, no
+ * budget or area limits. Price closeness then does the ranking.
+ */
+export function similarCriteria(c: MatchCriteria): {
+  criteria: MatchCriteria;
+  target: number | null;
+} {
+  const target =
+    c.minBudget && c.maxBudget
+      ? (c.minBudget + c.maxBudget) / 2
+      : (c.maxBudget ?? c.minBudget);
+  return {
+    criteria: {
+      ...c,
+      types: c.broadTypes,
+      minBudget: null,
+      maxBudget: null,
+      minArea: null,
+      maxArea: null,
+    },
+    target,
+  };
+}
+
 /** Ranking terms that apply; a bare `0` would be read as a column position. */
 const order = (...ranks: string[]) =>
   ranks
@@ -124,9 +172,13 @@ const order = (...ranks: string[]) =>
     .join('');
 
 /** Available properties, nearest locality and BHK first. */
-export function propertyMatchQuery(c: MatchCriteria) {
+export function propertyMatchQuery(c: MatchCriteria, similar?: SimilarSearch) {
   const where = ["p.status = 'available'"];
   const params: unknown[] = [];
+  if (similar?.exclude.length) {
+    where.push(`p.id NOT IN (${placeholders(similar.exclude)})`);
+    params.push(...similar.exclude);
+  }
   const area =
     'COALESCE(NULLIF(pd.area_sqft, 0), NULLIF(pd.built_up_area, 0), NULLIF(pd.carpet_area, 0), NULLIF(pd.plot_area, 0))';
 
@@ -163,7 +215,12 @@ export function propertyMatchQuery(c: MatchCriteria) {
     ? `CASE WHEN s.locality_name IN (${placeholders(c.localities)}) THEN 0 ELSE 1 END`
     : '0';
   const bhkRank = c.bhk ? 'COALESCE(ABS(pd.bedrooms - ?), 99)' : '0';
-  const rankParams = [...c.localities, ...(c.bhk ? [c.bhk] : [])];
+  const priceRank = similar?.target ? 'COALESCE(ABS(p.price - ?), 1e15)' : '0';
+  const rankParams = [
+    ...c.localities,
+    ...(similar?.target ? [similar.target] : []),
+    ...(c.bhk ? [c.bhk] : []),
+  ];
 
   return {
     sql: `SELECT p.id, p.property_code AS code, p.title, p.slug,
@@ -175,14 +232,14 @@ export function propertyMatchQuery(c: MatchCriteria) {
           LEFT JOIN property_locations pl ON pl.property_id = p.id
           LEFT JOIN sublocations s ON s.id = pl.location_id
           WHERE ${where.join(' AND ')}
-          ORDER BY ${order(localityRank, bhkRank)}p.created_at DESC
-          LIMIT ${MATCH_LIMIT}`,
+          ORDER BY ${order(localityRank, priceRank, bhkRank)}p.created_at DESC
+          LIMIT ${similar ? SIMILAR_LIMIT : MATCH_LIMIT}`,
     params: [...c.localities, ...params, ...rankParams],
   };
 }
 
 /** Published projects with at least one available unit that fits. */
-export function projectMatchQuery(c: MatchCriteria) {
+export function projectMatchQuery(c: MatchCriteria, similar?: SimilarSearch) {
   const types = c.types
     ? c.types.filter((t) => PROJECT_TYPES.includes(t))
     : PROJECT_TYPES;
@@ -193,6 +250,10 @@ export function projectMatchQuery(c: MatchCriteria) {
     `pr.project_type IN (${placeholders(types)})`,
   ];
   const projectParams: unknown[] = [...types];
+  if (similar?.exclude.length) {
+    where.push(`pr.id NOT IN (${placeholders(similar.exclude)})`);
+    projectParams.push(...similar.exclude);
+  }
   if (c.city) {
     where.push('pr.city = ?');
     projectParams.push(c.city);
@@ -219,7 +280,14 @@ export function projectMatchQuery(c: MatchCriteria) {
     ? `CASE WHEN pr.sublocation IN (${placeholders(c.localities)}) THEN 0 ELSE 1 END`
     : '0';
   const bhkRank = c.bhk ? 'COALESCE(MIN(ABS(u.bedrooms - ?)), 99)' : '0';
-  const rankParams = [...c.localities, ...(c.bhk ? [c.bhk] : [])];
+  const priceRank = similar?.target
+    ? `COALESCE(MIN(ABS(${unitPrice} - ?)), 1e15)`
+    : '0';
+  const rankParams = [
+    ...c.localities,
+    ...(similar?.target ? [similar.target] : []),
+    ...(c.bhk ? [c.bhk] : []),
+  ];
 
   return {
     sql: `SELECT pr.id, pr.project_code AS code, pr.name, pr.canonical_slug AS slug, pr.cover_image_url AS photo, pr.project_type, pr.city, pr.sublocation AS locality,
@@ -231,8 +299,8 @@ export function projectMatchQuery(c: MatchCriteria) {
           JOIN project_units u ON ${unit.join(' AND ')}
           WHERE ${where.join(' AND ')}
           GROUP BY pr.id
-          ORDER BY ${order(localityRank, bhkRank)}pr.created_at DESC
-          LIMIT ${MATCH_LIMIT}`,
+          ORDER BY ${order(localityRank, priceRank, bhkRank)}pr.created_at DESC
+          LIMIT ${similar ? SIMILAR_LIMIT : MATCH_LIMIT}`,
     params: [...c.localities, ...unitParams, ...projectParams, ...rankParams],
   };
 }
