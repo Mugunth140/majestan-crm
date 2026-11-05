@@ -494,10 +494,20 @@ export function isPropertyTypeAllowed(
     : !isRentalOnlyPropertyType(value);
 }
 
+/** Names the old CRM used, where the master registry's label differs. */
+const PROPERTY_TYPE_NAMES: Record<string, string> = {
+  commercial: "Commercial",
+  coworking: "Coworking",
+};
+
+export function propertyTypeName(value: string | null | undefined, label: string): string {
+  return PROPERTY_TYPE_NAMES[propertyTypeKey(value)] ?? label;
+}
+
 export function propertyTypesForListing<
   T extends { value: string; label: string },
 >(types: T[], listingType: string): T[] {
-  return types.filter((type) =>
-    isPropertyTypeAllowed(type.value, listingType, type.label),
-  );
+  return types
+    .filter((type) => isPropertyTypeAllowed(type.value, listingType, type.label))
+    .map((type) => ({ ...type, label: propertyTypeName(type.value, type.label) }));
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { PropertyForm } from "./_components/PropertyForm";
+import { propertyTypeName } from "./_components/property-form-fields";
 import { EMPTY_PROPERTY_FILTERS, propertyUploaderLabel } from "@/lib/property-list-filters";
 import { propertyStatusLabel } from "@/lib/property-status";
 
@@ -35,8 +36,8 @@ const PROPERTY_TYPE_OPTIONS = [
   { value: "apartment", label: "Apartment" },
   { value: "villa", label: "Villa" },
   { value: "plot", label: "Plot" },
-  { value: "commercial", label: "Commercial Space" },
-  { value: "coworking", label: "Co-working" },
+  { value: "commercial", label: "Commercial" },
+  { value: "coworking", label: "Coworking" },
   { value: "farmland", label: "Farmland" },
   { value: "industrial", label: "Industrial" },
   { value: "individual_portion", label: "Independent House" },
@@ -384,7 +385,7 @@ export default function PropertiesPage() {
           </div>
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Property Type</label>
-            <FormSelect name="propertyType" options={propertyTypes.length ? propertyTypes : PROPERTY_TYPE_OPTIONS} value={filters.propertyType} onValueChange={(v) => { setFilters((f) => ({ ...f, propertyType: v || "" })); resetPage(); }} placeholder="All Types" />
+            <FormSelect name="propertyType" options={propertyTypes.length ? propertyTypes.map((t) => ({ ...t, label: propertyTypeName(t.value, t.label) })) : PROPERTY_TYPE_OPTIONS} value={filters.propertyType} onValueChange={(v) => { setFilters((f) => ({ ...f, propertyType: v || "" })); resetPage(); }} placeholder="All Types" />
           </div>
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Listing Type</label>

@@ -3062,12 +3062,12 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
             {/* Maintenance Charges — hidden for plot / farmland */}
             {isFieldVisible("maintenanceCharges") && (
               <div className="space-y-2">
-                <label className={labelClass}>Maintenance Charges</label>
-                <Input
+                <label htmlFor="maintenanceCharges" className={labelClass}>Maintenance Charges</label>
+                <PriceInput className={PROPERTY_FIELD}
+                  id="maintenanceCharges"
                   value={maintenanceCharges}
-                  onChange={(e) => setMaintenanceCharges(e.target.value)}
+                  onChange={setMaintenanceCharges}
                   placeholder="e.g. 2000/month"
-                  className={inputClass}
                 />
               </div>
             )}

@@ -95,7 +95,7 @@ async function choose(container: HTMLElement, text: string) {
 it("loads the create form and clears an incompatible real dropdown safely", async () => {
   const { container } = await open();
   fireEvent.click(screen.getByRole("button", { name: "Rent", exact: true }));
-  await choose(container, "Co-working");
+  await choose(container, "Coworking");
   await waitFor(() => expect(screen.queryByText("Monthly rent *")).toBeNull());
   expect(screen.getByText("Furnishing Items")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Buy", exact: true }));
