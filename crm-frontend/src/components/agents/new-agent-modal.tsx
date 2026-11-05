@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { FormSelect, SearchableFormSelect } from "@/components/shared/form-select";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
+import { PriceInput } from "@/components/shared/price-input";
 import {
   FieldRow, FOCUS_BUTTON, FOCUS_FIELD, FocusField, FocusModal, FocusSection, ToggleCard, fieldName, stepStatus,
 } from "@/components/shared/focus-modal";
@@ -53,6 +54,9 @@ export function NewAgentModal({ open, onOpenChange, onCreated }: {
   const [touched, setTouched] = useState<Set<string>>(() => new Set());
   const [submitting, setSubmitting] = useState(false);
   const [cities, setCities] = useState<{ label: string; value: string }[] | null>(null);
+  // The partner who already has a mobile, found when leaving the Contact step.
+  const [taken, setTaken] = useState<{ mobile: string; name: string; existingStaff: string } | null>(null);
+  const [checking, setChecking] = useState(false);
 
   // Fresh form each time it opens.
   const [wasOpen, setWasOpen] = useState(open);
@@ -64,6 +68,7 @@ export function NewAgentModal({ open, onOpenChange, onCreated }: {
       setVisited(new Set(["partner"]));
       setShowErrors(new Set());
       setTouched(new Set());
+      setTaken(null);
     }
   }
 
@@ -79,7 +84,10 @@ export function NewAgentModal({ open, onOpenChange, onCreated }: {
 
   const set = <K extends keyof AgentForm>(key: K, value: AgentForm[K]) => setForm((f) => ({ ...f, [key]: value }));
 
-  const valid = (step: AgentStep) => Object.keys(checkAgent(step, form)).length === 0;
+  const mobileTaken = taken && taken.mobile === form.mobile.trim()
+    ? `${taken.name} already has this number (with ${taken.existingStaff}). Use a different number.`
+    : null;
+  const valid = (step: AgentStep) => Object.keys(checkAgent(step, form)).length === 0 && !(step === "contact" && mobileTaken);
   const allErrors = checkAgent(active, form);
   const errors = showErrors.has(active) ? allErrors : Object.fromEntries(Object.entries(allErrors).filter(([k]) => touched.has(k)));
   const ready = valid(active);
@@ -87,9 +95,28 @@ export function NewAgentModal({ open, onOpenChange, onCreated }: {
   const last = index === AGENT_STEPS.length - 1;
 
   const steps = useMemo(
-    () => AGENT_STEPS.map((s, i) => ({ ...s, status: stepStatus(i, index, visited.has(s.key) && Object.keys(checkAgent(s.key, form)).length === 0) })),
-    [index, visited, form],
+    () => AGENT_STEPS.map((s, i) => ({ ...s, status: stepStatus(i, index, visited.has(s.key) && Object.keys(checkAgent(s.key, form)).length === 0 && !(s.key === "contact" && mobileTaken)) })),
+    [index, visited, form, mobileTaken],
   );
+  const CONTACT = AGENT_STEPS.findIndex((s) => s.key === "contact");
+
+  /** False, and the Contact step shown with the reason, when another partner already has this mobile. */
+  const mobileFree = async () => {
+    const mobile = form.mobile.trim();
+    setChecking(true);
+    try {
+      const res = await apiFetch(`${API_URL}/agents/mobile-check`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mobile }) });
+      const result = await res.json().catch(() => null);
+      if (result?.success && result.data) {
+        setTaken({ mobile, name: result.data.name, existingStaff: result.data.existingStaff });
+        flag("contact");
+        go("contact");
+        return false;
+      }
+    } catch { /* the save still refuses to make a second partner with this mobile */ }
+    finally { setChecking(false); }
+    return true;
+  };
 
   const go = (key: AgentStep) => {
     setActive(key);
@@ -104,10 +131,12 @@ export function NewAgentModal({ open, onOpenChange, onCreated }: {
       go(blocked.key);
       return;
     }
+    if (index <= CONTACT && target > CONTACT) return void mobileFree().then((free) => { if (free) go(key); });
     go(key);
   };
-  const next = () => {
+  const next = async () => {
     if (!valid(active)) return flag(active);
+    if (active === "contact" && !(await mobileFree())) return;
     if (!last) go(AGENT_STEPS[index + 1].key);
     else void submit();
   };
@@ -119,6 +148,7 @@ export function NewAgentModal({ open, onOpenChange, onCreated }: {
       go(invalid.key);
       return;
     }
+    if (!(await mobileFree())) return;
     setSubmitting(true);
     try {
       const res = await apiFetch(`${API_URL}/agents`, {
@@ -173,7 +203,7 @@ export function NewAgentModal({ open, onOpenChange, onCreated }: {
     body = (
       <FocusSection title="Contact" description="How to reach them. The mobile number identifies the partner, so it can't repeat.">
         <FieldRow>
-          <FocusField required name="mobile" label="Mobile" htmlFor="na-mobile" error={errors.mobile}>
+          <FocusField required name="mobile" label="Mobile" htmlFor="na-mobile" error={errors.mobile ?? (showErrors.has("contact") ? mobileTaken : null)}>
             <Input id="na-mobile" type="tel" inputMode="tel" autoFocus value={form.mobile} onChange={(e) => set("mobile", e.target.value)} placeholder="+91 98765 43210" className={INPUT} />
           </FocusField>
           <FocusField name="whatsapp" label="WhatsApp" htmlFor="na-whatsapp" optional error={errors.whatsapp}
@@ -205,7 +235,11 @@ export function NewAgentModal({ open, onOpenChange, onCreated }: {
               <FormSelect name="commission_type" placeholder="Select" className={SELECT} value={form.commission_type || null} options={COMMISSION_TYPES} onValueChange={(v) => set("commission_type", v)} />
             </FocusField>
             <FocusField required name="commission_value" label={form.commission_type === "fixed_amount" ? "Amount (₹)" : "Percentage"} htmlFor="na-commission" error={errors.commission_value}>
-              <Input id="na-commission" inputMode="decimal" value={form.commission_value} onChange={(e) => set("commission_value", e.target.value)} placeholder={form.commission_type === "fixed_amount" ? "50000" : "2"} className={INPUT} />
+              {form.commission_type === "fixed_amount" ? (
+                <PriceInput id="na-commission" value={form.commission_value} onChange={(v) => set("commission_value", v)} placeholder="50000" className={INPUT} />
+              ) : (
+                <Input id="na-commission" inputMode="decimal" value={form.commission_value} onChange={(e) => set("commission_value", e.target.value)} placeholder="2" className={INPUT} />
+              )}
             </FocusField>
           </FieldRow>
         </ToggleCard>
@@ -267,17 +301,17 @@ export function NewAgentModal({ open, onOpenChange, onCreated }: {
             aria-disabled={!ready}
             title={ready ? undefined : "Fill in the fields marked * first"}
             className={cn(last ? FOCUS_BUTTON.primary : FOCUS_BUTTON.secondary, !ready && "cursor-not-allowed opacity-50")}
-            onClick={next}
-            disabled={submitting}
+            onClick={() => void next()}
+            disabled={submitting || checking}
           >
-            {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {(submitting || checking) && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {last ? (submitting ? "Saving…" : "Add agent") : "Continue"}
           </button>
         </>
       }
     >
       <form
-        onSubmit={(e) => { e.preventDefault(); next(); }}
+        onSubmit={(e) => { e.preventDefault(); if (!checking) void next(); }}
         onBlur={(e) => {
           if (!(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) return;
           const name = fieldName(e.target);

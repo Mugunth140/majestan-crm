@@ -282,6 +282,14 @@ export class AgentsService {
     });
   }
 
+  /** The agent with this exact mobile (as the add form sends it), with only what a repeat add would reveal. */
+  async findByMobile(mobile: string): Promise<{ id: number; name: string; existingStaff: string } | null> {
+    const value = mobile.trim();
+    if (!value) return null;
+    const agent = await this.dataSource.getRepository(Agent).findOne({ where: { mobile_number: value }, relations: { assigned_staff: true } });
+    return agent ? { id: agent.id, name: agent.name, existingStaff: agent.assigned_staff?.name ?? 'Unassigned' } : null;
+  }
+
   async createAgent(body: any, actorId: number | null = null): Promise<CreateAgentResult> {
     const result = await this.createAgentRecord(body, actorId);
     // partners@ "thanks for connecting" draft, after commit (only reaches partners with an email).

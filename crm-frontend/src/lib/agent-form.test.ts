@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY_AGENT, agentPayload, checkAgent, commissionText, type AgentForm } from "./agent-form";
+import { EMPTY_AGENT, agentPayload, checkAgent, commissionKind, commissionText, type AgentForm } from "./agent-form";
 
 const form = (patch: Partial<AgentForm>): AgentForm => ({ ...EMPTY_AGENT, ...patch });
 
@@ -33,5 +33,13 @@ describe("agent create form", () => {
     expect(commissionText("fixed_amount", "50000")).toBe("₹50,000");
     expect(commissionText("percentage", "")).toBe("");
     expect(commissionText(null, "half of brokerage")).toBe("half of brokerage");
+  });
+});
+
+describe("older commission records", () => {
+  it("reads Fixed Amount and Percentage the same as the new values", () => {
+    expect(commissionKind("Fixed Amount")).toBe("fixed_amount");
+    expect(commissionText("Fixed Amount", "50000")).toBe("₹50,000");
+    expect(commissionText("Percentage", "2.0")).toBe("2%");
   });
 });

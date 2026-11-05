@@ -20,6 +20,12 @@ export class AgentsController {
     return { success: true, ...(await this.agentsService.staffList(req.user)) };
   }
 
+  /** Who already has this mobile, across the whole network, so the add form can stop a repeat. */
+  @Post('mobile-check')
+  async mobileCheck(@Body('mobile') mobile?: string) {
+    return { success: true, data: await this.agentsService.findByMobile(String(mobile ?? '')) };
+  }
+
   @Get(':id/activity')
   async activity(@Param('id') id: string, @Request() req: any) {
     return { success: true, data: await this.agentsService.activity(Number(id), req.user) };

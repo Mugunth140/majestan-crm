@@ -7,7 +7,7 @@ import { Database, History, Info, Loader2, MessagesSquare } from "lucide-react";
 import { apiFetch, apiJson } from "@/lib/api-fetch";
 import { sortContactLogs } from "@/lib/contact-log-utils";
 import {
-  AGENT_CATEGORIES, AGENT_STATUSES, AGENT_STATUS_TONES, COMMISSION_TYPES, PARTNER_TYPES, commissionText, partnerTypeLabel,
+  AGENT_CATEGORIES, AGENT_STATUSES, AGENT_STATUS_TONES, COMMISSION_TYPES, PARTNER_TYPES, commissionKind, commissionText, partnerTypeLabel,
 } from "@/lib/agent-form";
 import { INDIAN_STATES, inboundErrorMessage } from "@/lib/inbound-form";
 import { statusDot, statusPillClass } from "@/components/tables/cells";
@@ -98,9 +98,9 @@ function TabButton({ active, onClick, icon: Icon, label, count }: {
 /** One group of fields on the Data tab, two columns wide on desktop. */
 function DataCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="overflow-hidden rounded-xl border bg-card">
+    <section className="@container overflow-hidden rounded-xl border bg-card">
       <h3 className="flex h-11 items-center border-b px-4 text-[14px] font-semibold text-foreground">{title}</h3>
-      <div className="grid gap-x-8 px-3 py-2 md:grid-cols-2 md:px-4">{children}</div>
+      <div className="grid gap-x-8 px-3 py-2 @xl:grid-cols-2 md:px-4">{children}</div>
     </section>
   );
 }
@@ -236,9 +236,10 @@ function AgentDetail() {
     <AssigneeButton name={assignee} variant={variant} people={staff.people} value={agent.assigned_staff_id} onPick={staff.canAssign ? assign : undefined} />
   );
   const assigneeField = <FieldRow label="Assigned to">{assigneeButton("field")}</FieldRow>;
+  const fixedCommission = commissionKind(agent.commission_type) === "fixed_amount";
   const commissionField = agent.commission_accepted ? (
-    <InlineText label={agent.commission_type === "fixed_amount" ? "Amount (₹)" : "Percentage"} value={agent.commission_value}
-      placeholder={agent.commission_type === "fixed_amount" ? "50000" : "2"} onSave={saveText("commission_value")} />
+    <InlineText label={fixedCommission ? "Amount (₹)" : "Percentage"} value={agent.commission_value}
+      placeholder={fixedCommission ? "50000" : "2"} inWords={fixedCommission} onSave={saveText("commission_value")} />
   ) : null;
 
   const summary = (

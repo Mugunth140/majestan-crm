@@ -39,13 +39,17 @@ export const AGENT_STATUSES = Object.keys(AGENT_STATUS_TONES);
 export const partnerTypeLabel = (v?: string | null) => PARTNER_TYPES.find((p) => p.value === v)?.label ?? (v ? v.replace(/_/g, " ") : "");
 
 /** "2" + percentage → "2%", "50000" + fixed_amount → "₹50,000"; anything else as typed. */
+/** "fixed_amount" or "percentage", also from older records that stored "Fixed Amount" / "Percentage". */
+export const commissionKind = (type?: string | null) => String(type ?? "").trim().toLowerCase().replace(/\s+/g, "_");
+
 export function commissionText(type?: string | null, value?: string | null) {
+  const kind = commissionKind(type);
   const raw = String(value ?? "").trim();
   if (!raw) return "";
   const n = Number(raw.replace(/[,%₹\s]/g, ""));
   if (!Number.isFinite(n) || n <= 0) return raw;
-  if (type === "percentage") return `${n}%`;
-  if (type === "fixed_amount") return `₹${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(n)}`;
+  if (kind === "percentage") return `${n}%`;
+  if (kind === "fixed_amount") return `₹${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(n)}`;
   return raw;
 }
 

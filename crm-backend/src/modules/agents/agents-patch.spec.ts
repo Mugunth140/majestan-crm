@@ -30,3 +30,11 @@ describe('AgentsService.patchAgent', () => {
     expect(recordEvents.record).toHaveBeenCalledWith(expect.objectContaining({ type: 'status_changed', from: 'New', to: 'Contacted' }));
   });
 });
+
+describe('AgentsService.findByMobile', () => {
+  it('names the agent and their owner, and nothing else', async () => {
+    const { svc } = setup({ id: 9, name: 'Rajesh Kumar', mobile_number: '9000000001', email: 'r@x.in', assigned_staff: { name: 'Tele Staff' } });
+    expect(await svc.findByMobile(' 9000000001 ')).toEqual({ id: 9, name: 'Rajesh Kumar', existingStaff: 'Tele Staff' });
+    expect(await svc.findByMobile('  ')).toBeNull();
+  });
+});

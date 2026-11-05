@@ -113,9 +113,9 @@ function Restricted({ label }: { label: string }) {
 /** One group of fields on the Data tab, two columns wide on desktop. */
 function DataCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="overflow-hidden rounded-xl border bg-card">
+    <section className="@container overflow-hidden rounded-xl border bg-card">
       <h3 className="flex h-11 items-center border-b px-4 text-[14px] font-semibold text-foreground">{title}</h3>
-      <div className="grid gap-x-8 px-3 py-2 md:grid-cols-2 md:px-4">{children}</div>
+      <div className="grid gap-x-8 px-3 py-2 @xl:grid-cols-2 md:px-4">{children}</div>
     </section>
   );
 }

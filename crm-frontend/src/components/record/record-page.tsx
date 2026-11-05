@@ -27,9 +27,9 @@ export function Fact({ label, children }: { label: string; children: ReactNode }
 /** One group of facts on a tab, two columns wide on desktop. */
 export function DataCard({ title, children, columns = true }: { title: string; children: ReactNode; columns?: boolean }) {
   return (
-    <section className="overflow-hidden rounded-xl border bg-card">
+    <section className="@container overflow-hidden rounded-xl border bg-card">
       <h3 className="flex h-11 items-center border-b px-4 text-[14px] font-semibold text-foreground">{title}</h3>
-      <div className={cn("px-3 py-2 md:px-4", columns && "grid grid-cols-1 gap-x-8 md:grid-cols-2")}>{children}</div>
+      <div className={cn("px-3 py-2 md:px-4", columns && "grid grid-cols-1 gap-x-8 @xl:grid-cols-2")}>{children}</div>
     </section>
   );
 }
