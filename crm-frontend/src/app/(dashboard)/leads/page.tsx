@@ -38,7 +38,6 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { GroupedList } from "@/components/tables/grouped-list";
 import { NewLeadModal } from "@/components/leads/new-lead-modal";
 import { GroupByPicker, LEAD_GROUP_FIELDS, type LeadGroupField } from "@/components/leads/group-by-picker";
-import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
 import { getBulkImportDestination, mapImportSheetRow, resolveLeadImportSource, normalizeIndianMobile, partitionPendingImports, resolveStaffAssignments } from "@/lib/lead-import";
 import type { DuplicateLeadInfo, PendingImportRow, StaffOption, LeadImportSource } from "@/lib/lead-import";
 import { resetPageIndex } from "@/lib/pagination";
@@ -71,7 +70,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 // Kanban and Group By show one board, not pages: load up to this many leads for them.
 const BOARD_LIMIT = 500;
 
-const LEADS_TABS = ["All Leads", "Open Pipeline", "Action Required", "Unqualified"];
+const LEADS_TABS = ["All Leads", "Open Pipeline", "Unqualified"];
 // Open Pipeline only shows an in-memory import review that doesn't survive
 // navigation, so it's never restored — that would land on an empty placeholder.
 const RESTORABLE_LEADS_TABS = LEADS_TABS.filter((t) => t !== "Open Pipeline");
@@ -109,7 +108,6 @@ export default function LeadsPage() {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
   const [activeTab, setActiveTab] = usePersistedState<string>("leads:tab", "All Leads", { allowed: RESTORABLE_LEADS_TABS });
-  const [actionFilter, setActionFilter] = usePersistedState<string>("leads:actionFilter", "Today", { allowed: ACTION_FILTERS });
   const [leads, setLeads] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -272,7 +270,6 @@ export default function LeadsPage() {
   const [filters, setFilters] = usePersistedState("leads:filters", EMPTY_LEADS_FILTERS);
   const [filterOptions, setFilterOptions] = useState<LeadsFilterOptions>(EMPTY_FILTER_OPTIONS);
 
-  const [todayViewMode, setTodayViewMode] = usePersistedState<"pending" | "completed">("leads:todayViewMode", "pending", { allowed: ["pending", "completed"] });
   const [totalCount, setTotalCount] = useState(0);
   const [pagination, setPagination] = usePersistedState("leads:page", { pageIndex: 0, pageSize: 10 });
   const [view, setView] = usePersistedState<ViewType>("leads:view", "list", { allowed: ["list", "kanban", "group"] });
@@ -321,7 +318,6 @@ export default function LeadsPage() {
   }, []);
 
   const tabs = [...LEADS_TABS];
-  const actionFilters = [...ACTION_FILTERS];
 
   const resetPage = () => setPagination((prev) => (prev.pageIndex === 0 ? prev : resetPageIndex(prev)));
   const updateFilters = (updater: (prev: typeof filters) => typeof filters) => {
@@ -342,10 +338,6 @@ export default function LeadsPage() {
       if (debouncedSearchQuery.trim()) params.append('search', debouncedSearchQuery.trim());
       if (activeTab && activeTab !== "Open Pipeline") params.append('tab', activeTab);
       if (deptFilter) params.append('dept', deptFilter);
-      if (activeTab === "Action Required" && actionFilter) {
-        params.append('actionFilter', actionFilter);
-        params.append('todayViewMode', todayViewMode);
-      }
       if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
       if (filters.dateTo) params.append('dateTo', filters.dateTo);
       if (filters.category) params.append('category', filters.category);
@@ -383,7 +375,7 @@ export default function LeadsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [pagination, debouncedSearchQuery, activeTab, deptFilter, actionFilter, todayViewMode, filters, pendingImports.length, boardView]);
+  }, [pagination, debouncedSearchQuery, activeTab, deptFilter, filters, pendingImports.length, boardView]);
 
   useEffect(() => {
     fetchLeads();
@@ -639,30 +631,12 @@ export default function LeadsPage() {
     { accessorKey: "source", header: "Source" },
     { 
       accessorKey: "date", 
-      header: activeTab === "Action Required" 
-        ? (todayViewMode === "completed" ? "Followed Up" : "Next Follow Up") 
-        : "Date",
+      header: "Date",
       cell: ({ row }) => {
-        if (activeTab === "Action Required") {
-          if (todayViewMode === "completed") {
-            if (row.original.lastFollowedUpDate) {
-              const dateStr = new Date(row.original.lastFollowedUpDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-              return <span>{dateStr}{row.original.lastFollowedUpTime ? ` ${row.original.lastFollowedUpTime.slice(0,5)}` : ''}</span>;
-            }
-            return <span className="text-muted-foreground italic">No record</span>;
-          }
-          if (todayViewMode === "pending") {
-            if (row.original.nextFollowUpDate) {
-              const dateStr = new Date(row.original.nextFollowUpDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-              return <span>{dateStr}{row.original.nextFollowUpTime ? ` ${row.original.nextFollowUpTime.slice(0,5)}` : ''}</span>;
-            }
-            return <span className="text-muted-foreground italic">Not Scheduled</span>;
-          }
-        }
         return <span className="text-muted-foreground">{row.original.date}</span>;
       }
     },
-  ], [activeTab, todayViewMode, pendingAssignments, unresolvedStaffIds]);
+  ], [activeTab, pendingAssignments, unresolvedStaffIds]);
 
   // Pending-review extras: duplicate badge + per-row remove (Open Pipeline only)
   const reviewColumn: ColumnDef<any> = {
@@ -1147,55 +1121,6 @@ export default function LeadsPage() {
         )}
       </div>
 
-      {activeTab === "Action Required" && (
-        <div className="flex flex-wrap items-center gap-2 px-5 pb-1 animate-in slide-in-from-top-2 fade-in duration-200">
-          <div className="flex h-8 items-center gap-1.5">
-            {actionFilters.map((filter) => {
-              const isActive = actionFilter === filter;
-              let activeClass = "bg-primary/10 text-primary border-primary/30";
-              if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
-              else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
-              else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
-              return (
-                <button
-                  key={filter}
-                  className={"h-7 shrink-0 flex items-center justify-center cursor-pointer px-2.5 rounded-md text-[13px] font-medium leading-none transition-colors border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
-                  onClick={() => { setActionFilter(filter); resetPage(); }}
-                >
-                  {getActionFilterLabel(filter)}
-                </button>
-              );
-            })}
-          </div>
-          
-          <div className={`ml-auto flex h-8 shrink-0 self-center items-center bg-muted/70 p-0.5 rounded-md relative transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "opacity-0 pointer-events-none w-0 overflow-hidden"}`}>
-            {[
-              { id: "pending", label: "Follow Up" },
-              { id: "completed", label: "Followed Up" }
-            ].map((mode) => {
-              const isSelected = todayViewMode === mode.id;
-              return (
-                <button
-                  key={mode.id}
-                  onClick={() => { setTodayViewMode(mode.id as "pending" | "completed"); resetPage(); }}
-                  className={`relative h-full flex items-center px-2.5 rounded text-[13px] font-medium leading-none transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                >
-                  {isSelected && (
-                    <motion.div
-                      layoutId="desktopTodayToggleBg"
-                      className="absolute inset-0 rounded bg-background shadow-[0_1px_2px_rgba(0,0,0,0.08),0_0_0_1px_rgba(0,0,0,0.04)] dark:bg-white/10"
-                      initial={false}
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                      style={{ zIndex: -1 }}
-                    />
-                  )}
-                  <span className="relative z-10">{mode.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Content */}
       <div className="flex w-full flex-col md:min-h-0 md:flex-1 md:overflow-hidden">
@@ -1341,56 +1266,6 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {/* Action Required Row */}
-      {activeTab === "Action Required" && (
-        <div className="flex flex-col gap-3 pt-1">
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
-            {actionFilters.map((filter) => {
-              const isActive = actionFilter === filter;
-              let activeClass = "bg-primary/10 text-primary border-primary/30";
-              if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
-              else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
-              else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
-              return (
-                <button
-                  key={filter}
-                  className={"h-9 flex items-center justify-center cursor-pointer px-4 rounded-full text-[13px] font-medium transition-all ease-out active:scale-95 border whitespace-nowrap " + (isActive ? activeClass : "bg-card text-muted-foreground border-border hover:bg-muted")}
-                  onClick={() => { setActionFilter(filter); resetPage(); }}
-                >
-                  {getActionFilterLabel(filter)}
-                </button>
-              );
-            })}
-          </div>
-          
-          <div className={`flex items-center h-10 bg-black/5 dark:bg-white/10 p-1 rounded-xl relative transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "opacity-0 pointer-events-none h-0 overflow-hidden"}`}>
-            {[
-              { id: "pending", label: "Follow Up" },
-              { id: "completed", label: "Followed Up" }
-            ].map((mode) => {
-              const isSelected = todayViewMode === mode.id;
-              return (
-                <button
-                  key={mode.id}
-                  onClick={() => { setTodayViewMode(mode.id as "pending" | "completed"); resetPage(); }}
-                  className={`flex-1 relative h-full flex items-center justify-center rounded-lg text-[13px] font-bold transition-colors z-10 active:scale-[0.98] ${isSelected ? "text-foreground" : "text-muted-foreground"}`}
-                >
-                  {isSelected && (
-                    <motion.div
-                      layoutId="mobileTodayToggleBg"
-                      className="absolute inset-0 bg-background shadow-sm rounded-lg"
-                      initial={false}
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                      style={{ zIndex: -1 }}
-                    />
-                  )}
-                  <span className="relative z-10">{mode.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 

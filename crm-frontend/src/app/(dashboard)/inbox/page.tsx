@@ -9,14 +9,9 @@ import { MobileHeader } from "@/components/layout/mobile-header";
 import { EmptyState as IllustratedEmpty } from "@/components/shared/empty-state";
 import { PageActions } from "@/components/layout/page-actions";
 import { useState } from "react";
+import { notificationHref, type NotificationLike } from "@/lib/notification-text";
 
-function destination(notification: any): string | null {
-  if (!notification.entity_id) return null;
-  if (notification.entity_type === "lead") return `/leads/${notification.entity_id}`;
-  if (notification.entity_type === "inbound") return `/inbound/${notification.entity_id}`;
-  if (notification.entity_type === "agent") return `/agent-network/${notification.entity_id}`;
-  return null;
-}
+const destination = (notification: NotificationLike) => notificationHref(notification);
 
 export default function InboxPage() {
   const router = useRouter();

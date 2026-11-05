@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Plus, Eye, Search, Filter, X, FileSpreadsheet } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
-import { motion } from "motion/react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -28,8 +27,6 @@ import { MobileHeader } from "@/components/layout/mobile-header";
 import { ListFrame, ListToolbar, SegmentTabs, ToolbarEnd, ToolbarSearch, headerButtonClass, headerPrimaryClass, toolbarFilterButton } from "@/components/layout/list-page";
 import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
-import { matchesHrActionFilter, formatHrFollowUp } from "@/lib/hr-action-required";
-import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
 import { StaffName } from "@/components/shared/name-avatar";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -52,11 +49,9 @@ export default function HrPage() {
   const [pendingImports, setPendingImports] = useState<HrImportRow[]>([]);
   const [creating, setCreating] = useState(false);
 
-  const [activeTab, setActiveTab] = usePersistedState<string>("hr:tab", "All Candidates", { allowed: ["All Candidates", "Action Required", "Rejected"] });
-  const [actionFilter, setActionFilter] = usePersistedState<string>("hr:actionFilter", "Today", { allowed: ACTION_FILTERS });
+  const [activeTab, setActiveTab] = usePersistedState<string>("hr:tab", "All Candidates", { allowed: ["All Candidates", "Rejected"] });
   const [searchQuery, setSearchQuery] = usePersistedState("hr:search", "");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
-  const [todayViewMode, setTodayViewMode] = usePersistedState<"pending" | "completed">("hr:todayViewMode", "pending", { allowed: ["pending", "completed"] });
 
   const [assignmentIds, setAssignmentIds] = useState<number[] | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
@@ -91,8 +86,7 @@ export default function HrPage() {
     status: "",
   });
 
-  const tabs = ["All Candidates", "Action Required", "Rejected"];
-  const actionFilters = [...ACTION_FILTERS];
+  const tabs = ["All Candidates", "Rejected"];
 
   const fetchCandidates = () => {
     setIsLoading(true);
@@ -160,17 +154,10 @@ export default function HrPage() {
     if (filters.department) filtered = filtered.filter(c => c.department === filters.department);
     if (filters.status) filtered = filtered.filter(c => c.status === filters.status);
 
-    if (activeTab === "Action Required") {
-      return filtered.filter(candidate =>
-        (filters.status || !["Joined", "Rejected"].includes(candidate.status)) &&
-        matchesHrActionFilter(candidate, actionFilter, todayViewMode)
-      );
-    }
-
     if (activeTab === "Rejected") return filtered.filter(c => c.status === "Rejected");
     if (activeTab === "All Candidates") return filtered.filter(c => c.status !== "Rejected");
     return filtered;
-  }, [candidates, debouncedSearchQuery, filters, activeTab, actionFilter, todayViewMode]);
+  }, [candidates, debouncedSearchQuery, filters, activeTab]);
 
   const uniqueDepartments = Array.from(new Set(candidates.map(l => l.department).filter(Boolean)));
   const uniqueStatuses = Array.from(new Set(candidates.map(l => l.status).filter(Boolean)));
@@ -210,18 +197,6 @@ export default function HrPage() {
         <IdCell href={`/hr/${row.original.id}`}>{row.getValue("formattedId")}</IdCell>
       ),
     },
-    ...(activeTab === "Action Required" ? [{
-      id: "followUpDate",
-      header: actionFilter === "Yesterday" || (actionFilter === "Today" && todayViewMode === "completed")
-        ? "Followed Up" : "Next Follow Up",
-      cell: ({ row }: any) => {
-        const completed = actionFilter === "Yesterday" || (actionFilter === "Today" && todayViewMode === "completed");
-        return formatHrFollowUp(
-          completed ? row.original.lastFollowedUpDate : row.original.nextFollowUpDate,
-          completed ? row.original.lastFollowedUpTime : row.original.nextFollowUpTime,
-        );
-      },
-    }] : []),
     { accessorKey: "name", header: "Name", cell: ({ row }: any) => <NameCell name={row.original.name} avatar /> },
     { accessorKey: "mobile", header: "Mobile", cell: ({ row }: any) => <span className="tabular-nums">{row.original.mobile}</span> },
     { id: "assignee", header: "Assigned staff", cell: ({ row }: any) => (
@@ -331,56 +306,6 @@ export default function HrPage() {
         })}
       </div>
 
-      {/* Action Required sub-filters */}
-      {activeTab === "Action Required" && (
-        <div className="flex flex-col gap-3 -mx-4 px-4">
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
-            {actionFilters.map((filter) => {
-              const isActive = actionFilter === filter;
-              let activeClass = "bg-primary/10 text-primary border-primary/30";
-              if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
-              else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
-              else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
-              return (
-                <button
-                  key={filter}
-                  className={"h-9 shrink-0 flex items-center justify-center cursor-pointer px-4 rounded-full text-[13px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-card text-muted-foreground border-border hover:bg-muted hover:text-foreground")}
-                  onClick={() => setActionFilter(filter)}
-                >
-                  {getActionFilterLabel(filter)}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className={`flex items-center h-10 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "hidden opacity-0 pointer-events-none"}`}>
-            {[
-              { id: "pending", label: "Follow Up" },
-              { id: "completed", label: "Followed Up" }
-            ].map((mode) => {
-              const isSelected = todayViewMode === mode.id;
-              return (
-                <button
-                  key={mode.id}
-                  onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
-                  className={`flex-1 relative h-full flex items-center justify-center rounded-full text-[13px] font-bold transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
-                >
-                  {isSelected && (
-                    <motion.div
-                      layoutId="hrTodayToggleBgMobile"
-                      className="absolute inset-0 bg-[#0052FF] shadow-md rounded-full"
-                      initial={false}
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                      style={{ zIndex: -1 }}
-                    />
-                  )}
-                  <span className="relative z-10">{mode.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 
@@ -395,56 +320,6 @@ export default function HrPage() {
         </ToolbarEnd>
       </ListToolbar>
 
-      {/* Action Required Row */}
-      {activeTab === "Action Required" && (
-        <div className="flex flex-wrap items-center gap-2 px-5 pb-1 animate-in slide-in-from-top-2 fade-in duration-200">
-          <div className="flex h-10 items-center gap-2 overflow-x-auto scrollbar-hide">
-            {actionFilters.map((filter) => {
-              const isActive = actionFilter === filter;
-              let activeClass = "bg-primary/10 text-primary border-primary/30";
-              if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
-              else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
-              else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
-              return (
-                <button
-                  key={filter}
-                  className={"h-10 shrink-0 flex items-center justify-center cursor-pointer px-5 rounded-full text-[13.5px] font-medium leading-none transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
-                  onClick={() => setActionFilter(filter)}
-                >
-                  {getActionFilterLabel(filter)}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className={`ml-auto flex h-10 shrink-0 self-center items-center bg-muted/60 p-0.5 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "hidden opacity-0 pointer-events-none"}`}>
-            {[
-              { id: "pending", label: "Follow Up" },
-              { id: "completed", label: "Followed Up" }
-            ].map((mode) => {
-              const isSelected = todayViewMode === mode.id;
-              return (
-                <button
-                  key={mode.id}
-                  onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
-                  className={`relative h-full flex items-center px-4 rounded-full text-[13px] font-bold leading-none transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
-                >
-                  {isSelected && (
-                    <motion.div
-                      layoutId="hrTodayToggleBgDesktop"
-                      className="absolute inset-0 rounded bg-background shadow-[0_1px_2px_rgba(0,0,0,0.08),0_0_0_1px_rgba(0,0,0,0.04)] dark:bg-white/10"
-                      initial={false}
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                      style={{ zIndex: -1 }}
-                    />
-                  )}
-                  <span className="relative z-10">{mode.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Table */}
       <div className="flex w-full min-w-0 flex-col md:min-h-0 md:flex-1 md:overflow-hidden">

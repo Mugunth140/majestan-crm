@@ -1,6 +1,5 @@
 "use client";
 
-import { matchesInboundActionFilter } from "@/lib/inbound-action-required";
 import { inboundStatusLabel } from "@/lib/inbound-status";
 import { InboundAssignmentDialog } from "@/components/inbound/inbound-assignment-dialog";
 import { NewInboundModal, showQueueNext } from "@/components/inbound/new-inbound-modal";
@@ -17,7 +16,6 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Eye, Search, Filter, X, Lock } from "lucide-react";
-import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -34,7 +32,6 @@ import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { cn } from "@/lib/utils";
 import { canViewInboundContacts, isAdmin } from "@/lib/permissions";
-import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
 import { StaffName } from "@/components/shared/name-avatar";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -63,8 +60,7 @@ export default function InboundPage() {
   const isPhone = useIsMobile();
   const [creating, setCreating] = useState(false);
   const views = useModuleView("inbound", INBOUND_FIELDS);
-  const [activeTab, setActiveTab] = usePersistedState<string>("inbound:tab", "All Inbound", { allowed: ["All Inbound", "Queue", "Action Required", "Closed"] });
-  const [actionFilter, setActionFilter] = usePersistedState<string>("inbound:actionFilter", "Today", { allowed: ACTION_FILTERS });
+  const [activeTab, setActiveTab] = usePersistedState<string>("inbound:tab", "All Inbound", { allowed: ["All Inbound", "Queue", "Closed"] });
   const [inbounds, setInbounds] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -112,10 +108,8 @@ export default function InboundPage() {
     status: "",
   });
 
-  const [todayViewMode, setTodayViewMode] = usePersistedState<"pending" | "completed">("inbound:todayViewMode", "pending", { allowed: ["pending", "completed"] });
 
-  const tabs = ["All Inbound", "Queue", "Action Required", "Closed"];
-  const actionFilters = [...ACTION_FILTERS];
+  const tabs = ["All Inbound", "Queue", "Closed"];
 
   const fetchInbounds = useCallback(async () => {
     try {
@@ -173,18 +167,13 @@ export default function InboundPage() {
 
     const closedStatuses = ["Closed"];
 
-    if (activeTab === "Action Required") {
-      const now = new Date();
-      return filtered.filter(record => matchesInboundActionFilter(record, actionFilter, todayViewMode, now, filters.status));
-    }
-
     if (activeTab === "Closed") {
       return filtered.filter(l => closedStatuses.includes(l.status));
     }
 
     // Default: All Inbound (Active Pipeline)
     return filtered.filter(l => !closedStatuses.includes(l.status));
-  }, [inbounds, debouncedSearchQuery, filters, activeTab, queueFilters, actionFilter, todayViewMode]);
+  }, [inbounds, debouncedSearchQuery, filters, activeTab, queueFilters]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -493,56 +482,6 @@ export default function InboundPage() {
         })}
       </div>
 
-      {/* Action Required Row */}
-      {activeTab === "Action Required" && (
-        <div className="flex flex-col gap-3 -mx-4 px-4">
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
-            {actionFilters.map((filter) => {
-              const isActive = actionFilter === filter;
-              let activeClass = "bg-primary/10 text-primary border-primary/30";
-              if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
-              else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
-              else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
-              return (
-                <button
-                  key={filter}
-                  className={"h-9 shrink-0 flex items-center justify-center cursor-pointer px-4 rounded-full text-[13px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-card text-muted-foreground border-border hover:bg-muted hover:text-foreground")}
-                  onClick={() => setActionFilter(filter)}
-                >
-                  {getActionFilterLabel(filter)}
-                </button>
-              );
-            })}
-          </div>
-          
-          <div className={`flex items-center h-10 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "hidden opacity-0 pointer-events-none"}`}>
-            {[
-              { id: "pending", label: "Follow Up" },
-              { id: "completed", label: "Followed Up" }
-            ].map((mode) => {
-              const isSelected = todayViewMode === mode.id;
-              return (
-                <button
-                  key={mode.id}
-                  onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
-                  className={`flex-1 relative h-full flex items-center justify-center rounded-full text-[13px] font-bold transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
-                >
-                  {isSelected && (
-                    <motion.div
-                      layoutId="todayToggleBgMobile"
-                      className="absolute inset-0 bg-[#0052FF] shadow-md rounded-full"
-                      initial={false}
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                      style={{ zIndex: -1 }}
-                    />
-                  )}
-                  <span className="relative z-10">{mode.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
     </div>
   );
@@ -559,56 +498,6 @@ export default function InboundPage() {
         </ToolbarEnd>
       </ListToolbar>
 
-      {/* Action Required Row */}
-      {activeTab === "Action Required" && (
-        <div className="flex flex-wrap items-center gap-2 px-5 pb-1 animate-in slide-in-from-top-2 fade-in duration-200">
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
-            {actionFilters.map((filter) => {
-              const isActive = actionFilter === filter;
-              let activeClass = "bg-primary/10 text-primary border-primary/30";
-              if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
-              else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
-              else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
-              return (
-                <button
-                  key={filter}
-                  className={"h-7 shrink-0 flex items-center justify-center cursor-pointer px-2.5 rounded-md text-[13px] font-medium leading-none transition-colors border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
-                  onClick={() => setActionFilter(filter)}
-                >
-                  {getActionFilterLabel(filter)}
-                </button>
-              );
-            })}
-          </div>
-          
-          <div className={`ml-auto shrink-0 flex h-8 items-center bg-muted/70 p-0.5 rounded-md relative transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "hidden opacity-0 pointer-events-none"}`}>
-            {[
-              { id: "pending", label: "Follow Up" },
-              { id: "completed", label: "Followed Up" }
-            ].map((mode) => {
-              const isSelected = todayViewMode === mode.id;
-              return (
-                <button
-                  key={mode.id}
-                  onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
-                  className={`relative h-full flex items-center px-2.5 rounded text-[13px] font-medium leading-none transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                >
-                  {isSelected && (
-                    <motion.div
-                      layoutId="todayToggleBgDesktop"
-                      className="absolute inset-0 rounded bg-background shadow-[0_1px_2px_rgba(0,0,0,0.08),0_0_0_1px_rgba(0,0,0,0.04)] dark:bg-white/10"
-                      initial={false}
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                      style={{ zIndex: -1 }}
-                    />
-                  )}
-                  <span className="relative z-10">{mode.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Table */}
       <div className="flex w-full min-w-0 flex-col md:min-h-0 md:flex-1 md:overflow-hidden">

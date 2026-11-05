@@ -21,13 +21,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FormSelect } from "@/components/shared/form-select";
 import { Plus, Search, Eye, Filter, X } from "lucide-react";
-import { motion } from "motion/react";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { ListFrame, ListToolbar, SegmentTabs, ToolbarEnd, ToolbarSearch, headerPrimaryClass, toolbarFilterButton } from "@/components/layout/list-page";
+import { ListFrame, ListToolbar, ToolbarEnd, ToolbarSearch, headerPrimaryClass, toolbarFilterButton } from "@/components/layout/list-page";
 import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { NewAgentModal } from "@/components/agents/new-agent-modal";
-import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -51,8 +49,6 @@ const AGENT_FIELDS: ViewField[] = [
 export default function AgentsPage() {
   const router = useRouter();
   const views = useModuleView("agents", AGENT_FIELDS);
-  const [activeTab, setActiveTab] = usePersistedState<string>("agents:tab", "All Agents", { allowed: ["All Agents", "Action Required"] });
-  const [actionFilter, setActionFilter] = usePersistedState<string>("agents:actionFilter", "Today", { allowed: ACTION_FILTERS });
   const [agents, setAgents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -61,14 +57,11 @@ export default function AgentsPage() {
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
   const [role, setRole] = useState<string>("");
-  const [todayViewMode, setTodayViewMode] = usePersistedState<"pending" | "completed">("agents:todayViewMode", "pending", { allowed: ["pending", "completed"] });
 
   const [searchQuery, setSearchQuery] = usePersistedState("agents:search", "");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [filters, setFilters] = usePersistedState("agents:filters", { partnerType: "", status: "" });
 
-  const tabs = ["All Agents", "Action Required"];
-  const actionFilters = [...ACTION_FILTERS];
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -147,41 +140,8 @@ export default function AgentsPage() {
     if (filters.partnerType) filtered = filtered.filter(a => a.partner_type === filters.partnerType);
     if (filters.status) filtered = filtered.filter(a => a.status === filters.status);
 
-    if (activeTab === "Action Required") {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-
-      return filtered.filter(agent => {
-        const parseLocal = (dStr: string) => {
-          if (!dStr) return null;
-          const parts = dStr.split("T")[0].split("-");
-          if (parts.length !== 3) return null;
-          const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-          d.setHours(0, 0, 0, 0);
-          return d;
-        };
-        const fDate = parseLocal(agent.nextFollowUpDate);
-        const lDate = parseLocal(agent.lastFollowedUpDate);
-
-        if (actionFilter === "Overdue") return !!(fDate && fDate < today);
-        if (actionFilter === "Yesterday") return !!(lDate && lDate.getTime() === yesterday.getTime());
-        if (actionFilter === "Today") {
-          const isFollowedUpToday = !!(lDate && lDate.getTime() === today.getTime());
-          if (todayViewMode === "completed") return !!(isFollowedUpToday && !(fDate && fDate.getTime() === today.getTime()));
-          return !!(fDate && fDate.getTime() === today.getTime());
-        }
-        if (actionFilter === "Tomorrow") return !!(fDate && fDate.getTime() === tomorrow.getTime());
-        if (actionFilter === "All Scheduled") return !!(fDate && fDate > tomorrow);
-        return false;
-      });
-    }
-
     return filtered;
-  }, [agents, debouncedSearchQuery, filters, activeTab, actionFilter, todayViewMode]);
+  }, [agents, debouncedSearchQuery, filters]);
 
   const columns: ColumnDef<any>[] = [
     {
@@ -329,79 +289,12 @@ export default function AgentsPage() {
         {renderFilterPopover(true)}
       </div>
 
-      {/* Pill Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 -mx-4 px-4">
-        {tabs.map(tab => {
-          const isActive = activeTab === tab;
-          return (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-5 h-10 rounded-full text-[14px] font-semibold whitespace-nowrap transition-all border active:scale-95 ${isActive ? "bg-[#017D58] text-white dark:bg-[#2FB585] dark:text-black" : "bg-foreground/[0.06] text-foreground"}`}
-            >
-              {tab}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Action Required sub-filters */}
-      {activeTab === "Action Required" && (
-        <div className="flex flex-col gap-3 -mx-4 px-4">
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
-            {actionFilters.map((filter) => {
-              const isActive = actionFilter === filter;
-              let activeClass = "bg-primary/10 text-primary border-primary/30";
-              if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
-              else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
-              else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
-              return (
-                <button
-                  key={filter}
-                  className={"h-9 shrink-0 flex items-center justify-center cursor-pointer px-4 rounded-full text-[13px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-card text-muted-foreground border-border hover:bg-muted hover:text-foreground")}
-                  onClick={() => setActionFilter(filter)}
-                >
-                  {getActionFilterLabel(filter)}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className={`flex items-center h-10 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "hidden opacity-0 pointer-events-none"}`}>
-            {[
-              { id: "pending", label: "Follow Up" },
-              { id: "completed", label: "Followed Up" }
-            ].map((mode) => {
-              const isSelected = todayViewMode === mode.id;
-              return (
-                <button
-                  key={mode.id}
-                  onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
-                  className={`flex-1 relative h-full flex items-center justify-center rounded-full text-[13px] font-bold transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
-                >
-                  {isSelected && (
-                    <motion.div
-                      layoutId="agentTodayToggleBgMobile"
-                      className="absolute inset-0 bg-[#0052FF] shadow-md rounded-full"
-                      initial={false}
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                      style={{ zIndex: -1 }}
-                    />
-                  )}
-                  <span className="relative z-10">{mode.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 
   const desktopFilters = (
     <ListFrame>
       <ListToolbar>
-        <SegmentTabs tabs={tabs} value={activeTab} onChange={setActiveTab} label="Views" />
         <ToolbarEnd>
           {views.picker}
           <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search ID, Name, Phone, Company" />
@@ -409,56 +302,6 @@ export default function AgentsPage() {
         </ToolbarEnd>
       </ListToolbar>
 
-      {/* Action Required Row */}
-      {activeTab === "Action Required" && (
-        <div className="flex flex-wrap items-center gap-2 px-5 pb-1 animate-in slide-in-from-top-2 fade-in duration-200">
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
-            {actionFilters.map((filter) => {
-              const isActive = actionFilter === filter;
-              let activeClass = "bg-primary/10 text-primary border-primary/30";
-              if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
-              else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
-              else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
-              return (
-                <button
-                  key={filter}
-                  className={"h-7 shrink-0 flex items-center justify-center cursor-pointer px-2.5 rounded-md text-[13px] font-medium leading-none transition-colors border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
-                  onClick={() => setActionFilter(filter)}
-                >
-                  {getActionFilterLabel(filter)}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className={`ml-auto flex h-8 items-center bg-muted/70 p-0.5 rounded-md relative transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "hidden opacity-0 pointer-events-none"}`}>
-            {[
-              { id: "pending", label: "Follow Up" },
-              { id: "completed", label: "Followed Up" }
-            ].map((mode) => {
-              const isSelected = todayViewMode === mode.id;
-              return (
-                <button
-                  key={mode.id}
-                  onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
-                  className={`relative h-full flex items-center px-2.5 rounded text-[13px] font-medium leading-none transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                >
-                  {isSelected && (
-                    <motion.div
-                      layoutId="agentTodayToggleBgDesktop"
-                      className="absolute inset-0 rounded bg-background shadow-[0_1px_2px_rgba(0,0,0,0.08),0_0_0_1px_rgba(0,0,0,0.04)] dark:bg-white/10"
-                      initial={false}
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                      style={{ zIndex: -1 }}
-                    />
-                  )}
-                  <span className="relative z-10">{mode.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Table */}
       <div className="flex w-full min-w-0 flex-col md:min-h-0 md:flex-1 md:overflow-hidden">

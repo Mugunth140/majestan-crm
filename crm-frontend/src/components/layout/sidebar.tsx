@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type CSSProperties, type ReactElement } from "react";
+import { useCallback, useEffect, useState, type CSSProperties, type ReactElement } from "react";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import { Bell, ChevronRight, Search } from "lucide-react";
 import { useNotifications } from "@/context/notification-context";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "./sidebar-context";
-import { NotificationsSheet } from "./notifications-sheet";
+import { NotificationsPanel } from "./notifications-panel";
 import { UpdateButton } from "./app-update";
 import { NAVIGATION, canSee, readUser, type StoredUser } from "./nav-items";
 import { SearchPalette, useSearchShortcut } from "./search-palette";
@@ -49,6 +49,7 @@ export function Sidebar() {
   const { unreadCount } = useNotifications();
   const [user, setUser] = useState<StoredUser | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const closeNotifications = useCallback(() => setNotificationsOpen(false), []);
   const [searchOpen, setSearchOpen] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   useSearchShortcut(setSearchOpen);
@@ -66,7 +67,7 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "hidden h-full shrink-0 flex-col border-r bg-sidebar transition-[width] duration-200 ease-out md:flex",
+        "relative hidden h-full shrink-0 flex-col border-r bg-sidebar transition-[width] duration-200 ease-out md:flex",
         isCollapsed ? "w-[52px]" : "w-[232px]",
       )}
     >
@@ -97,18 +98,24 @@ export function Sidebar() {
           </button>
         </RailTip>
         <RailTip label="Notifications" collapsed={isCollapsed}>
-          <button type="button" onClick={() => setNotificationsOpen(true)} className={rowClass(false, isCollapsed)}>
+          <button
+            type="button"
+            id="notifications-btn"
+            aria-expanded={notificationsOpen}
+            onClick={() => setNotificationsOpen((o) => !o)}
+            className={rowClass(notificationsOpen, isCollapsed)}
+          >
             <span className="relative">
               <Bell className={mutedIcon} strokeWidth={1.75} />
               {unreadCount > 0 && isCollapsed && (
-                <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-red-500" />
+                <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-foreground ring-1 ring-sidebar" />
               )}
             </span>
             {!isCollapsed && (
               <>
                 <span className="flex-1 truncate text-left">Notifications</span>
                 {unreadCount > 0 && (
-                  <span className="min-w-5 rounded-full bg-red-500 px-1.5 text-center text-[11px] font-semibold leading-5 text-white">
+                  <span className="min-w-5 rounded bg-foreground/[0.08] px-1.5 text-center text-[11px] font-medium leading-5 text-foreground dark:bg-white/10">
                     {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
                 )}
@@ -191,7 +198,7 @@ export function Sidebar() {
       {/* Footer: only appears when an update is waiting */}
       <UpdateButton collapsed={isCollapsed} className="border-t p-2" />
 
-      <NotificationsSheet open={notificationsOpen} onOpenChange={setNotificationsOpen} />
+      <NotificationsPanel open={notificationsOpen} onClose={closeNotifications} toggleId="notifications-btn" />
       <SearchPalette open={searchOpen} onOpenChange={setSearchOpen} viewer={user} />
     </aside>
   );

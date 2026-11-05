@@ -137,16 +137,18 @@ export class AgentsService {
         a.created_at as createdAt,
         s.name as staff,
         latest_f.next_follow_up_date as nextFollowUpDate,
-        latest_actual_f.follow_up_date as lastFollowedUpDate
+        latest_f.next_follow_up_time as nextFollowUpTime,
+        latest_actual_f.follow_up_date as lastFollowedUpDate,
+        latest_actual_f.follow_up_time as lastFollowedUpTime
       FROM agents a
       LEFT JOIN users s ON a.assigned_staff_id = s.id
       LEFT JOIN (
-        SELECT agent_id, next_follow_up_date,
+        SELECT agent_id, next_follow_up_date, next_follow_up_time,
                ROW_NUMBER() OVER(PARTITION BY agent_id ORDER BY created_at DESC) as rn
         FROM agent_follow_ups
       ) latest_f ON latest_f.agent_id = a.id AND latest_f.rn = 1
       LEFT JOIN (
-        SELECT agent_id, follow_up_date,
+        SELECT agent_id, follow_up_date, follow_up_time,
                ROW_NUMBER() OVER(PARTITION BY agent_id ORDER BY follow_up_date DESC) as rn
         FROM agent_follow_ups
         WHERE follow_up_date IS NOT NULL
@@ -166,7 +168,9 @@ export class AgentsService {
       staff: row.staff ?? 'Unassigned',
       status: row.status ?? 'New',
       nextFollowUpDate: row.nextFollowUpDate || null,
+      nextFollowUpTime: row.nextFollowUpTime || null,
       lastFollowedUpDate: row.lastFollowedUpDate || null,
+      lastFollowedUpTime: row.lastFollowedUpTime || null,
     }));
   }
 

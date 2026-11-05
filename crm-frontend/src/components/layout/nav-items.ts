@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 import {
   Activity,
   BookOpen,
+  CalendarClock,
   Briefcase,
   Database,
   Gauge,
@@ -38,6 +39,7 @@ export interface NavItem {
 // Sidebar navigation, also searched by the ⌘K palette.
 export const NAVIGATION: NavItem[] = [
   { name: "Dashboard", href: "/", icon: Gauge, color: "text-blue-600 dark:text-blue-400" },
+  { name: "Scheduler", href: "/scheduler", icon: CalendarClock, color: "text-sky-600 dark:text-sky-400" },
   { name: "Leads", href: "/leads", icon: TrendingUp, color: "text-emerald-600 dark:text-emerald-400" },
   { name: "Lead Routing", href: "/lead-routing", icon: Route, color: "text-violet-600 dark:text-violet-400" },
   { name: "Inbound", href: "/inbound", icon: Inbox, color: "text-cyan-600 dark:text-cyan-400" },

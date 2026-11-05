@@ -286,7 +286,9 @@ export class InboundsService {
     const canSee = await this.canSeeContacts(user);
     return inbounds.map(inbound => {
       let nextFollowUpDate = null;
+      let nextFollowUpTime = null;
       let lastFollowedUpDate = null;
+      let lastFollowedUpTime = null;
       
       if (inbound.follow_ups && inbound.follow_ups.length > 0) {
         // Find latest scheduled follow-up
@@ -294,6 +296,7 @@ export class InboundsService {
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
         nextFollowUpDate = scheduledFus.length > 0 ? scheduledFus[0].next_follow_up_date : null;
+        nextFollowUpTime = scheduledFus.length > 0 ? scheduledFus[0].next_follow_up_time : null;
 
         // Find latest actual follow up (where follow_up_date is set)
         const actualFus = [...inbound.follow_ups]
@@ -301,6 +304,7 @@ export class InboundsService {
           .sort((a, b) => new Date(b.follow_up_date!).getTime() - new Date(a.follow_up_date!).getTime());
         
         lastFollowedUpDate = actualFus.length > 0 ? actualFus[0].follow_up_date : null;
+        lastFollowedUpTime = actualFus.length > 0 ? actualFus[0].follow_up_time : null;
       }
 
       return {
@@ -309,7 +313,9 @@ export class InboundsService {
         assigned: names.get(inbound.assigned_staff_id) || null,
         submission_status: statuses.get(inbound.id) || 'New',
         nextFollowUpDate,
-        lastFollowedUpDate
+        nextFollowUpTime,
+        lastFollowedUpDate,
+        lastFollowedUpTime
       };
     });
   }
