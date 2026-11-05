@@ -144,6 +144,10 @@ const UNIT_TYPE_OPTIONS = [
 
 const PLOT_UNIT_TYPE_OPTIONS = [{ value: "plot_unit", label: "Plot" }];
 
+/** How a saved unit type reads; units saved without one are stored as "other". */
+export const unitTypeLabel = (value?: string | null) =>
+  [...UNIT_TYPE_OPTIONS, ...PLOT_UNIT_TYPE_OPTIONS].find((o) => o.value === value)?.label ?? (value ? value.replace(/_/g, " ") : "Other");
+
 // Project Area is collected in any unit but always stored as sqft.
 const PROJECT_AREA_UNITS = [
   { value: "sqft", label: "Sq Ft", factor: 1 },
@@ -1650,7 +1654,8 @@ export function ProjectForm({
         return {
           unitCode: u.unitCode.trim(),
           title: u.title.trim() || undefined,
-          unitType: u.unitType || undefined,
+          // Left blank, the site stores "other"; plot units can only be plots.
+          unitType: u.unitType || (isPlotUnit ? "plot_unit" : undefined),
           bedrooms:
             !isPlotUnit && u.bedrooms ? Number(u.bedrooms) : undefined,
           bathrooms:
@@ -3279,7 +3284,7 @@ export function ProjectForm({
                               onValueChange={(v) =>
                                 updateUnit(idx, { unitType: v || "" })
                               }
-                              placeholder="Any"
+                              placeholder={isPlotProject(projectType) ? "Plot" : "Other"}
                             />
                           </div>
                           <div className="space-y-2">

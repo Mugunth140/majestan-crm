@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useCallback, useEffect, useMemo, useState, Fragment, type ReactNode } from "react";
+import { use, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Building2, ChevronDown, Download, Edit, FileQuestion, ImageIcon, Info, LayoutGrid, Loader2, MapPin, Play } from "lucide-react";
@@ -17,7 +17,7 @@ import { projectsApi } from "@/lib/projects-api";
 import { PROJECT_FAQ_SECTIONS, sectionOf } from "@/lib/faq-sections";
 import { computeProjectRanges, formatPrice, formatPriceRange } from "@/lib/project-ranges";
 import { cn } from "@/lib/utils";
-import { ProjectForm } from "../_components/ProjectForm";
+import { ProjectForm, unitTypeLabel } from "../_components/ProjectForm";
 
 type Tab = "overview" | "units" | "media" | "location" | "faqs";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the project API's shape
@@ -296,142 +296,60 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         {units.length === 0 ? (
           <EmptyState art={<AttachmentsArt />} title="No units yet" hint="Add unit types, their sizes and prices from Edit → Units." />
         ) : (
-          <section className="overflow-hidden rounded-xl border bg-card px-4">
-            <div className="overflow-x-auto">
-              <table className="w-full whitespace-nowrap text-left text-[14px]">
-                <thead>
-                  <tr className="border-b text-[13px] text-muted-foreground">
-                    <th
-                      className="py-3 pr-2 font-medium w-8"
-                      aria-label="Expand"
-                    />
-                    <th className="py-3 pr-4 font-medium">Code</th>
-                    <th className="py-3 pr-4 font-medium">Type</th>
-                    {project.projectType !== "plot" && (
-                      <th className="py-3 pr-4 font-medium">BHK</th>
-                    )}
-                    <th className="py-3 pr-4 font-medium">
-                      {project.projectType === "plot" ? "Area" : "Area (sqft)"}
-                    </th>
-                    {project.projectType !== "plot" && (
-                      <th className="py-3 pr-4 font-medium">Floor Nos</th>
-                    )}
-                    <th className="py-3 pr-4 font-medium">Price</th>
-                    <th className="py-3 pr-4 font-medium">Facing</th>
-                    {project.projectType !== "plot" && (
-                      <th className="py-3 pr-4 font-medium">Furnishing</th>
-                    )}
-                    {project.projectType !== "plot" && (
-                      <th className="py-3 pr-4 font-medium">Parking</th>
-                    )}
-                    <th className="py-3 pr-4 font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60">
-                  {units.map((u: Project, idx: number) => {
-                    const key = String(u.id ?? u.unitCode ?? idx);
-                    const open = expandedUnits[key] ?? false;
-                    const floorPlans: Array<{ floorName: string; imageKey?: string; imageUrl?: string }> = Array.isArray(u.floorPlans)
-                      ? u.floorPlans
-                      : (u.floorPlanImageUrl || u.floorPlanImageKey)
-                        ? [{ floorName: "Existing plan", imageKey: u.floorPlanImageKey ?? u.floorPlanImageUrl, imageUrl: u.floorPlanImageUrl }]
-                        : [];
-                    return (
-                      <Fragment key={u.id ?? u.unitCode}>
-                        <tr
-                          key={u.id ?? u.unitCode}
-                          className={open ? "bg-muted/30" : undefined}
-                        >
-                          <td className="py-3 pr-2">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setExpandedUnits((prev) => ({
-                                  ...prev,
-                                  [key]: !open,
-                                }))
-                              }
-                              className="p-1.5 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                              aria-label={
-                                open
-                                  ? `Collapse unit ${u.unitCode}`
-                                  : `Expand unit ${u.unitCode}`
-                              }
-                              aria-expanded={open}
-                            >
-                              <ChevronDown
-                                className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-                              />
-                            </button>
-                          </td>
-                          <td className="py-3 pr-4 font-mono text-xs">
-                            {u.unitCode}
-                          </td>
-                          <td className="py-3 pr-4 capitalize">
-                            {u.unitType?.replace(/_/g, " ") ?? "-"}
-                          </td>
-                          {project.projectType !== "plot" && (
-                            <td className="py-3 pr-4">
-                              {u.bedrooms != null ? `${u.bedrooms}BHK` : "-"}
-                            </td>
-                          )}
-                          <td className="py-3 pr-4">
-                            {project.projectType === "plot"
-                              ? u.plotAreaCents != null &&
-                                String(u.plotAreaCents).trim() !== ""
-                                ? `${String(parseFloat(Number(u.plotAreaCents).toFixed(2)))} cents`
-                                : "-"
-                              : (u.builtupAreaSqft ?? u.carpetAreaSqft ?? "-")}
-                          </td>
-                          {project.projectType !== "plot" && (
-                            <td className="py-3 pr-4">
-                              {u.floorNo != null && String(u.floorNo).trim() !== ""
-                                ? u.totalFloors
-                                  ? `${u.floorNo} of ${u.totalFloors}`
-                                  : `${u.floorNo}`
-                                : "-"}
-                            </td>
-                          )}
-                          <td className="py-3 pr-4 font-semibold">
-                            {formatPrice(Number(u.price))}
-                          </td>
-                          <td className="py-3 pr-4 capitalize">
-                            {u.facing?.replace(/_/g, " ") ?? "-"}
-                          </td>
-                          {project.projectType !== "plot" && (
-                            <td className="py-3 pr-4 capitalize">
-                              {u.furnishedStatus?.replace(/_/g, " ") ?? "-"}
-                            </td>
-                          )}
-                          {project.projectType !== "plot" && (
-                            <td className="py-3 pr-4 capitalize">
-                              {[
-                                u.parking != null ? `${u.parking}` : null,
-                                u.parkingType
-                                  ? String(u.parkingType).replace(/_/g, " ")
-                                  : null,
-                                u.unitGuestParking ? "Guest" : null,
-                              ]
-                                .filter(Boolean)
-                                .join(" · ") || "-"}
-                            </td>
-                          )}
-                          <td className="py-3 pr-4 capitalize">
-                            {u.status ?? "-"}
-                          </td>
-                        </tr>
-                        {open && (
-                          <tr key={`${u.id ?? u.unitCode}-details`}>
-                            <td
-                              colSpan={project.projectType === "plot" ? 6 : 11}
-                              className="py-4 pr-4 bg-muted/20"
-                            >
+          <ul className="space-y-3">
+            {units.map((u: Project, idx: number) => {
+              const key = String(u.id ?? u.unitCode ?? idx);
+              const open = expandedUnits[key] ?? false;
+              const floorPlans: Array<{ floorName: string; imageKey?: string; imageUrl?: string }> = Array.isArray(u.floorPlans)
+                ? u.floorPlans
+                : (u.floorPlanImageUrl || u.floorPlanImageKey)
+                  ? [{ floorName: "Existing plan", imageKey: u.floorPlanImageKey ?? u.floorPlanImageUrl, imageUrl: u.floorPlanImageUrl }]
+                  : [];
+              const facts: [string, ReactNode][] = [
+                ...(!isPlot ? [["BHK", u.bedrooms != null ? `${u.bedrooms} BHK` : null] as [string, ReactNode]] : []),
+                [isPlot ? "Area" : "Area (sqft)", isPlot
+                  ? u.plotAreaCents != null && String(u.plotAreaCents).trim() !== "" ? `${String(parseFloat(Number(u.plotAreaCents).toFixed(2)))} cents` : null
+                  : (u.builtupAreaSqft ?? u.carpetAreaSqft)],
+                ...(!isPlot ? [["Floor", u.floorNo != null && String(u.floorNo).trim() !== "" ? (u.totalFloors ? `${u.floorNo} of ${u.totalFloors}` : `${u.floorNo}`) : null] as [string, ReactNode]] : []),
+                ["Facing", u.facing ? capital(String(u.facing).replace(/_/g, " ")) : null],
+                ...(!isPlot ? [
+                  ["Furnishing", u.furnishedStatus ? capital(String(u.furnishedStatus).replace(/_/g, " ")) : null],
+                  ["Parking", [u.parking != null ? `${u.parking}` : null, u.parkingType ? String(u.parkingType).replace(/_/g, " ") : null, u.unitGuestParking ? "Guest" : null].filter(Boolean).join(" · ") || null],
+                ] as [string, ReactNode][] : []),
+              ];
+              return (
+                <li key={key} className="overflow-hidden rounded-xl border bg-card">
+                  <button type="button" aria-expanded={open}
+                    aria-label={open ? `Collapse unit ${u.unitCode}` : `Expand unit ${u.unitCode}`}
+                    onClick={() => setExpandedUnits((prev) => ({ ...prev, [key]: !open }))}
+                    className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30">
+                    <ChevronDown className={cn("mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200", open && "rotate-180")} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className="font-mono text-xs text-muted-foreground">{u.unitCode}</span>
+                        <span className="text-[14px] font-medium">{unitTypeLabel(u.unitType)}</span>
+                        {u.status && (
+                          <span className={cn("rounded-full px-2 py-0.5 text-[12px] font-medium capitalize", statusPillClass(u.status))}>{u.status}</span>
+                        )}
+                        <span className="ml-auto text-[14px] font-semibold">{formatPrice(Number(u.price))}</span>
+                      </div>
+                      <dl className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(7.5rem,1fr))] gap-x-4 gap-y-2">
+                        {facts.map(([label, value]) => (
+                          <div key={label} className="min-w-0">
+                            <dt className="text-[12px] text-muted-foreground">{label}</dt>
+                            <dd className="truncate text-[13px] capitalize">{value ?? "-"}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
+                  </button>
+                  {open && (
+                    <div className="border-t bg-muted/20 px-4 py-4">
                               {(() => {
                                 const fmtArea = (v: unknown) =>
                                   v != null && String(v).trim() !== ""
                                     ? `${Number(v).toLocaleString("en-IN")} sqft`
                                     : undefined;
-                                const isPlot = project.projectType === "plot";
                                 const plotCents =
                                   u.plotAreaCents != null &&
                                   String(u.plotAreaCents).trim() !== ""
@@ -611,16 +529,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                                     </div>
                                   </div>
                                 )}
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </section>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
     </div>
