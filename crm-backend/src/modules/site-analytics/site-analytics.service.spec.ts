@@ -200,3 +200,70 @@ describe('website analytics proxy', () => {
     expect(data.realtime).toEqual({ visitors: 7, pageviews: 11 });
   });
 });
+
+describe('inventory proxy contracts', () => {
+  let fetcher: jest.SpiedFunction<typeof fetch>;
+  let service: SiteAnalyticsService;
+  const filters = { from: '2026-11-01', to: '2026-11-07', section: 'overview' };
+  beforeEach(() => {
+    service = new SiteAnalyticsService(
+      new ConfigService({
+        SITE_ANALYTICS_API_URL: 'http://localhost:5000/api/v1',
+        SITE_ANALYTICS_READ_KEY: 'fixture-read-key',
+      }),
+    );
+    fetcher = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        response({
+          version: 2,
+          filters: { ...filters, visible: 'true' },
+          records: { items: [{ code: '001', price: '100.25' }] },
+          uploader: ['123'],
+          listingKeys: ['property:1'],
+        }),
+      );
+  });
+  afterEach(() => jest.restoreAllMocks());
+  it('preserves decimal strings, listing codes, filter values and option IDs', async () => {
+    const r = await service.inventory('report', filters, {
+      id: 1,
+      role: 'Admin',
+    });
+    expect(r.records).toEqual({ items: [{ code: '001', price: '100.25' }] });
+    expect(r.uploader).toEqual(['123']);
+    expect(r.filters).toEqual({ ...filters, visible: 'true' });
+    expect(r.listingKeys).toBeUndefined();
+  });
+  it('scopes cache entries by authorization identity and filters', async () => {
+    await service.inventory('report', filters, { id: 1, role: 'Admin' });
+    await service.inventory('report', filters, { id: 1, role: 'Admin' });
+    await service.inventory(
+      'report',
+      { ...filters, city: 'Chennai' },
+      { id: 1, role: 'Admin' },
+    );
+    await service.inventory('report', filters, { id: 2, role: 'Manager' });
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
+  it('invalidates reports on explicit refresh and forwards POST', async () => {
+    await service.inventory('report', filters, { id: 1, role: 'Admin' });
+    await service.refreshInventory();
+    await service.inventory('report', filters, { id: 1, role: 'Admin' });
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(fetcher.mock.calls[1][1]?.method).toBe('POST');
+  });
+  it('rejects invalid actions and structured filter injection', async () => {
+    await expect(
+      service.inventory('unknown', filters, { id: 1, role: 'Admin' }),
+    ).rejects.toThrow();
+    await expect(
+      service.inventory(
+        'report',
+        { ...filters, city: ['Chennai'] },
+        { id: 1, role: 'Admin' },
+      ),
+    ).rejects.toThrow();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+});

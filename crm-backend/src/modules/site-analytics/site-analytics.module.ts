@@ -1,3 +1,4 @@
+import { InventoryController } from "./inventory.controller";
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { RolesGuard } from '../auth/roles.guard';
@@ -6,7 +7,7 @@ import { SiteAnalyticsService } from './site-analytics.service';
 
 @Module({
   imports: [AuthModule],
-  controllers: [SiteAnalyticsController],
+  controllers: [SiteAnalyticsController, InventoryController],
   providers: [SiteAnalyticsService, RolesGuard],
 })
 export class SiteAnalyticsModule {}

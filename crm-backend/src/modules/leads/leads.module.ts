@@ -9,12 +9,11 @@ import { LeadEventsService } from './lead-events.service';
 import { LeadShareService } from './share/lead-share.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AuthModule } from '../auth/auth.module';
-import { TasksModule } from '../tasks/tasks.module';
 import { MailModule } from '../mail/mail.module';
 import { SALES_MAIL_EVENTS } from './mail/sales-mails';
 
 @Module({
-  imports: [NotificationsModule, AuthModule, TasksModule, MailModule.forFeature(SALES_MAIL_EVENTS)],
+  imports: [NotificationsModule, AuthModule, MailModule.forFeature(SALES_MAIL_EVENTS)],
   controllers: [LeadsController, WebsiteLeadsController, NinetyNineAcresController],
   providers: [LeadsService, LeadEventsService, LeadShareService, NinetyNineAcresKeyGuard, NinetyNineAcresService],
   exports: [LeadsService, LeadEventsService],

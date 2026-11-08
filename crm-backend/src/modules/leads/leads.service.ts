@@ -16,7 +16,6 @@ import { WebsiteEnquiryEvent } from '../../database/entities/website-enquiry-eve
 import { NON_QUEUEABLE_LEAD_STATUSES, SALES_PIPELINE_STATUSES } from './lead-statuses';
 import { transferLeadToSales } from '../lead-routing/transfer-to-sales';
 import { NotificationsService } from '../notifications/notifications.service';
-import { TasksService } from '../tasks/tasks.service';
 import { LeadEventsService } from './lead-events.service';
 import { S3Client } from 'bun';
 import { extname } from 'path';
@@ -61,7 +60,6 @@ export class LeadsService {
     @InjectDataSource() private dataSource: DataSource,
     @InjectDataSource('site') private siteDataSource: DataSource,
     private readonly notificationsService: NotificationsService,
-    private readonly tasksService: TasksService,
     // Domain events for the central mail service (docs/mail-composer-plan.md).
     @Optional() private readonly events?: EventEmitter2,
     // Lead history for the Timeline tab and analytics.
@@ -318,10 +316,6 @@ export class LeadsService {
       existingLead.department !== 'sales' &&
       SALES_PIPELINE_STATUSES.includes(body.status_name);
 
-    // Snapshot before the department changes, so the metric still credits the
-    // pipeline that did the work.
-    const metricLead = { ...existingLead };
-
     const saved = entersSales
       ? await transferLeadToSales(
           this.dataSource,
@@ -331,13 +325,6 @@ export class LeadsService {
           `Auto-transferred: status set to ${body.status_name}`,
         )
       : await leadRepo.save(existingLead);
-
-    // Auto-increment task metrics based on new lead status
-    if (body.status_name && metricLead.assigned_staff_id) {
-      this.tasksService.autoIncrementFromLeadStatus(metricLead, body.status_name).catch(err => {
-        console.error('Task auto-increment error (non-fatal):', err?.message);
-      });
-    }
 
     if (body.status_name && body.status_name !== previousStatus) {
       await this.events?.emitAsync('leads.lead.status_changed', {
@@ -812,7 +799,12 @@ export class LeadsService {
           // Mobile wins on conflict: only adopt the email match when mobile matched nothing.
           if (byEmail) matchedLead = byEmail;
         }
+        if(normalised.analyticsSubmissionId){
+          const prior=await eventRepo.findOne({where:{analyticsSubmissionId:normalised.analyticsSubmissionId}});
+          if(prior)return {lead:matchedLead,isExistingCustomer:!!matchedLead,existingStaff:matchedLead?.assigned_staff?.name??'Unassigned'};
+        }
         const event = eventRepo.create({
+          analyticsSubmissionId:normalised.analyticsSubmissionId||null,analyticsSessionId:normalised.analyticsSessionId||null,analyticsPageId:normalised.analyticsPageId||null,
           name: normalised.name ?? null,
           mobile_number: mobile,
           email: normalised.email || null,
@@ -836,7 +828,11 @@ export class LeadsService {
           matched_lead_id: matchedLead ? matchedLead.id : null,
           status: 'open',
         });
-        const savedEvent = await manager.save(event);
+        let savedEvent: WebsiteEnquiryEvent;
+        try{savedEvent=await manager.save(event);}catch(error){
+          if(!normalised.analyticsSubmissionId||!error||typeof error!=='object'||!('code' in error)||error.code!=='ER_DUP_ENTRY')throw error;
+          const prior=await eventRepo.findOne({where:{analyticsSubmissionId:normalised.analyticsSubmissionId}});if(!prior)throw error;savedEvent=prior;
+        }
         return {
           lead: matchedLead,
           isExistingCustomer: !!matchedLead,
@@ -930,13 +926,6 @@ export class LeadsService {
         referred_by_contact: normalised.referredByContact || null,
       });
       const savedLead: Lead = await manager.save(lead);
-
-      // Auto-increment sourcing metric if assigned to sales staff
-      if (savedLead.department === 'sales' && savedLead.assigned_staff_id) {
-        this.tasksService.autoIncrementSourcing(savedLead.assigned_staff_id).catch(err => {
-          console.error('Task sourcing auto-increment error (non-fatal):', err?.message);
-        });
-      }
 
       if (normalised.purchaseType || normalised.propertyType || normalised.funder || normalised.project || normalised.propertyCategory || normalised.propertyId) {
         const inquiryBase = {

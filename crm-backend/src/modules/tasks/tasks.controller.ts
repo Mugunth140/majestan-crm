@@ -1,5 +1,5 @@
 import {
-  Body, Controller, Delete, Get, Param, Post, Request,
+  Body, Controller, Delete, Get, Param, Patch, Post, Query, Request,
   UploadedFile, UseGuards, UseInterceptors, BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -20,24 +20,38 @@ export class TasksController {
     return { success: true, data };
   }
 
-  // GET /api/v1/tasks/dashboard
-  @Get('dashboard')
-  async getDashboard(@Request() req: any) {
-    const data = await this.tasksService.getDashboard(req.user);
+  // GET /api/v1/tasks/board?month=YYYY-MM
+  @Get('board')
+  async board(@Query('month') month: string | undefined, @Request() req: any) {
+    const data = await this.tasksService.board(req.user, month);
+    return { success: true, data };
+  }
+
+  // GET /api/v1/tasks/setup?month=YYYY-MM — departments, people and targets to choose from
+  @Get('setup')
+  async setup(@Query('month') month: string | undefined, @Request() req: any) {
+    const data = await this.tasksService.setup(req.user, month);
+    return { success: true, data };
+  }
+
+  // POST /api/v1/tasks/copy — repeat last month's targets
+  @Post('copy')
+  async copy(@Body() body: any, @Request() req: any) {
+    const data = await this.tasksService.copyPreviousMonth(body, req.user);
     return { success: true, data };
   }
 
   // GET /api/v1/tasks/metrics/:deptName
   @Get('metrics/:deptName')
-  async getMetrics(@Param('deptName') deptName: string) {
-    const data = await this.tasksService.getMetricsForDepartment(deptName);
+  getMetrics(@Param('deptName') deptName: string) {
+    const data = this.tasksService.getMetricsForDepartment(deptName);
     return { success: true, data };
   }
 
-  // GET /api/v1/tasks
+  // GET /api/v1/tasks?month=YYYY-MM — same as the board
   @Get()
-  async getTaskTemplates(@Request() req: any) {
-    const data = await this.tasksService.getTaskTemplates(req.user);
+  async getTaskTemplates(@Query('month') month: string | undefined, @Request() req: any) {
+    const data = await this.tasksService.board(req.user, month);
     return { success: true, data };
   }
 
@@ -52,6 +66,20 @@ export class TasksController {
   @Get(':id')
   async getTaskById(@Param('id') id: string, @Request() req: any) {
     const data = await this.tasksService.getTaskById(Number(id), req.user);
+    return { success: true, data };
+  }
+
+  // PATCH /api/v1/tasks/:id — change targets
+  @Patch(':id')
+  async updateTargets(@Param('id') id: string, @Body() body: any, @Request() req: any) {
+    const data = await this.tasksService.updateTargets(Number(id), body, req.user);
+    return { success: true, data };
+  }
+
+  // GET /api/v1/tasks/:id/activity — what was counted
+  @Get(':id/activity')
+  async getActivity(@Param('id') id: string, @Request() req: any) {
+    const data = await this.tasksService.getActivity(Number(id), req.user);
     return { success: true, data };
   }
 

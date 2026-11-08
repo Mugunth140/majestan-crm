@@ -1,7 +1,8 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { DashboardSkeleton, DetailPageSkeleton, ListPageSkeleton } from "@/components/layout/page-skeletons";
+import { DetailPageSkeleton, ListPageSkeleton } from "@/components/layout/page-skeletons";
+import { DashboardSkeleton } from "@/components/dashboard/skeleton";
 
 // Shown while a page's code loads. The shell (sidebar, top row) stays put, so
 // only the content area needs a placeholder, shaped like the page being opened.

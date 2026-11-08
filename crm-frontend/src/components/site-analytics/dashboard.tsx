@@ -3,11 +3,11 @@ import { useState } from "react";
 import {
   ArrowDownRight,
   ArrowUpRight,
-  Globe,
   Info,
-  RefreshCw,
   TriangleAlert,
 } from "lucide-react";
+import { ToolbarSelect } from "@/components/layout/list-page";
+import { PageActions } from "@/components/layout/page-actions";
 import { DataCard } from "@/components/record/record-page";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -29,6 +29,7 @@ import {
 } from "@/lib/site-analytics";
 import { RankedPanel, CONTROL, type Ranking } from "./ranked-panel";
 import { TrafficChart } from "./traffic-chart";
+import { PropertyInsights } from "./property-insights";
 import { SpeedInsights } from "./speed-insights";
 import { useSiteAnalytics } from "./use-site-analytics";
 
@@ -65,7 +66,6 @@ function KPIs({
       value: report.overview.visitors,
       prior: previous?.overview.visitors,
       format: number,
-      detail: "unique visitor-days",
       tip: "Daily pseudonyms estimate visitors, so these are not cross-day unique people.",
     },
     {
@@ -73,14 +73,12 @@ function KPIs({
       value: report.overview.pageviews,
       prior: previous?.overview.pageviews,
       format: number,
-      detail: "public page navigations",
     },
     {
       label: "Bounce rate",
       value: bounceRate(report),
       prior: previous ? bounceRate(previous) : undefined,
       format: percent,
-      detail: "of sessions starting in range",
       inverse: true,
     },
     {
@@ -88,14 +86,12 @@ function KPIs({
       value: report.overview.avg_engagement_ms,
       prior: previous?.overview.avg_engagement_ms,
       format: duration,
-      detail: "active time per started session",
     },
     {
       label: "Conversions",
       value: conversions(report),
       prior: previous ? conversions(previous) : undefined,
       format: number,
-      detail: "successful submissions",
     },
   ];
   return (
@@ -132,17 +128,10 @@ function KPIs({
             >
               {tile.format(tile.value)}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">{tile.detail}</p>
             <p
               className={`mt-3 flex items-center gap-1 text-xs tabular-nums ${better === null ? "text-muted-foreground" : better ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400"}`}
             >
-              {delta === null ? (
-                <span>
-                  {tile.prior === undefined
-                    ? "Comparison unavailable"
-                    : "New in this period"}
-                </span>
-              ) : (
+              {delta !== null && (
                 <>
                   {delta !== 0 &&
                     (delta > 0 ? (
@@ -209,6 +198,7 @@ export function TrafficPanels({ report }: { report: SiteReport }) {
         />
         <RankedPanel
           title="Acquisition"
+          chart
           groups={dims([
             ["referrer", "Referrers"],
             ["utm_source", "UTM source"],
@@ -227,6 +217,7 @@ export function TrafficPanels({ report }: { report: SiteReport }) {
         />
         <RankedPanel
           title="Devices"
+          chart
           groups={dims([
             ["device", "Device"],
             ["browser", "Browser"],
@@ -284,7 +275,7 @@ export function SiteAnalyticsDashboard() {
     DEFAULT_RANGE,
     { deserialize: restoreRange },
   );
-  const [tab, setTab] = useState<"traffic" | "speed">("traffic");
+  const [tab, setTab] = useState<"traffic" | "property" | "speed">("traffic");
   const range = selectedRange(selection);
   const {
     report,
@@ -298,63 +289,45 @@ export function SiteAnalyticsDashboard() {
   const end = range ? utcDate(Date.parse(range.to) - 86400_000) : "";
   return (
     <div className="mx-auto w-full min-w-0 max-w-7xl space-y-6 pb-8 text-foreground">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <Globe className="size-4 text-muted-foreground" />
-            <h1 className="text-xl font-semibold tracking-tight">
-              Website analytics
-            </h1>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            majestanrealty.com
-          </p>
-        </div>
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <PageActions mobile>
+        <span
+          title="Visitors with pageviews received in the last five minutes; refreshed every 30 seconds while visible."
+          className="inline-flex h-8 items-center gap-2 px-2 text-sm text-muted-foreground"
+        >
           <span
-            title="Visitors with pageviews received in the last five minutes; refreshed every 30 seconds while visible."
-            className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs ${liveError ? "text-muted-foreground" : "text-emerald-700 dark:text-emerald-400"}`}
-          >
-            <span
-              className={`size-1.5 rounded-full ${liveError ? "bg-muted-foreground" : "bg-emerald-500"}`}
-            />
+            className={`size-1.5 rounded-full ${liveError ? "bg-muted-foreground" : "bg-emerald-500"}`}
+          />
+          <span className="font-medium tabular-nums text-foreground">
             {liveError
-              ? "Live unavailable"
-              : `Live · ${report?.realtime ? number(report.realtime.visitors) : "—"}`}
-            <span className="sr-only">visitors in the last 5 minutes</span>
+              ? "—"
+              : report?.realtime
+                ? number(report.realtime.visitors)
+                : "—"}
           </span>
-          <label className="sr-only" htmlFor="analytics-range">
-            Date range in UTC
-          </label>
-          <select
-            id="analytics-range"
-            className={CONTROL}
-            value={selection.preset}
-            onChange={(e) =>
-              setSelection((s) => ({
-                ...s,
-                preset: e.target.value as RangeSelection["preset"],
-                from: s.from || range?.from || utcDate(Date.now()),
-                to: s.to || end || utcDate(Date.now()),
-              }))
-            }
-          >
-            <option value="today">Today</option>
-            <option value="7">Last 7 days</option>
-            <option value="30">Last 30 days</option>
-            <option value="90">Last 90 days</option>
-            <option value="custom">Custom</option>
-          </select>
-          <button
-            type="button"
-            className={CONTROL}
-            aria-label="Refresh analytics"
-            onClick={refresh}
-          >
-            <RefreshCw className="size-4" />
-          </button>
-        </div>
-      </header>
+          <span>{liveError ? "Unavailable" : "online"}</span>
+          <span className="sr-only">visitors in the last 5 minutes</span>
+        </span>
+        <ToolbarSelect<RangeSelection["preset"]>
+          label="Period"
+          value={selection.preset}
+          closeOnSelect
+          options={[
+            { value: "today", label: "Today" },
+            { value: "7", label: "Last 7 days" },
+            { value: "30", label: "Last 30 days" },
+            { value: "90", label: "Last 90 days" },
+            { value: "custom", label: "Custom" },
+          ]}
+          onChange={(preset) =>
+            setSelection((s) => ({
+              ...s,
+              preset,
+              from: s.from || range?.from || utcDate(Date.now()),
+              to: s.to || end || utcDate(Date.now()),
+            }))
+          }
+        />
+      </PageActions>
       {selection.preset === "custom" && (
         <div className="flex flex-wrap gap-3">
           <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
@@ -387,7 +360,7 @@ export function SiteAnalyticsDashboard() {
           role="tablist"
           aria-label="Website analytics views"
         >
-          {(["traffic", "speed"] as const).map((key) => (
+          {(["traffic", "property", "speed"] as const).map((key) => (
             <button
               type="button"
               key={key}
@@ -398,20 +371,27 @@ export function SiteAnalyticsDashboard() {
               onClick={() => setTab(key)}
               className={`border-b-2 py-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-ring ${tab === key ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
             >
-              {key === "traffic" ? "Web Analytics" : "Speed Insights"}
+              {key === "traffic"
+                ? "Web Analytics"
+                : key === "property"
+                  ? "Property Insights"
+                  : "Speed Insights"}
             </button>
           ))}
         </div>
-        <p className="text-xs tabular-nums text-muted-foreground">
-          {range
-            ? `${range.from} – ${end} · UTC days`
-            : "Custom range · maximum 93 UTC days"}
-        </p>
       </div>
       {!range ? (
         <div role="alert" className="rounded-xl border bg-card p-6 text-sm">
           Choose valid start and end dates spanning at most 93 days.
         </div>
+      ) : tab === "property" ? (
+        <section
+          id="analytics-property-panel"
+          aria-labelledby="analytics-property-tab"
+          role="tabpanel"
+        >
+          <PropertyInsights from={range.from} to={range.to} />
+        </section>
       ) : loading ? (
         <AnalyticsSkeleton />
       ) : error ? (

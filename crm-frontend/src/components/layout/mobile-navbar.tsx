@@ -40,8 +40,8 @@ const SPRING = { type: "spring", stiffness: 500, damping: 38 } as const;
 /**
  * Phone dock: a frosted island floating above the home indicator. Tabs are
  * icons; the current one opens into a tinted pill with its name. Beside it, a
- * "+" pops in on pages that can create something: the module's form, or the
- * Create sheet on Home.
+ * "+" on every page: the module's own form where it has one, otherwise the
+ * Create sheet.
  */
 export function MobileNavbar() {
   const router = useRouter();
@@ -51,9 +51,10 @@ export function MobileNavbar() {
   const [createOpen, setCreateOpen] = useState(false);
   if (hidesTabBar(pathname)) return null;
   const current = activeTab(pathname);
-  const createRoute = createRouteFor(pathname);
-  // No "+" for a module this user can't open.
-  const createLabel = createRoute && !canOpen(createRoute, viewer) ? null : createLabelFor(pathname);
+  // A module's own form when this user can open it, otherwise the Create sheet.
+  const formRoute = createRouteFor(pathname);
+  const createRoute = formRoute && canOpen(formRoute, viewer) ? formRoute : null;
+  const createLabel = (createRoute && createLabelFor(pathname)) || "Create";
 
   return (
     <>
@@ -116,22 +117,20 @@ export function MobileNavbar() {
             })}
           </motion.ul>
           <AnimatePresence initial={false} mode="popLayout">
-            {createLabel && (
-              <motion.button
-                key="create"
-                type="button"
-                aria-label={createLabel}
-                onClick={() => (createRoute ? router.push(createRoute) : setCreateOpen(true))}
-                initial={{ opacity: 0, scale: 0.4 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.4 }}
-                whileTap={{ scale: 0.9 }}
-                transition={SPRING}
-                className="pointer-events-auto flex size-[60px] shrink-0 max-[359px]:size-[52px] items-center justify-center rounded-full bg-[#017D58] text-white shadow-[0_8px_24px_-6px_rgba(1,125,88,0.55),0_2px_6px_-2px_rgba(0,0,0,0.2)] outline-none focus-visible:ring-2 focus-visible:ring-[#017D58]/40 focus-visible:ring-offset-2 dark:bg-[#2FB585] dark:text-black"
-              >
-                <Plus className="size-6" strokeWidth={2.5} />
-              </motion.button>
-            )}
+            <motion.button
+              key="create"
+              type="button"
+              aria-label={createLabel}
+              onClick={() => (createRoute ? router.push(createRoute) : setCreateOpen(true))}
+              initial={{ opacity: 0, scale: 0.4 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.4 }}
+              whileTap={{ scale: 0.9 }}
+              transition={SPRING}
+              className="pointer-events-auto flex size-12 shrink-0 max-[359px]:size-11 items-center justify-center rounded-full bg-[#017D58] text-white shadow-[0_6px_18px_-6px_rgba(1,125,88,0.55),0_2px_6px_-2px_rgba(0,0,0,0.2)] outline-none focus-visible:ring-2 focus-visible:ring-[#017D58]/40 focus-visible:ring-offset-2 dark:bg-[#2FB585] dark:text-black"
+            >
+              <Plus className="size-5" strokeWidth={2.5} />
+            </motion.button>
           </AnimatePresence>
         </LayoutGroup>
       </MotionConfig>

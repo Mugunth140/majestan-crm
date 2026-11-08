@@ -31,7 +31,7 @@ import { LeadRoutingModule } from './modules/lead-routing/lead-routing.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ContactLogsModule } from './modules/contact-logs/contact-logs.module';
 import { TasksModule } from './modules/tasks/tasks.module';
-import { MetricsModule } from './modules/metrics/metrics.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { SiteAnalyticsModule } from './modules/site-analytics/site-analytics.module';
 import { PropertiesModule } from './modules/properties/properties.module';
@@ -175,7 +175,7 @@ import { CommunicationsModule } from './modules/communications/communications.mo
     TasksModule,
     AnalyticsModule,
     SiteAnalyticsModule,
-    MetricsModule,
+    DashboardModule,
     PropertiesModule,
     ProjectsModule,
     BuildersModule,

@@ -53,13 +53,17 @@ export const shareApi = {
       body: JSON.stringify({ channel, items: items(listings) }),
     }),
 
-  /** Saves a listing's brochure to the user's device. */
+  /**
+   * Saves a listing's brochure to the user's device. The lead's Activity notes
+   * the download, unless it is part of a share (which is recorded itself).
+   */
   async downloadPdf(
     leadId: number,
     listing: Pick<SharedListing, "kind" | "id">,
+    opts?: { forShare?: boolean },
   ) {
     const res = await apiFetch(
-      `${API_URL}/leads/${leadId}/share/pdf/${listing.kind}/${listing.id}`,
+      `${API_URL}/leads/${leadId}/share/pdf/${listing.kind}/${listing.id}${opts?.forShare ? "?via=share" : ""}`,
     );
     if (!res.ok) throw new Error("Could not prepare the PDF");
     const name = /filename\*=UTF-8''([^;]+)/.exec(

@@ -394,3 +394,36 @@
 .email-prose .email-var-block { display: inline-block; width: 100%; padding: 8px 10px; border: 1px dashed rgba(0, 82, 255, 0.45); background: rgba(0, 82, 255, 0.05); }
 .email-prose .email-var-unknown { background: rgba(220, 38, 38, 0.12); color: #b91c1c; }
 .dark .email-prose .email-var-unknown { color: #fca5a5; }
+
+/* Dashboard charts: categorical slots in fixed order, status steps, and the
+   blue sequential ramp. Dark mode uses its own validated steps, not a flip. */
+.dash-palette {
+  --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a; --series-4: #eda100;
+  --series-5: #e87ba4; --series-6: #008300; --series-7: #6250d6; --series-8: #e34948;
+  --status-good: #0ca30c; --status-warn: #fab219; --status-bad: #d03b3b;
+  --delta-good: #006300; --delta-bad: #c42b2b;
+  --seq-0: #f1f5fb; --seq-1: #cde2fb; --seq-2: #9ec5f4; --seq-3: #6da7ec; --seq-4: #3987e5; --seq-5: #256abf; --seq-6: #184f95;
+  --chart-grid: #ebeae6; --chart-axis: #c3c2b7;
+}
+.dark .dash-palette {
+  --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
+  --series-5: #d55181; --series-6: #008300; --series-7: #9085e9; --series-8: #e66767;
+  --delta-good: #3fbf3f; --delta-bad: #f07070;
+  --seq-0: #1f2329; --seq-1: #183152; --seq-2: #184f95; --seq-3: #256abf; --seq-4: #3987e5; --seq-5: #6da7ec; --seq-6: #9ec5f4;
+  --chart-grid: #2c2c2a; --chart-axis: #383835;
+}
+@keyframes dash-load { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+
+/* One-time entry animation for the first dashboard a visit loads (.dash-intro is removed after it). */
+@keyframes dash-rise { from { opacity: 0; transform: translateY(10px); } }
+@keyframes dash-fade-in { from { opacity: 0; } }
+@keyframes dash-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes dash-grow { from { transform: scaleX(0); } }
+@media (prefers-reduced-motion: no-preference) {
+  .dash-intro .dash-rise { animation: dash-rise 560ms cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: calc(var(--i, 0) * 50ms); }
+  .dash-intro .dash-line { stroke-dasharray: 1; animation: dash-draw 1200ms cubic-bezier(0.45, 0, 0.2, 1) 450ms both; }
+  .dash-intro .dash-fade { animation: dash-fade-in 500ms ease-out 1300ms both; }
+  .dash-intro .dash-sweep { animation: dash-draw 1000ms cubic-bezier(0.45, 0, 0.2, 1) 500ms both; }
+  .dash-intro .dash-grow { transform-origin: left; animation: dash-grow 800ms cubic-bezier(0.2, 0.8, 0.2, 1) 500ms both; }
+}
+.dash-sweep { stroke-dashoffset: 0; }

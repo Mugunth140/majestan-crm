@@ -3,13 +3,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   cleanup,
   fireEvent,
-  render,
+  render as renderComponent,
   screen,
   within,
 } from "@testing-library/react";
+import {
+  PageActionsProvider,
+  PageActionsSlot,
+} from "@/components/layout/page-actions";
 import { SiteAnalyticsDashboard } from "./dashboard";
 import { useSiteAnalytics } from "./use-site-analytics";
 import { analyticsFixture } from "./test-fixtures";
+
+function render(ui: React.ReactNode) {
+  return renderComponent(
+    <PageActionsProvider>
+      <header aria-label="Page toolbar">
+        <PageActionsSlot />
+      </header>
+      {ui}
+    </PageActionsProvider>,
+  );
+}
 
 vi.mock("./use-site-analytics", () => ({ useSiteAnalytics: vi.fn() }));
 vi.mock("@/components/ui/dialog", () => ({
@@ -50,15 +65,24 @@ afterEach(() => {
 describe("website analytics dashboard", () => {
   it("shows traffic KPIs, UTC, visitor-day disclosure and ranked panels", () => {
     render(<SiteAnalyticsDashboard />);
-    expect(screen.getByText("unique visitor-days")).toBeTruthy();
+    expect(screen.queryByText("unique visitor-days")).toBeNull();
     expect(screen.getByText("25%")).toBeTruthy();
     expect(screen.getByText("1m 12s")).toBeTruthy();
-    expect(screen.getByText("Live · 3")).toBeTruthy();
+    expect(
+      within(screen.getByRole("banner", { name: "Page toolbar" })).getByText(
+        "online",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("Website analytics")).toBeNull();
+    expect(screen.queryByText("majestanrealty.com")).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Refresh analytics" }),
+    ).toBeNull();
     expect(
       screen.getByRole("button", { name: /Daily pseudonyms/ }),
     ).toBeTruthy();
     expect(screen.getByText("9")).toBeTruthy();
-    expect(screen.getByLabelText("Date range in UTC")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Period:/ })).toBeTruthy();
   });
   it("opens all results and keeps unknown countries last", () => {
     render(<SiteAnalyticsDashboard />);
@@ -83,9 +107,8 @@ describe("website analytics dashboard", () => {
   });
   it("validates and persists the picked date range", () => {
     render(<SiteAnalyticsDashboard />);
-    fireEvent.change(screen.getByLabelText("Date range in UTC"), {
-      target: { value: "custom" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: /Period:/ }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Custom" }));
     fireEvent.change(screen.getByLabelText("Start date (UTC)"), {
       target: { value: "2026-01-01" },
     });

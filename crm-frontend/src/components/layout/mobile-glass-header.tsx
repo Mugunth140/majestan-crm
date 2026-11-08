@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { useMobileHeader } from "./mobile-header-context";
 import { guardNavigation } from "@/lib/leave-guard";
+import { MobilePageActionsSlot } from "./page-actions";
 import { cn } from "@/lib/utils";
 
 /**
@@ -14,9 +15,14 @@ import { cn } from "@/lib/utils";
 export function MobileGlassHeader() {
   const router = useRouter();
   const pathname = usePathname() ?? "/";
-  const { resolvedTitle, showBack: overrideBack, isScrolled } = useMobileHeader();
+  const {
+    resolvedTitle,
+    showBack: overrideBack,
+    isScrolled,
+  } = useMobileHeader();
 
-  const showBack = overrideBack || pathname.split("/").filter(Boolean).length >= 2;
+  const showBack =
+    overrideBack || pathname.split("/").filter(Boolean).length >= 2;
 
   return (
     <>
@@ -26,7 +32,7 @@ export function MobileGlassHeader() {
           isScrolled ? "m-bar" : "border-transparent bg-transparent",
         )}
       >
-        <div className="relative flex h-11 items-center justify-between px-2">
+        <div className="group relative flex h-11 items-center justify-between px-2">
           <div className="z-10 flex min-w-0 items-center">
             {showBack && (
               <button
@@ -43,13 +49,13 @@ export function MobileGlassHeader() {
           <h1
             aria-hidden={!isScrolled}
             className={cn(
-              "pointer-events-none absolute inset-x-24 truncate text-center text-[17px] font-semibold tracking-tight text-foreground transition-opacity duration-150",
+              "group-has-[[data-mobile-page-actions]:not(:empty)]:hidden pointer-events-none absolute inset-x-24 truncate text-center text-[17px] font-semibold tracking-tight text-foreground transition-opacity duration-150",
               isScrolled ? "opacity-100" : "opacity-0",
             )}
           >
             {resolvedTitle}
           </h1>
-
+          <MobilePageActionsSlot />
         </div>
       </header>
     </>

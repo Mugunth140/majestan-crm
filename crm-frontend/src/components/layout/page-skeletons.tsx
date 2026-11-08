@@ -80,31 +80,3 @@ export function DetailPageSkeleton() {
     </div>
   );
 }
-
-/** Dashboard: KPI tiles over two chart panels. */
-export function DashboardSkeleton() {
-  return (
-    <div aria-busy="true" aria-label="Loading" className="space-y-5 px-4 pt-4 md:px-0 md:pt-0">
-      <div className="space-y-2">
-        <Bone className="h-5 w-44" />
-        <Bone className="h-3 w-64" />
-      </div>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {Array.from({ length: 8 }, (_, i) => (
-          <div key={i} className="space-y-3 rounded-xl border p-4">
-            <Bone className="h-2.5 w-20" />
-            <Bone className="h-6 w-12" />
-          </div>
-        ))}
-      </div>
-      <div className="grid gap-3 lg:grid-cols-2">
-        {[0, 1].map((i) => (
-          <div key={i} className="h-64 rounded-xl border p-4">
-            <Bone className="h-3 w-28" />
-            <Bone className="mt-4 h-[calc(100%-2rem)] w-full bg-muted/50" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}

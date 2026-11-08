@@ -120,9 +120,10 @@ export class LeadsController {
     @Param('kind', new ParseEnumPipe({ property: 'property', project: 'project' })) kind: 'property' | 'project',
     @Param('listingId', ParseIntPipe) listingId: number,
     @Request() req: any,
+    // A WhatsApp share downloads its brochures too; the share itself is the record of that.
+    @Query('via') via?: string,
   ) {
-    await this.share.assertAccess(id, req.user);
-    const { buffer, filename } = await this.share.pdf({ kind, id: listingId });
+    const { buffer, filename } = await this.share.download(id, { kind, id: listingId }, req.user, via !== 'share');
     return new StreamableFile(buffer, {
       type: 'application/pdf',
       length: buffer.length,

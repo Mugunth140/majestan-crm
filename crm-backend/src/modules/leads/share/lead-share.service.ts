@@ -17,6 +17,7 @@ import {
   type ListingKind,
 } from './listing-data';
 import { renderListingPdf } from './listing-pdf';
+import { LeadEventsService } from '../lead-events.service';
 
 export type ShareChannel = 'email' | 'whatsapp';
 export interface ShareItem {
@@ -70,6 +71,7 @@ export class LeadShareService {
     private readonly dataSource: DataSource,
     @InjectDataSource('site') private readonly site: DataSource,
     private readonly attachments: MailAttachmentsService,
+    private readonly events: LeadEventsService,
   ) {}
 
   /** Same rule as opening the lead: staff only reach their own leads. */
@@ -111,6 +113,36 @@ export class LeadShareService {
       buffer,
       filename: `${listing.code} ${slug(listing.title)} - Majestan Realty.pdf`,
     };
+  }
+
+  /** A brochure saved to staff's device, noted in the lead's Activity with the listing it was for. */
+  async download(
+    leadId: number,
+    item: ShareItem,
+    user: { id: number; role?: string },
+    record: boolean,
+  ) {
+    await this.assertAccess(leadId, user);
+    const file = await this.pdf(item);
+    if (record) {
+      const l = file.listing;
+      await this.events.record({
+        leadId,
+        actorId: user.id,
+        type: 'listing_downloaded',
+        field: l.kind,
+        to: l.title,
+        meta: {
+          kind: l.kind,
+          id: l.id,
+          code: l.code,
+          title: l.title,
+          price: l.price,
+          subtitle: l.subtitle,
+        },
+      });
+    }
+    return file;
   }
 
   /** Brochures attached and a message written, ready to open in the email composer. */

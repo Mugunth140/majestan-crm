@@ -19,6 +19,14 @@ export class SiteAnalyticsController {
   async compare(@Query('from') from: string, @Query('to') to: string) {
     return { success: true, data: await this.analytics.compare(from, to) };
   }
+  @Get('property-insights')
+  @Header('Cache-Control', 'no-store')
+  async propertyInsights(@Query('from') from: string, @Query('to') to: string) {
+    return {
+      success: true,
+      data: await this.analytics.propertyInsights(from, to),
+    };
+  }
   @Get('status')
   @Header('Cache-Control', 'no-store')
   async status() {

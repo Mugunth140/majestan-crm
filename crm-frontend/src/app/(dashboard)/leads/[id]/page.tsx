@@ -41,7 +41,8 @@ import {
 import { cn } from "@/lib/utils";
 import { shouldAutoOpenFollowUps, wantsFollowUps } from "@/lib/follow-up-deep-link";
 import { InlineSelect, InlineText, Section, FieldRow, withCurrent, type Option } from "@/components/record/inline-field";
-import { Feed, timelineItems, type TimelineEntry } from "./lead-timeline";
+import { Feed, isShareEntry, sharedCount, timelineItems, type TimelineEntry } from "./lead-timeline";
+import { SegmentTabs } from "@/components/layout/list-page";
 import { TabHeader } from "@/components/record/feed";
 import { LeadConversation, type ComposeRequest } from "@/components/record/conversation";
 import { FollowUpComposer } from "@/components/record/follow-up-composer";
@@ -178,6 +179,7 @@ function LeadDetail() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("timeline");
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
+  const [activityView, setActivityView] = useState<"all" | "shared">("all");
   const [sources, setSources] = useState<Option[]>([]);
   const [cities, setCities] = useState<Option[]>([]);
 
@@ -280,9 +282,10 @@ function LeadDetail() {
     }
   };
 
-  const downloadPdfs = async (listings: SharedListing[]) => {
+  const downloadPdfs = async (listings: SharedListing[], forShare = false) => {
     try {
-      for (const listing of listings) await shareApi.downloadPdf(Number(id), listing);
+      for (const listing of listings) await shareApi.downloadPdf(Number(id), listing, { forShare });
+      if (!forShare) void refreshTimeline();
     } catch {
       toast.error("Couldn't prepare the PDF");
       throw new Error("download failed");
@@ -296,7 +299,7 @@ function LeadDetail() {
     const to = digits.length === 10 ? `91${digits}` : digits;
     window.open(`https://wa.me/${to}?text=${encodeURIComponent(whatsappMessage(lead?.name, listings))}`, "_blank", "noopener");
     try {
-      await downloadPdfs(listings);
+      await downloadPdfs(listings, true);
       await shareApi.log(Number(id), "whatsapp", listings);
       toast.success(listings.length === 1 ? "PDF downloaded. Attach it in the WhatsApp chat." : "PDFs downloaded. Attach them in the WhatsApp chat.");
       setIsAutoMatchOpen(false);
@@ -602,7 +605,11 @@ function LeadDetail() {
   // Defensive newest-first sort (created_at, id tiebreak) — backend orders
   // the same way, but bulk device syncs share second precision.
   const contactLogs: any[] = useMemo(() => sortContactLogs(lead?.contact_logs || []), [lead]);
-  const timelineFeed = useMemo(() => timelineItems(timeline), [timeline]);
+  const sharedTotal = useMemo(() => sharedCount(timeline), [timeline]);
+  const timelineFeed = useMemo(
+    () => timelineItems(activityView === "shared" ? timeline.filter(isShareEntry) : timeline),
+    [timeline, activityView],
+  );
   const sourceOptions = useMemo(() => {
     const current = lead?.lead_source;
     if (!current || sources.some((s) => s.value === current)) return sources;
@@ -881,8 +888,30 @@ function LeadDetail() {
 
             {shownTab === "timeline" && (
               <div className="pb-4">
-                <TabHeader title="Activity" />
-                {timelineFeed.length ? <Feed items={timelineFeed} /> : empty(<History className="h-5 w-5" />, "Nothing recorded yet", "Status changes, edits and assignments will show up here.")}
+                <TabHeader
+                  title="Activity"
+                  action={
+                    <SegmentTabs
+                      label="Show"
+                      value={activityView}
+                      onChange={setActivityView}
+                      tabs={[
+                        { value: "all", label: "All" },
+                        { value: "shared", label: <>Shared<span className="ml-1 tabular-nums text-muted-foreground">{sharedTotal}</span></> },
+                      ]}
+                    />
+                  }
+                />
+                {activityView === "shared" && timelineFeed.length > 0 && (
+                  <p className="mx-3 -mt-1 mb-3 text-[13px] text-muted-foreground sm:mx-10">
+                    <span className="font-medium tabular-nums text-foreground">{sharedTotal}</span> {sharedTotal === 1 ? "property" : "properties"} shared with this lead, with every share and PDF download
+                  </p>
+                )}
+                {timelineFeed.length
+                  ? <Feed items={timelineFeed} />
+                  : activityView === "shared"
+                    ? empty(<History className="h-5 w-5" />, "Nothing shared yet", "Properties shared by email or WhatsApp, and PDFs downloaded for this lead, will show up here.")
+                    : empty(<History className="h-5 w-5" />, "Nothing recorded yet", "Status changes, edits and assignments will show up here.")}
               </div>
             )}
 

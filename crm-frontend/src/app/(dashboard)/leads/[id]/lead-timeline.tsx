@@ -1,12 +1,14 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Link from "next/link";
 import {
-  ArrowRightLeft, CalendarCheck, ClipboardPlus, ClipboardX, FilePlus2, FileX2, Inbox, PencilLine, ShieldAlert, Sparkles, TrendingUp, UserCheck, UserMinus, UserPlus,
+  ArrowRightLeft, CalendarCheck, ClipboardPlus, ClipboardX, FileDown, FilePlus2, FileX2, Inbox, PencilLine, Share2, ShieldAlert, Sparkles, TrendingUp, UserCheck, UserMinus, UserPlus,
 } from "lucide-react";
+import { listingHref, type SharedListing } from "@/lib/listing-share";
 import { LEAD_STATUS_DOTS } from "@/lib/lead-constants";
 import { cn } from "@/lib/utils";
-import { Chip, Feed, Value, Who, change, pretty, sortNewestFirst, type FeedItem } from "@/components/record/feed";
+import { CARD, Chip, Feed, Value, Who, change, pretty, sortNewestFirst, type FeedItem } from "@/components/record/feed";
 
 /** One entry from GET /leads/:id/timeline. */
 export type TimelineEntry = {
@@ -87,9 +89,56 @@ function toItem(e: TimelineEntry): FeedItem {
       return { ...base, icon: <FileX2 />, title: <>{actor} removed <Value>{e.from}</Value></> };
     case "routing":
       return routingItem(e, actor, base);
+    case "listing_downloaded": {
+      const l = listingOf(meta);
+      return {
+        ...base, icon: <FileDown />,
+        title: <>{actor} downloaded the PDF of <Value>{l?.title ?? e.to ?? `a ${e.field ?? "listing"}`}</Value></>,
+        extra: l ? <Listings items={[l]} /> : undefined,
+      };
+    }
+    case "listings_shared": {
+      const listings = sharedListings(e);
+      const what = listings.length === 1 ? <Value>{listings[0].title}</Value> : `${listings.length || "some"} listings`;
+      return {
+        ...base, icon: <Share2 />,
+        title: <>{actor} shared {what} {e.field === "whatsapp" ? "on WhatsApp" : "by email"}</>,
+        extra: listings.length ? <Listings items={listings} /> : undefined,
+      };
+    }
     default:
       return { ...base, icon: <PencilLine />, title: <>{actor} updated the lead</> };
   }
+}
+
+const listingOf = (m: Record<string, unknown>): SharedListing | null =>
+  (m.kind === "property" || m.kind === "project") && m.id ? (m as unknown as SharedListing) : null;
+
+/** The listings a share sent, as they were at the time. */
+export const sharedListings = (e: TimelineEntry): SharedListing[] =>
+  Array.isArray(e.meta?.listings) ? (e.meta.listings as Record<string, unknown>[]).map(listingOf).filter((l): l is SharedListing => !!l) : [];
+
+/** Entries about sharing listings: what the Shared filter keeps. */
+export const isShareEntry = (e: TimelineEntry) => e.kind === "listings_shared" || e.kind === "listing_downloaded";
+
+/** How many different properties and projects this lead has been sent. */
+export function sharedCount(entries: TimelineEntry[]) {
+  const seen = new Set<string>();
+  for (const e of entries) if (e.kind === "listings_shared") for (const l of sharedListings(e)) seen.add(`${l.kind}-${l.id}`);
+  return seen.size;
+}
+
+function Listings({ items }: { items: SharedListing[] }) {
+  return (
+    <div className={cn(CARD, "divide-y divide-border/60 overflow-hidden")}>
+      {items.map((l) => (
+        <div key={`${l.kind}-${l.id}`} className="min-w-0 px-3.5 py-2.5">
+          <Link href={listingHref(l)} className="block truncate text-[14px] font-medium text-foreground hover:underline">{l.title}</Link>
+          <p className="truncate text-[12px] text-muted-foreground">{[l.code, l.subtitle, l.price].filter(Boolean).join(" · ")}</p>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 /** Assignment history (routing_histories). `field` holds the event type. */

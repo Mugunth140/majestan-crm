@@ -1,5 +1,6 @@
 import {
   IsDateString,
+  IsUUID,
   IsIn,
   IsInt,
   IsObject,
@@ -11,6 +12,9 @@ import {
 } from 'class-validator';
 
 export class WebsiteLeadDto {
+  @IsOptional() @IsUUID("4") analyticsSubmissionId?: string;
+  @IsOptional() @IsUUID("4") analyticsSessionId?: string;
+  @IsOptional() @IsUUID("4") analyticsPageId?: string;
   @IsString()
   @MaxLength(255)
   name: string;

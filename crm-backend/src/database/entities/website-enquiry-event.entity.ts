@@ -5,6 +5,10 @@ import { Lead } from './lead.entity';
 
 @Entity('website_enquiry_events')
 export class WebsiteEnquiryEvent {
+  @Column({name:'analytics_submission_id',type:'char',length:36,nullable:true}) analyticsSubmissionId!:string|null;
+  @Column({name:'analytics_session_id',type:'char',length:36,nullable:true}) analyticsSessionId!:string|null;
+  @Column({name:'analytics_page_id',type:'char',length:36,nullable:true}) analyticsPageId!:string|null;
+
   @PrimaryGeneratedColumn()
   id: number;
 

@@ -9,7 +9,7 @@ const OPEN = new Set([
   "notifications/notifications.controller.ts @Delete('all')",
   "notifications/notifications.controller.ts @Delete(':id')",
   "mail/mail.controller.ts @Delete('attachments/:id')",
-  "metrics/metrics.controller.ts @Delete('cache')",
+  "dashboard/dashboard.controller.ts @Delete('cache')",
 ]);
 
 const MODULES = join(__dirname, '..');

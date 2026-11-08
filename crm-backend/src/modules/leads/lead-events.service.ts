@@ -14,7 +14,8 @@ export type LeadEventType =
   | 'qualification_changed'
   | 'visit_scheduled'
   | 'document_added'
-  | 'document_removed';
+  | 'document_removed'
+  | 'listing_downloaded';
 
 export interface LeadEventInput {
   leadId: number;
@@ -28,7 +29,7 @@ export interface LeadEventInput {
 
 export interface TimelineItem {
   id: string;
-  kind: LeadEventType | 'routing';
+  kind: LeadEventType | 'routing' | 'listings_shared';
   at: string;
   actor: { id: number; name: string } | null;
   field: string | null;
@@ -116,9 +117,9 @@ export class LeadEventsService {
     });
   }
 
-  /** The lead's history, newest first: recorded events plus assignment history. */
+  /** The lead's history, newest first: recorded events, assignment history and listing shares. */
   async timeline(leadId: number): Promise<TimelineItem[]> {
-    const [events, routing] = await Promise.all([
+    const [events, routing, shares] = await Promise.all([
       this.ds.query(
         `SELECT e.id, e.type, e.field, e.from_value, e.to_value, e.meta, e.created_at, u.id AS actor_id, u.name AS actor_name
            FROM lead_events e LEFT JOIN users u ON u.id = e.actor_id
@@ -133,6 +134,13 @@ export class LeadEventsService {
            LEFT JOIN users f ON f.id = r.from_user_id
            LEFT JOIN users t ON t.id = r.to_user_id
           WHERE r.lead_id = ?`,
+        [leadId],
+      ),
+      // Shares live in the conversation (contact_logs); Activity lists them too.
+      this.ds.query(
+        `SELECT c.id, c.subject, c.message, c.created_at, u.id AS actor_id, u.name AS actor_name
+           FROM contact_logs c LEFT JOIN users u ON u.id = c.sent_by_id
+          WHERE c.lead_id = ? AND c.contact_type = 'share'`,
         [leadId],
       ),
     ]);
@@ -150,6 +158,14 @@ export class LeadEventsService {
         field: r.event_type, from: r.from_name, to: r.to_name,
         meta: { feedback: r.feedback ?? null, department: r.department ?? null },
       })),
+      ...shares.map((r: any) => {
+        let listings: unknown[] = [];
+        try { listings = JSON.parse(r.message ?? '[]'); } catch { /* an unreadable share still shows */ }
+        return {
+          id: `s${r.id}`, kind: 'listings_shared' as const, at: iso(r.created_at), actor: actor(r),
+          field: r.subject, from: null, to: null, meta: { listings: Array.isArray(listings) ? listings : [] },
+        };
+      }),
     ];
     return items.sort((a, b) => b.at.localeCompare(a.at));
   }

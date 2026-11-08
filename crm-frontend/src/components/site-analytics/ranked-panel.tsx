@@ -24,12 +24,14 @@ export function RankedPanel({
   title,
   groups,
   formatLabel = (label) => (unknown(label) ? "Unknown" : label),
+  chart = false,
   unknownLast = false,
 }: {
   title: string;
   groups: Ranking[];
   formatLabel?: (label: string) => string;
   unknownLast?: boolean;
+  chart?: boolean;
 }) {
   const [selected, setSelected] = useState(groups[0]?.key ?? "");
   const [open, setOpen] = useState(false);
@@ -101,15 +103,15 @@ export function RankedPanel({
           ))}
         </div>
       )}
-      <div className="flex justify-between gap-3 px-3 py-2 text-xs text-muted-foreground">
-        <span>{group?.label}</span>
-        <span>Count / share</span>
-      </div>
-      {list(false)}
+      {chart && rows.length > 0 && total > 0 ? (
+        <ShareChart rows={rows} total={total} formatLabel={formatLabel} />
+      ) : (
+        list(false)
+      )}
       {group?.note && (
         <p className="px-3 py-2 text-xs text-muted-foreground">{group.note}</p>
       )}
-      {rows.length > 8 && (
+      {rows.length > (chart ? 5 : 8) && (
         <button
           className="my-2 w-full rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
           onClick={() => setOpen(true)}
@@ -132,5 +134,66 @@ export function RankedPanel({
         </DialogContent>
       </Dialog>
     </DataCard>
+  );
+}
+
+const colors = ["#13a37b", "#568adc", "#ac83d3", "#e4ac54", "#db827d"];
+
+function ShareChart({
+  rows,
+  total,
+  formatLabel,
+}: {
+  rows: RankedRow[];
+  total: number;
+  formatLabel: (label: string) => string;
+}) {
+  const segments = rows.slice(0, 5).map((row, index) => ({
+    ...row,
+    label: formatLabel(row.label),
+    color: colors[index],
+  }));
+  const remainder = total - segments.reduce((sum, row) => sum + row.count, 0);
+  if (remainder > 0)
+    segments.push({ label: "Other", count: remainder, color: "#818793" });
+  const stops = segments.map(({ count, color }, index) => {
+    const start =
+      (segments.slice(0, index).reduce((sum, row) => sum + row.count, 0) /
+        total) *
+      100;
+    const end = start + (count / total) * 100;
+    return `${color} ${start}% ${end}%`;
+  });
+  return (
+    <div className="flex items-center gap-5 px-2 py-4">
+      <div
+        aria-hidden
+        className="grid size-24 shrink-0 place-items-center rounded-full"
+        style={{ background: `conic-gradient(${stops.join(", ")})` }}
+      >
+        <div className="grid size-[72px] place-content-center rounded-full bg-card text-center">
+          <strong className="text-sm tabular-nums">{number(total)}</strong>
+          <span className="text-xs text-muted-foreground">views</span>
+        </div>
+      </div>
+      <ul className="min-w-0 flex-1 space-y-2 text-sm">
+        {segments.map((row, index) => (
+          <li key={index} className="flex items-center gap-2">
+            <span
+              aria-hidden
+              className="size-2 shrink-0 rounded-full"
+              style={{ backgroundColor: row.color }}
+            />
+            <span className="min-w-0 flex-1 truncate" title={row.label}>
+              {row.label}
+            </span>
+            <span className="tabular-nums">{number(row.count)}</span>
+            <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">
+              {percent(row.count / total)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

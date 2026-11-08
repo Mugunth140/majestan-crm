@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { LeadsService } from './leads.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { TasksService } from '../tasks/tasks.service';
 import { Lead } from '../../database/entities/lead.entity';
 import { SALES_PIPELINE_STATUSES } from './lead-statuses';
 import { transferLeadToSales } from '../lead-routing/transfer-to-sales';
@@ -16,13 +15,11 @@ describe('LeadsService.updateLeadStatus — sales pipeline handover', () => {
   let service: LeadsService;
   let lead: Partial<Lead>;
   let save: jest.Mock;
-  let tasksService: { autoIncrementFromLeadStatus: jest.Mock };
   const transferMock = transferLeadToSales as jest.Mock;
 
   beforeEach(async () => {
     lead = { id: 42, department: 'telecalling', assigned_staff_id: 7, status: 'Interested' };
     save = jest.fn(async (l) => l);
-    tasksService = { autoIncrementFromLeadStatus: jest.fn(async () => {}) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -38,7 +35,6 @@ describe('LeadsService.updateLeadStatus — sales pipeline handover', () => {
         },
         { provide: getDataSourceToken('site'), useValue: {} },
         { provide: NotificationsService, useValue: {} },
-        { provide: TasksService, useValue: tasksService },
       ],
     }).compile();
 
@@ -57,15 +53,6 @@ describe('LeadsService.updateLeadStatus — sales pipeline handover', () => {
     expect(transferMock.mock.calls[0][2]).toMatchObject({ id: 42, status });
     expect(transferMock.mock.calls[0][3]).toBe(3);
     expect(result.transferredToSales).toBe(true);
-  });
-
-  it('credits the telecalling owner, not the sales pipeline, on transfer', async () => {
-    await service.updateLeadStatus(42, { status_name: 'Site Visit Completed' }, 3);
-
-    expect(tasksService.autoIncrementFromLeadStatus).toHaveBeenCalledWith(
-      expect.objectContaining({ department: 'telecalling', assigned_staff_id: 7 }),
-      'Site Visit Completed',
-    );
   });
 
   it('keeps a telecalling lead in telecalling before the site visit', async () => {

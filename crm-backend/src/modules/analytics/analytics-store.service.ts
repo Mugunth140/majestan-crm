@@ -13,7 +13,8 @@ const MIRRORED_TABLES = [
   'leads', 'lead_follow_ups', 'lead_events', 'lead_inquiries', 'routing_histories',
   'contact_logs', 'agent_contact_logs', 'inbound_contact_logs', 'asset_contact_logs', 'hr_contact_logs',
   'users', 'departments', 'inbounds', 'agents', 'assets', 'hr_candidates',
-  'task_templates', 'task_metric_targets', 'task_metric_progress', 'task_activity_logs',
+  'task_templates', 'task_metric_targets', 'task_metric_progress', 'task_activity_logs', 'task_receipts',
+  'roles', 'record_events', 'inbound_follow_ups', 'logger_devices', 'website_enquiry_events', 'hr_sources',
 ] as const;
 
 // Columns never needed for analytics (large or binary).
@@ -241,9 +242,9 @@ export class AnalyticsStoreService implements OnModuleInit, OnApplicationShutdow
  */
 const CREATE_VIEWS = `
 CREATE OR REPLACE VIEW all_contacts AS
-  SELECT 'lead' AS entity, lead_id AS entity_id, sent_by_id, contact_type, created_at FROM contact_logs
-  UNION ALL SELECT 'agent', agent_id, sent_by_id, contact_type, created_at FROM agent_contact_logs
-  UNION ALL SELECT 'inbound', inbound_id, sent_by_id, contact_type, created_at FROM inbound_contact_logs
-  UNION ALL SELECT 'asset', asset_id, sent_by_id, contact_type, created_at FROM asset_contact_logs
-  UNION ALL SELECT 'hr', hr_candidate_id, sent_by_id, contact_type, created_at FROM hr_contact_logs;
+  SELECT 'lead' AS entity, id, lead_id AS entity_id, sent_by_id, contact_type, call_direction, call_duration, source_call_id, created_at FROM contact_logs
+  UNION ALL SELECT 'agent', id, agent_id, sent_by_id, contact_type, call_direction, call_duration, source_call_id, created_at FROM agent_contact_logs
+  UNION ALL SELECT 'inbound', id, inbound_id, sent_by_id, contact_type, call_direction, call_duration, source_call_id, created_at FROM inbound_contact_logs
+  UNION ALL SELECT 'asset', id, asset_id, sent_by_id, contact_type, call_direction, call_duration, source_call_id, created_at FROM asset_contact_logs
+  UNION ALL SELECT 'hr', id, hr_candidate_id, sent_by_id, contact_type, call_direction, call_duration, source_call_id, created_at FROM hr_contact_logs;
 `;

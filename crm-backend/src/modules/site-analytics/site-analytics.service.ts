@@ -1,7 +1,9 @@
+import { DataSource } from 'typeorm';
 import {
   BadGatewayException,
   BadRequestException,
   Injectable,
+  Optional,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -52,8 +54,126 @@ export class SiteAnalyticsService {
   private readonly cache = new Map<string, { at: number; report: Report }>();
   private readonly pending = new Map<string, Promise<Report>>();
   private live: { at: number; data: Json } | null = null;
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    @Optional() private readonly db?: DataSource,
+  ) {}
 
+  private readonly inventoryCache = new Map<
+    string,
+    { at: number; data: Report }
+  >();
+  private readonly inventoryPending = new Map<string, Promise<Report>>();
+  async inventory(
+    action: string,
+    query: Record<string, unknown>,
+    user: { id: number; role: string },
+  ): Promise<Report> {
+    if (
+      ![
+        'report',
+        'options',
+        'records',
+        'listing',
+        'compare',
+        'export',
+      ].includes(action)
+    )
+      throw new BadRequestException('Invalid insights action');
+    analyticsRange(query.from, query.to);
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(query)) {
+      if (typeof v !== 'string' || v.length > 1000)
+        throw new BadRequestException('Invalid filter');
+      params.set(k, v);
+    }
+    const key = JSON.stringify([
+      user.role,
+      user.id,
+      action,
+      [...params].sort(),
+    ]);
+    const cached = this.inventoryCache.get(key);
+    if (cached && Date.now() - cached.at < 60000) return cached.data;
+    const pending = this.inventoryPending.get(key);
+    if (pending) return pending;
+    const task = (async () => {
+      const data = await this.upstream(
+        'analytics/property-insights/v2/' + action + '?' + params.toString(),
+      );
+      if (this.db) {
+        try {
+          const ids = new Set<number>();
+          const find = (value: Json) => {
+            if (Array.isArray(value)) value.forEach(find);
+            else if (value && typeof value === 'object') {
+              if (typeof value.uploaderId === 'number')
+                ids.add(value.uploaderId);
+              Object.values(value).forEach(find);
+            }
+          };
+          find(data);
+          if (Array.isArray(data.uploader))
+            data.uploader.forEach((v) => {
+              if (typeof v === 'string' && /^\d+$/.test(v)) ids.add(Number(v));
+            });
+          const names = ids.size
+            ? await this.db.query<{ id: number; name: string }[]>(
+                'SELECT id,name FROM users WHERE id IN (?)',
+                [[...ids]],
+              )
+            : [];
+          data.uploaderNames = Object.fromEntries(
+            names.map((r) => [String(r.id), r.name]),
+          );
+          if (action === 'report' || action === 'listing') {
+            const allowedKeys = Array.isArray(data.listingKeys)
+              ? data.listingKeys.filter(
+                  (v): v is string => typeof v === 'string',
+                )
+              : [];
+            const rows = await this.db.query<
+              { key: string; status: string; count: string }[]
+            >(
+              `SELECT CASE WHEN property_id IS NOT NULL AND property_id<>999 THEN CONCAT('property:',property_id) WHEN JSON_EXTRACT(preferences,'$.projectId') IS NOT NULL THEN CONCAT('project:',JSON_UNQUOTE(JSON_EXTRACT(preferences,'$.projectId'))) ELSE 'unmapped' END \`key\`,status,COUNT(*) count FROM website_enquiry_events WHERE created_at>=? AND created_at<? GROUP BY 1,2`,
+              [query.from, query.to],
+            );
+            data.intake = {
+              available: true,
+              rows: rows
+                .filter((r) => allowedKeys.includes(r.key))
+                .map((r) => ({ ...r, count: Number(r.count) })),
+            };
+          }
+        } catch {
+          data.intake = { available: false };
+        }
+      }
+      delete data.listingKeys;
+      if (this.inventoryCache.size >= 128)
+        this.inventoryCache.delete(this.inventoryCache.keys().next().value!);
+      this.inventoryCache.set(key, { at: Date.now(), data });
+      return data;
+    })();
+    this.inventoryPending.set(key, task);
+    try {
+      return await task;
+    } finally {
+      this.inventoryPending.delete(key);
+    }
+  }
+  async refreshInventory() {
+    const data = await this.upstream(
+      'analytics/property-insights/v2/refresh',
+      'POST',
+    );
+    this.inventoryCache.clear();
+    return data;
+  }
+  propertyInsights(from: string, to: string) {
+    analyticsRange(from, to);
+    return this.upstream(`analytics/property-insights?from=${from}&to=${to}`);
+  }
   private settings() {
     const settings = siteAnalyticsEnvironment({
       SITE_ANALYTICS_API_URL: this.config.get<string>('SITE_ANALYTICS_API_URL'),
@@ -68,12 +188,13 @@ export class SiteAnalyticsService {
     return settings;
   }
 
-  private async upstream(path: string): Promise<Report> {
+  private async upstream(path: string, method = 'GET'): Promise<Report> {
     const { apiUrl, readKey } = this.settings();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
     try {
       const response = await fetch(`${apiUrl}/${path}`, {
+        method,
         headers: { 'X-Analytics-Key': readKey, Accept: 'application/json' },
         signal: controller.signal,
       });
@@ -98,7 +219,9 @@ export class SiteAnalyticsService {
           'Website analytics returned an invalid report',
         );
       }
-      return numericAnalytics(payload.data) as Report;
+      return path.startsWith('analytics/property-insights/v2/')
+        ? (payload.data as Report)
+        : (numericAnalytics(payload.data) as Report);
     } catch (error) {
       if (
         error instanceof BadGatewayException ||

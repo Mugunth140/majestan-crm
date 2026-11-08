@@ -323,7 +323,7 @@ export function LeadConversation({
                   </div>
                   <button
                     type="button"
-                    onClick={() => shareApi.downloadPdf(leadId, l).catch(() => toast.error("Couldn't prepare the PDF"))}
+                    onClick={() => shareApi.downloadPdf(leadId, l).then(onRefresh, () => toast.error("Couldn't prepare the PDF"))}
                     className="shrink-0 rounded-md px-2 py-1 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   >
                     PDF
