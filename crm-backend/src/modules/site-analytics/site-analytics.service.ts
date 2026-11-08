@@ -12,6 +12,8 @@ import { siteAnalyticsEnvironment } from '../../env.validation';
 type Json = null | boolean | string | number | Json[] | { [key: string]: Json };
 type Report = Record<string, Json>;
 const DAY = 86400_000;
+/** A year: room for "last 6 months" and its comparison period, and any custom range up to a year. */
+const MAX_DAYS = 366;
 export function analyticsRange(from: unknown, to: unknown) {
   const date = (v: unknown): v is string =>
     typeof v === 'string' &&
@@ -22,10 +24,10 @@ export function analyticsRange(from: unknown, to: unknown) {
     !date(from) ||
     !date(to) ||
     Date.parse(to) <= Date.parse(from) ||
-    Date.parse(to) - Date.parse(from) > 93 * DAY
+    Date.parse(to) - Date.parse(from) > MAX_DAYS * DAY
   ) {
     throw new BadRequestException(
-      'Use valid UTC dates from < to, at most 93 days. The end date is exclusive.',
+      `Use valid UTC dates from < to, at most ${MAX_DAYS} days. The end date is exclusive.`,
     );
   }
   return { from, to };

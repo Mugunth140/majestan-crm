@@ -11,8 +11,12 @@ export const WORK_END_MIN = 18 * 60 + 30;
 export const RESPONSE_SLA_MIN = 60;
 
 export const RANGE_KEYS = ['today', '7d', '30d', '6m'] as const;
-export type RangeKey = (typeof RANGE_KEYS)[number];
-const LENGTH: Record<RangeKey, number> = { today: 1, '7d': 7, '30d': 30, '6m': 182 };
+export type RangeKey = (typeof RANGE_KEYS)[number] | 'custom';
+const LENGTH: Record<Exclude<RangeKey, 'custom'>, number> = { today: 1, '7d': 7, '30d': 30, '6m': 182 };
+/** A custom period is written `YYYY-MM-DD..YYYY-MM-DD` (both days included). */
+const CUSTOM = /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/;
+/** Two years: longer periods make the weekly charts unreadable and the queries slow. */
+const MAX_CUSTOM_DAYS = 731;
 
 export type Range = {
   key: RangeKey;
@@ -44,17 +48,33 @@ export function workingDaysBetween(from: string, to: string) {
 }
 
 export function parseRange(raw: string | undefined, now = new Date()): Range {
-  const key = (raw ?? '30d') as RangeKey;
-  if (!RANGE_KEYS.includes(key)) throw new BadRequestException('Choose today, 7d, 30d or 6m');
-  const days = LENGTH[key];
   const today = istToday(now);
-  const from = addDays(today, -(days - 1));
+  const custom = raw ? CUSTOM.exec(raw) : null;
+  let key: RangeKey;
+  let from: string;
+  let to: string;
+  if (custom) {
+    [, from, to] = custom;
+    const valid = (d: string) => !Number.isNaN(Date.parse(d)) && new Date(Date.parse(d)).toISOString().slice(0, 10) === d;
+    if (!valid(from) || !valid(to)) throw new BadRequestException('Those dates are not real calendar days');
+    if (from > to) throw new BadRequestException('The start date is after the end date');
+    if (to > today) to = today;
+    if (from > today) throw new BadRequestException('The period starts in the future');
+    key = 'custom';
+  } else {
+    key = (raw ?? '30d') as RangeKey;
+    if (!(RANGE_KEYS as readonly string[]).includes(key)) throw new BadRequestException('Choose today, 7d, 30d, 6m or a from..to date range');
+    from = addDays(today, -(LENGTH[key as Exclude<RangeKey, 'custom'>] - 1));
+    to = today;
+  }
+  const days = Math.round((Date.parse(to) - Date.parse(from)) / DAY) + 1;
+  if (days > MAX_CUSTOM_DAYS) throw new BadRequestException('Pick a period of two years or less');
   const prevTo = addDays(from, -1);
   const prevFrom = addDays(prevTo, -(days - 1));
   return {
-    key, from, to: today, prevFrom, prevTo, days, today,
-    bucket: key === 'today' ? 'hour' : key === '6m' ? 'week' : 'day',
-    workingDays: workingDaysBetween(from, today),
+    key, from, to, prevFrom, prevTo, days, today,
+    bucket: days === 1 ? 'hour' : days > 92 ? 'week' : 'day',
+    workingDays: workingDaysBetween(from, to),
     prevWorkingDays: workingDaysBetween(prevFrom, prevTo),
   };
 }

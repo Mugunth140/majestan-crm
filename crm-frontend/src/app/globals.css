@@ -427,3 +427,11 @@
   .dash-intro .dash-grow { transform-origin: left; animation: dash-grow 800ms cubic-bezier(0.2, 0.8, 0.2, 1) 500ms both; }
 }
 .dash-sweep { stroke-dashoffset: 0; }
+
+/* Scrolls sideways without a visible bar (filter strips, tab strips). */
+@utility scrollbar-hide {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

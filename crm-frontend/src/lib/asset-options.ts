@@ -3,6 +3,9 @@ import { formatIndianCurrencyShort, parseIndianCurrency } from "./indian-currenc
 /** The choices the asset form offers; the values are stored as shown. */
 const list = (...values: string[]) => values.map((v) => ({ label: v, value: v }));
 
+/** Where an asset stands; the API accepts only these. Sold reads violet, the rest follow the shared status colours. */
+export const ASSET_STATUSES = ["New", "Pending", "Approved", "Available", "Sold", "Rejected"];
+
 export const ASSET_SOURCES = list("Mediator", "MD", "Referral", "CP Reference");
 export const ASSET_ZONES = list("Coimbatore East", "Coimbatore West", "Coimbatore South", "Coimbatore North", "Coimbatore Center");
 export const YES_NO_NA = list("Yes", "No", "N/A");

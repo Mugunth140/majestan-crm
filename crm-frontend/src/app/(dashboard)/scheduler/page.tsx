@@ -14,9 +14,8 @@ import { MobileHeader } from "@/components/layout/mobile-header";
 import {
   ListBody,
   ListFrame,
-  ToolbarClear,
-  ToolbarSelect,
 } from "@/components/layout/list-page";
+import { ClearFilters, FilterStrip, QuickFilter, toOptions } from "@/components/shared/quick-filters";
 import { ACTION_FILTERS, type ActionFilter } from "@/lib/action-filters";
 import {
   SCHEDULE_MODULES,
@@ -56,8 +55,6 @@ const BUCKETS: Record<
   "All Scheduled": { label: "Later", hint: "After tomorrow" },
 };
 
-// ToolbarSelect needs a value for "no filter".
-const ALL = "all";
 
 type Filters = { module: "" | ScheduleModule; staff: string; status: string };
 const NO_FILTERS: Filters = { module: "", staff: "", status: "" };
@@ -386,44 +383,12 @@ export default function SchedulerPage() {
   const filterBar = (
     <>
       {seesAll && (
-        <ToolbarSelect
-          label="Module"
-          closeOnSelect
-          value={filters.module || ALL}
-          onChange={(v) =>
-            setFilter({ module: v === ALL ? "" : (v as ScheduleModule) })
-          }
-          options={[
-            { value: ALL, label: "All" },
-            ...SCHEDULE_MODULES.map((m) => ({
-              value: m.value,
-              label: m.label,
-            })),
-          ]}
-        />
+        <QuickFilter label="Module" value={filters.module} onChange={(v) => setFilter({ module: v as ScheduleModule | "" })}
+          options={SCHEDULE_MODULES.map((m) => ({ value: m.value, label: m.label }))} />
       )}
-      {picksStaff && (
-        <ToolbarSelect
-          label="Staff"
-          closeOnSelect
-          value={filters.staff || ALL}
-          onChange={(v) => setFilter({ staff: v === ALL ? "" : v })}
-          options={[
-            { value: ALL, label: "Anyone" },
-            ...options.staff.map((s) => ({ value: s, label: s })),
-          ]}
-        />
-      )}
-      <ToolbarSelect
-        label="Status"
-        closeOnSelect
-        value={filters.status || ALL}
-        onChange={(v) => setFilter({ status: v === ALL ? "" : v })}
-        options={[
-          { value: ALL, label: "Any" },
-          ...options.statuses.map((s) => ({ value: s, label: s })),
-        ]}
-      />
+      {picksStaff && <QuickFilter label="Staff" value={filters.staff} options={toOptions(options.staff)} onChange={(v) => setFilter({ staff: v })} />}
+      <QuickFilter label="Status" value={filters.status} options={toOptions(options.statuses)} onChange={(v) => setFilter({ status: v })} />
+      <ClearFilters show={activeFilters > 0} onClick={() => setFilters(NO_FILTERS)} />
     </>
   );
 
@@ -505,14 +470,8 @@ export default function SchedulerPage() {
                 </span>
               </p>
             )}
-            <div className="mb-1.5 ml-auto flex flex-wrap items-center justify-end gap-1.5">
-              {filterBar}
-              {activeFilters > 0 && (
-                <ToolbarClear
-                  onClick={() => setFilters(NO_FILTERS)}
-                  title="Clear filters"
-                />
-              )}
+            <div className="mb-1.5 ml-auto flex min-w-0 max-w-full justify-end">
+              <FilterStrip>{filterBar}</FilterStrip>
             </div>
           </div>
 

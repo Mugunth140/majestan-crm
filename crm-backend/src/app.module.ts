@@ -32,6 +32,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { ContactLogsModule } from './modules/contact-logs/contact-logs.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { SiteAnalyticsModule } from './modules/site-analytics/site-analytics.module';
 import { PropertiesModule } from './modules/properties/properties.module';
@@ -176,6 +177,7 @@ import { CommunicationsModule } from './modules/communications/communications.mo
     AnalyticsModule,
     SiteAnalyticsModule,
     DashboardModule,
+    ReportsModule,
     PropertiesModule,
     ProjectsModule,
     BuildersModule,

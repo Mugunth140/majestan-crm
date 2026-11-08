@@ -11,21 +11,7 @@ import {
 import { PropertyWorkspace } from "./property-workspace";
 import { apiFetch, apiJson } from "@/lib/api-fetch";
 vi.mock("@/lib/api-fetch", () => ({ apiJson: vi.fn(), apiFetch: vi.fn() }));
-vi.mock("./inventory-chart", () => ({
-  InventoryChart: ({
-    spec,
-    onDrill,
-  }: {
-    spec: { title: string };
-    onDrill: (f: Record<string, string>, s: string) => void;
-  }) => (
-    <button onClick={() => onDrill({ city: "Chennai" }, spec.title)}>
-      {spec.title}
-    </button>
-  ),
-}));
 vi.mock("./inventory-records", () => ({
-  InventoryRecordTable: () => <p>Inventory records</p>,
   InventoryRecordsDialog: ({
     filters,
   }: {
@@ -87,10 +73,12 @@ const report = {
       key: "city",
       title: "Inventory by city",
       type: "bar",
-      rows: [{ label: "Chennai", value: 2, match: { city: "Chennai" } }],
+      rows: ["Chennai", "Madurai", "Salem", "Trichy", "Erode", "Vellore"].map((label, i) => ({ label, value: 6 - i, match: { city: label } })),
     },
+    { key: "attention", title: "Attention by issue", type: "bar", rows: [{ label: "Missing price", value: 3 }] },
+    { key: "empty", title: "Nothing here", type: "bar", rows: [{ label: "A", value: 0 }] },
   ],
-  issues: [],
+  issues: [{ key: "missing_price", label: "Missing applicable price", value: 3, match: { issue: "missing_price" } }],
   selectionRequired: null,
   records: { total: 948, items: [] },
 };
@@ -107,68 +95,51 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 describe("Property Insights workspace", () => {
-  it("keeps inventory usable with unavailable traffic and exposes source status", async () => {
+  it("renders dashboard tiles, useful charts and the attention queue", async () => {
     render(<PropertyWorkspace from={from} to={to} />);
-    expect(await screen.findByText("948")).toBeTruthy();
-    expect(screen.getByText("traffic: unavailable")).toBeTruthy();
+    expect(await screen.findByText("Current properties")).toBeTruthy();
+    expect(screen.getByText("Some data is missing: traffic: unavailable")).toBeTruthy();
     expect(screen.getByText("Inventory by city")).toBeTruthy();
+    expect(screen.queryByText("Attention by issue")).toBeNull();
+    expect(screen.queryByText("Nothing here")).toBeNull();
+    expect(screen.getByText("Attention queue")).toBeTruthy();
+    expect(screen.queryByText(/matching records/i)).toBeNull();
   });
-  it("has six focused sections and requests section-specific reports", async () => {
+  it("has no refresh or Excel buttons", async () => {
     render(<PropertyWorkspace from={from} to={to} />);
-    await screen.findByText("948");
-    const nav = screen.getByRole("navigation", {
-      name: "Property Insights sections",
-    });
-    expect(within(nav).getAllByRole("button")).toHaveLength(6);
-    fireEvent.click(
-      within(nav).getByRole("button", { name: "Projects", exact: true }),
-    );
+    await screen.findByText("Current properties");
+    expect(screen.queryByRole("button", { name: /refresh/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /excel/i })).toBeNull();
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+  it("has five sections and requests section-specific reports", async () => {
+    render(<PropertyWorkspace from={from} to={to} />);
+    await screen.findByText("Current properties");
+    const nav = screen.getByRole("navigation", { name: "Property Insights sections" });
+    expect(within(nav).getAllByRole("button")).toHaveLength(5);
+    fireEvent.click(within(nav).getByRole("button", { name: "Projects", exact: true }));
     await waitFor(() =>
-      expect(
-        vi
-          .mocked(apiJson)
-          .mock.calls.some(
-            ([u]) =>
-              String(u).includes("section=projects") &&
-              String(u).includes("kind=project"),
-          ),
-      ).toBe(true),
+      expect(vi.mocked(apiJson).mock.calls.some(([u]) => String(u).includes("section=projects") && String(u).includes("kind=project"))).toBe(true),
     );
   });
-  it("uses server filters for chart drill-downs", async () => {
+  it("drills a chart row into the listings behind it", async () => {
     render(<PropertyWorkspace from={from} to={to} />);
-    fireEvent.click(await screen.findByText("Inventory by city"));
+    fireEvent.click(await screen.findByRole("button", { name: "Open Chennai" }));
     expect(screen.getByRole("dialog").textContent).toBe("Chennai");
   });
-  it("applies searchable city and UTC range filters together", async () => {
+  it("opens the attention queue rows as listings", async () => {
     render(<PropertyWorkspace from={from} to={to} />);
-    await screen.findByText("948");
-    fireEvent.change(screen.getByLabelText("inventory-city"), {
-      target: { value: "Chennai" },
-    });
-    await waitFor(() =>
-      expect(
-        vi
-          .mocked(apiJson)
-          .mock.calls.some(
-            ([u]) =>
-              String(u).includes("/report?") &&
-              String(u).includes("city=Chennai") &&
-              String(u).includes("from=2026-11-01") &&
-              String(u).includes("to=2026-11-07"),
-          ),
-      ).toBe(true),
-    );
+    fireEvent.click(await screen.findByRole("button", { name: /Missing applicable price/ }));
+    expect(screen.getByRole("dialog")).toBeTruthy();
   });
-  it("refreshes the server read model explicitly", async () => {
+  it("keeps every filter behind the Filters button", async () => {
     render(<PropertyWorkspace from={from} to={to} />);
-    await screen.findByText("948");
-    fireEvent.click(screen.getByRole("button", { name: "Refresh inventory" }));
+    await screen.findByText("Current properties");
+    expect(screen.queryByLabelText("inventory-city")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Filters/ }));
+    fireEvent.change(await screen.findByLabelText("inventory-city"), { target: { value: "Chennai" } });
     await waitFor(() =>
-      expect(apiFetch).toHaveBeenCalledWith(
-        "/api/v1/site-analytics/property-insights/v2/refresh",
-        { method: "POST" },
-      ),
+      expect(vi.mocked(apiJson).mock.calls.some(([u]) => String(u).includes("/report?") && String(u).includes("city=Chennai") && String(u).includes("from=2026-11-01") && String(u).includes("to=2026-11-07"))).toBe(true),
     );
   });
 });

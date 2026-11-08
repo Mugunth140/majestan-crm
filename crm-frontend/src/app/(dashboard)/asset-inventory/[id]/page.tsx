@@ -7,14 +7,14 @@ import { toast } from "sonner";
 import { Database, ExternalLink, FileText, Image as ImageIcon, Layers, Loader2, MapPin, Upload } from "lucide-react";
 import { apiFetch, apiJson } from "@/lib/api-fetch";
 import {
-  ASSET_MEDIA, ASSET_SOURCES, ASSET_ZONES, BUSINESS_MODES, CLASSIFICATION_TYPES, DISTANCE_BANDS, REGISTRATION_TIMES,
+  ASSET_MEDIA, ASSET_SOURCES, ASSET_STATUSES, ASSET_ZONES, BUSINESS_MODES, CLASSIFICATION_TYPES, DISTANCE_BANDS, REGISTRATION_TIMES,
   SALEABLE_AREAS, SOIL_TYPES, WATER_DEPTHS, WATER_SOURCES, YES_NO, YES_NO_NA, assetCode, assetPlace, fromLayout, lakhs,
   loPriceText, plainNumber, toLayoutsPayload, toLoPrice, toNumber, type AssetLayout, type AssetMediaSlot,
 } from "@/lib/asset-options";
-import { formatTableDate, statusPillClass } from "@/components/tables/cells";
+import { formatTableDate, statusDot, statusPillClass } from "@/components/tables/cells";
 import { FieldRow, InlineSelect, InlineText, Section, type Option } from "@/components/record/inline-field";
 import { TabHeader } from "@/components/record/feed";
-import { HEADER_BUTTON } from "@/components/record/header-actions";
+import { HEADER_BUTTON, StatusMenu } from "@/components/record/header-actions";
 import { DataCard, RecordPage, RecordSkeleton, RecordSummary, type RecordTab } from "@/components/record/record-page";
 import { FOCUS_BUTTON } from "@/components/shared/focus-modal";
 import { cn } from "@/lib/utils";
@@ -163,7 +163,13 @@ export default function AssetDetailPage() {
   const title = place || a.owner_name || assetCode(a.id);
   const subtitle = [assetCode(a.id), loc.zone].filter(Boolean).join(" · ");
   const extent = feat.extent ? (isNaN(Number(feat.extent)) ? String(feat.extent) : `${plainNumber(feat.extent)} acres`) : null;
-  const pill = (size: string) => <span className={cn("inline-flex items-center rounded-md px-2.5 text-[13px] font-medium", size, statusPillClass(status))}>{status}</span>;
+  const tone = status === "Sold" ? "violet" as const : undefined;
+  const statusOptions = [...(ASSET_STATUSES.includes(status) ? [] : [status]), ...ASSET_STATUSES]
+    .map((v) => ({ value: v, dot: statusDot(v, v === "Sold" ? "violet" : undefined) }));
+  const pill = (size: "h-7" | "h-8", align: "start" | "end" = "end") => (
+    <StatusMenu status={status} options={statusOptions} pillClass={statusPillClass(status, tone)} size={size} align={align}
+      onChange={(v) => void save({ status: v }).catch(() => {})} />
+  );
   const fact = (label: string, value: ReactNode) => (
     <FieldRow label={label}><span className={cn("px-2 text-[14px]", value ? "text-foreground" : "text-muted-foreground/60")}>{value || "—"}</span></FieldRow>
   );
@@ -329,7 +335,7 @@ export default function AssetDetailPage() {
       actions={<>{pill("h-8")}{mapButton}</>}
       phone={
         <div className="flex flex-wrap items-center gap-2 text-[14px] text-muted-foreground">
-          {pill("h-7")}
+          {pill("h-7", "start")}
           <span className="truncate">{subtitle}</span>
         </div>
       }

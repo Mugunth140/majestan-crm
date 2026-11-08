@@ -62,18 +62,20 @@ export type SiteStatus = {
   last_received_at?: string | null;
 };
 export type RangeSelection = {
-  preset: "today" | "7" | "30" | "90" | "custom";
+  preset: "today" | "7" | "30" | "90" | "180" | "custom";
   from: string;
   to: string;
 };
 export const DEFAULT_RANGE: RangeSelection = { preset: "7", from: "", to: "" };
 const DAY = 86400_000;
+/** The server takes at most a year. */
+export const MAX_RANGE_DAYS = 366;
 export const utcDate = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 export function restoreRange(raw: unknown): RangeSelection | undefined {
   if (!raw || typeof raw !== "object") return;
   const r = raw as Partial<RangeSelection>;
   if (
-    !["today", "7", "30", "90", "custom"].includes(r.preset ?? "") ||
+    !["today", "7", "30", "90", "180", "custom"].includes(r.preset ?? "") ||
     typeof r.from !== "string" ||
     typeof r.to !== "string"
   )
@@ -97,7 +99,7 @@ export function selectedRange(selection: RangeSelection, now = Date.now()) {
     !valid(selection.from) ||
     !valid(selection.to) ||
     selection.from > selection.to ||
-    Date.parse(selection.to) - Date.parse(selection.from) >= 93 * DAY
+    Date.parse(selection.to) - Date.parse(selection.from) >= MAX_RANGE_DAYS * DAY
   )
     return null;
   return { from: selection.from, to: utcDate(Date.parse(selection.to) + DAY) };

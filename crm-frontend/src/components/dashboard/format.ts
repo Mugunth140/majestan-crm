@@ -3,7 +3,7 @@ import type { Better, Fmt, MetricOut, RangeKey } from "./types";
 const int = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
 const one = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 1 });
 
-export const RANGES: { value: RangeKey; label: string; short: string }[] = [
+export const RANGES: { value: Exclude<RangeKey, "custom">; label: string; short: string }[] = [
   { value: "today", label: "Today", short: "Today" },
   { value: "7d", label: "Last 7 days", short: "7 days" },
   { value: "30d", label: "Last 30 days", short: "30 days" },

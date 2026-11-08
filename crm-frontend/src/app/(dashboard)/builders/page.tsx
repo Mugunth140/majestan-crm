@@ -16,7 +16,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FormSelect } from "@/components/shared/form-select";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { ListBody, ListFrame, ListToolbar, SegmentTabs, ToolbarClear, ToolbarEnd, ToolbarSearch, headerPrimaryClass, toolbarFilterButton } from "@/components/layout/list-page";
+import { ListBody, ListFrame, ListToolbar, SegmentTabs, ToolbarEnd, ToolbarSearch, headerPrimaryClass, toolbarFilterButton } from "@/components/layout/list-page";
+import { ClearFilters, FilterDivider, FilterStrip, QuickFilter } from "@/components/shared/quick-filters";
 import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
@@ -359,13 +360,17 @@ export default function BuildersPage() {
 
   const desktopFilters = (
     <ListFrame>
-      <ListToolbar>
+      <ListToolbar className="md:flex-nowrap">
         <SegmentTabs tabs={tabs} value={activeTab} onChange={(tab) => { setActiveTab(tab); resetPage(); }} label="Builders views" />
+        <FilterDivider />
+        <FilterStrip>
+          <QuickFilter label="Contact" value={hasContactFilter} onChange={(v) => { setHasContactFilter(v); resetPage(); }}
+            options={[{ label: "Has phone number", value: "phone" }, { label: "Has email", value: "email" }, { label: "Has website", value: "website" }]} />
+          <ClearFilters show={activeFiltersCount > 0 || !!searchQuery} onClick={() => { setSearchQuery(""); clearFilters(); }} />
+        </FilterStrip>
         <ToolbarEnd>
           {views.picker}
-          <ToolbarSearch value={searchQuery} onChange={(v) => { setSearchQuery(v); resetPage(); }} placeholder="Search name, email, phone" />
-          {renderFilterPopover(false)}
-          {(searchQuery || activeFiltersCount > 0) && <ToolbarClear onClick={() => { setSearchQuery(""); clearFilters(); }} />}
+          <ToolbarSearch value={searchQuery} onChange={(v) => { setSearchQuery(v); resetPage(); }} placeholder="Search name, email, phone" className="md:[&_input]:w-56" />
         </ToolbarEnd>
       </ListToolbar>
       <ListBody>

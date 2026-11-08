@@ -1,6 +1,27 @@
-import { IsString, IsOptional, IsInt, IsArray, IsObject, ValidateNested } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsInt,
+  IsArray,
+  IsObject,
+  ValidateNested,
+  IsIn,
+} from 'class-validator';
+
+export const ASSET_STATUSES = [
+  'New',
+  'Pending',
+  'Approved',
+  'Available',
+  'Sold',
+  'Rejected',
+] as const;
 
 export class CreateAssetDto {
+  @IsOptional()
+  @IsIn(ASSET_STATUSES)
+  status?: string;
+
   @IsOptional()
   @IsString()
   owner_name?: string;

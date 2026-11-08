@@ -24,6 +24,22 @@ describe('dashboard range', () => {
     expect(parseRange(undefined, lateUtc).key).toBe('30d');
   });
 
+  it('takes a custom period, with the previous period of the same length', () => {
+    const r = parseRange('2026-10-01..2026-10-10', lateUtc);
+    expect(r).toMatchObject({ key: 'custom', from: '2026-10-01', to: '2026-10-10', prevFrom: '2026-09-21', prevTo: '2026-09-30', days: 10, bucket: 'day' });
+    expect(parseRange('2026-11-07..2026-11-07', lateUtc).bucket).toBe('hour');
+    expect(parseRange('2026-01-01..2026-11-07', lateUtc).bucket).toBe('week');
+    // An end after today stops at today.
+    expect(parseRange('2026-11-01..2026-12-31', lateUtc).to).toBe('2026-11-07');
+  });
+
+  it('rejects bad custom periods', () => {
+    expect(() => parseRange('2026-10-10..2026-10-01', lateUtc)).toThrow(BadRequestException);
+    expect(() => parseRange('2026-02-30..2026-03-01', lateUtc)).toThrow(BadRequestException);
+    expect(() => parseRange('2026-12-01..2026-12-05', lateUtc)).toThrow(BadRequestException);
+    expect(() => parseRange('2020-01-01..2026-11-07', lateUtc)).toThrow(BadRequestException);
+  });
+
   it('rejects unknown ranges', () => {
     expect(() => parseRange('1y')).toThrow(BadRequestException);
   });

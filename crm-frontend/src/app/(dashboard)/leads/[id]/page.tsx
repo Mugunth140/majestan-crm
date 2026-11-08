@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/api-fetch";
 import { normalizeDepartment, pipelineOf } from "@/lib/department";
 import { recordNotInterested } from "@/lib/not-interested";
 import { NotInterestedDialog } from "./not-interested-dialog";
+import { ConvertLeadDialog } from "./convert-lead-dialog";
 import { ScheduleVisitDialog, type VisitDetails } from "@/components/leads/schedule-visit-dialog";
 
 const VISIT_STATUSES = ["Site Visit Scheduled", "Re Visit Scheduled"];
@@ -1174,62 +1175,16 @@ function LeadDetail() {
       />
 
       {/* ── Convert Lead Dialog ── */}
-      <Dialog open={isConvertOpen} onOpenChange={(o) => !o && setIsConvertOpen(false)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Convert lead</DialogTitle>
-            <DialogDescription>
-              Choose where this lead goes next and add a note for the team.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-[13px] font-medium text-foreground/80">Convert to</label>
-              <div className="flex gap-3">
-                {([
-                  { label: "Inbound", value: "inbound" as const },
-                  { label: "Agent Network", value: "agent" as const },
-                ]).map((opt) => (
-                  <button
-                    key={opt.value}
-                    onClick={() => setConvertTo(opt.value)}
-                    className={[
-                      "h-10 flex-1 rounded-lg border text-[14px] font-medium transition-colors",
-                      convertTo === opt.value
-                        ? "border-foreground bg-foreground text-background"
-                        : "border-border text-foreground hover:bg-muted",
-                    ].join(" ")}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[13px] font-medium text-foreground/80">Note</label>
-              <Textarea
-                value={convertFeedback}
-                onChange={(e) => setConvertFeedback(e.target.value)}
-                placeholder="Enter conversion feedback..."
-                className="h-28 rounded-xl bg-muted/30 resize-none"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsConvertOpen(false)} disabled={isConverting}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleConvertLead}
-              disabled={isConverting || !convertTo || !convertFeedback.trim()}
-              className="bg-foreground text-background hover:bg-foreground/85"
-            >
-              {isConverting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Convert
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConvertLeadDialog
+        open={isConvertOpen}
+        busy={isConverting}
+        target={convertTo}
+        note={convertFeedback}
+        onTarget={setConvertTo}
+        onNote={setConvertFeedback}
+        onClose={() => setIsConvertOpen(false)}
+        onConfirm={handleConvertLead}
+      />
 
     </div>
   );

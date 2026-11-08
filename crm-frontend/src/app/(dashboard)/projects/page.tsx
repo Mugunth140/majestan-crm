@@ -16,7 +16,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FormSelect } from "@/components/shared/form-select";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { ListBody, ListFrame, ListToolbar, SegmentTabs, ToolbarClear, ToolbarEnd, ToolbarSearch, headerPrimaryClass, toolbarFilterButton } from "@/components/layout/list-page";
+import { ListBody, ListFrame, ListToolbar, SegmentTabs, ToolbarEnd, ToolbarSearch, headerPrimaryClass, toolbarFilterButton } from "@/components/layout/list-page";
+import { ClearFilters, FilterDivider, FilterStrip, QuickFilter, RangeQuickFilter } from "@/components/shared/quick-filters";
 import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
@@ -375,13 +376,20 @@ export default function ProjectsPage() {
 
   const desktopFilters = (
     <ListFrame>
-      <ListToolbar>
+      <ListToolbar className="md:flex-nowrap">
         <SegmentTabs tabs={tabs} value={activeTab} onChange={(tab) => { setActiveTab(tab); resetPage(); }} label="Projects views" />
+        <FilterDivider />
+        <FilterStrip>
+          <QuickFilter label="Project type" value={filters.projectType} options={PROJECT_TYPE_OPTIONS} onChange={(v) => { setFilters((f) => ({ ...f, projectType: v })); resetPage(); }} />
+          <QuickFilter label="Locality" value={filters.locality} options={localityOptions} onChange={(v) => { setFilters((f) => ({ ...f, locality: v })); resetPage(); }} />
+          <QuickFilter label="BHK" value={filters.bhk[0] != null ? String(filters.bhk[0]) : ""} options={BHK_FILTER_OPTIONS} onChange={(v) => setBhkFilter(v)} />
+          <RangeQuickFilter label="Price" unit="₹" min={filters.minPrice} max={filters.maxPrice} onChange={(minPrice, maxPrice) => { setFilters((f) => ({ ...f, minPrice, maxPrice })); resetPage(); }} />
+          <QuickFilter label="Units" value={filters.minUnits} options={UNITS_FILTER_OPTIONS} onChange={(v) => { setFilters((f) => ({ ...f, minUnits: v })); resetPage(); }} />
+          <ClearFilters show={activeFiltersCount > 0 || !!searchQuery} onClick={() => { setSearchQuery(""); clearFilters(); }} />
+        </FilterStrip>
         <ToolbarEnd>
           {views.picker}
-          <ToolbarSearch value={searchQuery} onChange={(v) => { setSearchQuery(v); resetPage(); }} placeholder="Search name, builder, city" />
-          {renderFilterPopover(false)}
-          {(searchQuery || activeFiltersCount > 0) && <ToolbarClear onClick={() => { setSearchQuery(""); clearFilters(); }} />}
+          <ToolbarSearch value={searchQuery} onChange={(v) => { setSearchQuery(v); resetPage(); }} placeholder="Search name, builder, city" className="md:[&_input]:w-56" />
         </ToolbarEnd>
       </ListToolbar>
       <ListBody>

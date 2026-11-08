@@ -28,6 +28,7 @@ import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { ListFrame, ListToolbar, SegmentTabs, ToolbarEnd, ToolbarSearch, headerPrimaryClass, toolbarFilterButton } from "@/components/layout/list-page";
+import { ClearFilters, FilterDivider, FilterStrip, DateQuickFilter, QuickFilter, toOptions } from "@/components/shared/quick-filters";
 import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { cn } from "@/lib/utils";
@@ -488,12 +489,25 @@ export default function InboundPage() {
 
   const desktopFilters = (
     <ListFrame>
-      <ListToolbar>
+      <ListToolbar className="md:flex-nowrap">
         <SegmentTabs tabs={tabs} value={activeTab} onChange={setActiveTab} label="Views" />
+        <FilterDivider />
+        <FilterStrip>
+          {activeTab === "Queue" && (
+            <QuickFilter label="Uploaded by" value={queueFilters.uploader} onChange={(v) => setQueueFilters((f) => ({ ...f, uploader: v }))}
+              options={Array.from(new Map(inbounds.filter((row) => row.uploaded_by).map((row) => [row.uploaded_by.id, row.uploaded_by])).values()).map((person) => ({ label: person.name, value: String(person.id) }))} />
+          )}
+          <QuickFilter label="Assigned to" value={queueFilters.staff} onChange={(v) => setQueueFilters((f) => ({ ...f, staff: v }))}
+            options={[{ label: "Unassigned", value: "unassigned" }, ...staffDirectory.map((person) => ({ label: person.name, value: String(person.id) }))]} />
+          <DateQuickFilter label="Created" from={filters.dateFrom} to={filters.dateTo} onChange={(dateFrom, dateTo) => setFilters((f) => ({ ...f, dateFrom, dateTo }))} />
+          <QuickFilter label="Status" value={filters.status} options={toOptions(uniqueStatuses)} onChange={(v) => setFilters((f) => ({ ...f, status: v }))} />
+          <QuickFilter label="Category" value={filters.category} options={toOptions(uniqueCategories)} onChange={(v) => setFilters((f) => ({ ...f, category: v }))} />
+          <QuickFilter label="Property type" value={filters.type} options={toOptions(uniqueTypes)} onChange={(v) => setFilters((f) => ({ ...f, type: v }))} />
+          <ClearFilters show={activeFiltersCount > 0 || !!searchQuery} onClick={() => { clearFilters(); setSearchQuery(""); }} />
+        </FilterStrip>
         <ToolbarEnd>
           {views.picker}
-          <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search ID, Type, Phone" />
-          {renderFilterPopover(false)}
+          <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search ID, Type, Phone" className="md:[&_input]:w-56" />
         </ToolbarEnd>
       </ListToolbar>
 

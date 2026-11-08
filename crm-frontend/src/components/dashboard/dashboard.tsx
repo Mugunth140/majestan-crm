@@ -2,15 +2,15 @@
 import { GettingStarted } from "@/components/onboarding/getting-started";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronRight, RefreshCw } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { PageActions } from "@/components/layout/page-actions";
-import { ToolbarSelect } from "@/components/layout/list-page";
 import { apiFetch, apiJson } from "@/lib/api-fetch";
 import { cn } from "@/lib/utils";
 import { DashContext } from "./chart-kit";
 import { BarList, Donut, Funnel, Heatmap, Radar, Scatter, StackedBars, TrendChart } from "./charts";
-import { RANGES, syncedAgo } from "./format";
+import { RANGES } from "./format";
+import { PeriodPicker } from "@/components/shared/period-picker";
 import { Insights, Kpis, Leaderboard, MetricTable, Queue, Targets } from "./lists";
 import { Progress, confetti } from "./progress";
 import { DashboardSkeleton } from "./skeleton";
@@ -19,6 +19,7 @@ import type { Block, RangeKey, Report, Section, Span, Subjects } from "./types";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 const RANGE_KEYS = RANGES.map((r) => r.value);
+const CUSTOM_RANGE = /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/;
 
 /** Reports already fetched this visit, so switching back to a tab is instant. */
 const cache = new Map<string, Report>();
@@ -70,10 +71,11 @@ export function Dashboard() {
   const pathname = usePathname();
   const subjects = useSubjects();
   const [nonce, setNonce] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
 
-  const rawRange = params.get("range") as RangeKey | null;
-  const range: RangeKey = rawRange && RANGE_KEYS.includes(rawRange) ? rawRange : "30d";
+  // A preset key, or a custom period written from..to (both days included).
+  const rawRange = params.get("range");
+  const customRange = rawRange ? CUSTOM_RANGE.exec(rawRange) : null;
+  const range: string = customRange ? rawRange! : rawRange && (RANGE_KEYS as string[]).includes(rawRange) ? rawRange : "30d";
   const subject = params.get("subject") ?? subjects.data?.defaultSubject ?? null;
   const tab = params.get("tab");
 
@@ -113,37 +115,18 @@ export function Dashboard() {
 
   useCelebrations(data);
 
-  const refresh = async () => {
-    setRefreshing(true);
-    try {
-      await apiFetch(`${API}/dashboard/cache`, { method: "DELETE" });
-      cache.clear();
-      setNonce((n) => n + 1);
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
   if (subjects.error) return <ErrorState message={subjects.error} />;
   if (!subjects.data || (!data && !report.error)) return <DashboardSkeleton />;
   if (!data) return <ErrorState message={report.error ?? "Could not load the dashboard"} onRetry={() => setNonce((n) => n + 1)} />;
 
   const s = subjects.data;
-  const synced = syncedAgo(data.syncedAt);
   const controls = (
     <>
       {s.scope !== "self" && <SubjectPicker subjects={s} value={data.subject.key} onChange={openSubject} />}
-      <ToolbarSelect<RangeKey> label="Period" value={range} closeOnSelect options={RANGES} onChange={(r) => setParams({ range: r === "30d" ? null : r })} />
-      <button
-        type="button"
-        onClick={refresh}
-        disabled={refreshing || report.loading}
-        title={synced ? `Data synced ${synced}. Refresh now` : "Refresh"}
-        aria-label="Refresh dashboard"
-        className="flex size-8 items-center justify-center rounded-md bg-muted/70 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60"
-      >
-        <RefreshCw aria-hidden className={cn("size-3.5", (refreshing || report.loading) && "animate-spin")} />
-      </button>
+      <PeriodPicker presets={RANGES} value={customRange ? "custom" : (range as Exclude<RangeKey, "custom">)} from={customRange?.[1]} to={customRange?.[2]}
+        timeZone="Asia/Kolkata" note="Days are India time"
+        onPreset={(r) => setParams({ range: r === "30d" ? null : r })}
+        onRange={(from, to) => setParams({ range: `${from}..${to}` })} />
     </>
   );
 

@@ -16,12 +16,14 @@ import {
   addCounters, compute, DEPARTMENTS, DEPT_METRICS, deptKeyOf, deptLabel, HEADLINE, median, percentile,
   SCORE_METRICS, type Counters, type DeptKey, type MetricDef,
 } from './metrics';
+import { hrTab, sourcingTab } from './module-tabs';
 import { changeInsights, outlierInsights, targetInsights, workloadInsights } from './insights';
 import type {
   Achievement, Bar, Block, Insight, LeaderRow, MetricOut, Person, ProgressHero, Scope, Section, Subject, Tab, TargetRow, Viewer,
 } from './types';
 
 const ORG_ROLES = ['Admin', 'Super Admin', 'Manager'];
+const MODULE_TABS: DeptKey[] = ['hr', 'sourcing'];
 type PeriodCounters = { cur: Counters; prev: Counters };
 type SeriesMap = Map<number, Map<string, Record<string, number>>>;
 
@@ -148,7 +150,8 @@ export class DashboardService {
       return [
         { id: 'overview', label: 'Overview' },
         ...(me.role === 'Manager' ? [{ id: 'me', label: 'My work' }] : []),
-        ...DEPARTMENTS.filter(d => present.has(d.key)).map(d => ({ id: d.key, label: d.label })),
+        // HR and Sourcing always have a tab: they report on the whole module, not only on their department's people.
+        ...DEPARTMENTS.filter(d => present.has(d.key) || MODULE_TABS.includes(d.key)).map(d => ({ id: d.key, label: d.label })),
         { id: 'people', label: 'People' },
       ];
     }
@@ -170,7 +173,7 @@ export class DashboardService {
     const tabs = this.tabsFor(subject, me, scope, roster);
     const tab = tabs.find(t => t.id === query.tab) ?? tabs[0];
     const visible = this.visible(scope, me, roster);
-    const key = `dashboard:v1:${me.id}:${me.role}:${subject.key}:${range.key}:${range.today}:${tab.id}:${visible.map(p => `${p.id}.${p.departmentId}`).join(',')}`;
+    const key = `dashboard:v1:${me.id}:${me.role}:${subject.key}:${range.key}:${range.from}..${range.to}:${range.today}:${tab.id}:${visible.map(p => `${p.id}.${p.departmentId}`).join(',')}`;
     const sections = await this.cache.wrap(key, 60, () => this.build(subject, tab.id, range, me, visible, roster));
     // Celebrations depend on what this viewer has already seen, so they are never cached.
     await this.markCelebrations(me, sections);
@@ -187,6 +190,7 @@ export class DashboardService {
       if (tab === 'overview') return this.overview(visible, range);
       const dept = tab as DeptKey;
       const members = visible.filter(p => p.dept === dept);
+      if (MODULE_TABS.includes(dept)) return this.moduleTab(dept, members, range, roster);
       const data = await this.load(members, range);
       const [team, metrics] = await Promise.all([this.teamSections(dept, members, data, null), this.deptSections(dept, members, data, null)]);
       return [...team, ...metrics];
@@ -198,6 +202,18 @@ export class DashboardService {
       return tab === 'metrics' ? this.deptSections(subject.dept, members, data, null) : this.teamSections(subject.dept, members, data, me);
     }
     return this.personTabs(subject.person, roster, range, tab, me);
+  }
+
+  /** Business-wide HR or Sourcing, then the department's own leaderboard when it has people. */
+  private async moduleTab(dept: DeptKey, members: Person[], range: Range, roster: Person[]): Promise<Section[]> {
+    const ctx: Q.Ctx = { ids: Q.idList(members.map(p => p.id)), range, now: Q.nowLiteral() };
+    const query = <T>(sql: string) => this.store.query<T>(sql);
+    const sections = await (dept === 'hr' ? hrTab : sourcingTab)(query, ctx, roster);
+    if (members.length) {
+      const data = await this.load(members, range);
+      sections.push({ id: `${dept}-board`, title: `${deptLabel(dept)} team`, blocks: [this.leaderboard(`${dept}-board`, 'Team leaderboard', dept, members, data)] });
+    }
+    return sections;
   }
 
   private async personTabs(person: Person, roster: Person[], range: Range, tab: string, viewer: Person) {

@@ -37,8 +37,8 @@ export const DEPARTMENTS: { key: DeptKey; label: string; match: RegExp }[] = [
   { key: 'telecalling', label: 'Telecalling', match: /telecall/i },
   { key: 'sales', label: 'Sales', match: /sales/i },
   { key: 'collection', label: 'Finance / CRM / Collection', match: /collection|finance|crm/i },
-  { key: 'sourcing', label: 'Sourcing / Inbound', match: /sourcing|inbound/i },
-  { key: 'hr', label: 'HR', match: /^hr\b|human/i },
+  { key: 'sourcing', label: 'Sourcing', match: /sourcing|inbound/i },
+  { key: 'hr', label: 'Human Resource', match: /^hr\b|human/i },
   { key: 'digital', label: 'Digital Marketing', match: /digital/i },
   { key: 'design', label: 'Design', match: /design/i },
 ];

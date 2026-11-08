@@ -5,6 +5,7 @@ import {
   BedDouble,
   Building2,
   ClipboardList,
+  FileSpreadsheet,
   Compass,
   Filter,
   KeyRound,
@@ -41,7 +42,7 @@ import {
   type LucideProps,
 } from "lucide-react";
 import { can } from "@/lib/permissions";
-import { visibleNav, type NavAccessViewer, type NavKey } from "@/lib/nav-access";
+import { isAdminRole, visibleNav, type NavAccessViewer, type NavKey } from "@/lib/nav-access";
 
 export interface NavItem {
   name: string;
@@ -51,6 +52,8 @@ export interface NavItem {
   color: string;
   /** Shown or hidden per user on the Access tab; the dashboard has none and is always shown. */
   key?: NavKey;
+  /** Admins only, whatever a user's Access tab says. */
+  adminOnly?: boolean;
   subItems?: SubItem[];
 }
 
@@ -65,6 +68,7 @@ export interface SubItem {
 export const NAVIGATION: NavItem[] = [
   { name: "Dashboard", href: "/", icon: Gauge, color: "text-blue-600 dark:text-blue-400" },
   { name: "Analytics", key: "analytics", href: "/analytics", icon: ChartNoAxesCombined, color: "text-cyan-700 dark:text-cyan-300" },
+  { name: "Reports", href: "/reports", adminOnly: true, icon: FileSpreadsheet, color: "text-green-600 dark:text-green-400" },
   { name: "Scheduler", key: "scheduler", href: "/scheduler", icon: CalendarClock, color: "text-sky-600 dark:text-sky-400" },
   { name: "Leads", key: "leads", href: "/leads", icon: TrendingUp, color: "text-emerald-600 dark:text-emerald-400" },
   { name: "Routing", key: "routing", href: "/lead-routing", icon: Route, color: "text-violet-600 dark:text-violet-400" },
@@ -124,6 +128,7 @@ export type NavViewer = NavAccessViewer;
 
 /** Whether this user's sidebar shows the item. */
 export function canSee(item: NavItem, viewer: NavViewer | null) {
+  if (item.adminOnly) return isAdminRole(viewer?.role);
   return !item.key || visibleNav(viewer).has(item.key);
 }
 

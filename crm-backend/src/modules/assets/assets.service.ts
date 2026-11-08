@@ -129,6 +129,7 @@ export class AssetsService {
       if (dto.mediator_name !== undefined) asset.mediator_name = dto.mediator_name;
       if (dto.cp_reference_name !== undefined) asset.cp_reference_name = dto.cp_reference_name;
       if (dto.remarks !== undefined) asset.remarks = dto.remarks;
+      if (dto.status !== undefined) asset.status = dto.status;
       Object.assign(asset, visitFields(dto));
 
       await queryRunner.manager.save(asset);

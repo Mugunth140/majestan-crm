@@ -45,7 +45,7 @@ describe('website analytics proxy', () => {
   it.each([
     ['2026-02-30', '2026-03-03'],
     ['2026-11-01', '2026-11-01'],
-    ['2026-01-01', '2026-11-01'],
+    ['2025-01-01', '2026-11-01'],
     ['2026-1-1', '2026-01-02'],
     [undefined, '2026-11-08'],
     [['2026-11-01'], '2026-11-08'],
@@ -55,10 +55,10 @@ describe('website analytics proxy', () => {
     });
     expect(fetcher).not.toHaveBeenCalled();
   });
-  it('accepts exactly 93 days, converts nested numbers and keeps dates/labels', () => {
-    expect(analyticsRange('2026-01-01', '2026-04-04')).toEqual({
+  it('accepts exactly 366 days, converts nested numbers and keeps dates/labels', () => {
+    expect(analyticsRange('2026-01-01', '2027-01-02')).toEqual({
       from: '2026-01-01',
-      to: '2026-04-04',
+      to: '2027-01-02',
     });
     expect(
       numericAnalytics({

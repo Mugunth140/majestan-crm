@@ -17,15 +17,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import type { ColumnDef, PaginationState } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Filter, ChevronDown, Check, X } from "lucide-react";
+import { Loader2, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { EmptyState } from "@/components/shared/empty-state";
 import { AssignLeadModal } from "@/components/shared/assign-lead-modal";
-import { FormSelect } from "@/components/shared/form-select";
-import { DatePicker } from "@/components/shared/date-picker";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { SegmentTabs, ToolbarSelect, toolbarButtonClass } from "@/components/layout/list-page";
+import { SegmentTabs } from "@/components/layout/list-page";
+import { ClearFilters, DateQuickFilter, FilterDivider, FilterStrip, QuickFilter } from "@/components/shared/quick-filters";
 import { canTakeLeadFromQueue, canConvertEnquiry, assignRoutingLeads } from "@/lib/lead-routing";
 import { VerificationQueue } from "./verification-queue";
 import { timeAgo } from "@/lib/time-ago";
@@ -109,6 +108,10 @@ interface HistoryEntry {
   department?: string | null;
   feedback?: string | null;
 }
+
+/** The filter chips speak YYYY-MM-DD; this page keeps local Dates. */
+const dayOf = (d?: Date) => (d ? format(d, "yyyy-MM-dd") : "");
+const dateOf = (day: string) => { if (!day) return undefined; const [y, m, dd] = day.split("-").map(Number); return new Date(y, m - 1, dd); };
 
 const EVENT_TYPE_OPTIONS = [
   { label: "All events", value: "" },
@@ -315,11 +318,6 @@ export default function LeadRoutingPage() {
   const enquiryHasFilters =
     enquiryTypeFilter !== "" || enquiryIntentFilter !== "" || enquirySourceFilter !== "" ||
     enquiryDateFrom !== undefined || enquiryDateTo !== undefined;
-  const enquiryActiveFilterCount =
-    (enquiryTypeFilter !== "" ? 1 : 0) + (enquiryIntentFilter !== "" ? 1 : 0) +
-    (enquirySourceFilter !== "" ? 1 : 0) +
-    (enquiryDateFrom !== undefined ? 1 : 0) + (enquiryDateTo !== undefined ? 1 : 0);
-  const [enquiryFilterOpen, setEnquiryFilterOpen] = useState(false);
 
   // History state
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -1047,7 +1045,7 @@ export default function LeadRoutingPage() {
       {!verifying && activeView.switcher}
       <div className="w-full flex flex-col space-y-4 pt-4 md:space-y-0 md:pt-0 md:h-full">
         <div className="flex flex-col md:min-h-0 md:flex-1 lg:-mx-6 lg:-mb-8 lg:-mt-6">
-        <div className="flex flex-wrap items-center gap-2 px-4 pb-2 pt-3 md:px-5">
+        <div className="flex flex-wrap items-center gap-2 px-4 pb-2 pt-3 md:flex-nowrap md:px-5">
           <SegmentTabs
             label="Routing views"
             value={mainTab}
@@ -1059,168 +1057,34 @@ export default function LeadRoutingPage() {
             ]}
           />
 
-          {mainTab === "queue" && visibleDeptTabs.length > 1 && (
-            <SegmentTabs label="Pipeline" value={deptTab} onChange={setDeptTab} tabs={visibleDeptTabs.map((d) => ({ value: d.value, label: d.label }))} />
-          )}
+          {!verifying && (mainTab !== "queue" || visibleDeptTabs.length > 1) && <FilterDivider />}
+          <FilterStrip>
+            {mainTab === "queue" && visibleDeptTabs.length > 1 && (
+              <QuickFilter label="Pipeline" required value={deptTab} options={visibleDeptTabs.map((d) => ({ value: d.value, label: d.label }))} onChange={(v) => setDeptTab(v as typeof deptTab)} />
+            )}
+            {mainTab === "history" && (
+              <>
+                <DateQuickFilter label="Date" from={dayOf(historyDateFrom)} to={dayOf(historyDateTo)}
+                  onChange={(from, to) => { setHistoryDateFrom(dateOf(from)); setHistoryDateTo(dateOf(to)); setHistoryPage(1); }} />
+                <QuickFilter label="Event" value={historyEventFilter} options={EVENT_TYPE_OPTIONS} onChange={(v) => { setHistoryEventFilter(v); setHistoryPage(1); }} />
+                <ClearFilters show={historyDateFrom !== undefined || historyDateTo !== undefined || !!historyEventFilter}
+                  onClick={() => { setHistoryDateFrom(undefined); setHistoryDateTo(undefined); setHistoryEventFilter(""); setHistoryPage(1); }} />
+              </>
+            )}
+            {mainTab === "enquiry" && (
+              <>
+                <DateQuickFilter label="Enquiry date" from={dayOf(enquiryDateFrom)} to={dayOf(enquiryDateTo)}
+                  onChange={(from, to) => { setEnquiryDateFrom(dateOf(from)); setEnquiryDateTo(dateOf(to)); setEnquiryPage(1); }} />
+                <QuickFilter label="Property type" value={enquiryTypeFilter} onChange={(v) => { setEnquiryTypeFilter(v); setEnquiryPage(1); }}
+                  options={[{ label: "Apartment", value: "apartment" }, { label: "Villa", value: "villa" }, { label: "Individual House", value: "individual_portion" }, { label: "Plot", value: "plot" }, { label: "Commercial", value: "commercial" }, { label: "Farmland", value: "farmland" }]} />
+                <QuickFilter label="Source" value={enquirySourceFilter} options={ENQUIRY_SOURCE_OPTIONS} onChange={(v) => { setEnquirySourceFilter(v); setEnquiryPage(1); }} />
+                <QuickFilter label="Purpose" value={enquiryIntentFilter} options={[{ label: "Enquiry", value: "enquiry" }, { label: "Site Visit", value: "site_visit" }]} onChange={(v) => { setEnquiryIntentFilter(v); setEnquiryPage(1); }} />
+                <ClearFilters show={enquiryHasFilters} onClick={() => { setEnquiryTypeFilter(""); setEnquiryIntentFilter(""); setEnquirySourceFilter(""); setEnquiryDateFrom(undefined); setEnquiryDateTo(undefined); setEnquiryPage(1); }} />
+              </>
+            )}
+          </FilterStrip>
 
-          {activeView.picker && !verifying && <div className={mainTab === "history" ? undefined : "ml-auto"}>{activeView.picker}</div>}
-
-          {mainTab === "history" && (
-            <div role="group" aria-label="Routing history filters" className="ml-auto flex w-full min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-2 md:w-auto">
-              <div role="group" aria-label="Date range" className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:w-auto sm:grid-cols-[9rem_auto_9rem]">
-                <DatePicker
-                  value={historyDateFrom}
-                  onChange={(d) => { setHistoryDateFrom(d); setHistoryPage(1); }}
-                  placeholder="From date"
-                  className="h-8 min-w-0 gap-2 rounded-md border-transparent bg-muted/70 px-2 text-sm shadow-none hover:bg-muted [&_svg]:mr-0"
-                />
-                <span aria-hidden className="text-xs text-muted-foreground">to</span>
-                <DatePicker
-                  value={historyDateTo}
-                  onChange={(d) => { setHistoryDateTo(d); setHistoryPage(1); }}
-                  placeholder="To date"
-                  className="h-8 min-w-0 gap-2 rounded-md border-transparent bg-muted/70 px-2 text-sm shadow-none hover:bg-muted [&_svg]:mr-0"
-                />
-              </div>
-              <ToolbarSelect
-                label="Event"
-                options={EVENT_TYPE_OPTIONS}
-                closeOnSelect
-                value={historyEventFilter}
-                onChange={(value) => { setHistoryEventFilter(value); setHistoryPage(1); }}
-              />
-              {(historyDateFrom !== undefined || historyDateTo !== undefined || historyEventFilter) && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 rounded-md px-2 text-muted-foreground hover:text-foreground"
-                  onClick={() => {
-                    setHistoryDateFrom(undefined);
-                    setHistoryDateTo(undefined);
-                    setHistoryEventFilter("");
-                    setHistoryPage(1);
-                  }}
-                >
-                  <X aria-hidden className="size-4" />
-                  Clear filters
-                </Button>
-              )}
-            </div>
-          )}
-
-          {mainTab === "enquiry" && (
-            <div className={activeView.picker ? "relative" : "relative ml-auto"}>
-              <button
-                type="button"
-                className={toolbarButtonClass}
-                data-state={enquiryFilterOpen ? "open" : undefined}
-                onClick={() => setEnquiryFilterOpen((o) => !o)}
-              >
-                <Filter className="size-4 text-muted-foreground" strokeWidth={1.75} />
-                Filter
-                {enquiryActiveFilterCount > 0 && (
-                  <span className="rounded bg-[#017D58] px-1.5 text-[11px] font-medium leading-[18px] text-white">
-                    {enquiryActiveFilterCount}
-                  </span>
-                )}
-                <ChevronDown className={`size-3.5 text-muted-foreground transition-transform ${enquiryFilterOpen ? "rotate-180" : ""}`} />
-              </button>
-
-              {enquiryFilterOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setEnquiryFilterOpen(false)}
-                  />
-                  <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-border bg-card p-4 shadow-lg space-y-4">
-                    <div className="space-y-1.5">
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Property Type</p>
-                      <FormSelect
-                        name="enquiryPropertyType"
-                        options={[
-                          { label: "Apartment", value: "apartment" },
-                          { label: "Villa", value: "villa" },
-                          { label: "Individual House", value: "individual_portion" },
-                          { label: "Plot", value: "plot" },
-                          { label: "Commercial", value: "commercial" },
-                          { label: "Farmland", value: "farmland" },
-                        ]}
-                        value={enquiryTypeFilter}
-                        onValueChange={(v) => { setEnquiryTypeFilter(v || ""); setEnquiryPage(1); }}
-                        placeholder="All Types"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Source</p>
-                      <FormSelect
-                        name="enquirySource"
-                        options={ENQUIRY_SOURCE_OPTIONS}
-                        value={enquirySourceFilter}
-                        onValueChange={(v) => { setEnquirySourceFilter(v || ""); setEnquiryPage(1); }}
-                        placeholder="All Sources"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Purpose</p>
-                      <FormSelect
-                        name="enquiryIntent"
-                        options={[
-                          { label: "Enquiry", value: "enquiry" },
-                          { label: "Site Visit", value: "site_visit" },
-                        ]}
-                        value={enquiryIntentFilter}
-                        onValueChange={(v) => { setEnquiryIntentFilter(v || ""); setEnquiryPage(1); }}
-                        placeholder="All Purposes"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Enquiry Date</p>
-                      <div className="space-y-2">
-                        <DatePicker
-                          value={enquiryDateFrom}
-                          onChange={(d) => { setEnquiryDateFrom(d); setEnquiryPage(1); }}
-                          placeholder="From date"
-                          className="w-full"
-                        />
-                        <DatePicker
-                          value={enquiryDateTo}
-                          onChange={(d) => { setEnquiryDateTo(d); setEnquiryPage(1); }}
-                          placeholder="To date"
-                          className="w-full"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between pt-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-2 text-muted-foreground hover:text-red-500"
-                        disabled={!enquiryHasFilters}
-                        onClick={() => {
-                          setEnquiryTypeFilter("");
-                          setEnquiryIntentFilter("");
-                          setEnquirySourceFilter("");
-                          setEnquiryDateFrom(undefined);
-                          setEnquiryDateTo(undefined);
-                          setEnquiryPage(1);
-                        }}
-                      >
-                        Clear all
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="h-8"
-                        onClick={() => setEnquiryFilterOpen(false)}
-                      >
-                        Done
-                      </Button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+          {activeView.picker && !verifying && <div className="shrink-0">{activeView.picker}</div>}
         </div>
 
         {/* Queue Tab */}

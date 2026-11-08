@@ -6,7 +6,7 @@ import {
   Info,
   TriangleAlert,
 } from "lucide-react";
-import { ToolbarSelect } from "@/components/layout/list-page";
+import { PeriodPicker } from "@/components/shared/period-picker";
 import { PageActions } from "@/components/layout/page-actions";
 import { DataCard } from "@/components/record/record-page";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,7 +23,7 @@ import {
   percent,
   restoreRange,
   selectedRange,
-  utcDate,
+  MAX_RANGE_DAYS,
   type RangeSelection,
   type SiteReport,
 } from "@/lib/site-analytics";
@@ -269,6 +269,14 @@ export function TrafficPanels({ report }: { report: SiteReport }) {
   );
 }
 
+const PERIOD_PRESETS: { value: Exclude<RangeSelection["preset"], "custom">; label: string }[] = [
+  { value: "today", label: "Today" },
+  { value: "7", label: "Last 7 days" },
+  { value: "30", label: "Last 30 days" },
+  { value: "90", label: "Last 90 days" },
+  { value: "180", label: "Last 6 months" },
+];
+
 export function SiteAnalyticsDashboard() {
   const [selection, setSelection] = usePersistedState<RangeSelection>(
     "site-analytics:range",
@@ -286,7 +294,6 @@ export function SiteAnalyticsDashboard() {
     liveError,
     refresh,
   } = useSiteAnalytics(range);
-  const end = range ? utcDate(Date.parse(range.to) - 86400_000) : "";
   return (
     <div className="mx-auto w-full min-w-0 max-w-7xl space-y-6 pb-8 text-foreground">
       <PageActions mobile>
@@ -307,53 +314,17 @@ export function SiteAnalyticsDashboard() {
           <span>{liveError ? "Unavailable" : "online"}</span>
           <span className="sr-only">visitors in the last 5 minutes</span>
         </span>
-        <ToolbarSelect<RangeSelection["preset"]>
-          label="Period"
+        <PeriodPicker<Exclude<RangeSelection["preset"], "custom">>
+          presets={PERIOD_PRESETS}
           value={selection.preset}
-          closeOnSelect
-          options={[
-            { value: "today", label: "Today" },
-            { value: "7", label: "Last 7 days" },
-            { value: "30", label: "Last 30 days" },
-            { value: "90", label: "Last 90 days" },
-            { value: "custom", label: "Custom" },
-          ]}
-          onChange={(preset) =>
-            setSelection((s) => ({
-              ...s,
-              preset,
-              from: s.from || range?.from || utcDate(Date.now()),
-              to: s.to || end || utcDate(Date.now()),
-            }))
-          }
+          from={selection.from}
+          to={selection.to}
+          timeZone="UTC"
+          note={`UTC days · up to ${MAX_RANGE_DAYS} days`}
+          onPreset={(preset) => setSelection((s) => ({ ...s, preset }))}
+          onRange={(from, to) => setSelection({ preset: "custom", from, to })}
         />
       </PageActions>
-      {selection.preset === "custom" && (
-        <div className="flex flex-wrap gap-3">
-          <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
-            Start date (UTC)
-            <input
-              type="date"
-              className={`${CONTROL} min-w-0`}
-              value={selection.from}
-              onChange={(e) =>
-                setSelection((s) => ({ ...s, from: e.target.value }))
-              }
-            />
-          </label>
-          <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
-            End date (UTC, included)
-            <input
-              type="date"
-              className={`${CONTROL} min-w-0`}
-              value={selection.to}
-              onChange={(e) =>
-                setSelection((s) => ({ ...s, to: e.target.value }))
-              }
-            />
-          </label>
-        </div>
-      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div
           className="flex gap-4"
@@ -382,7 +353,7 @@ export function SiteAnalyticsDashboard() {
       </div>
       {!range ? (
         <div role="alert" className="rounded-xl border bg-card p-6 text-sm">
-          Choose valid start and end dates spanning at most 93 days.
+          Choose a start and end day at most {MAX_RANGE_DAYS} days apart.
         </div>
       ) : tab === "property" ? (
         <section

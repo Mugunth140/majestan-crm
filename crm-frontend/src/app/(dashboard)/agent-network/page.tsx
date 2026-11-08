@@ -23,6 +23,7 @@ import { FormSelect } from "@/components/shared/form-select";
 import { Plus, Search, Eye, Filter, X } from "lucide-react";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { ListFrame, ListToolbar, ToolbarEnd, ToolbarSearch, headerPrimaryClass, toolbarFilterButton } from "@/components/layout/list-page";
+import { ClearFilters, FilterStrip, QuickFilter, toOptions } from "@/components/shared/quick-filters";
 import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { NewAgentModal } from "@/components/agents/new-agent-modal";
@@ -294,11 +295,16 @@ export default function AgentsPage() {
 
   const desktopFilters = (
     <ListFrame>
-      <ListToolbar>
+      <ListToolbar className="md:flex-nowrap">
+        <FilterStrip>
+          <QuickFilter label="Partner type" value={filters.partnerType} onChange={(v) => setFilters((f) => ({ ...f, partnerType: v }))}
+            options={uniquePartnerTypes.map((c: any) => ({ label: String(c).replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()), value: c }))} />
+          <QuickFilter label="Status" value={filters.status} options={toOptions(uniqueStatuses as string[])} onChange={(v) => setFilters((f) => ({ ...f, status: v }))} />
+          <ClearFilters show={activeFiltersCount > 0 || !!searchQuery} onClick={() => { clearFilters(); setSearchQuery(""); }} />
+        </FilterStrip>
         <ToolbarEnd>
           {views.picker}
-          <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search ID, Name, Phone, Company" />
-          {renderFilterPopover(false)}
+          <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search ID, Name, Phone, Company" className="md:[&_input]:w-56" />
         </ToolbarEnd>
       </ListToolbar>
 

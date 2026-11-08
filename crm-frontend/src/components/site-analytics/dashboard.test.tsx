@@ -105,20 +105,22 @@ describe("website analytics dashboard", () => {
     expect(screen.getByText("2.3 s")).toBeTruthy();
     expect(screen.getAllByText(/split unavailable/).length).toBe(3);
   });
-  it("validates and persists the picked date range", () => {
+  it("persists the picked period, including the six-month preset", () => {
     render(<SiteAnalyticsDashboard />);
     fireEvent.click(screen.getByRole("button", { name: /Period:/ }));
-    fireEvent.click(screen.getByRole("menuitemradio", { name: "Custom" }));
-    fireEvent.change(screen.getByLabelText("Start date (UTC)"), {
-      target: { value: "2026-01-01" },
-    });
-    fireEvent.change(screen.getByLabelText("End date (UTC, included)"), {
-      target: { value: "2026-11-06" },
-    });
-    expect(screen.getByRole("alert").textContent).toContain("at most 93 days");
+    fireEvent.click(screen.getByRole("option", { name: "Last 6 months" }));
     expect(
       sessionStorage.getItem("crm_view:anon:site-analytics:range"),
-    ).toContain("custom");
+    ).toContain('"180"');
+  });
+  it("explains a saved custom range that is too long", () => {
+    sessionStorage.setItem(
+      "crm_view:anon:site-analytics:range",
+      JSON.stringify({ preset: "custom", from: "2024-01-01", to: "2026-11-06" }),
+    );
+    render(<SiteAnalyticsDashboard />);
+    expect(screen.getByRole("alert").textContent).toContain("at most 366 days");
+    expect(screen.getByRole("button", { name: /Period:/ }).textContent).toMatch(/2024/);
   });
   it("supports exact chart values with the keyboard", () => {
     render(<SiteAnalyticsDashboard />);

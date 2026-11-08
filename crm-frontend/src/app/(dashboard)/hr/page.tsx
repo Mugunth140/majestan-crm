@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { ListFrame, ListToolbar, SegmentTabs, ToolbarEnd, ToolbarSearch, headerButtonClass, headerPrimaryClass, toolbarFilterButton } from "@/components/layout/list-page";
+import { ClearFilters, DateQuickFilter, FilterDivider, FilterStrip, QuickFilter, toOptions } from "@/components/shared/quick-filters";
 import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { StaffName } from "@/components/shared/name-avatar";
@@ -311,12 +312,18 @@ export default function HrPage() {
 
   const desktopFilters = (
     <ListFrame>
-      <ListToolbar>
+      <ListToolbar className="md:flex-nowrap">
         <SegmentTabs tabs={tabs} value={activeTab} onChange={setActiveTab} label="Views" />
+        <FilterDivider />
+        <FilterStrip>
+          <DateQuickFilter label="Created" from={filters.dateFrom} to={filters.dateTo} onChange={(dateFrom, dateTo) => setFilters((f) => ({ ...f, dateFrom, dateTo }))} />
+          <QuickFilter label="Status" value={filters.status} options={toOptions(uniqueStatuses as string[])} onChange={(v) => setFilters((f) => ({ ...f, status: v }))} />
+          <QuickFilter label="Department" value={filters.department} options={toOptions(uniqueDepartments as string[])} onChange={(v) => setFilters((f) => ({ ...f, department: v }))} />
+          <ClearFilters show={activeFiltersCount > 0 || !!searchQuery} onClick={() => { clearFilters(); setSearchQuery(""); }} />
+        </FilterStrip>
         <ToolbarEnd>
           {views.picker}
-          <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search ID, Name, Phone" />
-          {renderFilterPopover(false)}
+          <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search ID, Name, Phone" className="md:[&_input]:w-56" />
         </ToolbarEnd>
       </ListToolbar>
 

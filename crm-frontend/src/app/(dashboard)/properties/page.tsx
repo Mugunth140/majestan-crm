@@ -19,7 +19,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FormSelect } from "@/components/shared/form-select";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { ListBody, ListFrame, ListToolbar, SegmentTabs, ToolbarClear, ToolbarEnd, ToolbarSearch, headerPrimaryClass, toolbarFilterButton } from "@/components/layout/list-page";
+import { ListBody, ListFrame, ListToolbar, SegmentTabs, ToolbarEnd, ToolbarSearch, headerPrimaryClass, toolbarFilterButton } from "@/components/layout/list-page";
+import { ClearFilters, DateQuickFilter, FilterDivider, FilterStrip, QuickFilter, RangeQuickFilter, TextQuickFilter } from "@/components/shared/quick-filters";
 import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
@@ -448,13 +449,27 @@ export default function PropertiesPage() {
 
   const desktopFilters = (
     <ListFrame>
-      <ListToolbar>
+      <ListToolbar className="md:flex-nowrap">
         <SegmentTabs tabs={tabs} value={activeTab} onChange={(tab) => { setActiveTab(tab); resetPage(); }} label="Properties views" />
+        <FilterDivider />
+        <FilterStrip>
+          <QuickFilter label="Listing" value={filters.listingType} options={[{ label: "Buy", value: "Sell" }, { label: "Rent", value: "Rent" }]} onChange={(v) => { setFilters((f) => ({ ...f, listingType: v })); resetPage(); }} />
+          <QuickFilter label="Property type" value={filters.propertyType} options={propertyTypes.length ? propertyTypes.map((t) => ({ ...t, label: propertyTypeName(t.value, t.label) })) : PROPERTY_TYPE_OPTIONS} onChange={(v) => { setFilters((f) => ({ ...f, propertyType: v })); resetPage(); }} />
+          <QuickFilter label="City" value={filters.cityId} options={cities.map((c) => ({ label: c.cityName, value: String(c.id) }))} onChange={(v) => { setFilters((f) => ({ ...f, cityId: v, sublocationId: "" })); resetPage(); }} />
+          <QuickFilter label="Location" value={filters.sublocationId} options={sublocations.filter((item) => !filters.cityId || String(item.cityId) === filters.cityId).map((item) => ({ label: item.name, value: String(item.id) }))} onChange={(v) => { setFilters((f) => ({ ...f, sublocationId: v })); resetPage(); }} />
+          <QuickFilter label="Road" value={filters.roadName} options={roadNames} onChange={(v) => { setFilters((f) => ({ ...f, roadName: v })); resetPage(); }} />
+          <RangeQuickFilter label="Budget" unit="₹" min={filters.minBudget} max={filters.maxBudget} onChange={(minBudget, maxBudget) => { setFilters((f) => ({ ...f, minBudget, maxBudget })); resetPage(); }} />
+          <RangeQuickFilter label="Area" unit="sq.ft" min={filters.minSqft} max={filters.maxSqft} onChange={(minSqft, maxSqft) => { setFilters((f) => ({ ...f, minSqft, maxSqft })); resetPage(); }} />
+          <QuickFilter label="Furnishing" value={filters.furnishingStatus} options={[{ label: "Bareshell", value: "BARESHELL" }, { label: "Fully furnished", value: "FULLY FURNISHED" }, { label: "Semi furnished", value: "SEMI FURNISHED" }, { label: "Unfurnished", value: "UNFURNISHED" }]} onChange={(v) => { setFilters((f) => ({ ...f, furnishingStatus: v })); resetPage(); }} />
+          <TextQuickFilter label="Floor" value={filters.floor} placeholder="e.g. Ground, 1, 2" onChange={(v) => { setFilters((f) => ({ ...f, floor: v })); resetPage(); }} />
+          <TextQuickFilter label="Special purpose" value={filters.specialPurpose} placeholder="e.g. Office, showroom" onChange={(v) => { setFilters((f) => ({ ...f, specialPurpose: v })); resetPage(); }} />
+          <QuickFilter label="Uploaded by" value={filters.uploadedById} options={staff.map((user) => ({ label: `${user.name}${user.isActive ? "" : " (Inactive)"}`, value: String(user.id) }))} onChange={(v) => { setFilters((f) => ({ ...f, uploadedById: v })); resetPage(); }} />
+          <DateQuickFilter label="Uploaded" from={filters.uploadedFrom} to={filters.uploadedTo} onChange={(uploadedFrom, uploadedTo) => { setFilters((f) => ({ ...f, uploadedFrom, uploadedTo })); resetPage(); }} />
+          <ClearFilters show={activeFiltersCount > 0 || !!searchQuery} onClick={() => { setSearchQuery(""); clearFilters(); }} />
+        </FilterStrip>
         <ToolbarEnd>
           {views.picker}
-          <ToolbarSearch value={searchQuery} onChange={(v) => { setSearchQuery(v); resetPage(); }} placeholder="Search title, code, owner, city" />
-          {renderFilterPopover(false)}
-          {(searchQuery || activeFiltersCount > 0) && <ToolbarClear onClick={() => { setSearchQuery(""); clearFilters(); }} />}
+          <ToolbarSearch value={searchQuery} onChange={(v) => { setSearchQuery(v); resetPage(); }} placeholder="Search title, code, owner, city" className="md:[&_input]:w-56" />
         </ToolbarEnd>
       </ListToolbar>
       <ListBody>

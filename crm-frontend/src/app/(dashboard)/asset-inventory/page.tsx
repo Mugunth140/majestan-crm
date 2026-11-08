@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { DataTable } from "@/components/tables/data-table";
 import { ModuleMobileRows, ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
 import { IdCell, StatusCell, statusDot } from "@/components/tables/cells";
+import { ASSET_STATUSES } from "@/lib/asset-options";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,6 +19,7 @@ import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { ListFrame, ListToolbar, ToolbarEnd, ToolbarSearch, headerPrimaryClass, toolbarFilterButton } from "@/components/layout/list-page";
+import { ClearFilters, FilterStrip, QuickFilter } from "@/components/shared/quick-filters";
 import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
@@ -29,7 +31,7 @@ import { AssetForm } from "./_components/AssetForm";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 const ASSET_FIELDS: ViewField[] = [
-  { id: "status", label: "Status", get: (a) => a.status || "New", order: ["New", "Available", "Pending", "Sold"], dot: (v) => statusDot(v, v === "Sold" ? "violet" : undefined) },
+  { id: "status", label: "Status", get: (a) => a.status || "New", order: ASSET_STATUSES, dot: (v) => statusDot(v, v === "Sold" ? "violet" : undefined) },
   { id: "district", label: "District", get: (a) => a.location?.district },
   { id: "zone", label: "Zone", get: (a) => a.location?.zone },
 ];
@@ -143,7 +145,8 @@ export default function AssetInventoryPage() {
     return filtered;
   }, [assets, searchQuery, filters]);
 
-  const uniqueStatuses = Array.from(new Set(assets.map(a => a.status).filter(Boolean)));
+  // Every status, not just the ones some asset has today, plus any old value still in the data.
+  const uniqueStatuses = Array.from(new Set([...ASSET_STATUSES, ...assets.map(a => a.status).filter(Boolean)]));
   const activeFiltersCount = Object.values(filters).filter(v => v !== "").length;
   const clearFilters = () => setFilters({ status: "" });
 
@@ -320,11 +323,15 @@ export default function AssetInventoryPage() {
 
   const desktopFilters = (
     <ListFrame>
-      <ListToolbar>
+      <ListToolbar className="md:flex-nowrap">
+        <FilterStrip>
+          <QuickFilter label="Status" value={filters.status} onChange={(v) => setFilters((f) => ({ ...f, status: v }))}
+            options={uniqueStatuses.map((s) => ({ label: s as string, value: s as string, dot: statusDot(s as string, s === "Sold" ? "violet" : undefined) }))} />
+          <ClearFilters show={activeFiltersCount > 0 || !!searchQuery} onClick={() => { clearFilters(); setSearchQuery(""); }} />
+        </FilterStrip>
         <ToolbarEnd>
           {views.picker}
-          <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search ID, Owner, Address" />
-          {renderFilterPopover(false)}
+          <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search ID, Owner, Address" className="md:[&_input]:w-56" />
         </ToolbarEnd>
       </ListToolbar>
 

@@ -80,7 +80,7 @@ export function Sidebar() {
   const open = (name: string) => setPick({ at: pathname, name });
   const back = () => setPick({ at: pathname, name: null });
 
-  // Whether rows are hidden below the floating update card.
+  // Whether rows are hidden below the visible part of the menu.
   const navRef = useRef<HTMLElement>(null);
   const [canScroll, setCanScroll] = useState(false);
   const measure = useCallback(() => {
@@ -89,12 +89,27 @@ export function Sidebar() {
   }, []);
   useEffect(() => {
     const el = navRef.current;
-    if (!el || !floating) return;
+    if (!el) return;
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     if (el.firstElementChild) ro.observe(el.firstElementChild);
     return () => ro.disconnect();
   }, [floating, panelName, measure]);
+
+  const hint = (
+    <button
+      type="button"
+      onClick={() => navRef.current?.scrollBy({ top: 200, behavior: "smooth" })}
+      aria-label="Scroll the menu down"
+      tabIndex={canScroll ? 0 : -1}
+      className={cn(
+        "sb-hint mx-auto flex size-6 items-center justify-center rounded-full bg-background text-muted-foreground shadow-[0_0_0_1px_rgba(0,0,0,0.07),0_2px_6px_-1px_rgba(0,0,0,0.1)] transition-[opacity,transform] duration-200 hover:text-foreground dark:bg-white/10 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08)]",
+        canScroll ? "pointer-events-auto opacity-100" : "translate-y-1 opacity-0",
+      )}
+    >
+      <ChevronDown className="size-3.5" strokeWidth={2.25} />
+    </button>
+  );
 
   return (
     <aside
@@ -159,6 +174,7 @@ export function Sidebar() {
 
       {/* Navigation: scrolls on its own, rows keep their height. Master Registry and
           Settings slide in as their own panel, with Back as the first row. */}
+      <div className="relative flex min-h-0 flex-1 flex-col">
       <nav
         ref={navRef}
         onScroll={measure}
@@ -251,22 +267,18 @@ export function Sidebar() {
           </AnimatePresence>
         </MotionConfig>
       </nav>
+      {/* More rows below: a fade and a nudge at the bottom edge of the menu. */}
+      {!floating && (
+        <div aria-hidden={!canScroll} className={cn("sb-float pointer-events-none absolute inset-x-0 bottom-0 flex justify-center pb-2 pt-8 transition-opacity duration-200", canScroll ? "opacity-100" : "opacity-0")}>
+          {hint}
+        </div>
+      )}
+      </div>
 
       {/* Update: floats over the end of the nav on a fade, with a nudge to scroll when rows hide behind it */}
       {floating ? (
         <div className="sb-float pointer-events-none absolute inset-x-0 bottom-0 px-2 pb-3 pt-12">
-          <button
-            type="button"
-            onClick={() => navRef.current?.scrollBy({ top: 200, behavior: "smooth" })}
-            aria-label="Scroll the menu down"
-            tabIndex={canScroll ? 0 : -1}
-            className={cn(
-              "sb-hint mx-auto mb-2 flex size-6 items-center justify-center rounded-full bg-background text-muted-foreground shadow-[0_0_0_1px_rgba(0,0,0,0.07),0_2px_6px_-1px_rgba(0,0,0,0.1)] transition-[opacity,transform] duration-200 hover:text-foreground dark:bg-white/10 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08)]",
-              canScroll ? "pointer-events-auto opacity-100" : "translate-y-1 opacity-0",
-            )}
-          >
-            <ChevronDown className="size-3.5" strokeWidth={2.25} />
-          </button>
+          <div className="mb-2">{hint}</div>
           <UpdateButton deployed={deployed} collapsed={false} className="pointer-events-auto" />
         </div>
       ) : (

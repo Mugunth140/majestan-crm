@@ -29,12 +29,12 @@ describe("website analytics presentation rules", () => {
       restoreRange({ preset: "unbounded", from: "", to: "" }),
     ).toBeUndefined();
   });
-  it("handles inclusive custom dates with a strict 93-day limit and rejects rollover dates", () => {
+  it("handles inclusive custom dates with a strict 366-day limit and rejects rollover dates", () => {
     expect(
-      selectedRange({ preset: "custom", from: "2026-01-01", to: "2026-04-03" }),
-    ).toEqual({ from: "2026-01-01", to: "2026-04-04" });
+      selectedRange({ preset: "custom", from: "2026-01-01", to: "2027-01-01" }),
+    ).toEqual({ from: "2026-01-01", to: "2027-01-02" });
     expect(
-      selectedRange({ preset: "custom", from: "2026-01-01", to: "2026-04-04" }),
+      selectedRange({ preset: "custom", from: "2026-01-01", to: "2027-01-02" }),
     ).toBeNull();
     expect(
       selectedRange({ preset: "custom", from: "2026-02-30", to: "2026-03-04" }),

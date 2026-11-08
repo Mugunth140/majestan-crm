@@ -17,7 +17,8 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { EmptyState as IllustratedEmpty } from "@/components/shared/empty-state";
-import { ListBody, ListFrame, ListToolbar, ToolbarClear, ToolbarEnd, ToolbarSearch, ToolbarSelect, headerPrimaryClass, headerButtonClass } from "@/components/layout/list-page";
+import { ListBody, ListFrame, ListToolbar, ToolbarClear, ToolbarEnd, ToolbarSearch, headerPrimaryClass, headerButtonClass } from "@/components/layout/list-page";
+import { FilterStrip, QuickFilter } from "@/components/shared/quick-filters";
 import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
@@ -478,21 +479,13 @@ export default function AdsPage() {
 
   const desktopFilters = (
     <ListFrame>
-      <ListToolbar>
-        <ToolbarSelect
-          label="Placement"
-          disabled={isBusy}
-          value={placement}
-          onChange={setPlacement}
-          options={ADS_PLACEMENTS.map((p) => ({ value: p.value, label: p.label }))}
-        />
-        <ToolbarSelect
-          label="Status"
-          disabled={isBusy}
-          value={activeTab}
-          onChange={setActiveTab}
-          options={tabs.map((tab) => ({ value: tab, label: tab, count: isLoading ? undefined : tab === "Active" ? activeCount : ads.length - activeCount }))}
-        />
+      <ListToolbar className="md:flex-nowrap">
+        <FilterStrip>
+          <QuickFilter label="Placement" required value={placement} onChange={(v) => setPlacement(v as typeof placement)}
+            options={ADS_PLACEMENTS.map((p) => ({ value: p.value, label: p.label }))} />
+          <QuickFilter label="Status" required value={activeTab} onChange={(v) => setActiveTab(v as typeof activeTab)}
+            options={tabs.map((tab) => ({ value: tab, label: isLoading ? tab : `${tab} · ${tab === "Active" ? activeCount : ads.length - activeCount}` }))} />
+        </FilterStrip>
         <ToolbarEnd>
           {views.picker}
           <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search ads by title" />

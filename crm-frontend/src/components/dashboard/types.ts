@@ -4,7 +4,7 @@
 export type Fmt = "n" | "pct" | "avg" | "min" | "hrs" | "days" | "dur" | "inr" | "score";
 export type Better = "up" | "down" | "none";
 export type Tone = "good" | "bad" | "warn";
-export type RangeKey = "today" | "7d" | "30d" | "6m";
+export type RangeKey = "today" | "7d" | "30d" | "6m" | "custom";
 export type Scope = "organization" | "department" | "self";
 
 export type Person = {

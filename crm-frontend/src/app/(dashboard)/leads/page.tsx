@@ -9,13 +9,14 @@ import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Plus, FileSpreadsheet, UploadCloud, RefreshCw, Search, Filter, X, Loader2, Download } from "lucide-react";
+import { Plus, FileSpreadsheet, RefreshCw, Search, Filter, X, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FormSelect } from "@/components/shared/form-select";
+import { DateQuickFilter, FilterStrip, QuickFilter, RangeQuickFilter } from "@/components/shared/quick-filters";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -29,13 +30,14 @@ import { MobileHeader } from "@/components/layout/mobile-header";
 import { LastFollowupCell } from "./last-followup-column";
 import { Device } from "@/components/shared/device";
 import { LEAD_STATUS_DOTS, LEAD_STATUS_ORDER, leadStatusPill } from "@/lib/lead-constants";
-import { StatusCell } from "@/components/tables/cells";
+import { StatusCell, statusDot } from "@/components/tables/cells";
 import { ViewSwitcher, type ViewType } from "@/components/views/view-switcher";
 import { LeadsKanban, leadCard, type KanbanLead } from "@/components/leads/leads-kanban";
 import { MobileRowsProvider, type MobileRowData } from "@/components/mobile/mobile-rows";
 import { NameAvatar } from "@/components/shared/name-avatar";
 import { EmptyState } from "@/components/shared/empty-state";
 import { GroupedList } from "@/components/tables/grouped-list";
+import { ImportDialog } from "@/components/shared/import-dialog";
 import { NewLeadModal } from "@/components/leads/new-lead-modal";
 import { GroupByPicker, LEAD_GROUP_FIELDS, type LeadGroupField } from "@/components/leads/group-by-picker";
 import { getBulkImportDestination, mapImportSheetRow, resolveLeadImportSource, normalizeIndianMobile, partitionPendingImports, resolveStaffAssignments } from "@/lib/lead-import";
@@ -70,10 +72,12 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 // Kanban and Group By show one board, not pages: load up to this many leads for them.
 const BOARD_LIMIT = 500;
 
-const LEADS_TABS = ["All Leads", "Open Pipeline", "Unqualified"];
+const LEADS_TABS = ["All Leads", "Unqualified", "Open Pipeline"];
 // Open Pipeline only shows an in-memory import review that doesn't survive
 // navigation, so it's never restored — that would land on an empty placeholder.
 const RESTORABLE_LEADS_TABS = LEADS_TABS.filter((t) => t !== "Open Pipeline");
+const PRIORITY_OPTIONS = [{ label: "Low", value: "low" }, { label: "Medium", value: "medium" }, { label: "High", value: "high" }, { label: "Urgent", value: "urgent" }];
+
 const EMPTY_LEADS_FILTERS = {
   dateFrom: "",
   dateTo: "",
@@ -277,7 +281,7 @@ export default function LeadsPage() {
     allowed: LEAD_GROUP_FIELDS.map((f) => f.id),
   });
   // The import review is a list-only flow
-  const boardView = view !== "list" && activeTab !== "Open Pipeline";
+  const boardView = view !== "list" && !(activeTab === "Open Pipeline" && pendingImports.length > 0);
 
   // Role-based state
   const [role, setRole] = useState<string>("");
@@ -317,7 +321,10 @@ export default function LeadsPage() {
     }
   }, []);
 
-  const tabs = [...LEADS_TABS];
+  // Import review is a tab only while there are rows to review.
+  const tabs = LEADS_TABS.filter((t) => t !== "Open Pipeline" || pendingImports.length > 0);
+  const shownTab = activeTab === "Open Pipeline" && pendingImports.length === 0 ? "All Leads" : activeTab;
+  const tabLabel = (t: string) => (t === "Open Pipeline" ? `Import review · ${pendingImports.length}` : t);
 
   const resetPage = () => setPagination((prev) => (prev.pageIndex === 0 ? prev : resetPageIndex(prev)));
   const updateFilters = (updater: (prev: typeof filters) => typeof filters) => {
@@ -676,11 +683,7 @@ export default function LeadsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- reviewColumn only reads existingByMobile
   const visibleColumns = useMemo(() => (isReviewingImports ? [...columns, reviewColumn] : columns), [columns, isReviewingImports, existingByMobile]);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    // Reset so picking the same file again still fires onChange
-    e.target.value = "";
-    if (!file) return;
+  const readImportFile = (file: File) => {
 
     // Snapshot: a completed parse must not silently discard this review
     const hadPendingReview = pendingImports.length > 0;
@@ -884,8 +887,8 @@ export default function LeadsPage() {
   };
 
   const deptPipelines: { label: string; value: "telecalling" | "sales" }[] = [
-    { label: "Telecalling Pipeline", value: "telecalling" },
-    { label: "Sales Pipeline", value: "sales" },
+    { label: "Telecalling", value: "telecalling" },
+    { label: "Sales", value: "sales" },
   ];
 
   // Staff only see their own dept tab
@@ -986,7 +989,7 @@ export default function LeadsPage() {
     data: displayedLeads,
     showToolbar: !isReviewingImports,
     onSelectionChange: setPendingSelection,
-    showDeleteAction: isAdmin({ role }) && activeTab !== "Open Pipeline",
+    showDeleteAction: isAdmin({ role }) && !isReviewingImports,
     onDeleteSelected: (rows: any[]) => setBulkDeleteIds(rows.map(r => r.rawId)),
     renderToolbarActions: (selectedRows: any[], clearSelection: any) => {
       const isSingle = selectedRows.length === 1;
@@ -1073,51 +1076,55 @@ export default function LeadsPage() {
 
   const desktopFilters = (
     <div className="md:flex md:min-h-0 md:flex-1 md:flex-col lg:-mx-6 lg:-mb-8 lg:-mt-6">
-      {/* Toolbar: views of the data on the left, search and filters on the right */}
-      <div className="flex flex-wrap items-center gap-2 px-5 pb-2 pt-3">
-        <div className="flex items-center rounded-md bg-muted/70 p-0.5">
+      {/* Toolbar: which leads, then every filter in one sideways-scrolling strip, search at the end */}
+      <div className="flex items-center gap-2 px-5 pb-2 pt-3">
+        <div className="flex shrink-0 items-center rounded-md bg-muted/70 p-0.5" role="group" aria-label="Leads">
           {tabs.map((tab) => (
-            <button key={tab} type="button" onClick={() => { setActiveTab(tab); resetPage(); }} className={segmentClass(activeTab === tab)}>
-              {tab}
+            <button key={tab} type="button" aria-pressed={shownTab === tab} onClick={() => { setActiveTab(tab); resetPage(); }}
+              className={cn(segmentClass(shownTab === tab), tab === "Open Pipeline" && shownTab !== tab && "text-[#017D58] dark:text-[#2FB585]")}>
+              {tabLabel(tab)}
             </button>
           ))}
         </div>
-        {visiblePipelines.length > 1 && (
-          <div className="flex items-center rounded-md bg-muted/70 p-0.5">
-            {visiblePipelines.map((d) => (
-              <button key={d.value} type="button" onClick={() => { setDeptFilter(d.value); resetPage(); }} className={segmentClass(deptFilter === d.value)}>
-                {d.label}
-              </button>
-            ))}
-          </div>
-        )}
 
-        {!isReviewingImports && (
-          <div className="ml-auto flex items-center gap-2">
-            {boardView && view === "group" && <GroupByPicker value={groupField} onChange={setGroupField} />}
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.75} />
-              <input
-                type="search"
-                aria-label="Search leads"
-                placeholder="Search ID, name, phone, email"
-                value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); resetPage(); }}
-                className="h-8 w-64 rounded-md border border-transparent bg-muted/70 pl-8 pr-2 text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground hover:bg-muted focus:border-border focus:bg-background focus:shadow-sm"
-              />
+        {isReviewingImports ? <div className="flex-1" /> : (
+          <>
+            <span aria-hidden className="h-5 w-px shrink-0 bg-border" />
+            <FilterStrip>
+              {visiblePipelines.length > 1 && (
+                <QuickFilter label="Pipeline" required value={deptFilter} options={visiblePipelines}
+                  onChange={(v) => { setDeptFilter(v as "telecalling" | "sales"); resetPage(); }} />
+              )}
+              <DateQuickFilter label="Created" from={filters.dateFrom} to={filters.dateTo} onChange={(dateFrom, dateTo) => updateFilters((f) => ({ ...f, dateFrom, dateTo }))} />
+              <QuickFilter label="Status" value={filters.status} options={filterOptions.statuses.map((v) => ({ label: v, value: v, dot: statusDot(v) }))} onChange={(v) => updateFilters((f) => ({ ...f, status: v }))} />
+              {role !== "Staff" && <QuickFilter label="Assigned to" value={filters.staff} options={filterOptions.staff.map((v) => ({ label: v, value: v }))} onChange={(v) => updateFilters((f) => ({ ...f, staff: v }))} />}
+              <QuickFilter label="Source" value={filters.source} options={filterOptions.sources.map((v) => ({ label: v, value: v }))} onChange={(v) => updateFilters((f) => ({ ...f, source: v }))} />
+              <QuickFilter label="Priority" value={filters.priority} options={PRIORITY_OPTIONS} onChange={(v) => updateFilters((f) => ({ ...f, priority: v }))} />
+              <QuickFilter label="Category" value={filters.category} options={filterOptions.categories.map((v) => ({ label: v, value: v }))} onChange={(v) => updateFilters((f) => ({ ...f, category: v }))} />
+              <QuickFilter label="Property type" value={filters.type} options={filterOptions.types.map((v) => ({ label: v.replace(/_/g, " "), value: v }))} onChange={(v) => updateFilters((f) => ({ ...f, type: v }))} />
+              <RangeQuickFilter label="Budget" unit="lakh" min={filters.minBudgetLakh} max={filters.maxBudgetLakh} onChange={(minBudgetLakh, maxBudgetLakh) => updateFilters((f) => ({ ...f, minBudgetLakh, maxBudgetLakh }))} />
+              {(searchQuery || activeFiltersCount > 0) && (
+                <button type="button" onClick={() => { setSearchQuery(""); clearFilters(); }}
+                  className="h-8 shrink-0 rounded-md px-2 text-[13px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                  Clear all
+                </button>
+              )}
+            </FilterStrip>
+            <div className="flex shrink-0 items-center gap-2">
+              {boardView && view === "group" && <GroupByPicker value={groupField} onChange={setGroupField} />}
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.75} />
+                <input
+                  type="search"
+                  aria-label="Search leads"
+                  placeholder="Search ID, name, phone, email"
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); resetPage(); }}
+                  className="h-8 w-56 rounded-md border border-transparent bg-muted/70 pl-8 pr-2 text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground hover:bg-muted focus:border-border focus:bg-background focus:shadow-sm"
+                />
+              </div>
             </div>
-            {renderFilterPopover(false)}
-            {(searchQuery || activeFiltersCount > 0) && (
-              <button
-                type="button"
-                onClick={() => { setSearchQuery(""); clearFilters(); }}
-                title="Clear search and filters"
-                className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <X className="size-4" />
-              </button>
-            )}
-          </div>
+          </>
         )}
       </div>
 
@@ -1157,18 +1164,7 @@ export default function LeadsPage() {
                 </div>
              </div>
         )}
-        {activeTab === "Open Pipeline" && pendingImports.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-border rounded-xl bg-muted/10 mx-6 mb-6 mt-4">
-            <div className="h-16 w-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-4 shadow-sm border border-blue-100">
-              <FileSpreadsheet className="h-8 w-8" />
-            </div>
-            <h3 className="text-xl font-bold text-foreground mb-2">No Imported Leads</h3>
-            <p className="text-muted-foreground max-w-sm mb-6">You haven't imported any leads yet. Use the bulk import feature to add an Excel file.</p>
-            <Button onClick={() => setIsImportOpen(true)} className="bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md px-6">
-              <UploadCloud className="h-4 w-4 mr-2" /> Bulk Import
-            </Button>
-          </div>
-        ) : isLoading ? (
+        {isLoading ? (
           <div className="px-5 pt-3"><TableSkeleton /></div>
         ) : boardView && view === "kanban" ? (
           <LeadsKanban leads={displayedLeads} onMove={handleMoveLead} />
@@ -1232,7 +1228,7 @@ export default function LeadsPage() {
       {/* Pill Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 -mx-4 px-4">
         {tabs.map(tab => {
-          const isActive = activeTab === tab;
+          const isActive = shownTab === tab;
           return (
             <button 
               key={tab}
@@ -1242,7 +1238,7 @@ export default function LeadsPage() {
                 isActive ? "bg-[#017D58] text-white dark:bg-[#2FB585] dark:text-black" : "bg-foreground/[0.06] text-foreground"
               )}
             >
-              {tab}
+              {tabLabel(tab)}
             </button>
           )
         })}
@@ -1306,54 +1302,25 @@ export default function LeadsPage() {
       <MobileHeader title="Leads" />
       <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:h-full">
         <PageActions>
-          <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
-            <DialogTrigger className="inline-flex h-8 items-center gap-1.5 rounded-md border bg-background px-3 text-[14px] font-medium text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors hover:bg-muted">
-              <FileSpreadsheet size={15} className="text-muted-foreground" />
-              Import
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader className="pr-8">
-                <div className="flex items-center justify-between gap-2">
-                <DialogTitle className="block">Import Leads</DialogTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={downloadTemplate}
-                  className="h-8 text-xs"
-                >
-                  <Download className="h-3.5 w-3.5 mr-1.5" />
-                  Sample Template
-                </Button>
-              </div>
-              </DialogHeader>
-              
-              <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-xl bg-muted/20 border-border/60">
-                {isImporting ? (
-                  <div className="w-full space-y-4">
-                    <div className="flex items-center justify-between text-sm font-medium">
-                      <span>Processing...</span>
-                      <span>{importProgress}%</span>
-                    </div>
-                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-[#0052FF] transition-all duration-200" style={{ width: `${importProgress}%` }}></div>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <UploadCloud className="h-10 w-10 text-muted-foreground mb-4" />
-                    <p className="text-sm font-medium text-foreground mb-1">Click to upload or drag and drop</p>
-                    <p className="text-xs text-muted-foreground mb-4">.xlsx, .xls, or .csv files</p>
-                    <Input type="file" accept=".xlsx, .xls, .csv" className="max-w-[250px] cursor-pointer" onChange={handleFileUpload} />
-                  </>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
+          <button type="button" onClick={() => setIsImportOpen(true)} className="inline-flex h-8 items-center gap-1.5 rounded-md border bg-background px-3 text-[14px] font-medium text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors hover:bg-muted">
+            <FileSpreadsheet size={15} className="text-muted-foreground" />
+            Import
+          </button>
           <button type="button" onClick={() => setCreating(true)} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-foreground px-3 text-[14px] font-medium text-background transition-colors hover:bg-foreground/85">
             <Plus size={16} />
             Create
           </button>
         </PageActions>
+        <ImportDialog
+          open={isImportOpen}
+          onOpenChange={setIsImportOpen}
+          title="Import leads"
+          description="Upload a spreadsheet of leads. You'll review every row, with duplicates flagged, before anything is added."
+          onFile={readImportFile}
+          onTemplate={() => void downloadTemplate()}
+          busy={isImporting}
+          progress={importProgress}
+        />
         <NewLeadModal
           open={creating}
           onOpenChange={setCreating}
