@@ -64,3 +64,33 @@
 @media (prefers-reduced-motion: reduce) {
   .sb-enter > * { animation: none; }
 }
+
+/* Updating dialog: a bar that keeps running, and each step fading in */
+.update-bar { animation: update-bar 1.3s cubic-bezier(0.65, 0, 0.35, 1) infinite; }
+@keyframes update-bar {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
+}
+.update-step { animation: update-step 0.35s ease-out both; }
+@keyframes update-step {
+  from { opacity: 0; transform: translateY(3px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .update-bar { animation-duration: 2.6s; }
+  .update-step { animation: none; }
+}
+
+/* Floating footer over the end of the nav: the sidebar colour fading to clear */
+.sb-float {
+  background: linear-gradient(to top, var(--sidebar) 0%, var(--sidebar) 62%, color-mix(in oklab, var(--sidebar) 80%, transparent) 80%, transparent 100%);
+}
+
+/* Scroll nudge above the update card: a slow bob, so it reads as "more below" */
+.sb-hint.opacity-100 svg { animation: sb-hint 1.8s ease-in-out infinite; }
+@keyframes sb-hint {
+  0%, 100% { transform: translateY(-1px); }
+  50% { transform: translateY(2px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-hint svg { animation: none !important; }
+}

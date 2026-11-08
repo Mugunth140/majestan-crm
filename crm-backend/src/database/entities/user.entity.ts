@@ -50,6 +50,10 @@ export class User {
   @Column({ type: 'json', nullable: true })
   nav_access: string[] | null;
 
+  /** Welcome, tours and checklist progress; null means nothing seen yet (see migration 078). */
+  @Column({ type: 'json', nullable: true })
+  onboarding: Record<string, unknown> | null;
+
   @Column({ name: 'role_id' })
   role_id: number;
 

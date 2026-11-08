@@ -9,9 +9,9 @@ import { APP_VERSION, BUILD_ID, releasesSince, type ChangeKind, type Release } f
 import { cn } from "@/lib/utils";
 
 const CHECK_EVERY_MS = 5 * 60 * 1000;
-const MIN_UPDATING_MS = 2200; // let the loader play at least one full cycle
+const MIN_UPDATING_MS = 4600; // the loader plays about two full cycles before the reload
 
-interface DeployedBuild {
+export interface DeployedBuild {
   buildId: string;
   version: string;
   releases: Release[];
@@ -73,9 +73,9 @@ const KIND_STYLE: Record<ChangeKind, string> = {
   fixed: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
 };
 
-// Sidebar entry point: a card when expanded, an icon button when collapsed.
-export function UpdateButton({ collapsed, className }: { collapsed: boolean; className?: string }) {
-  const deployed = useAppUpdate();
+// Sidebar entry point. Expanded, it floats over the bottom of the nav on a fade from the
+// sidebar colour; collapsed, it is an icon button. The sidebar owns the polling.
+export function UpdateButton({ deployed, collapsed, className }: { deployed: DeployedBuild | null; collapsed: boolean; className?: string }) {
   const [open, setOpen] = useState(false);
   if (!deployed) return null;
 
@@ -90,29 +90,50 @@ export function UpdateButton({ collapsed, className }: { collapsed: boolean; cla
           className="relative mx-auto flex size-8 items-center justify-center rounded-md text-[#017D58] hover:bg-black/5 dark:text-[#2FB585] dark:hover:bg-white/5"
         >
           <ArrowCircleUpIcon size={18} weight="fill" />
-          <span className="absolute right-1 top-1 size-1.5 rounded-full bg-[#017D58] dark:bg-[#2FB585]" />
         </button>
       ) : (
-        <div className="update-card-enter rounded-lg border bg-background p-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-          <div className="flex items-center gap-2">
-            <span className="relative flex size-2">
-              <span className="absolute inset-0 animate-ping rounded-full bg-[#017D58]/60 motion-reduce:animate-none dark:bg-[#2FB585]/60" />
-              <span className="relative size-2 rounded-full bg-[#017D58] dark:bg-[#2FB585]" />
+        <div className="update-card-enter px-1.5">
+          <div className="flex items-center gap-2.5">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-background shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.06)] dark:bg-white/10 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08)]">
+              <PrismarkAssembly className="size-4 text-[#017D58] dark:text-[#2FB585]" />
             </span>
-            <p className="text-[13px] font-medium text-foreground">Update available</p>
+            <div className="min-w-0">
+              <p className="text-[13.5px] font-semibold leading-tight text-foreground">Update available</p>
+              <p className="mt-0.5 text-[12px] leading-tight text-muted-foreground">Version {deployed.version} is ready</p>
+            </div>
           </div>
-          <p className="mt-1 pl-4 text-xs text-muted-foreground">Version {deployed.version} is ready</p>
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="mt-2.5 flex h-7 w-full items-center justify-center gap-1.5 rounded-md bg-[#017D58] text-[13px] font-medium text-white transition-colors hover:bg-[#016347] dark:bg-[#0B8F66] dark:hover:bg-[#017D58]"
+            className="mt-3 flex h-8 w-full items-center justify-center rounded-lg bg-[#017D58] text-[13px] font-medium text-white shadow-[0_1px_2px_rgba(1,125,88,0.3),inset_0_1px_0_rgba(255,255,255,0.12)] transition-[background-color,transform] duration-150 hover:bg-[#016347] active:scale-[0.98] dark:bg-[#0B8F66] dark:hover:bg-[#017D58]"
           >
-            <ArrowCircleUpIcon size={15} weight="bold" />
             Update now
           </button>
         </div>
       )}
       <UpdateDialog deployed={deployed} open={open} onOpenChange={setOpen} />
+    </div>
+  );
+}
+
+const UPDATE_STEPS = ["Downloading the new version", "Clearing the old files", "Restarting the CRM"];
+
+/** Shown while the update installs: the looping mark, a running bar and the current step. */
+function UpdatingView({ version }: { version: string }) {
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setStep((s) => Math.min(s + 1, UPDATE_STEPS.length - 1)), MIN_UPDATING_MS / UPDATE_STEPS.length);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <div role="status" aria-live="polite" className="flex flex-col items-center px-8 pb-10 pt-12 text-center">
+      <PrismarkAssembly loop className="size-14 text-[#017D58] dark:text-[#2FB585]" />
+      <Dialog.Title className="mt-7 text-base font-semibold">Updating to v{version}</Dialog.Title>
+      <p key={step} className="update-step mt-1 text-sm text-kumo-subtle">{UPDATE_STEPS[step]}…</p>
+      <div className="mt-6 h-1 w-48 overflow-hidden rounded-full bg-[#017D58]/12 dark:bg-[#2FB585]/15">
+        <div className="update-bar h-full w-1/3 rounded-full bg-[#017D58] dark:bg-[#2FB585]" />
+      </div>
+      <p className="mt-5 text-xs text-kumo-subtle">The page reloads by itself when it&apos;s done.</p>
     </div>
   );
 }
@@ -138,15 +159,9 @@ function UpdateDialog({
 
   return (
     <Dialog.Root open={open} onOpenChange={(o) => !updating && onOpenChange(o)}>
-      <Dialog size="lg" className="overflow-hidden p-0">
+      <Dialog size="lg" className="top-1/2 overflow-hidden p-0 sm:top-1/2 -translate-y-1/2">
         {updating ? (
-          <div role="status" aria-live="polite" className="flex flex-col items-center px-8 py-14 text-center">
-            <PrismarkAssembly loop className="size-14 text-[#017D58] dark:text-[#2FB585]" />
-            <Dialog.Title className="mt-7 text-base font-semibold">Updating Prismark CRM</Dialog.Title>
-            <p className="mt-1 text-sm text-kumo-subtle">
-              Installing version {deployed.version}. The page will reload in a moment.
-            </p>
-          </div>
+          <UpdatingView version={deployed.version} />
         ) : (
           <>
             <div className="flex items-start gap-4 border-b border-kumo-line px-6 pb-5 pt-6">

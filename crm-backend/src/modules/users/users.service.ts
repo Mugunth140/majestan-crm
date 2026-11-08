@@ -7,6 +7,9 @@ import { PermissionsService } from '../permissions/permissions.service';
 import { ContactLogsService } from '../contact-logs/contact-logs.service';
 import { UserAvatarsService } from './user-avatars.service';
 import { cleanNavAccess } from './nav-access';
+import type { SelfUpdateDto } from './dto/self-update.dto';
+
+const ONBOARDING_KEYS = new Set(['welcomed_at', 'checklist_dismissed_at', 'last_seen_version']);
 
 @Injectable()
 export class UsersService {
@@ -157,6 +160,50 @@ export class UsersService {
       await this.contactLogsService.revokeAllUserDevices(saved.id);
     }
     return fullUser(saved);
+  }
+
+  /** Someone editing their own details: only the fields in SelfUpdateDto. */
+  async updateSelf(id: number, body: SelfUpdateDto) {
+    const user = await this.mustFind(id);
+    const blank = (v: string | undefined, cur: string) => (v === undefined ? cur : v.trim() || (null as any));
+    if (body.name !== undefined && body.name.trim()) user.name = body.name.trim();
+    user.phone = blank(body.phone, user.phone);
+    user.whatsapp_no = blank(body.whatsapp_no, user.whatsapp_no);
+    user.address = blank(body.address, user.address);
+    user.dob = blank(body.dob, user.dob);
+    user.qualification = blank(body.qualification, user.qualification);
+    return fullUser(await this.userRepository.save(user));
+  }
+
+  /** Changes a password after checking the current one; signs the user out of their other devices. */
+  async changePassword(id: number, current: string, next: string) {
+    const user = await this.mustFind(id);
+    if (!(await bcrypt.compare(current, user.password_hash))) throw new BadRequestException('Your current password is wrong');
+    if (current === next) throw new BadRequestException('Choose a password you have not used here');
+    user.password_hash = await bcrypt.hash(next, 10);
+    await this.userRepository.save(user);
+    await this.contactLogsService.revokeAllUserDevices(id);
+  }
+
+  async onboarding(id: number) {
+    const user = await this.mustFind(id);
+    return user.onboarding ?? {};
+  }
+
+  /** Merges top-level keys and per-tour entries; `reset: true` clears everything so the tours run again. */
+  async updateOnboarding(id: number, patch: Record<string, unknown>) {
+    const user = await this.mustFind(id);
+    if (patch.reset === true) {
+      user.onboarding = null;
+    } else {
+      const cur = (user.onboarding ?? {}) as Record<string, any>;
+      const { tours, ...rest } = patch as Record<string, any>;
+      const clean = Object.fromEntries(Object.entries(rest).filter(([k]) => ONBOARDING_KEYS.has(k)));
+      const nextTours = tours && typeof tours === 'object' ? { ...(cur.tours ?? {}), ...tours } : cur.tours;
+      user.onboarding = { ...cur, ...clean, ...(nextTours ? { tours: nextTours } : {}) };
+    }
+    await this.userRepository.save(user);
+    return user.onboarding ?? {};
   }
 
   /** Stores a new profile photo, then removes the old one. */

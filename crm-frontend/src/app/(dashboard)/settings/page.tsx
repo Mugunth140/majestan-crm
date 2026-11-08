@@ -1,86 +1,121 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ChevronRight, LogOut, Mail } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { LogOut } from "lucide-react";
 import { toast } from "sonner";
-import { MobileHeader } from "@/components/layout/mobile-header";
 import { ProfilePhoto } from "@/components/users/profile-photo";
-import { apiJson } from "@/lib/api-fetch";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Field, MobileSettingsNav, Section, SettingsPage } from "@/components/settings/settings-ui";
+import { meApi, syncStoredUser, type Me, type MeUpdate } from "@/lib/me-api";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
-type Me = { id: number; name: string; email: string; role?: { name: string } | string | null; avatar_url?: string | null };
+const EDITABLE = ["name", "phone", "whatsapp_no", "dob", "qualification", "address"] as const;
+const formOf = (me: Me): Required<Record<(typeof EDITABLE)[number], string>> => ({
+  name: me.name ?? "",
+  phone: me.phone ?? "",
+  whatsapp_no: me.whatsapp_no ?? "",
+  dob: me.dob?.slice(0, 10) ?? "",
+  qualification: me.qualification ?? "",
+  address: me.address ?? "",
+});
 
-/** The signed-in user's own card: their photo, which they can change, and who they're signed in as. */
-function YourProfile() {
-  const [me, setMe] = useState<Me | null>(null);
-  useEffect(() => {
-    let live = true;
-    let stored: Me | null = null;
-    try { stored = JSON.parse(localStorage.getItem("crm_user") || "null"); } catch { /* ignore */ }
-    if (!stored?.id) return;
-    // The stored copy is from sign-in; ask for the current photo.
-    apiJson<{ success?: boolean; data?: Me }>(`${API_URL}/users/${stored.id}`)
-      .then((r) => { if (live) setMe(r?.success && r.data ? r.data : stored); })
-      .catch(() => { if (live) setMe(stored); });
-    return () => { live = false; };
-  }, []);
-  if (!me) return null;
-  const role = typeof me.role === "string" ? me.role : me.role?.name;
-  return (
-    <section className="mb-4 flex items-center gap-4 rounded-lg border bg-background px-4 py-4">
-      <ProfilePhoto userId={me.id} name={me.name} src={me.avatar_url} editable className="h-14 w-14 text-[17px]"
-        onChange={(url) => setMe((m) => (m ? { ...m, avatar_url: url } : m))} />
-      <div className="min-w-0">
-        <p className="truncate text-[15px] font-medium text-foreground">{me.name}</p>
-        <p className="truncate text-[13px] text-muted-foreground">{[role, me.email].filter(Boolean).join(" · ")}</p>
-        <p className="mt-1 text-[13px] text-muted-foreground">Click your photo to {me.avatar_url ? "change or remove it" : "add one"}.</p>
-      </div>
-    </section>
-  );
-}
-
-export default function SettingsPage() {
+export default function ProfileSettingsPage() {
   const router = useRouter();
+  const [me, setMe] = useState<Me | null>(null);
+  const [form, setForm] = useState<ReturnType<typeof formOf> | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const handleLogout = () => {
+  useEffect(() => {
+    meApi.get().then((m) => { setMe(m); setForm(formOf(m)); }).catch(() => toast.error("Couldn't load your profile"));
+  }, []);
+
+  const changed = !!me && !!form && EDITABLE.some((k) => form[k] !== formOf(me)[k]);
+  const set = (k: keyof ReturnType<typeof formOf>) => (e: { target: { value: string } }) => setForm((f) => (f ? { ...f, [k]: e.target.value } : f));
+
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!me || !form || !changed) return;
+    if (!form.name.trim()) return toast.error("Your name can't be empty");
+    setSaving(true);
+    try {
+      const patch = Object.fromEntries(EDITABLE.filter((k) => form[k] !== formOf(me)[k]).map((k) => [k, form[k]])) as MeUpdate;
+      const next = await meApi.update(patch);
+      setMe(next);
+      setForm(formOf(next));
+      syncStoredUser({ name: next.name });
+      toast.success("Profile saved");
+    } catch (err) {
+      toast.error((err as Error).message || "Couldn't save your profile");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const logout = () => {
     localStorage.removeItem("crm_token");
     localStorage.removeItem("crm_user");
     document.cookie = "crm_token=; path=/; max-age=0";
-    toast.success("Logged out successfully");
     router.push("/login");
   };
 
-  return (
-    <div className="flex flex-col space-y-6 md:space-y-0">
-      <MobileHeader title="Settings" />
-      <div className="px-4 md:px-0">
-        <YourProfile />
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3 md:pt-1">
-          <button
-            type="button"
-            onClick={() => router.push("/settings/email-templates")}
-            className="group flex items-center gap-3 rounded-lg border bg-background px-3.5 py-3 text-left outline-none transition-[background-color,box-shadow] hover:bg-muted/40 hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.08)] focus-visible:ring-2 focus-visible:ring-[#017D58]/40"
-          >
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted/70">
-              <Mail className="size-[18px] text-blue-600 dark:text-blue-400" strokeWidth={1.75} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[14px] font-medium text-foreground">Email templates</span>
-              <span className="block truncate text-[13px] text-muted-foreground">Wording of the emails the CRM sends, and your saved templates.</span>
-            </span>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5" />
-          </button>
-        </div>
+  const role = me?.role?.name;
+  const team = me?.department?.name?.replace(/\s+Department$/i, "");
 
-        <button
-          onClick={handleLogout}
-          className="md:hidden mt-6 w-full flex items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50/50 dark:border-red-900/40 dark:bg-red-950/30 py-4 text-red-600 dark:text-red-400 font-semibold active:scale-[0.98] transition-transform"
+  return (
+    <SettingsPage root title="Profile" description="How you appear to your team, and your contact details.">
+      <Section>
+        {me ? (
+          <div className="flex items-center gap-4">
+            <ProfilePhoto userId={me.id} name={me.name} src={me.avatar_url} editable className="size-16 text-[18px]"
+              onChange={(url) => { setMe((m) => (m ? { ...m, avatar_url: url } : m)); syncStoredUser({ avatar_url: url }); }} />
+            <div className="min-w-0">
+              <p className="truncate text-[16px] font-semibold text-foreground">{me.name}</p>
+              <p className="truncate text-[13px] text-muted-foreground">{[role, team].filter(Boolean).join(" · ")}</p>
+              <p className="mt-1 text-[12.5px] text-muted-foreground">Click your photo to {me.avatar_url ? "change or remove it" : "add one"}.</p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-4"><Skeleton className="size-16 rounded-full" /><div className="space-y-2"><Skeleton className="h-4 w-40" /><Skeleton className="h-3 w-28" /></div></div>
+        )}
+      </Section>
+
+      <MobileSettingsNav />
+
+      <form onSubmit={save}>
+        <Section
+          title="Your details"
+          description="Your email, role, team and ID details are managed by an admin."
+          footer={
+            <>
+              {changed && <span className="mr-auto text-[12.5px] text-muted-foreground">Unsaved changes</span>}
+              <Button type="button" variant="ghost" disabled={!changed || saving} onClick={() => me && setForm(formOf(me))}>Discard</Button>
+              <Button type="submit" disabled={!changed || saving}>{saving ? "Saving…" : "Save changes"}</Button>
+            </>
+          }
         >
-          <LogOut className="w-5 h-5" />
-          Log Out
-        </button>
-      </div>
-    </div>
+          {form ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Full name" className="sm:col-span-2"><Input value={form.name} onChange={set("name")} autoComplete="name" maxLength={80} /></Field>
+              <Field label="Email"><Input value={me?.email ?? ""} disabled /></Field>
+              <Field label="Phone"><Input value={form.phone} onChange={set("phone")} inputMode="tel" autoComplete="tel" maxLength={20} /></Field>
+              <Field label="WhatsApp number"><Input value={form.whatsapp_no} onChange={set("whatsapp_no")} inputMode="tel" maxLength={20} /></Field>
+              <Field label="Date of birth"><Input type="date" value={form.dob} onChange={set("dob")} /></Field>
+              <Field label="Qualification" className="sm:col-span-2"><Input value={form.qualification} onChange={set("qualification")} maxLength={120} /></Field>
+              <Field label="Address" className="sm:col-span-2"><Textarea value={form.address} onChange={set("address")} rows={3} maxLength={500} /></Field>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-14" />)}</div>
+          )}
+        </Section>
+      </form>
+
+      <button type="button" onClick={logout}
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50/50 py-3.5 font-semibold text-red-600 transition-transform active:scale-[0.98] md:hidden dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-400">
+        <LogOut className="size-5" /> Log out
+      </button>
+    </SettingsPage>
   );
 }

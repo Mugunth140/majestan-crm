@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useState, type CSSProperties, type ReactElement } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactElement } from "react";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
-import { Bell, ChevronRight, Search } from "lucide-react";
+import { ArrowLeft, Bell, ChevronDown, ChevronRight, Search } from "lucide-react";
 import { useNotifications } from "@/context/notification-context";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "./sidebar-context";
 import { NotificationsPanel } from "./notifications-panel";
-import { UpdateButton } from "./app-update";
+import { UpdateButton, useAppUpdate } from "./app-update";
 import { useNavViewer } from "@/hooks/use-nav-viewer";
-import { NAVIGATION, canSee } from "./nav-items";
+import { NAVIGATION, SETTINGS, canSee, type NavItem } from "./nav-items";
 import { SearchPalette, useSearchShortcut } from "./search-palette";
 import { WorkspaceMenu } from "./workspace-menu";
 import "./sidebar.css";
@@ -29,6 +30,19 @@ const rowClass = (active: boolean, collapsed: boolean) =>
       : "text-foreground/75 hover:bg-black/[0.045] hover:text-foreground dark:hover:bg-white/[0.06]",
     collapsed && "justify-center px-0",
   );
+
+const PANELS = [...NAVIGATION.filter((i) => i.subItems), SETTINGS];
+const panelHref = (p: NavItem) => p.href ?? p.subItems![0].href.replace(/\/[^/]+$/, "");
+// A panel's first row can share its parent's address (/settings is Profile): match that one exactly.
+const subActive = (pathname: string, href: string, parent?: string) =>
+  href === parent ? pathname === href : pathname === href || pathname.startsWith(href + "/");
+
+const slide = {
+  enter: (d: number) => ({ x: d * 40, opacity: 0 }),
+  center: { x: 0, opacity: 1 },
+  exit: (d: number) => ({ x: d * -40, opacity: 0 }),
+};
+const slideTransition = { type: "tween", ease: [0.23, 1, 0.32, 1], duration: 0.22 } as const;
 
 const mutedIcon = "size-4 shrink-0 text-muted-foreground group-hover/row:text-foreground";
 
@@ -52,8 +66,35 @@ export function Sidebar() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const closeNotifications = useCallback(() => setNotificationsOpen(false), []);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   useSearchShortcut(setSearchOpen);
+  const deployed = useAppUpdate();
+  const floating = !!deployed && !isCollapsed;
+
+  // The panel follows the page (a registry page opens Master Registry); Back or a click
+  // overrides it until the page changes.
+  const routePanel = PANELS.find((p) => p.subItems!.some((s) => subActive(pathname, s.href, p.href)) || pathname === panelHref(p)) ?? null;
+  const [pick, setPick] = useState<{ at: string; name: string | null } | null>(null);
+  const panelName = pick && pick.at === pathname ? pick.name : (routePanel?.name ?? null);
+  const panel = PANELS.find((p) => p.name === panelName && canSee(p, user)) ?? null;
+  const dir = panel ? 1 : -1;
+  const open = (name: string) => setPick({ at: pathname, name });
+  const back = () => setPick({ at: pathname, name: null });
+
+  // Whether rows are hidden below the floating update card.
+  const navRef = useRef<HTMLElement>(null);
+  const [canScroll, setCanScroll] = useState(false);
+  const measure = useCallback(() => {
+    const el = navRef.current;
+    if (el) setCanScroll(el.scrollTop + el.clientHeight < el.scrollHeight - 8);
+  }, []);
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el || !floating) return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    return () => ro.disconnect();
+  }, [floating, panelName, measure]);
 
   return (
     <aside
@@ -116,93 +157,121 @@ export function Sidebar() {
         </RailTip>
       </div>
 
-      {/* Navigation: scrolls on its own, rows keep their height */}
-      <nav className="sb-scroll mt-2 min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2">
-        <div className={cn(entering && "sb-enter", "flex flex-col gap-0.5")} style={{ "--sb-base": 3 } as CSSProperties}>
-          {NAVIGATION.map((item) => {
-            if (!canSee(item, user)) return null;
-            const Icon = item.icon;
-
-            if (item.subItems) {
-              const childActive = item.subItems.some((s) => isActivePath(pathname, s.href));
-              const open = !isCollapsed && (expanded[item.name] ?? childActive);
-              return (
-                <div key={item.name} className="flex flex-col">
-                  <RailTip label={item.name} collapsed={isCollapsed}>
-                    <button
-                      type="button"
-                      aria-expanded={open}
-                      onClick={() =>
-                        isCollapsed
-                          ? (setIsCollapsed(false), setExpanded((e) => ({ ...e, [item.name]: true })))
-                          : setExpanded((e) => ({ ...e, [item.name]: !open }))
-                      }
-                      className={rowClass(isCollapsed && childActive, isCollapsed)}
-                    >
-                      <Icon className={cn("size-4 shrink-0", item.color)} strokeWidth={1.75} />
-                      {!isCollapsed && (
-                        <>
-                          <span className="flex-1 truncate text-left">{item.name}</span>
-                          <ChevronRight
-                            className={cn("size-3.5 text-muted-foreground transition-transform duration-200", open && "rotate-90")}
-                          />
-                        </>
-                      )}
-                    </button>
-                  </RailTip>
-                  <div className={cn("grid transition-[grid-template-rows] duration-200 ease-out", open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
-                    <div className="overflow-hidden">
-                      {/* A tree under the parent's icon: a trunk, and a curved branch into each row */}
-                      <div className="ml-[15px] mt-0.5 flex flex-col gap-0.5 py-0.5">
-                        {item.subItems.map((sub, i) => {
-                          const active = isActivePath(pathname, sub.href);
-                          const last = i === item.subItems!.length - 1;
-                          return (
-                            <div key={sub.href} className="relative pl-[14px]">
-                              {!last && (
-                                <span aria-hidden className={cn("pointer-events-none absolute -bottom-0.5 left-0 w-px bg-border", i === 0 ? "-top-2" : "-top-0.5")} />
-                              )}
-                              <span
-                                aria-hidden
-                                className={cn(
-                                  "pointer-events-none absolute left-0 w-[11px] rounded-bl-[8px] border-b border-l transition-colors",
-                                  i === 0 ? "-top-2 h-[calc(50%+8px)]" : "-top-0.5 h-[calc(50%+2px)]",
-                                  active ? "border-foreground/35" : "border-border",
-                                )}
-                              />
-                              <Link
-                                href={sub.href}
-                                tabIndex={open ? undefined : -1}
-                                aria-current={active ? "page" : undefined}
-                                className={cn(rowClass(active, false), "h-7 text-[13px]")}
-                              >
-                                <span className="truncate">{sub.name}</span>
-                              </Link>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
-            const active = isActivePath(pathname, item.href!);
-            return (
-              <RailTip key={item.name} label={item.name} collapsed={isCollapsed}>
-                <Link href={item.href!} aria-current={active ? "page" : undefined} className={rowClass(active, isCollapsed)}>
-                  <Icon className={cn("size-4 shrink-0", item.color)} strokeWidth={active ? 2 : 1.75} />
-                  {!isCollapsed && <span className="truncate">{item.name}</span>}
-                </Link>
-              </RailTip>
-            );
-          })}
-        </div>
+      {/* Navigation: scrolls on its own, rows keep their height. Master Registry and
+          Settings slide in as their own panel, with Back as the first row. */}
+      <nav
+        ref={navRef}
+        onScroll={measure}
+        className={cn("sb-scroll relative mt-2 min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2", floating ? "pb-[150px]" : "pb-2")}
+      >
+        <MotionConfig reducedMotion="user">
+          <AnimatePresence mode="popLayout" initial={false} custom={dir}>
+            {panel ? (
+              <motion.div
+                key={panel.name}
+                custom={dir}
+                variants={slide}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={slideTransition}
+                className="flex w-full flex-col gap-0.5"
+              >
+                <RailTip label="Back" collapsed={isCollapsed}>
+                  <button
+                    type="button"
+                    onClick={back}
+                    className={cn(
+                      "group/row flex h-8 w-full shrink-0 items-center gap-2.5 rounded-md px-2 text-[14px] font-medium outline-none transition-colors",
+                      "text-[#017D58] hover:bg-[#017D58]/[0.08] focus-visible:ring-2 focus-visible:ring-[#017D58]/40 dark:text-[#2FB585] dark:hover:bg-[#2FB585]/10",
+                      isCollapsed && "justify-center px-0",
+                    )}
+                  >
+                    <ArrowLeft className="size-4 shrink-0 transition-transform duration-150 group-hover/row:-translate-x-0.5" strokeWidth={2} />
+                    {!isCollapsed && <span className="truncate">Back</span>}
+                  </button>
+                </RailTip>
+                {!isCollapsed && (
+                  <p className="mb-1 mt-3 flex items-center gap-2 px-2 text-[12px] font-medium text-muted-foreground">
+                    <panel.icon className={cn("size-3.5", panel.color)} strokeWidth={2} />
+                    {panel.name}
+                  </p>
+                )}
+                {isCollapsed && <div className="mx-auto my-1.5 h-px w-5 bg-border" />}
+                {panel.subItems!.map((sub) => {
+                  const active = subActive(pathname, sub.href, panel.href);
+                  const Icon = sub.icon ?? panel.icon;
+                  return (
+                    <RailTip key={sub.href} label={sub.name} collapsed={isCollapsed}>
+                      <Link href={sub.href} aria-current={active ? "page" : undefined} className={rowClass(active, isCollapsed)}>
+                        <Icon className={cn("size-4 shrink-0", sub.color ?? panel.color)} strokeWidth={active ? 2 : 1.75} />
+                        {!isCollapsed && <span className="truncate">{sub.name}</span>}
+                      </Link>
+                    </RailTip>
+                  );
+                })}
+              </motion.div>
+            ) : (
+              <motion.div
+                key="main"
+                custom={dir}
+                variants={slide}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={slideTransition}
+                className={cn(entering && "sb-enter", "flex w-full flex-col gap-0.5")}
+                style={{ "--sb-base": 3 } as CSSProperties}
+              >
+                {[...NAVIGATION, SETTINGS].map((item) => {
+                  if (!canSee(item, user)) return null;
+                  const Icon = item.icon;
+                  const href = item.href ?? item.subItems![0].href.replace(/\/[^/]+$/, "");
+                  const opensPanel = !!item.subItems;
+                  const active = isActivePath(pathname, href);
+                  return (
+                    <RailTip key={item.name} label={item.name} collapsed={isCollapsed}>
+                      <Link
+                        href={href}
+                        onClick={opensPanel ? () => open(item.name) : undefined}
+                        aria-current={active ? "page" : undefined}
+                        className={cn(rowClass(active, isCollapsed), item === SETTINGS && "mt-2")}
+                      >
+                        <Icon className={cn("size-4 shrink-0", item.color)} strokeWidth={active ? 2 : 1.75} />
+                        {!isCollapsed && <span className="flex-1 truncate">{item.name}</span>}
+                        {!isCollapsed && opensPanel && (
+                          <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/70 transition-transform duration-150 group-hover/row:translate-x-0.5" />
+                        )}
+                      </Link>
+                    </RailTip>
+                  );
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </MotionConfig>
       </nav>
 
-      {/* Footer: only appears when an update is waiting */}
-      <UpdateButton collapsed={isCollapsed} className="border-t p-2" />
+      {/* Update: floats over the end of the nav on a fade, with a nudge to scroll when rows hide behind it */}
+      {floating ? (
+        <div className="sb-float pointer-events-none absolute inset-x-0 bottom-0 px-2 pb-3 pt-12">
+          <button
+            type="button"
+            onClick={() => navRef.current?.scrollBy({ top: 200, behavior: "smooth" })}
+            aria-label="Scroll the menu down"
+            tabIndex={canScroll ? 0 : -1}
+            className={cn(
+              "sb-hint mx-auto mb-2 flex size-6 items-center justify-center rounded-full bg-background text-muted-foreground shadow-[0_0_0_1px_rgba(0,0,0,0.07),0_2px_6px_-1px_rgba(0,0,0,0.1)] transition-[opacity,transform] duration-200 hover:text-foreground dark:bg-white/10 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08)]",
+              canScroll ? "pointer-events-auto opacity-100" : "translate-y-1 opacity-0",
+            )}
+          >
+            <ChevronDown className="size-3.5" strokeWidth={2.25} />
+          </button>
+          <UpdateButton deployed={deployed} collapsed={false} className="pointer-events-auto" />
+        </div>
+      ) : (
+        <UpdateButton deployed={deployed} collapsed={isCollapsed} className="border-t p-2" />
+      )}
 
       <NotificationsPanel open={notificationsOpen} onClose={closeNotifications} toggleId="notifications-btn" />
       <SearchPalette open={searchOpen} onOpenChange={setSearchOpen} viewer={user} />

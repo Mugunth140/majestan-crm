@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Fragment, useEffect } from "react";
-import { NAVIGATION } from "./nav-items";
+import { NAVIGATION, SETTINGS } from "./nav-items";
 import { useMobileHeader } from "./mobile-header-context";
 import { PageActionsSlot, PageCrumbSlot, usePageSlots } from "./page-actions";
 
@@ -16,6 +16,7 @@ for (const item of NAVIGATION) {
     for (const sub of item.subItems) LABELS.set(sub.href, sub.name);
   }
 }
+for (const sub of SETTINGS.subItems!.slice(1)) LABELS.set(sub.href, sub.name);
 
 const SEGMENT_LABELS: Record<string, string> = { new: "New", edit: "Edit" };
 const looksLikeId = (s: string) => /^\d+$/.test(s) || /^[0-9a-f-]{16,}$/i.test(s);

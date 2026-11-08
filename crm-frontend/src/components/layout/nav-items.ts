@@ -1,6 +1,24 @@
 import type { ComponentType } from "react";
 import {
   Activity,
+  Armchair,
+  BedDouble,
+  Building2,
+  ClipboardList,
+  Compass,
+  Filter,
+  KeyRound,
+  Mail,
+  Map as MapIcon,
+  MapPin,
+  Palette,
+  Plug,
+  Receipt,
+  Ruler,
+  Settings,
+  Signpost,
+  UserRound,
+  UserSearch,
   BookOpen,
   ChartNoAxesCombined,
   CalendarClock,
@@ -33,7 +51,14 @@ export interface NavItem {
   color: string;
   /** Shown or hidden per user on the Access tab; the dashboard has none and is always shown. */
   key?: NavKey;
-  subItems?: { name: string; href: string }[];
+  subItems?: SubItem[];
+}
+
+export interface SubItem {
+  name: string;
+  href: string;
+  icon?: ComponentType<LucideProps>;
+  color?: string;
 }
 
 // Sidebar navigation, also searched by the ⌘K palette.
@@ -63,22 +88,37 @@ export const NAVIGATION: NavItem[] = [
     icon: Database,
     color: "text-stone-600 dark:text-stone-300",
     subItems: [
-      { name: "Amenities", href: "/master/amenities" },
-      { name: "Lead Sources", href: "/master/sources" },
-      { name: "HR Sources", href: "/master/hr-sources" },
-      { name: "Property Types", href: "/master/property-types" },
-      { name: "Cities", href: "/master/cities" },
-      { name: "Sublocations", href: "/master/sublocations" },
-      { name: "Road Names", href: "/master/road-names" },
-      { name: "Registration Charges", href: "/master/registration-charges" },
-      { name: "Furnishing Items", href: "/master/furnishing-items" },
-      { name: "Room Names", href: "/master/room-names" },
-      { name: "Room Dimensions", href: "/master/room-dimensions" },
-      { name: "Specifications", href: "/master/specifications" },
-      { name: "Utilities", href: "/master/utilities" },
+      { name: "Amenities", href: "/master/amenities", icon: Sparkles, color: "text-fuchsia-600 dark:text-fuchsia-400" },
+      { name: "Lead Sources", href: "/master/sources", icon: Filter, color: "text-blue-600 dark:text-blue-400" },
+      { name: "HR Sources", href: "/master/hr-sources", icon: UserSearch, color: "text-indigo-600 dark:text-indigo-400" },
+      { name: "Property Types", href: "/master/property-types", icon: Building2, color: "text-violet-600 dark:text-violet-400" },
+      { name: "Cities", href: "/master/cities", icon: MapPin, color: "text-emerald-600 dark:text-emerald-400" },
+      { name: "Sublocations", href: "/master/sublocations", icon: MapIcon, color: "text-amber-600 dark:text-amber-400" },
+      { name: "Road Names", href: "/master/road-names", icon: Signpost, color: "text-orange-600 dark:text-orange-400" },
+      { name: "Registration Charges", href: "/master/registration-charges", icon: Receipt, color: "text-lime-600 dark:text-lime-400" },
+      { name: "Furnishing Items", href: "/master/furnishing-items", icon: Armchair, color: "text-yellow-600 dark:text-yellow-400" },
+      { name: "Room Names", href: "/master/room-names", icon: BedDouble, color: "text-rose-600 dark:text-rose-400" },
+      { name: "Room Dimensions", href: "/master/room-dimensions", icon: Ruler, color: "text-teal-600 dark:text-teal-400" },
+      { name: "Specifications", href: "/master/specifications", icon: ClipboardList, color: "text-sky-600 dark:text-sky-400" },
+      { name: "Utilities", href: "/master/utilities", icon: Plug, color: "text-cyan-600 dark:text-cyan-400" },
     ],
   },
 ];
+
+/** Everyone's own settings. Not a module, so it isn't on the Access tab; the sidebar opens it as its own panel. */
+export const SETTINGS: NavItem = {
+  name: "Settings",
+  href: "/settings",
+  icon: Settings,
+  color: "text-zinc-600 dark:text-zinc-300",
+  subItems: [
+    { name: "Profile", href: "/settings", icon: UserRound, color: "text-blue-600 dark:text-blue-400" },
+    { name: "Password", href: "/settings/password", icon: KeyRound, color: "text-amber-600 dark:text-amber-400" },
+    { name: "Appearance", href: "/settings/appearance", icon: Palette, color: "text-violet-600 dark:text-violet-400" },
+    { name: "Email templates", href: "/settings/email-templates", icon: Mail, color: "text-sky-600 dark:text-sky-400" },
+    { name: "Tour and help", href: "/settings/tour", icon: Compass, color: "text-emerald-600 dark:text-emerald-400" },
+  ],
+};
 
 export type NavViewer = NavAccessViewer;
 
