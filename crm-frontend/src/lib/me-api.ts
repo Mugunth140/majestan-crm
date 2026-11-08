@@ -36,6 +36,7 @@ export const meApi = {
   get: () => apiJson<{ data: Me }>(`${API_URL}/users/me`).then((r) => r.data),
   update: (body: MeUpdate) => apiJson<{ data: Me }>(`${API_URL}/users/me`, json("PATCH", body)).then((r) => r.data),
   changePassword: (current: string, next: string) => apiJson(`${API_URL}/users/me/password`, json("POST", { current, next })),
+  checklist: () => apiJson<{ data: { items: { key: string; title: string; detail: string; href: string; done: boolean }[]; dismissed: boolean } }>(`${API_URL}/users/me/checklist`).then((r) => r.data),
   onboarding: () => apiJson<{ data: Onboarding }>(`${API_URL}/users/me/onboarding`).then((r) => r.data),
   updateOnboarding: (patch: Onboarding | { reset: true }) =>
     apiJson<{ data: Onboarding }>(`${API_URL}/users/me/onboarding`, json("PATCH", patch)).then((r) => r.data),

@@ -59,6 +59,18 @@ export class UsersController {
     return { success: true };
   }
 
+  @Post('me/avatar/preset')
+  async presetAvatar(@Request() req: any, @Body() body: { name?: string }) {
+    const data = await this.service.setPresetAvatar(Number(req.user.id), String(body?.name ?? ''));
+    return { success: true, data };
+  }
+
+  @Get('me/checklist')
+  async checklist(@Request() req: any) {
+    const data = await this.service.checklist(Number(req.user.id));
+    return { success: true, data };
+  }
+
   @Get('me/onboarding')
   async onboarding(@Request() req: any) {
     const data = await this.service.onboarding(Number(req.user.id));

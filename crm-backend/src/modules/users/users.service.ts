@@ -8,6 +8,8 @@ import { ContactLogsService } from '../contact-logs/contact-logs.service';
 import { UserAvatarsService } from './user-avatars.service';
 import { cleanNavAccess } from './nav-access';
 import type { SelfUpdateDto } from './dto/self-update.dto';
+import { gettingStarted } from './getting-started';
+import { isPreset, presetUrl } from './avatar-presets';
 
 const ONBOARDING_KEYS = new Set(['welcomed_at', 'checklist_dismissed_at', 'last_seen_version']);
 
@@ -185,6 +187,13 @@ export class UsersService {
     await this.contactLogsService.revokeAllUserDevices(id);
   }
 
+  /** First-steps checklist, and whether the person has put it away. */
+  async checklist(id: number) {
+    const user = await this.mustFind(id);
+    const items = await gettingStarted(this.userRepository.manager.connection, id);
+    return { items, dismissed: !!(user.onboarding as any)?.checklist_dismissed_at };
+  }
+
   async onboarding(id: number) {
     const user = await this.mustFind(id);
     return user.onboarding ?? {};
@@ -213,6 +222,16 @@ export class UsersService {
     const url = await this.avatars.upload(id, file);
     await this.userRepository.update(id, { avatar_url: url });
     await this.avatars.discard(previous).catch(() => {}); // a leftover file is harmless
+    return { avatar_url: url };
+  }
+
+  /** Switches to one of the ready-made avatars; an uploaded photo it replaces is deleted. */
+  async setPresetAvatar(id: number, name: string) {
+    if (!isPreset(name)) throw new BadRequestException('Pick one of the avatars shown');
+    const user = await this.mustFind(id);
+    const url = presetUrl(name);
+    await this.userRepository.update(id, { avatar_url: url });
+    await this.avatars.discard(user.avatar_url).catch(() => {});
     return { avatar_url: url };
   }
 

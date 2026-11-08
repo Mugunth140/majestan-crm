@@ -7,10 +7,29 @@ export interface Release {
   version: string;
   date: string; // YYYY-MM-DD
   title: string;
-  changes: { kind: ChangeKind; text: string }[];
+  /** `slide` names a tour slide (components/onboarding/tour-data.ts) that shows the change. */
+  changes: { kind: ChangeKind; text: string; slide?: string }[];
 }
 
 export const RELEASES: Release[] = [
+  {
+    version: "2.1.0",
+    date: "2026-11-08",
+    title: "The redesigned CRM",
+    changes: [
+      { kind: "new", text: "A guided tour for everyone, and a getting-started checklist with its own badge.", slide: "updates" },
+      { kind: "new", text: "Leads redesigned, with List, Kanban and Group by views.", slide: "views" },
+      { kind: "new", text: "Edit leads and assets right where you read them.", slide: "direct-edit" },
+      { kind: "new", text: "Activity on every lead, with a Shared filter for properties sent and downloaded.", slide: "activity" },
+      { kind: "new", text: "Conversation keeps every call, email, WhatsApp message and follow-up in one thread.", slide: "conversation" },
+      { kind: "new", text: "Scheduler shows your follow-ups by day.", slide: "scheduler" },
+      { kind: "new", text: "Role dashboards, and a Progress tab with streaks and achievements.", slide: "dashboard" },
+      { kind: "new", text: "Settings for your own profile, password, theme and tour." },
+      { kind: "improved", text: "Dark mode is now the default. You can switch in Settings, Appearance." },
+      { kind: "improved", text: "Inbox grouped by day, with an Unread filter and swipe to delete." },
+      { kind: "fixed", text: "Pages no longer hang when the cache server is unreachable." },
+    ],
+  },
   {
     version: "2.0.0",
     date: "2026-11-02",

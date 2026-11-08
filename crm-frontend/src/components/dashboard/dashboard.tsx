@@ -1,4 +1,5 @@
 "use client";
+import { GettingStarted } from "@/components/onboarding/getting-started";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronRight, RefreshCw } from "lucide-react";
@@ -151,6 +152,7 @@ export function Dashboard() {
       <PageActions>{controls}</PageActions>
       <div className={cn("dash-palette mx-auto w-full min-w-0 max-w-screen-2xl px-4 pb-16 pt-4 lg:px-0 lg:pt-0", intro && "dash-intro")}>
         <div className="space-y-4">
+          <GettingStarted />
           <Crumbs report={data} subjects={s} onOpen={openSubject} />
           <div className="flex flex-wrap items-center gap-2 md:hidden">{controls}</div>
           <Tabs tabs={data.tabs} active={data.tab} onChange={(id) => setParams({ tab: id === data.tabs[0]?.id ? null : id })} />

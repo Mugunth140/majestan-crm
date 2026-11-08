@@ -13,6 +13,7 @@ import { MobileGlassHeader } from "@/components/layout/mobile-glass-header";
 import { MobileHeaderProvider } from "@/components/layout/mobile-header-context";
 import { MainScrollArea } from "@/components/layout/mobile-main-scroller";
 import { NotificationProvider } from "@/context/notification-context";
+import { Onboarding } from "@/components/onboarding/onboarding";
 import { useIsClient } from "@/hooks/use-is-client";
 import DashboardLoading from "./loading";
 import "@/components/mobile/mobile.css";
@@ -45,6 +46,7 @@ export default function DashboardLayout({
                   {isClient ? <NavGuard>{children}</NavGuard> : <DashboardLoading />}
                 </MainScrollArea>
                 <MobileNavbar />
+                {isClient && <Onboarding />}
               </div>
             </div>
           </PageActionsProvider>

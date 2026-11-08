@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { ProfilePhoto } from "@/components/users/profile-photo";
+import { AvatarPicker } from "@/components/users/avatar-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -74,11 +75,15 @@ export default function ProfileSettingsPage() {
             <div className="min-w-0">
               <p className="truncate text-[16px] font-semibold text-foreground">{me.name}</p>
               <p className="truncate text-[13px] text-muted-foreground">{[role, team].filter(Boolean).join(" · ")}</p>
-              <p className="mt-1 text-[12.5px] text-muted-foreground">Click your photo to {me.avatar_url ? "change or remove it" : "add one"}.</p>
+              <p className="mt-1 text-[12.5px] text-muted-foreground">Upload a photo or pick an avatar below.</p>
             </div>
           </div>
         ) : (
           <div className="flex items-center gap-4"><Skeleton className="size-16 rounded-full" /><div className="space-y-2"><Skeleton className="h-4 w-40" /><Skeleton className="h-3 w-28" /></div></div>
+        )}
+        {me && (
+          <AvatarPicker userId={me.id} value={me.avatar_url} className="mt-5 border-t pt-5 sm:grid-cols-9 md:grid-cols-[repeat(13,minmax(0,1fr))]"
+            onChange={(url) => setMe((m) => (m ? { ...m, avatar_url: url } : m))} />
         )}
       </Section>
 

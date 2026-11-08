@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Section, SettingsPage } from "@/components/settings/settings-ui";
 import { meApi, type Onboarding } from "@/lib/me-api";
 import { APP_VERSION } from "@/lib/release";
+import { OPEN_TOUR_EVENT } from "@/components/onboarding/onboarding";
 
 const date = (iso?: string) => (iso ? new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null);
 
@@ -26,7 +27,7 @@ export default function TourSettingsPage() {
     setBusy(true);
     try {
       setState(await meApi.updateOnboarding({ reset: true }));
-      toast.success("Done. The welcome and tour will start the next time you open the dashboard.");
+      toast.success("Done. The tour starts again the next time you open the CRM.");
     } catch {
       toast.error("Couldn't reset the tour");
     } finally {
@@ -40,9 +41,14 @@ export default function TourSettingsPage() {
         title="Product tour"
         description="A short walk through the pages you use, made for your role."
         footer={
-          <Button onClick={reset} disabled={busy || !state}>
-            <RotateCcw className="size-4" /> {busy ? "Resetting…" : "Reset the tour"}
-          </Button>
+          <>
+            <Button variant="ghost" onClick={reset} disabled={busy || !state}>
+              <RotateCcw className="size-4" /> {busy ? "Resetting…" : "Reset"}
+            </Button>
+            <Button onClick={() => window.dispatchEvent(new Event(OPEN_TOUR_EVENT))}>
+              <Compass className="size-4" /> Take the tour now
+            </Button>
+          </>
         }
       >
         <div className="flex items-center gap-3">
@@ -51,7 +57,7 @@ export default function TourSettingsPage() {
           </span>
           <p className="text-[13.5px] text-muted-foreground">
             {!state ? "Checking…" : finished ? `You finished the tour on ${date(finished)}.` : seen ? "You've started the tour but haven't finished it." : "You haven't taken the tour yet."}
-            {" "}Resetting shows the welcome and the tour again from the start.
+            {" "}Take it again now, or reset it to start fresh the next time you open the CRM.
           </p>
         </div>
       </Section>

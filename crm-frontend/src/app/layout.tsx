@@ -72,7 +72,7 @@ export default function RootLayout({
       <body className={`${inter.className} text-[14px] bg-background text-foreground transition-colors duration-500 ease-in-out antialiased`}>
         <ThemeProvider
           attribute={["class", "data-mode"]}
-          defaultTheme="system"
+          defaultTheme="dark"
           enableSystem
           storageKey="theme"
         >

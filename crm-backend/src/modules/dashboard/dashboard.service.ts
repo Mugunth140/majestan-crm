@@ -1,3 +1,4 @@
+import { gettingStarted, type ChecklistItem } from '../users/getting-started';
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, In } from 'typeorm';
@@ -734,7 +735,8 @@ export class DashboardService {
     const weaknesses = [...measured].sort((a, b) => a.percentile! - b.percentile!).filter(m => m.percentile! <= 40).slice(0, 3);
 
     const c = data.counters.get(person.id)?.cur ?? {};
-    const achievements = this.achievements(person, targets, history, streak, best, c, data.range);
+    const firstSteps = await gettingStarted(this.db, person.id).catch(() => null);
+    const achievements = this.achievements(person, targets, history, streak, best, c, data.range, firstSteps);
     const hero: ProgressHero = {
       score: s.score, scoreBasis: s.basis, rank: rank >= 0 ? rank + 1 : null, rankOf: scores.length,
       streak: { days: streak, metric: SERIES_LABELS[primary] ?? primary },
@@ -816,7 +818,7 @@ export class DashboardService {
     return { value, date, today: history.get(today)?.[key] ?? 0 };
   }
 
-  private achievements(person: Person, targets: TargetRow[], history: Map<string, Record<string, number>>, streak: number, best: { value: number; today: number }, c: Counters, range: Range): Achievement[] {
+  private achievements(person: Person, targets: TargetRow[], history: Map<string, Record<string, number>>, streak: number, best: { value: number; today: number }, c: Counters, range: Range, firstSteps: ChecklistItem[] | null = null): Achievement[] {
     const month = range.today.slice(0, 7);
     const week = taskWeek(range.today);
     const list: Omit<Achievement, 'celebrate'>[] = [];
@@ -841,6 +843,10 @@ export class DashboardService {
       list.push({ key: 'fast-responder', period: range.from, title: 'Fast responder', detail: `Average first response ${Math.round(avg)} min`, unlocked: avg <= 15 });
     }
     if ((c.open ?? 0) >= 5) list.push({ key: 'clean-sheet', period: range.today, title: 'Clean sheet', detail: c.overdue ? `${c.overdue} overdue follow-ups` : 'No overdue follow-ups', unlocked: !c.overdue });
+    if (firstSteps) {
+      const done = firstSteps.filter(i => i.done).length;
+      list.push({ key: 'getting-started', period: 'once', title: 'Getting started', detail: `${done} of ${firstSteps.length} first steps`, unlocked: done === firstSteps.length });
+    }
     return list.map(a => ({ ...a, celebrate: false }));
   }
 

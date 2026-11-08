@@ -40,8 +40,8 @@ export function Progress({ hero }: { hero: ProgressHero }) {
     .sort((x, y) => y.p - x.p || x.i - y.i)
     .map((x) => x.a);
   return (
-    <div className="grid gap-4 lg:grid-cols-12">
-      <div className="flex items-center gap-5 rounded-xl border bg-card p-5 lg:col-span-6">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+      <div className="flex min-w-0 items-center gap-4 rounded-xl border bg-card p-4 sm:gap-5 sm:p-5 lg:col-span-6">
         <ScoreRing score={hero.score} />
         <div className="min-w-0 space-y-1.5">
           <div className="text-[13px] text-muted-foreground">Performance score</div>
@@ -64,7 +64,7 @@ export function Progress({ hero }: { hero: ProgressHero }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:col-span-6">
+      <div className="grid min-w-0 grid-cols-2 gap-4 lg:col-span-6">
         <Stat icon={Flame} tone={hero.streak.days >= 5 ? "warn" : undefined} label="Working-day streak" value={`${hero.streak.days} ${hero.streak.days === 1 ? "day" : "days"}`} detail={`${hero.streak.metric} goal met each day`} />
         <Stat
           icon={Sparkles}
@@ -94,7 +94,7 @@ export function Progress({ hero }: { hero: ProgressHero }) {
       </div>
 
       {(hero.strengths.length > 0 || hero.weaknesses.length > 0) && (
-        <div className="grid gap-4 md:grid-cols-2 lg:col-span-12">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:col-span-12">
           <Standouts title="Where you shine" tone="good" metrics={hero.strengths} empty="Keep going — strengths appear once you pull ahead of the team median." />
           <Standouts title="Where to improve" tone="bad" metrics={hero.weaknesses} empty="Nothing is lagging behind the team. Nice work." />
         </div>
