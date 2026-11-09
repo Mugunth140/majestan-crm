@@ -14,5 +14,6 @@ import { AuthModule } from '../auth/auth.module';
   imports: [TypeOrmModule.forFeature([Asset, AssetLocation, AssetFinancials, AssetFeature, AssetLayout, AssetDocument]), AuthModule],
   controllers: [AssetsController],
   providers: [AssetsService],
+  exports: [AssetsService],
 })
 export class AssetsModule {}

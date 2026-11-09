@@ -21,6 +21,7 @@ import { ActivityLogsModule } from './modules/activity-logs/activity-logs.module
 import { HealthModule } from './modules/health/health.module';
 import { MasterModule } from './modules/master/master.module';
 import { LeadsModule } from './modules/leads/leads.module';
+import { SearchModule } from './modules/search/search.module';
 import { AgentsModule } from './modules/agents/agents.module';
 import { InboundsModule } from './modules/inbounds/inbounds.module';
 import { RecordEventsModule } from './modules/record-events/record-events.module';
@@ -164,6 +165,7 @@ import { CommunicationsModule } from './modules/communications/communications.mo
     HealthModule,
     MasterModule,
     LeadsModule,
+    SearchModule,
     RecordEventsModule,
     StaffActivityModule,
     AgentsModule,

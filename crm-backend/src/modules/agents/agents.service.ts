@@ -108,21 +108,27 @@ export class AgentsService {
     return this.dataSource.getRepository(Agent).findOne({ where: { id }, relations: { assigned_staff: true } });
   }
 
-  async getAgents(user?: any): Promise<any[]> {
-    let roleWhere = '1=1';
-    const params: any[] = [];
-
+  /**
+   * The partners a user may see, as a condition on alias `a`; null when they
+   * may see none. Shared by the partner list and the global search.
+   */
+  static scopeFor(user?: any): { where: string; params: any[] } | null {
     if (user && user.role === 'Staff') {
       const staffId = Number(user.id);
-      if (!isFinite(staffId)) return [];
-      roleWhere = 'a.assigned_staff_id = ?';
-      params.push(staffId);
-    } else if (user && user.role === 'Team Lead') {
-      const deptId = Number(user.department_id);
-      if (!isFinite(deptId)) return [];
-      roleWhere = 'a.assigned_staff_id IN (SELECT id FROM users WHERE department_id = ?)';
-      params.push(deptId);
+      return isFinite(staffId) ? { where: 'a.assigned_staff_id = ?', params: [staffId] } : null;
     }
+    if (user && user.role === 'Team Lead') {
+      const deptId = Number(user.department_id);
+      return isFinite(deptId) ? { where: 'a.assigned_staff_id IN (SELECT id FROM users WHERE department_id = ?)', params: [deptId] } : null;
+    }
+    return { where: '1=1', params: [] };
+  }
+
+  async getAgents(user?: any): Promise<any[]> {
+    const scope = AgentsService.scopeFor(user);
+    if (!scope) return [];
+    const roleWhere = scope.where;
+    const params: any[] = [...scope.params];
 
     const rawAgents = await this.dataSource.query(`
       SELECT 

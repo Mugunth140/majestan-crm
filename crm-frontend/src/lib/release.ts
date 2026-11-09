@@ -13,6 +13,22 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2.2.0",
+    date: "2026-11-09",
+    title: "Search everything",
+    changes: [
+      { kind: "new", text: "⌘K / Ctrl+K searches leads, inbound, partners, properties, projects, builders, candidates, assets and people by ID, name or phone. Type a module's name, like \"inb\", and press Enter to search only there." },
+      { kind: "new", text: "Pet Friendly on every property type." },
+      { kind: "new", text: "Website analytics: see visits to the website alongside your CRM numbers." },
+      { kind: "new", text: "Emails go out on their own a few minutes after they're triggered. Press Don't send in the conversation to stop one." },
+      { kind: "improved", text: "Calls a team lead makes for their team's leads count toward the team lead's call target." },
+      { kind: "improved", text: "Every list shows 20 rows, and you can switch to 50 or 100." },
+      { kind: "improved", text: "Profile pictures show everywhere in the CRM, and update as soon as you pick one." },
+      { kind: "fixed", text: "Each department is listed once, without duplicates like \"HR\" and \"HR Department\"." },
+      { kind: "fixed", text: "Paging works on every list, not just Leads." },
+    ],
+  },
+  {
     version: "2.1.0",
     date: "2026-11-08",
     title: "The redesigned CRM",

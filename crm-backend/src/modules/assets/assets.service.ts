@@ -76,13 +76,26 @@ export class AssetsService {
     }
   }
 
-  async findAll(user?: any) {
+  /** The assets a user may see, as a TypeORM where. Shared with the global search. */
+  visibleWhere(user?: any): any {
     const whereClause: any = {};
     if (user && user.role === 'Staff') {
       whereClause.assigned_staff_id = user.id;
     } else if (user && user.role === 'Team Lead') {
       whereClause.assigned_staff = { department_id: user.department_id };
     }
+    return whereClause;
+  }
+
+  /** Ids of the assets a user may see; null when they see them all. */
+  async visibleIds(user?: any): Promise<number[] | null> {
+    const where = this.visibleWhere(user);
+    if (!Object.keys(where).length) return null;
+    return (await this.dataSource.getRepository(Asset).find({ where, select: { id: true } })).map((r) => r.id);
+  }
+
+  async findAll(user?: any) {
+    const whereClause = this.visibleWhere(user);
 
     return this.dataSource.getRepository(Asset).find({
       where: whereClause,

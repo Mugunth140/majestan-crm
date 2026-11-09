@@ -203,7 +203,7 @@ export class InboundsService {
     return copy as T;
   }
 
-  private async canSeeContacts(reqUser?: any): Promise<boolean> {
+  async canSeeContacts(reqUser?: any): Promise<boolean> {
     // req.user carries { id, role } where role is the role name string.
     // Admin / Super Admin / Manager see everything by default; Team Lead /
     // Staff need the explicit `inbounds.call_tracking` grant.
@@ -289,18 +289,35 @@ export class InboundsService {
     return this.update(id, data, actor?.id ?? null);
   }
 
-  async findAll(user?: any): Promise<any[]> {
+  /**
+   * The inbounds a user may see, as a TypeORM where; null when they see them
+   * all. Shared by the inbound list and the global search.
+   */
+  async visibleWhere(user?: any): Promise<any | null> {
     let whereClause: any = {};
     if (user && user.role === 'Staff') {
       whereClause.assigned_staff_id = user.id;
     } else if (user && user.role === 'Team Lead') {
       whereClause.assigned_staff = { department_id: user.department_id };
+    } else {
+      return null;
     }
-
-    if (user && ['Staff', 'Team Lead'].includes(user.role)) {
+    if (['Staff', 'Team Lead'].includes(user.role)) {
       whereClause = [whereClause, { uploaded_by_id: user.id },
         ...((await this.canManageQueue(user)) ? [{ is_queued: true }] : [])];
     }
+    return whereClause;
+  }
+
+  /** Ids of the inbounds a user may see; null when they see them all. */
+  async visibleIds(user?: any): Promise<number[] | null> {
+    const where = await this.visibleWhere(user);
+    if (!where) return null;
+    return (await this.inboundsRepository.find({ where, select: { id: true } })).map((r) => r.id);
+  }
+
+  async findAll(user?: any): Promise<any[]> {
+    const whereClause = (await this.visibleWhere(user)) ?? {};
 
     const inbounds = await this.inboundsRepository.find({
       where: whereClause,

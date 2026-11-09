@@ -1,4 +1,5 @@
 import { Injectable, ConflictException, NotFoundException, BadRequestException, ForbiddenException, Optional } from '@nestjs/common';
+import { leadScopeSql } from './lead-scope';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In } from 'typeorm';
@@ -984,23 +985,7 @@ export class LeadsService {
     const limit = query?.limit ? Number(query.limit) : 10;
     const offset = (page - 1) * limit;
 
-    let roleFilter = '';
-    if (user && user.role === 'Staff') {
-      roleFilter = `AND l.assigned_staff_id = ${Number(user.id)}`;
-    } else if (user && user.role === 'Team Lead') {
-      // A Team Lead owns a pipeline, not a staff list: a lead moved to Sales
-      // keeps its old owner, so filtering by the owner's department would hide
-      // it from Sales. Unknown departments keep the old owner-based scope.
-      const deptName = String(user.department ?? '');
-      const leadDept = /sales/i.test(deptName) ? 'sales'
-        : /telecalling/i.test(deptName) ? 'telecalling'
-        : null;
-      roleFilter = leadDept
-        ? `AND l.department = '${leadDept}' AND l.assigned_staff_id IS NOT NULL`
-        : `AND l.assigned_staff_id IN (SELECT id FROM users WHERE department_id = ${Number(user.department_id)})`;
-    } else {
-      roleFilter = `AND l.assigned_staff_id IS NOT NULL`;
-    }
+    const roleFilter = leadScopeSql(user);
 
     // Scope (role/tab/pipeline) also drives the filter-dropdown option lists,
     // so it is kept apart from the user's own search/filter conditions.
