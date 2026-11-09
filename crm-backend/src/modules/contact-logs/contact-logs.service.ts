@@ -122,13 +122,13 @@ export class ContactLogsService {
   }
 
   private async fetchMatchRows(userId: number) {
-    const selectFor = (table: string, extra: string, assigned: boolean, statusFilter?: string) => {
+    const selectFor = (table: string, extra: string, assigned: boolean, statusFilter?: string, owners: number[] = [userId]) => {
       const cols = ContactLogsService.NUMBER_COLUMNS[table].join(', ');
       const clauses: string[] = [];
       const params: any[] = [];
       if (assigned) {
-        clauses.push('assigned_staff_id = ?');
-        params.push(userId);
+        clauses.push(`assigned_staff_id IN (${owners.map(() => '?').join(', ')})`);
+        params.push(...owners);
       }
       if (statusFilter) clauses.push(statusFilter);
       const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
@@ -144,8 +144,9 @@ export class ContactLogsService {
     const inbounds = trackInbound
       ? await selectFor('inbounds', '', false, INBOUND_ACTIVE_FILTER)
       : await selectFor('inbounds', '', true);
+    const leadOwners = await this.leadOwnersFor(userId);
     const [leads, agents, assets] = await Promise.all([
-      selectFor('leads', '', true),
+      selectFor('leads', '', true, undefined, leadOwners),
       selectFor('agents', '', true),
       selectFor('assets', '', true),
     ]);
@@ -157,6 +158,25 @@ export class ContactLogsService {
       `SELECT id, mobile, whatsapp, createdAt AS created_at FROM hr_candidates WHERE ${HR_ACTIVE_FILTER}`,
     ).then((rows: any[]) => rows.map((row) => ({ table: 'hr_candidates', row, columns: ContactLogsService.NUMBER_COLUMNS['hr_candidates'] })));
     return [...leads, ...agents, ...inbounds, ...assets, ...hr];
+  }
+
+  /**
+   * Whose leads this phone's calls count for. A Team Lead often calls a
+   * staff member's lead to help out: those calls come from the lead's own
+   * phone, so their team's leads are tracked too and the call is credited
+   * to the Team Lead (sent_by_id is always the phone's owner), never to the
+   * staff member. Everyone else tracks only their own leads.
+   */
+  private async leadOwnersFor(userId: number): Promise<number[]> {
+    const rows: { id: number }[] = await this.dataSource.query(
+      `SELECT staff.id FROM users me
+       JOIN roles my_role ON my_role.id = me.role_id AND my_role.name = 'Team Lead'
+       JOIN users staff ON staff.department_id = me.department_id AND staff.id <> me.id AND staff.is_active = 1
+       JOIN roles staff_role ON staff_role.id = staff.role_id AND staff_role.name = 'Staff'
+       WHERE me.id = ? AND me.department_id IS NOT NULL`,
+      [userId],
+    );
+    return [userId, ...rows.map((r) => Number(r.id))];
   }
 
   /**

@@ -65,3 +65,44 @@ describe('ContactLogsService staff-number guard', () => {
     expect(inserted[0].params[0]).toBe(4);
   });
 });
+
+describe('ContactLogsService team lead calls', () => {
+  // Team Lead 20 leads Staff 21 and 22; lead 7 is Staff 21's, lead 8 someone else's.
+  function teamService(role: 'Team Lead' | 'Staff') {
+    const inserted: { sql: string; params: unknown[] }[] = [];
+    const LEADS = [
+      { id: 7, mobile_number: '9111111111', whatsapp_number: null, created_at: since, assigned_staff_id: 21 },
+      { id: 8, mobile_number: '9222222222', whatsapp_number: null, created_at: since, assigned_staff_id: 99 },
+    ];
+    const query = jest.fn(async (sql: string, params: unknown[] = []) => {
+      if (sql.includes("my_role.name = 'Team Lead'")) return role === 'Team Lead' ? [{ id: 21 }, { id: 22 }] : [];
+      if (sql.includes('FROM leads')) return LEADS.filter((l) => params.includes(l.assigned_staff_id));
+      return [];
+    });
+    const queryRunner = {
+      connect: jest.fn(), startTransaction: jest.fn(), commitTransaction: jest.fn(),
+      rollbackTransaction: jest.fn(), release: jest.fn(),
+      query: jest.fn(async (sql: string, params: unknown[]) => { inserted.push({ sql, params }); }),
+    };
+    const userRepo = { findOne: jest.fn(async () => ({ id: 20, role: { name: role } })) } as any;
+    return { service: new ContactLogsService(userRepo, { query, createQueryRunner: () => queryRunner } as any), inserted };
+  }
+
+  it("tracks the team's leads on a team lead's phone and credits the team lead", async () => {
+    const { service, inserted } = teamService('Team Lead');
+    expect((await service.getTrackableNumbers(20)).map((n) => n.number)).toEqual(['9111111111']);
+    const result = await service.syncCallLogs(20, [call('t', '9111111111'), call('o', '9222222222')]);
+    expect(result.receipts).toEqual([
+      { sourceCallId: 'o', status: 'rejected', reason: 'no_number_match' },
+      { sourceCallId: 't', status: 'accepted' },
+    ]);
+    expect(inserted[0].sql).toContain('contact_logs');
+    // [lead_id, contact_type, sent_by_id, ...]: the Team Lead made the call.
+    expect(inserted[0].params.slice(0, 3)).toEqual([7, 'call', 20]);
+  });
+
+  it("does not give a staff member their colleagues' leads", async () => {
+    const { service } = teamService('Staff');
+    expect(await service.getTrackableNumbers(20)).toEqual([]);
+  });
+});
