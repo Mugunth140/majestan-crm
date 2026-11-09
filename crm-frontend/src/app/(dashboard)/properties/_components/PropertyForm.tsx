@@ -442,6 +442,7 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
   // ---- Pricing ----
   const [price, setPrice] = useState(d?.price ? String(d.price) : "");
   const [negotiable, setNegotiable] = useState<boolean>(d?.negotiable ?? false);
+  const [petFriendly, setPetFriendly] = useState<boolean>(d?.petFriendly ?? false);
   // String-coerced: the API may return numbers for these varchar columns —
   // without String() the .trim() calls in submit would throw (bookingAmount
   // previously broke saving for exactly this reason).
@@ -825,6 +826,7 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
     { key: "tenantOccupied", kind: "s", get: () => tenantOccupied, set: setTenantOccupied },
     { key: "price", kind: "s", get: () => price, set: setPrice },
     { key: "negotiable", kind: "b", get: () => negotiable, set: setNegotiable },
+    { key: "petFriendly", kind: "b", get: () => petFriendly, set: setPetFriendly },
     { key: "bookingAmount", kind: "s", get: () => bookingAmount, set: setBookingAmount },
     { key: "brokerageType", kind: "s", get: () => brokerageType, set: setBrokerageType },
     { key: "brokerageValue", kind: "s", get: () => brokerageValue, set: setBrokerageValue },
@@ -1728,6 +1730,7 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
         propertyType,
         price: parseIndianCurrency(propertyType === "coworking" ? rentPerSeat : price),
         negotiable,
+        petFriendly,
         status,
         availableFrom: availableFrom || undefined,
         availableUntil: availableUntil || undefined,
@@ -3133,6 +3136,21 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
                 </label>
               </div>
             </div>)}
+
+            {/* Pet Friendly: every property type */}
+            <div className="space-y-2">
+              <label className={labelClass}>Pet Friendly</label>
+              <div className={checkboxRowClass}>
+                <Checkbox
+                  id="petFriendly"
+                  checked={petFriendly}
+                  onCheckedChange={(checked) => setPetFriendly(!!checked)}
+                />
+                <label htmlFor="petFriendly" className="flex-1 cursor-pointer text-[14px] text-foreground">
+                  Pets are allowed
+                </label>
+              </div>
+            </div>
 
             {/* Booking Amount */}
             {isFieldVisible("bookingAmount") && (

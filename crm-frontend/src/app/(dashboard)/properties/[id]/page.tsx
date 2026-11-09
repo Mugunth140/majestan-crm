@@ -317,6 +317,7 @@ export default function PropertyViewPage() {
             <SectionField label="Status" value={propertyStatusLabel(property.status, property.approvalStatus)} />
             <SectionField label={type === "coworking" ? "Rent per Seat" : "Price"} value={formatPrice(Number(type === "coworking" ? det.rentPerSeat ?? property.price : property.price))} />
             <SectionField label="Negotiable" value={bool(property.negotiable)} />
+            <SectionField label="Pet friendly" value={bool(property.petFriendly)} />
             {!isPlotLike && (<>
             <SectionField label="Property Condition" value={property.propertyCondition} />
             </>)}

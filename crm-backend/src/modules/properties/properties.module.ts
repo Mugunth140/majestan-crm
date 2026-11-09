@@ -10,6 +10,6 @@ import { PermissionsModule } from '../permissions/permissions.module';
   imports: [AuthModule, PermissionsModule],
   controllers: [PropertiesController],
   providers: [PropertiesService, SiteApiService, PropertyTypeRegistryService],
-  exports: [SiteApiService],
+  exports: [SiteApiService, PropertiesService],
 })
 export class PropertiesModule {}

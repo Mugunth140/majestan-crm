@@ -368,6 +368,7 @@ const properties: ReportModule = {
     pm('per_sqft', 'Price per sq ft', 'p.price_per_sqft', 'money'),
     pm('expected', 'Expected sale price', 'p.expected_sale_price', 'money'),
     pm('negotiable', 'Negotiable', 'p.negotiable', 'bool'),
+    pm('pet_friendly', 'Pet friendly', 'p.pet_friendly', 'bool'),
     pm('maintenance', 'Maintenance', 'p.maintenance_charges'),
     pm('deposit', 'Security deposit', 'p.security_deposit'),
     pm('booking', 'Booking amount', 'p.booking_amount'),

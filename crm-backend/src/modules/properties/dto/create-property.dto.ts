@@ -134,6 +134,10 @@ export class CreatePropertyDto {
   @IsOptional() @IsBoolean()
   negotiable?: boolean;
 
+  /** Pets allowed, on any property type. */
+  @IsOptional() @IsBoolean()
+  petFriendly?: boolean;
+
   @IsOptional() @IsArray()
   imageUrls?: { imageUrl: string; imageKey: string; isPrimary: boolean }[];
 

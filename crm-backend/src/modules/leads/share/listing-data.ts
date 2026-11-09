@@ -159,7 +159,7 @@ export async function loadProperty(
   const [p] = await site.query(
     // Details first: on a name clash (id) the property's own column wins.
     `SELECT d.*, p.id, p.property_code, p.title, p.price, p.property_type, p.listing_type, p.city, p.slug,
-            p.negotiable, p.maintenance_charges, p.security_deposit, p.price_per_sqft, p.available_from, p.property_condition,
+            p.negotiable, p.pet_friendly, p.maintenance_charges, p.security_deposit, p.price_per_sqft, p.available_from, p.property_condition,
             s.locality_name
        FROM properties p
        LEFT JOIN property_details d ON d.property_id = p.id
@@ -309,6 +309,7 @@ export function propertyListing(
         ],
         ['Security deposit', rupees(p.security_deposit)],
         ['Negotiable', Number(p.negotiable) ? 'Yes' : null],
+        ['Pet friendly', Number(p.pet_friendly) ? 'Yes' : null],
       ]),
       { title: 'Amenities', items: amenityNames(amenities) },
     ]),

@@ -633,6 +633,7 @@ export class PropertiesService {
       ownerEmail: dto.ownerEmail || undefined,
       ownerPhone: dto.ownerPhone || undefined,
       negotiable: dto.negotiable ?? false,
+      petFriendly: dto.petFriendly ?? false,
       maintenanceCharges: str(dto.maintenanceCharges),
       securityDeposit: str(dto.securityDeposit),
     };
@@ -753,6 +754,7 @@ export class PropertiesService {
     }
     const payload = await this.buildSitePayload(body);
     if (body.negotiable === undefined) delete payload.negotiable;
+    if (body.petFriendly === undefined) delete payload.petFriendly;
     // The site API replaces the details row on PATCH. Preserve omitted details
     // so curating a form never erases fields imported from the old CRM.
     if (payload.details && existing.propertyDetails) {
