@@ -1,22 +1,27 @@
 "use client";
 
+import { PropertyForm } from "./_components/PropertyForm";
+import { propertyTypeName } from "./_components/property-form-fields";
 import { EMPTY_PROPERTY_FILTERS, propertyUploaderLabel } from "@/lib/property-list-filters";
 import { propertyStatusLabel } from "@/lib/property-status";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DataTable } from "@/components/tables/data-table";
+import { BOARD_PAGE, ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { DateCell, IdCell, NameCell, StatusCell, statusDot, statusTone, type StatusTone } from "@/components/tables/cells";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FormSelect } from "@/components/shared/form-select";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { ListBody, ListFrame, ListToolbar, SegmentTabs, ToolbarEnd, ToolbarSearch, headerPrimaryClass, toolbarFilterButton } from "@/components/layout/list-page";
+import { ClearFilters, DateQuickFilter, FilterDivider, FilterStrip, QuickFilter, RangeQuickFilter, TextQuickFilter } from "@/components/shared/quick-filters";
+import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -24,17 +29,16 @@ import { useClampedPage, usePersistedState } from "@/hooks/use-persisted-state";
 import { propertiesApi } from "@/lib/properties-api";
 import { PROPERTY_TABS } from "@/lib/property-tabs";
 import { usePropertiesList } from "@/hooks/use-properties-list";
-import { canViewPropertyContacts } from "@/lib/permissions";
+import { canViewPropertyContacts, isAdmin } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
-import { motion } from "motion/react";
 import { Check, Edit, Eye, Filter, Lock, Plus, RefreshCw, Search, X } from "lucide-react";
 
 const PROPERTY_TYPE_OPTIONS = [
   { value: "apartment", label: "Apartment" },
   { value: "villa", label: "Villa" },
   { value: "plot", label: "Plot" },
-  { value: "commercial", label: "Commercial Space" },
-  { value: "coworking", label: "Co-working" },
+  { value: "commercial", label: "Commercial" },
+  { value: "coworking", label: "Coworking" },
   { value: "farmland", label: "Farmland" },
   { value: "industrial", label: "Industrial" },
   { value: "individual_portion", label: "Independent House" },
@@ -43,27 +47,32 @@ const PROPERTY_TYPE_OPTIONS = [
   { value: "pg_service_apartment", label: "PG / Service Apartment" },
 ];
 
-const STATUS_STYLES: Record<string, string> = {
-  available: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
-  archived: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400",
-  sold: "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400",
-  rented: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
-};
-
-const APPROVAL_STYLES: Record<string, string> = {
-  approved: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
-  pending: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
+const PROPERTY_TONES: Record<string, StatusTone> = {
+  available: "green",
+  rented: "blue",
+  sold: "violet",
+  archived: "gray",
+  "pending review": "amber",
 };
 
 function formatPrice(price: number): string {
-  if (!price) return "-";
+  if (!price) return "—";
   if (price >= 10000000) return `₹${(price / 10000000).toFixed(2)} Cr`;
   if (price >= 100000) return `₹${(price / 100000).toFixed(2)} L`;
   return `₹${price.toLocaleString("en-IN")}`;
 }
 
+const PROPERTY_FIELDS: ViewField[] = [
+  { id: "status", label: "Status", get: (p) => propertyStatusLabel(p.status, p.approvalStatus), order: ["available", "Pending review", "rented", "sold", "Archived"], dot: (v) => statusDot(v, PROPERTY_TONES[v.toLowerCase()]), capitalize: true },
+  { id: "propertyType", label: "Type", get: (p) => p.propertyType?.replace(/_/g, " "), capitalize: true },
+  { id: "listingType", label: "Listing", get: (p) => (p.listingType === "Rent" ? "Rent" : "Buy") },
+  { id: "locality", label: "Locality", get: (p) => p.localityName },
+  { id: "approval", label: "Approval", get: (p) => p.approvalStatus || "Pending", dot: (v) => statusDot(v), capitalize: true },
+];
+
 export default function PropertiesPage() {
   const router = useRouter();
+  const views = useModuleView("properties", PROPERTY_FIELDS);
   const [activeTab, setActiveTab] = usePersistedState<string>("properties:tab", "Available", { allowed: PROPERTY_TABS });
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
@@ -76,6 +85,7 @@ export default function PropertiesPage() {
   const [role, setRole] = useState("");
 
   const { properties, totalCount, isLoading, staff, cities, sublocations, roadNames, propertyTypes, fetchProperties, toggleVisibility, deleteBulk } = usePropertiesList();
+  const [creating, setCreating] = useState(false);
   useClampedPage(pagination, setPagination, totalCount, isLoading);
 
   useEffect(() => {
@@ -90,8 +100,9 @@ export default function PropertiesPage() {
   const canApprove = ["Admin", "Super Admin", "Manager"].includes(role);
 
   useEffect(() => {
-    fetchProperties({ pagination, debouncedSearchQuery, activeTab, filters });
-  }, [fetchProperties, pagination, debouncedSearchQuery, activeTab, filters]);
+    fetchProperties({ pagination: views.isBoard ? BOARD_PAGE : pagination, debouncedSearchQuery, activeTab, filters });
+  }, [fetchProperties, pagination, debouncedSearchQuery, activeTab, filters, views.isBoard]);
+  const reloadProperties = () => fetchProperties({ pagination: views.isBoard ? BOARD_PAGE : pagination, debouncedSearchQuery, activeTab, filters });
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -161,61 +172,43 @@ export default function PropertiesPage() {
     },
     {
       accessorKey: "id",
-      header: "Id",
+      header: "ID",
       cell: ({ row }) => (
-        <Link href={`/properties/${row.original.id}`} className="text-[#0052FF] hover:underline font-medium">
-          {row.original.propertyCode || row.original.id}
-        </Link>
+        <IdCell href={`/properties/${row.original.id}`}>{row.original.propertyCode || row.original.id}</IdCell>
       ),
     },
     {
       accessorKey: "title",
       header: "Title",
       cell: ({ row }) => {
-        const title = row.original.title || "-";
-        return (
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="h-7 w-7 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center font-bold text-xs text-blue-900 dark:text-blue-300 shrink-0">
-              {title.charAt(0).toUpperCase()}
-            </div>
-            <Link href={`/properties/${row.original.id}`} className="font-medium text-foreground hover:text-[#0052FF] hover:underline truncate max-w-[220px]" title={title}>
-              {title}
-            </Link>
-          </div>
-        );
+        const title = row.original.title || "—";
+        return <NameCell name={title} avatar className="max-w-[260px]" />;
       },
     },
     {
       accessorKey: "propertyType",
       header: "Type",
       cell: ({ row }) => (
-        <span className="capitalize">{row.original.propertyType?.replace(/_/g, " ") || "-"}</span>
+        <span className="capitalize">{row.original.propertyType?.replace(/_/g, " ") || "—"}</span>
       ),
     },
     {
       accessorKey: "listingType",
       header: "Listing",
-      cell: ({ row }) =>
-        row.original.listingType === "Rent" ? (
-          <Badge className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 font-medium shadow-sm border">Rent</Badge>
-        ) : (
-          <Badge className="bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 font-medium shadow-sm border">Buy</Badge>
-        ),
+      cell: ({ row }) => <span>{row.original.listingType === "Rent" ? "Rent" : "Buy"}</span>,
     },
     {
       accessorKey: "price",
       header: "Price",
-      cell: ({ row }) => <span className="font-semibold">{formatPrice(Number(row.original.price))}</span>,
+      cell: ({ row }) => <span className="whitespace-nowrap tabular-nums">{formatPrice(Number(row.original.price))}</span>,
     },
     {
       id: "locality",
       header: "Locality",
       cell: ({ row }) => {
-        const locality = row.original.localityName || "-";
+        const locality = row.original.localityName || "—";
         return (
-          <div className="min-w-0">
-            <div className="font-medium text-foreground text-sm truncate">{locality}</div>
-          </div>
+          <span className="block truncate">{locality}</span>
         );
       },
     },
@@ -232,11 +225,11 @@ export default function PropertiesPage() {
         }
         return row.original.ownerName || row.original.ownerPhone ? (
           <div className="min-w-0">
-            {row.original.ownerName && <div className="font-medium text-foreground text-sm truncate">{row.original.ownerName}</div>}
-            {row.original.ownerPhone && <div className="text-xs text-muted-foreground">{row.original.ownerPhone}</div>}
+            {row.original.ownerName && <div className="truncate">{row.original.ownerName}</div>}
+            {row.original.ownerPhone && <div className="text-[12px] tabular-nums text-muted-foreground">{row.original.ownerPhone}</div>}
           </div>
         ) : (
-          <span className="text-muted-foreground">-</span>
+          <span className="text-muted-foreground">—</span>
         );
       },
     },
@@ -244,9 +237,8 @@ export default function PropertiesPage() {
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => {
-        const s = (row.original.status || "").toLowerCase();
-        const cls = STATUS_STYLES[s] ?? "bg-gray-100 text-gray-800 border-gray-200";
-        return <Badge className={"font-medium shadow-sm border whitespace-nowrap capitalize " + cls}>{propertyStatusLabel(row.original.status, row.original.approvalStatus)}</Badge>;
+        const label = propertyStatusLabel(row.original.status, row.original.approvalStatus);
+        return <span className="capitalize"><StatusCell status={label} tone={PROPERTY_TONES[label.toLowerCase()] ?? statusTone(label)} /></span>;
       },
     },
     {
@@ -254,23 +246,18 @@ export default function PropertiesPage() {
       header: "Approval",
       cell: ({ row }) => {
         const a = (row.original.approvalStatus || "Pending").toLowerCase();
-        const cls = APPROVAL_STYLES[a] ?? "bg-gray-100 text-gray-800 border-gray-200";
-        return <Badge className={"font-medium shadow-sm border whitespace-nowrap capitalize " + cls}>{a}</Badge>;
+        return <span className="capitalize"><StatusCell status={a} /></span>;
       },
     },
     {
       id: "uploadedBy",
       header: "Uploaded by",
-      cell: ({ row }) => <span className="text-sm whitespace-nowrap">{propertyUploaderLabel(row.original)}</span>,
+      cell: ({ row }) => <span className="whitespace-nowrap">{propertyUploaderLabel(row.original)}</span>,
     },
     {
       accessorKey: "createdAt",
       header: "Uploaded on",
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground whitespace-nowrap">
-          {row.original.createdAt ? new Date(row.original.createdAt).toLocaleDateString("en-GB", {timeZone: "Asia/Kolkata"}) : "-"}
-        </span>
-      ),
+      cell: ({ row }) => <DateCell value={row.original.createdAt} />,
     },
   ];
 
@@ -279,7 +266,7 @@ export default function PropertiesPage() {
     columns,
     data: properties,
     showToolbar: true,
-    showDeleteAction: role === "Admin",
+    showDeleteAction: isAdmin({ role }),
     onDeleteSelected: (rows: any[]) => setBulkDeleteIds(rows.map((r) => r.id)),
     renderToolbarActions: (selectedRows: any[], clearSelection: () => void) => {
       const isSingle = selectedRows.length === 1;
@@ -329,22 +316,16 @@ export default function PropertiesPage() {
     <Popover>
       <PopoverTrigger render={
         isMobile ? (
-          <Button aria-label="Filters" variant="outline" size="icon" className="h-12 w-12 rounded-2xl bg-black/5 dark:bg-white/10 border-transparent relative shrink-0">
+          <Button aria-label="Filters" variant="outline" size="icon" className="h-10 w-10 rounded-[11px] bg-foreground/[0.06] border-transparent relative shrink-0">
             <Filter className="h-5 w-5 text-foreground" />
             {activeFiltersCount > 0 && (
-              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#0052FF] border-2 border-background text-white text-[10px] font-bold flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#017D58] border-2 border-background text-white text-[10px] font-bold flex items-center justify-center">
                 {activeFiltersCount}
               </span>
             )}
           </Button>
         ) : (
-          <Button variant="outline" className="h-10 rounded-xl bg-muted/30 border-border/60 px-4 flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium text-[13.5px]">Filters</span>
-            {activeFiltersCount > 0 && (
-              <Badge className="ml-1 bg-[#0052FF] text-white px-1.5 py-0.5 rounded-md text-[10px]">{activeFiltersCount}</Badge>
-            )}
-          </Button>
+          toolbarFilterButton(activeFiltersCount)
         )
       } />
       <PopoverContent align="start" className="w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60">
@@ -405,7 +386,7 @@ export default function PropertiesPage() {
           </div>
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Property Type</label>
-            <FormSelect name="propertyType" options={propertyTypes.length ? propertyTypes : PROPERTY_TYPE_OPTIONS} value={filters.propertyType} onValueChange={(v) => { setFilters((f) => ({ ...f, propertyType: v || "" })); resetPage(); }} placeholder="All Types" />
+            <FormSelect name="propertyType" options={propertyTypes.length ? propertyTypes.map((t) => ({ ...t, label: propertyTypeName(t.value, t.label) })) : PROPERTY_TYPE_OPTIONS} value={filters.propertyType} onValueChange={(v) => { setFilters((f) => ({ ...f, propertyType: v || "" })); resetPage(); }} placeholder="All Types" />
           </div>
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Listing Type</label>
@@ -422,13 +403,13 @@ export default function PropertiesPage() {
 
   const searchBar = (isMobile: boolean) => (
     <div className="relative flex-1">
-      <Search className={isMobile ? "absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" : "absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"} />
+      <Search className={isMobile ? "absolute left-3 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-muted-foreground" : "absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"} />
       <Input
         placeholder={isMobile ? "Search properties..." : "Search title, code, owner, city..."}
         value={searchQuery}
         onChange={(e) => { setSearchQuery(e.target.value); resetPage(); }}
         className={isMobile
-          ? "pl-11 h-12 bg-black/5 dark:bg-white/10 border-transparent rounded-2xl text-[16px] focus-visible:ring-1 focus-visible:ring-primary shadow-none"
+          ? "pl-10 h-10 bg-foreground/[0.06] border-transparent rounded-[11px] text-[16px] placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-[#017D58]/30 shadow-none"
           : "pl-9 h-10 bg-muted/30 rounded-xl border-border/60 text-[13.5px]"}
       />
       {isMobile && searchQuery && (
@@ -449,8 +430,8 @@ export default function PropertiesPage() {
             aria-pressed={activeTab === tab}
             onClick={() => { setActiveTab(tab); resetPage(); }}
             className={cn(
-              "px-5 h-10 rounded-full text-[14px] font-semibold whitespace-nowrap transition-all border active:scale-95",
-              isActive ? "bg-foreground text-background border-foreground shadow-sm" : "bg-card text-muted-foreground border-border hover:bg-muted"
+              "px-3.5 h-8 rounded-full text-[14px] font-medium whitespace-nowrap transition-colors active:opacity-60",
+              isActive ? "bg-[#017D58] text-white dark:bg-[#2FB585] dark:text-black" : "bg-foreground/[0.06] text-foreground"
             )}
           >
             {tab}
@@ -467,49 +448,54 @@ export default function PropertiesPage() {
   );
 
   const desktopFilters = (
-    <div className="bg-card border rounded-xl overflow-hidden shadow-sm md:flex md:flex-col md:flex-1 md:min-h-0">
-      <div className="flex items-center justify-between px-6 border-b bg-muted/10 pt-4 gap-4">
-        <div className="flex items-center gap-8 overflow-x-auto scrollbar-hide relative">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              aria-pressed={activeTab === tab}
-              onClick={() => { setActiveTab(tab); resetPage(); }}
-              className={"relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " + (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")}
-            >
-              {tab}
-              {activeTab === tab && (
-                <motion.div layoutId="desktopActiveTabUnderline" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full" initial={false} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3 px-6 py-4 border-b bg-background">
-        <div className="flex-1 min-w-[240px] max-w-md">{searchBar(false)}</div>
-        {renderFilterPopover(false)}
-        {(searchQuery || activeFiltersCount > 0) && (
-          <Button variant="ghost" size="icon" onClick={() => { setSearchQuery(""); clearFilters(); }} className="h-10 w-10 rounded-full text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors" title="Clear Search & Filters">
-            <X className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
-
-      <div className="w-full max-w-full min-w-0 md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col">{tableSection}</div>
-    </div>
+    <ListFrame>
+      <ListToolbar className="md:flex-nowrap">
+        <SegmentTabs tabs={tabs} value={activeTab} onChange={(tab) => { setActiveTab(tab); resetPage(); }} label="Properties views" />
+        <FilterDivider />
+        <FilterStrip>
+          <QuickFilter label="Listing" value={filters.listingType} options={[{ label: "Buy", value: "Sell" }, { label: "Rent", value: "Rent" }]} onChange={(v) => { setFilters((f) => ({ ...f, listingType: v })); resetPage(); }} />
+          <QuickFilter label="Property type" value={filters.propertyType} options={propertyTypes.length ? propertyTypes.map((t) => ({ ...t, label: propertyTypeName(t.value, t.label) })) : PROPERTY_TYPE_OPTIONS} onChange={(v) => { setFilters((f) => ({ ...f, propertyType: v })); resetPage(); }} />
+          <QuickFilter label="City" value={filters.cityId} options={cities.map((c) => ({ label: c.cityName, value: String(c.id) }))} onChange={(v) => { setFilters((f) => ({ ...f, cityId: v, sublocationId: "" })); resetPage(); }} />
+          <QuickFilter label="Location" value={filters.sublocationId} options={sublocations.filter((item) => !filters.cityId || String(item.cityId) === filters.cityId).map((item) => ({ label: item.name, value: String(item.id) }))} onChange={(v) => { setFilters((f) => ({ ...f, sublocationId: v })); resetPage(); }} />
+          <QuickFilter label="Road" value={filters.roadName} options={roadNames} onChange={(v) => { setFilters((f) => ({ ...f, roadName: v })); resetPage(); }} />
+          <RangeQuickFilter label="Budget" unit="₹" min={filters.minBudget} max={filters.maxBudget} onChange={(minBudget, maxBudget) => { setFilters((f) => ({ ...f, minBudget, maxBudget })); resetPage(); }} />
+          <RangeQuickFilter label="Area" unit="sq.ft" min={filters.minSqft} max={filters.maxSqft} onChange={(minSqft, maxSqft) => { setFilters((f) => ({ ...f, minSqft, maxSqft })); resetPage(); }} />
+          <QuickFilter label="Furnishing" value={filters.furnishingStatus} options={[{ label: "Bareshell", value: "BARESHELL" }, { label: "Fully furnished", value: "FULLY FURNISHED" }, { label: "Semi furnished", value: "SEMI FURNISHED" }, { label: "Unfurnished", value: "UNFURNISHED" }]} onChange={(v) => { setFilters((f) => ({ ...f, furnishingStatus: v })); resetPage(); }} />
+          <TextQuickFilter label="Floor" value={filters.floor} placeholder="e.g. Ground, 1, 2" onChange={(v) => { setFilters((f) => ({ ...f, floor: v })); resetPage(); }} />
+          <TextQuickFilter label="Special purpose" value={filters.specialPurpose} placeholder="e.g. Office, showroom" onChange={(v) => { setFilters((f) => ({ ...f, specialPurpose: v })); resetPage(); }} />
+          <QuickFilter label="Uploaded by" value={filters.uploadedById} options={staff.map((user) => ({ label: `${user.name}${user.isActive ? "" : " (Inactive)"}`, value: String(user.id) }))} onChange={(v) => { setFilters((f) => ({ ...f, uploadedById: v })); resetPage(); }} />
+          <DateQuickFilter label="Uploaded" from={filters.uploadedFrom} to={filters.uploadedTo} onChange={(uploadedFrom, uploadedTo) => { setFilters((f) => ({ ...f, uploadedFrom, uploadedTo })); resetPage(); }} />
+          <ClearFilters show={activeFiltersCount > 0 || !!searchQuery} onClick={() => { setSearchQuery(""); clearFilters(); }} />
+        </FilterStrip>
+        <ToolbarEnd>
+          {views.picker}
+          <ToolbarSearch value={searchQuery} onChange={(v) => { setSearchQuery(v); resetPage(); }} placeholder="Search title, code, owner, city" className="md:[&_input]:w-56" />
+        </ToolbarEnd>
+      </ListToolbar>
+      <ListBody>
+        {isLoading ? <TableSkeleton columns={12} rows={10} flush /> : <ModuleViews
+          state={views}
+          data={properties}
+          columns={columns}
+          list={
+            <DataTable key={activeTab} {...tableProps} variant="list" />
+          }
+          getKey={(p) => p.id}
+          onOpen={(p) => router.push(`/properties/${p.id}`)}
+          card={(p) => ({ title: p.title, id: p.propertyCode || p.id, href: `/properties/${p.id}`, subtitle: [p.localityName, Number(p.price) ? formatPrice(Number(p.price)) : ""].filter(Boolean).join(" · "), footer: propertyUploaderLabel(p), tag: p.propertyType?.replace(/_/g, " ") })}
+          totalCount={totalCount}
+          noun="properties"
+        />}
+      </ListBody>
+    </ListFrame>
   );
 
   const mobileFilters = (
-    <div className="px-4 pb-2 space-y-4">
+    <div className="px-4 pb-2 space-y-3">
       <div className="flex items-center gap-2">
         {searchBar(true)}
         {renderFilterPopover(true)}
       </div>
-      <Link href="/properties/new" className="flex h-11 w-full rounded-xl bg-[#0052FF] px-4 text-[14px] font-semibold text-white shadow-md hover:bg-[#0052FF]/90 items-center justify-center gap-2 transition-transform active:scale-95">
-        <Plus size={18} />
-        Add Property
-      </Link>
       {pillTabs}
     </div>
   );
@@ -517,32 +503,22 @@ export default function PropertiesPage() {
   return (
     <>
       <MobileHeader title="Properties" />
-      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:h-full">
-        <Device
-          mobile={null}
-          desktop={
-            <div className="flex h-[48px] items-center justify-between pr-[150px]">
-              <div>
-                <h1 className="text-[28px] font-bold tracking-tight">Properties</h1>
-                {/* <p className="text-muted-foreground text-sm mt-0.5">Manage your property listings</p> */}
-              </div>
-              <div className="flex items-center gap-3">
-                <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={() => fetchProperties({ pagination, debouncedSearchQuery, activeTab, filters })} title="Refresh">
-                  <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
-                </Button>
-                <Link href="/properties/new" className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
-                  <Plus size={18} />
-                  Add Property
-                </Link>
-              </div>
-            </div>
-          }
-        />
+      {views.switcher}
+      <div className="w-full flex flex-col space-y-6 pt-4 md:space-y-0 md:pt-0 md:h-full">
+        <PageActions>
+          <button type="button" onClick={() => setCreating(true)} className={headerPrimaryClass}>
+            <Plus className="size-4" />
+            Add Property
+          </button>
+        </PageActions>
 
         <Device mobile={mobileFilters} desktop={desktopFilters} />
-        <Device desktop={null} mobile={<div className="w-full px-4 md:px-0">{tableSection}</div>} />
+        <Device desktop={null} mobile={<div className="w-full">{tableSection}</div>} />
 
       </div>
+      {creating && (
+        <PropertyForm mode="create" onClose={() => setCreating(false)} onSuccess={() => { setCreating(false); reloadProperties(); }} />
+      )}
 
       <Dialog open={bulkDeleteIds !== null} onOpenChange={(open) => { if (!open) setBulkDeleteIds(null); }}>
         <DialogContent className="sm:max-w-[425px]">

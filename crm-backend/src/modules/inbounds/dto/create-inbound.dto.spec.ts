@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { CreateInboundDto } from './create-inbound.dto';
-import { UpdateInboundDto } from './update-inbound.dto';
+import { UpdateInboundDto, validateInboundRequiredEdits } from './update-inbound.dto';
 
 // Mirrors the global pipe in main.ts: whitelist + transform.
 async function pipeValidate(dtoClass: any, payload: any) {
@@ -190,5 +190,33 @@ describe('CreateInboundDto (inbound form contract)', () => {
       sale_price: 'eighty-five lakhs',
     });
     expect(errors.some((e) => e.property === 'sale_price')).toBe(true);
+  });
+});
+
+describe('inbound edits', () => {
+  it.each(['property_title', 'owner_name', 'mobile_number', 'property_category', 'property_type', 'purpose',
+    'status', 'state', 'city', 'locality', 'primary_contact', 'key_available_with', 'brokerage_accepted'])(
+    'rejects clearing %s even when it passes optional DTO validation',
+    (key) => {
+      expect(() => validateInboundRequiredEdits({ [key]: null })).toThrow('is required');
+      expect(() => validateInboundRequiredEdits({ [key]: '   ' })).toThrow('is required');
+    },
+  );
+
+  it('allows a partial edit of an incomplete quick capture', () => {
+    expect(() => validateInboundRequiredEdits({ landmark: 'Near the park', email: undefined })).not.toThrow();
+  });
+
+  it.each([CreateInboundDto, UpdateInboundDto])('validates email and allows an empty email', async (dtoClass) => {
+    const capture = { property_category: 'commercial', property_type: 'shop', mobile_number: '+91 98765 43210' };
+    expect(await pipeValidate(dtoClass, { ...capture, email: null })).toEqual([]);
+    expect(await pipeValidate(dtoClass, { ...capture, email: ' owner@example.com ' })).toEqual([]);
+    expect((await pipeValidate(dtoClass, { ...capture, email: 'invalid-email' })).map(e => e.property)).toContain('email');
+  });
+
+  it.each([
+    ['total_rent', 'not a number'], ['percentage', -1], ['fixed_amount', -50], ['brokerage_days', 1.5],
+  ])('rejects an invalid numeric edit to %s', async (key, value) => {
+    expect((await pipeValidate(UpdateInboundDto, { [key]: value })).map(e => e.property)).toContain(key);
   });
 });

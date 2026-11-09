@@ -3,6 +3,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { isQueuedWebsiteSource } from './website-sources';
+import { matchCriteria, projectMatchQuery, propertyMatchQuery, SIMILAR_WHEN, similarCriteria } from './auto-match';
+import { photoUrl } from './share/listing-data';
 import { LeadSource } from '../../database/entities/lead-source.entity';
 import { Lead } from '../../database/entities/lead.entity';
 import { LeadFollowUp } from '../../database/entities/lead-follow-up.entity';
@@ -14,7 +16,7 @@ import { WebsiteEnquiryEvent } from '../../database/entities/website-enquiry-eve
 import { NON_QUEUEABLE_LEAD_STATUSES, SALES_PIPELINE_STATUSES } from './lead-statuses';
 import { transferLeadToSales } from '../lead-routing/transfer-to-sales';
 import { NotificationsService } from '../notifications/notifications.service';
-import { TasksService } from '../tasks/tasks.service';
+import { LeadEventsService } from './lead-events.service';
 import { S3Client } from 'bun';
 import { extname } from 'path';
 import { fetchWatermarkedImage, isImageMimetype } from '../../common/imgproxy-watermark';
@@ -40,6 +42,16 @@ export function pickPropertyLink(inquiries?: Array<{ id: number; property_id?: n
   return linked.sort((a, b) => b.id - a.id)[0];
 }
 
+// Edits to these show on the lead Timeline (entity column names).
+const LEAD_TRACKED_FIELDS = [
+  'name', 'mobile_number', 'whatsapp_number', 'email', 'city', 'address', 'lead_source',
+  'commission', 'commission_remarks', 'is_referral', 'referred_by_name', 'referred_by_contact',
+];
+const INQUIRY_TRACKED_FIELDS = [
+  'purchase_type', 'property_category', 'property_type', 'funder', 'project_list', 'city_id',
+  'sub_locations', 'purchase_timeline', 'qualification_purpose', 'decision_maker', 'preferences',
+];
+
 @Injectable()
 export class LeadsService {
   private _s3Client: S3Client | null = null;
@@ -48,9 +60,10 @@ export class LeadsService {
     @InjectDataSource() private dataSource: DataSource,
     @InjectDataSource('site') private siteDataSource: DataSource,
     private readonly notificationsService: NotificationsService,
-    private readonly tasksService: TasksService,
     // Domain events for the central mail service (docs/mail-composer-plan.md).
     @Optional() private readonly events?: EventEmitter2,
+    // Lead history for the Timeline tab and analytics.
+    @Optional() private readonly leadEvents?: LeadEventsService,
   ) {}
 
   private get s3Client(): S3Client {
@@ -174,7 +187,7 @@ export class LeadsService {
   }
 
   // ── Follow-Up CRUD ────────────────────────────────────────────────────────
-  async addFollowUp(leadId: number, body: any) {
+  async addFollowUp(leadId: number, body: any, actorId: number | null = null) {
     const leadRepo = this.dataSource.getRepository(Lead);
     const lead = await leadRepo.findOne({ where: { id: leadId } });
     if (!lead) throw new NotFoundException('Lead not found');
@@ -193,7 +206,7 @@ export class LeadsService {
     followUp.outcome = body.outcome || null;
     followUp.is_completed = body.isCompleted ?? false;
     followUp.notes = body.notes || null;
-    followUp.created_by_id = body.createdById || null;
+    followUp.created_by_id = actorId ?? (body.createdById || null);
     const saved = await repo.save(followUp);
 
     // Update rnr_consecutive_count on the lead based on the rnr field (e.g. 'rnr3' → count 3)
@@ -235,8 +248,9 @@ export class LeadsService {
     followUp.follow_up_date = body.followUpDate ?? followUp.follow_up_date;
     followUp.follow_up_time = body.followUpTime ?? followUp.follow_up_time;
     followUp.contacted_via = body.contactedVia ?? followUp.contacted_via;
-    followUp.next_follow_up_date = body.nextFollowUpDate ?? followUp.next_follow_up_date;
-    followUp.next_follow_up_time = body.nextFollowUpTime ?? followUp.next_follow_up_time;
+    // "" clears the next follow-up (the edit dialog's way of removing it).
+    if (body.nextFollowUpDate !== undefined) followUp.next_follow_up_date = body.nextFollowUpDate || null;
+    if (body.nextFollowUpTime !== undefined) followUp.next_follow_up_time = body.nextFollowUpTime || null;
     followUp.purpose = body.purpose ?? followUp.purpose;
     followUp.priority = body.priority ?? followUp.priority;
     followUp.rnr = body.rnr ?? followUp.rnr;
@@ -281,6 +295,7 @@ export class LeadsService {
     const existingLead = await leadRepo.findOne({ where: { id } });
     if (!existingLead) throw new NotFoundException('Lead not found');
     const previousStatus = existingLead.status;
+    const wasUnqualified = !!existingLead.is_unqualified;
 
     if (body.status_name) {
       existingLead.status = body.status_name;
@@ -301,10 +316,6 @@ export class LeadsService {
       existingLead.department !== 'sales' &&
       SALES_PIPELINE_STATUSES.includes(body.status_name);
 
-    // Snapshot before the department changes, so the metric still credits the
-    // pipeline that did the work.
-    const metricLead = { ...existingLead };
-
     const saved = entersSales
       ? await transferLeadToSales(
           this.dataSource,
@@ -315,16 +326,17 @@ export class LeadsService {
         )
       : await leadRepo.save(existingLead);
 
-    // Auto-increment task metrics based on new lead status
-    if (body.status_name && metricLead.assigned_staff_id) {
-      this.tasksService.autoIncrementFromLeadStatus(metricLead, body.status_name).catch(err => {
-        console.error('Task auto-increment error (non-fatal):', err?.message);
-      });
-    }
-
     if (body.status_name && body.status_name !== previousStatus) {
       await this.events?.emitAsync('leads.lead.status_changed', {
         entityId: id, actorId: actionedById, from: previousStatus, to: body.status_name,
+        reason: body.drop_reason || null,
+      });
+    }
+
+    if (body.is_unqualified !== undefined && body.is_unqualified !== wasUnqualified) {
+      await this.leadEvents?.record({
+        leadId: id, actorId: actionedById, type: 'qualification_changed', field: 'is_unqualified',
+        from: wasUnqualified ? 'Unqualified' : 'Qualified', to: body.is_unqualified ? 'Unqualified' : 'Qualified',
       });
     }
 
@@ -367,11 +379,12 @@ export class LeadsService {
     return saved;
   }
 
-  async updateLead(id: number, body: any) {
-    return this.dataSource.transaction(async (manager) => {
+  async updateLead(id: number, body: any, actorId: number | null = null) {
+    const saved = await this.dataSource.transaction(async (manager) => {
       const leadRepo = manager.getRepository(Lead);
       const existingLead = await leadRepo.findOne({ where: { id } });
       if (!existingLead) throw new NotFoundException('Lead not found');
+      const before = { ...existingLead };
 
       // Normalize like create/bulk so a "+91 …" edit matches stored numbers
       // instead of false-conflicting or storing a second unnormalized form.
@@ -390,6 +403,7 @@ export class LeadsService {
       if (body.address !== undefined) existingLead.address = body.address || null;
       if (body.source !== undefined) existingLead.lead_source = body.source || null;
       existingLead.commission = body.commission !== undefined ? body.commission : existingLead.commission;
+      if (body.commissionRemarks !== undefined) existingLead.commission_remarks = body.commissionRemarks?.trim() || null;
       if (body.isReferral !== undefined) existingLead.is_referral = body.isReferral;
       if (body.referredByName !== undefined) existingLead.referred_by_name = body.referredByName;
       if (body.referredByContact !== undefined) existingLead.referred_by_contact = body.referredByContact;
@@ -413,14 +427,38 @@ export class LeadsService {
         await manager.save(LeadInquiry, inquiry);
       }
 
-      return existingLead;
+      return { lead: existingLead, before };
     });
+    await this.leadEvents?.recordChanges(id, actorId, 'field_changed', saved.before as any, saved.lead as any, LEAD_TRACKED_FIELDS);
+    return saved.lead;
   }
 
-  async updateInquiry(leadId: number, inquiryId: number, body: any) {
+  /** A requirement added by hand on the lead page (not a new enquiry from the lead). */
+  async addInquiry(leadId: number, body: any, actorId: number | null = null) {
+    const lead = await this.dataSource.getRepository(Lead).findOne({ where: { id: leadId } });
+    if (!lead) throw new NotFoundException('Lead not found');
+    const inquiryRepo = this.dataSource.getRepository(LeadInquiry);
+    const saved = await inquiryRepo.save(inquiryRepo.create({
+      lead_id: leadId,
+      source: 'manual',
+      project_list: body.project ?? null,
+      purchase_type: body.purchaseType ?? null,
+      property_category: body.propertyCategory ?? null,
+      property_type: body.propertyType ?? null,
+      funder: body.funder ?? null,
+      purchase_timeline: body.purchaseTimeline ?? null,
+      qualification_purpose: body.qualificationPurpose ?? null,
+      decision_maker: body.decisionMaker ?? null,
+    } as Partial<LeadInquiry>));
+    await this.leadEvents?.record({ leadId, actorId, type: 'requirement_added', meta: { inquiryId: saved.id } });
+    return saved;
+  }
+
+  async updateInquiry(leadId: number, inquiryId: number, body: any, actorId: number | null = null) {
     const inquiryRepo = this.dataSource.getRepository(LeadInquiry);
     const inquiry = await inquiryRepo.findOne({ where: { id: inquiryId, lead_id: leadId } });
     if (!inquiry) throw new NotFoundException('Inquiry not found');
+    const before = { ...inquiry };
 
     if (body.project !== undefined) inquiry.project_list = body.project;
     if (body.purchaseType !== undefined) inquiry.purchase_type = body.purchaseType;
@@ -428,13 +466,45 @@ export class LeadsService {
     if (body.propertyCategory !== undefined) inquiry.property_category = body.propertyCategory;
     if (body.funder !== undefined) inquiry.funder = body.funder;
     if (body.preferences !== undefined) inquiry.preferences = body.preferences;
+    // A patch is merged by MySQL in one statement after the save, so two
+    // preference fields saved at the same moment can't undo each other.
+    // Left undefined here so the save below doesn't write a stale copy.
+    const patch = body.preferencesPatch && body.preferences === undefined
+      ? Object.fromEntries(Object.entries(body.preferencesPatch).map(([k, v]) => [k, v === '' ? null : v ?? null]))
+      : null;
+    if (patch) inquiry.preferences = undefined;
     if (body.cityId !== undefined) inquiry.city_id = body.cityId;
     if (body.subLocations !== undefined) inquiry.sub_locations = body.subLocations;
     if (body.purchaseTimeline !== undefined) inquiry.purchase_timeline = body.purchaseTimeline;
     if (body.qualificationPurpose !== undefined) inquiry.qualification_purpose = body.qualificationPurpose;
     if (body.decisionMaker !== undefined) inquiry.decision_maker = body.decisionMaker;
 
-    return inquiryRepo.save(inquiry);
+    const saved = await inquiryRepo.save(inquiry);
+    if (patch) {
+      await this.dataSource.query(
+        'UPDATE lead_inquiries SET preferences = JSON_MERGE_PATCH(COALESCE(preferences, JSON_OBJECT()), CAST(? AS JSON)) WHERE id = ?',
+        [JSON.stringify(patch), inquiryId],
+      );
+      const [row] = await this.dataSource.query('SELECT preferences FROM lead_inquiries WHERE id = ?', [inquiryId]);
+      const merged = row?.preferences ?? null;
+      saved.preferences = typeof merged === 'string' ? JSON.parse(merged) : merged;
+    }
+    await this.leadEvents?.recordChanges(leadId, actorId, 'requirement_changed', before as any, saved as any, INQUIRY_TRACKED_FIELDS, { inquiryId });
+    return saved;
+  }
+
+  /** Removes one requirement; the timeline keeps a note of what it was. */
+  async deleteInquiry(leadId: number, inquiryId: number, actorId: number | null = null) {
+    const inquiryRepo = this.dataSource.getRepository(LeadInquiry);
+    const inquiry = await inquiryRepo.findOne({ where: { id: inquiryId, lead_id: leadId } });
+    if (!inquiry) throw new NotFoundException('Inquiry not found');
+    const summary = [inquiry.property_type ?? inquiry.property_category, inquiry.project_list].filter(Boolean).join(' · ') || null;
+    await this.dataSource.transaction(async (manager) => {
+      // A website enquiry that became this requirement stops pointing at it.
+      await manager.query('UPDATE website_enquiry_events SET migrated_inquiry_id = NULL WHERE migrated_inquiry_id = ?', [inquiryId]);
+      await manager.delete(LeadInquiry, { id: inquiryId, lead_id: leadId });
+    });
+    await this.leadEvents?.record({ leadId, actorId, type: 'requirement_removed', from: summary, meta: { inquiryId } });
   }
 
   async bulkCreateLeads(leads: any[], actionedBy?: any) {
@@ -729,7 +799,12 @@ export class LeadsService {
           // Mobile wins on conflict: only adopt the email match when mobile matched nothing.
           if (byEmail) matchedLead = byEmail;
         }
+        if(normalised.analyticsSubmissionId){
+          const prior=await eventRepo.findOne({where:{analyticsSubmissionId:normalised.analyticsSubmissionId}});
+          if(prior)return {lead:matchedLead,isExistingCustomer:!!matchedLead,existingStaff:matchedLead?.assigned_staff?.name??'Unassigned'};
+        }
         const event = eventRepo.create({
+          analyticsSubmissionId:normalised.analyticsSubmissionId||null,analyticsSessionId:normalised.analyticsSessionId||null,analyticsPageId:normalised.analyticsPageId||null,
           name: normalised.name ?? null,
           mobile_number: mobile,
           email: normalised.email || null,
@@ -753,7 +828,11 @@ export class LeadsService {
           matched_lead_id: matchedLead ? matchedLead.id : null,
           status: 'open',
         });
-        const savedEvent = await manager.save(event);
+        let savedEvent: WebsiteEnquiryEvent;
+        try{savedEvent=await manager.save(event);}catch(error){
+          if(!normalised.analyticsSubmissionId||!error||typeof error!=='object'||!('code' in error)||error.code!=='ER_DUP_ENTRY')throw error;
+          const prior=await eventRepo.findOne({where:{analyticsSubmissionId:normalised.analyticsSubmissionId}});if(!prior)throw error;savedEvent=prior;
+        }
         return {
           lead: matchedLead,
           isExistingCustomer: !!matchedLead,
@@ -841,18 +920,12 @@ export class LeadsService {
         status: normalised.intent === 'site_visit' ? 'Site Visit Scheduled' : 'New Lead',
         assigned_staff_id: assignedStaffId,
         commission: normalised.commission || null,
+        commission_remarks: normalised.commissionRemarks?.trim() || null,
         is_referral: normalised.isReferral || false,
         referred_by_name: normalised.referredByName || null,
         referred_by_contact: normalised.referredByContact || null,
       });
       const savedLead: Lead = await manager.save(lead);
-
-      // Auto-increment sourcing metric if assigned to sales staff
-      if (savedLead.department === 'sales' && savedLead.assigned_staff_id) {
-        this.tasksService.autoIncrementSourcing(savedLead.assigned_staff_id).catch(err => {
-          console.error('Task sourcing auto-increment error (non-fatal):', err?.message);
-        });
-      }
 
       if (normalised.purchaseType || normalised.propertyType || normalised.funder || normalised.project || normalised.propertyCategory || normalised.propertyId) {
         const inquiryBase = {
@@ -1214,66 +1287,47 @@ export class LeadsService {
     );
   }
 
-  async autoMatchProperties(leadId: number) {
-    const lead = await this.dataSource.getRepository(Lead).findOne({
-      where: { id: leadId },
-      relations: { inquiries: true },
+  /**
+   * Site properties and projects that fit a requirement: the one asked for,
+   * else the lead's latest. Missing preferences only widen the search.
+   */
+  async autoMatchProperties(leadId: number, inquiryId?: number) {
+    const inquiries = await this.dataSource.getRepository(LeadInquiry).find({
+      where: { lead: { id: leadId } },
+      order: { created_at: 'DESC', id: 'DESC' },
     });
-    if (!lead || !lead.inquiries?.length) throw new NotFoundException('Lead or inquiry not found');
+    const inquiry = inquiryId ? inquiries.find((i) => i.id === inquiryId) : inquiries[0];
+    if (!inquiry) throw new NotFoundException('Add a requirement to find matching properties.');
 
-    const inquiry = lead.inquiries[0];
-    const prefs = inquiry.preferences;
-    if (!prefs || Object.keys(prefs).length === 0) {
-      throw new ConflictException('Please define customer preferences (like budget or area) to auto-match properties.');
-    }
-
-    let query = `
-      SELECT p.id, p.title, p.price, p.property_type, p.status, p.slug, p.city, p.listing_type, 
-             pd.bedrooms, pd.bathrooms, pd.area_sqft, pd.furnished
-      FROM properties p
-      LEFT JOIN property_details pd ON p.id = pd.property_id
-      WHERE p.status = 'available'
-    `;
-    const params: any[] = [];
-
-    // Basic map for property type if there is a match in enum
-    // property_type enum: 'apartment','villa','plot','commercial','coworking','farmland','industrial','other','individual_portion'
-    if (inquiry.property_type) {
-      let mappedType = inquiry.property_type.toLowerCase();
-      const validTypes = ['apartment', 'villa', 'plot', 'commercial', 'coworking', 'farmland', 'industrial', 'other', 'individual_portion', 'investment_property', 'pg_service_apartment', 'farm_house'];
-      if (validTypes.includes(mappedType)) {
-        query += ` AND p.property_type = ?`;
-        params.push(mappedType);
+    const [city] = inquiry.city_id
+      ? await this.siteDataSource.query('SELECT city_name FROM cities WHERE id = ?', [inquiry.city_id])
+      : [];
+    const criteria = matchCriteria(inquiry, city?.city_name ?? null);
+    const wide = similarCriteria(criteria);
+    const run = async (build: typeof propertyMatchQuery | typeof projectMatchQuery) => {
+      const exactQuery = build(criteria);
+      const exact: any[] = exactQuery ? await this.siteDataSource.query(exactQuery.sql, exactQuery.params) : [];
+      // Few exact matches: add the closest listings from the wider search.
+      // Nothing of that kind to rent (or buy) either: offer it the other way.
+      let similar: any[] = [];
+      if (exact.length < SIMILAR_WHEN) {
+        const stages = criteria.listing ? [wide.criteria, { ...wide.criteria, listing: null }] : [wide.criteria];
+        for (const stage of stages) {
+          const query = build(stage, { target: wide.target, exclude: exact.map((r) => r.id) });
+          similar = query ? await this.siteDataSource.query(query.sql, query.params) : [];
+          if (similar.length) break;
+        }
       }
-    }
-
-    if (prefs.minBudget) {
-      query += ` AND p.price >= ?`;
-      params.push(Number(prefs.minBudget));
-    }
-    if (prefs.maxBudget) {
-      query += ` AND p.price <= ?`;
-      params.push(Number(prefs.maxBudget));
-    }
-    if (prefs.bhk) {
-      query += ` AND pd.bedrooms = ?`;
-      params.push(Number(prefs.bhk));
-    }
-    if (prefs.minArea) {
-      query += ` AND pd.area_sqft >= ?`;
-      params.push(Number(prefs.minArea));
-    }
-    if (prefs.maxArea) {
-      query += ` AND pd.area_sqft <= ?`;
-      params.push(Number(prefs.maxArea));
-    }
-
-    query += ` ORDER BY p.created_at DESC LIMIT 20`;
-
-    return this.siteDataSource.query(query, params);
+      return [...exact.map((row) => ({ ...row, match: 'exact' })), ...similar.map((row) => ({ ...row, match: 'similar' }))].map((row) => ({
+        ...row,
+        photo: photoUrl(row.photo),
+      }));
+    };
+    const [properties, projects] = await Promise.all([run(propertyMatchQuery), run(projectMatchQuery)]);
+    return { inquiryId: inquiry.id, properties, projects };
   }
 
-  async uploadDocument(leadId: number, file: Express.Multer.File) {
+  async uploadDocument(leadId: number, file: Express.Multer.File, actorId: number | null = null) {
     const lead = await this.dataSource.getRepository(Lead).findOne({ where: { id: leadId }, relations: { documents: true } });
     if (!lead) throw new NotFoundException('Lead not found');
     if (lead.documents.length >= 2) {
@@ -1331,10 +1385,12 @@ export class LeadsService {
       file_url: fileUrl,
       file_key: finalKey,
     });
-    return repo.save(doc);
+    const saved = await repo.save(doc);
+    await this.leadEvents?.record({ leadId, actorId, type: 'document_added', to: finalName, meta: { url: fileUrl } });
+    return saved;
   }
 
-  async deleteDocument(leadId: number, docId: number) {
+  async deleteDocument(leadId: number, docId: number, actorId: number | null = null) {
     const repo = this.dataSource.getRepository(LeadDocument);
     const doc = await repo.findOne({ where: { id: docId, lead_id: leadId } });
     if (!doc) throw new NotFoundException('Document not found');
@@ -1346,6 +1402,7 @@ export class LeadsService {
     }
 
     await repo.remove(doc);
+    await this.leadEvents?.record({ leadId, actorId, type: 'document_removed', from: doc.file_name });
     return { id: docId };
   }
 }

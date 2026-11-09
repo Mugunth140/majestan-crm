@@ -1,167 +1,141 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "motion/react";
-import { 
-  LayoutGrid, 
-  ArrowBigDownDash,
-  Settings, 
-  CheckCircle2, 
-  Plus, 
-  Contact,
-  X,
-  Briefcase,
-  Users,
-  Network,
-  Building2,
-  Layers,
-  Home
-} from "lucide-react";
+import { AnimatePresence, LayoutGroup, MotionConfig, motion } from "motion/react";
+import { CircleCheckBig, House, Inbox, LayoutGrid, Plus, type LucideIcon } from "lucide-react";
+import { CreateSheet, createLabelFor, createRouteFor } from "./mobile-create";
 import { cn } from "@/lib/utils";
 import { useNotifications } from "@/context/notification-context";
+import { useNavViewer } from "@/hooks/use-nav-viewer";
+import { canOpen } from "./nav-items";
 
-const navItems = [
-  { href: "/", icon: LayoutGrid, label: "Overview" },
-  { href: "/tasks", icon: CheckCircle2, label: "Tasks" },
-  { href: "/inbox", icon: ArrowBigDownDash, label: "Inbox" },
-  { href: "/settings", icon: Settings, label: "Settings" },
+interface Tab {
+  href: string;
+  icon: LucideIcon;
+  label: string;
+}
+
+const TABS: Tab[] = [
+  { href: "/", icon: House, label: "Home" },
+  { href: "/tasks", icon: CircleCheckBig, label: "Tasks" },
+  { href: "/inbox", icon: Inbox, label: "Inbox" },
+  { href: "/more", icon: LayoutGrid, label: "More" },
 ];
 
+const under = (pathname: string, href: string) => pathname === href || pathname.startsWith(href + "/");
+
+/** The tab a page belongs to: every module opened from Home or More keeps More selected. */
+function activeTab(pathname: string) {
+  if (pathname === "/") return "/";
+  return TABS.find((t) => t.href !== "/" && t.href !== "/more" && under(pathname, t.href))?.href ?? "/more";
+}
+
+/** Forms get the whole screen, like a pushed editor in a native app. */
+export const hidesTabBar = (pathname: string) => /\/(new|edit)(\/|$)/.test(pathname);
+
+const SPRING = { type: "spring", stiffness: 500, damping: 38 } as const;
+
+/**
+ * Phone dock: a frosted island floating above the home indicator. Tabs are
+ * icons; the current one opens into a tinted pill with its name. Beside it, a
+ * "+" on every page: the module's own form where it has one, otherwise the
+ * Create sheet.
+ */
 export function MobileNavbar() {
-  const pathname = usePathname();
   const router = useRouter();
-  const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+  const pathname = usePathname() ?? "/";
   const { unreadCount } = useNotifications();
-
-  const getDynamicAddRoute = () => {
-    if (pathname.startsWith("/leads")) return "/leads/new";
-    if (pathname.startsWith("/inbound")) return "/inbound/new";
-    if (pathname.startsWith("/asset-inventory")) return "/asset-inventory/new";
-    if (pathname.startsWith("/agent-network")) return "/agent-network/new";
-    if (pathname.startsWith("/hr")) return "/hr/new";
-    if (pathname.startsWith("/users")) return "/users/new";
-    if (pathname.startsWith("/tasks")) return "/tasks/new";
-    if (pathname.startsWith("/properties")) return "/properties/new";
-    if (pathname.startsWith("/projects")) return "/projects/new";
-    return null; 
-  };
-
-  const handleAddClick = () => {
-    const route = getDynamicAddRoute();
-    if (route) {
-      router.push(route);
-    } else {
-      setIsAddMenuOpen(true);
-    }
-  };
+  const viewer = useNavViewer();
+  const [createOpen, setCreateOpen] = useState(false);
+  if (hidesTabBar(pathname)) return null;
+  const current = activeTab(pathname);
+  // A module's own form when this user can open it, otherwise the Create sheet.
+  const formRoute = createRouteFor(pathname);
+  const createRoute = formRoute && canOpen(formRoute, viewer) ? formRoute : null;
+  const createLabel = (createRoute && createLabelFor(pathname)) || "Create";
 
   return (
     <>
-      <motion.div 
-        initial={{ y: 150, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 300, damping: 30, delay: 0.1 }}
-        className="md:hidden fixed left-0 right-0 px-4 z-50 flex items-center justify-center gap-4 pointer-events-none bottom-3"
-      >
-        <div className="flex-1 max-w-[320px] bg-white/90 dark:bg-[#1C1C1E]/95 backdrop-blur-xl border border-border/60 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.15)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.4)] rounded-[2.5rem] p-1.5 flex items-center justify-around pointer-events-auto relative overflow-hidden">
-          {navItems.map((item) => {
-            const isActive = item.href === "/" ? pathname === "/" : pathname?.startsWith(item.href);
-            const isInbox = item.href === "/inbox";
-            
-            return (
-              <button
-                key={item.label}
-                onClick={() => router.push(item.href)}
-                className="relative flex flex-col items-center justify-center w-19 h-[3.5rem] rounded-[2rem] transition-all duration-300 active:scale-90 z-10"
-              >
-                {isActive && (
-                  <motion.div
-                    layoutId="activeNavBackground"
-                    className="absolute inset-0 bg-[#0052FF]/10 dark:bg-white/15 rounded-[2rem]"
-                    initial={false}
-                    transition={{ type: "spring", stiffness: 450, damping: 30 }}
-                  />
-                )}
-                
-                {isInbox && unreadCount > 0 && (
-                  <span className="absolute top-1 right-2 h-4 min-w-[1rem] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none z-30 shadow-sm border border-background">
-                    {unreadCount > 99 ? "99+" : unreadCount}
-                  </span>
-                )}
-
-                <item.icon 
-                  className={cn(
-                    "w-[22px] h-[22px] mb-1 transition-colors relative z-20", 
-                    isActive ? "text-[#0052FF] dark:text-white" : "text-muted-foreground dark:text-white/60"
-                  )} 
-                  strokeWidth={isActive ? 2 : 2} 
-                />
-                <span className={cn(
-                  "text-[10px] font-medium transition-colors tracking-wide relative z-20",
-                  isActive ? "text-[#0052FF] dark:text-white" : "text-muted-foreground dark:text-white/60"
-                )}>
-                  {item.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        <button
-          onClick={handleAddClick}
-          className="w-[3.5rem] h-[3.5rem] shrink-0 bg-white/90 dark:bg-[#2C2C2E]/95 backdrop-blur-xl text-foreground dark:text-white rounded-[2rem] shadow-[0_8px_20px_-6px_rgba(0,0,0,0.15)] dark:shadow-[0_8px_20px_-6px_rgba(0,0,0,0.5)] flex items-center justify-center active:scale-90 transition-all pointer-events-auto border border-border/60 dark:border-white/10 hover:bg-muted dark:hover:bg-[#3C3C3E]"
-        >
-          <Plus className="w-7 h-7" strokeWidth={2} />
-        </button>
-      </motion.div>
-
-      <AnimatePresence>
-        {isAddMenuOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="md:hidden fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex flex-col justify-end"
-          >
-            <motion.div 
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", stiffness: 350, damping: 30 }}
-              className="bg-card border-t border-border rounded-t-[2.5rem] p-6 shadow-2xl pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+    <nav
+      aria-label="Main"
+      className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+10px)] z-50 flex items-center justify-center gap-2.5 px-4 select-none max-[359px]:gap-1.5 max-[359px]:px-2 md:hidden"
+    >
+      <MotionConfig reducedMotion="user">
+        <LayoutGroup>
+          <motion.ul layout transition={SPRING} className="m-bar m-dock pointer-events-auto flex h-[60px] items-center gap-1 rounded-full border p-1.5">
+            {TABS.filter((t) => canOpen(t.href, viewer)).map(({ href, icon: Icon, label }) => {
+              const active = current === href;
+              const badge = href === "/inbox" && unreadCount > 0 ? (unreadCount > 99 ? "99+" : String(unreadCount)) : null;
+              return (
+                <motion.li key={href} layout transition={SPRING}>
+                  <Link
+                    href={href}
+                    aria-label={label}
+                    aria-current={active ? "page" : undefined}
+                    // Tapping the tab you're on scrolls back to the top, as native tab bars do.
+                    onClick={() => {
+                      if (pathname === href) window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                    className={cn(
+                      "relative flex h-12 min-w-12 items-center justify-center gap-2 rounded-full outline-none transition-transform duration-150 active:scale-[0.92]",
+                      active ? "px-4 max-[359px]:px-3" : "px-3 max-[359px]:px-2.5",
+                    )}
+                  >
+                    {active && (
+                      <motion.span
+                        layoutId="dock-active"
+                        transition={SPRING}
+                        className="absolute inset-0 rounded-full bg-[#017D58]/12 dark:bg-[#2FB585]/18"
+                      />
+                    )}
+                    <span className="relative">
+                      <Icon
+                        className={cn("size-[22px]", active ? "text-[#017D58] dark:text-[#2FB585]" : "text-foreground/55")}
+                        strokeWidth={active ? 2.25 : 1.9}
+                      />
+                      {badge && (
+                        <span className="absolute -right-2.5 -top-1.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-background">
+                          {badge}
+                        </span>
+                      )}
+                    </span>
+                    {active && (
+                      <motion.span
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.18, delay: 0.06 }}
+                        className="relative text-[14px] font-semibold text-[#017D58] dark:text-[#2FB585]"
+                      >
+                        {label}
+                      </motion.span>
+                    )}
+                  </Link>
+                </motion.li>
+              );
+            })}
+          </motion.ul>
+          <AnimatePresence initial={false} mode="popLayout">
+            <motion.button
+              key="create"
+              type="button"
+              aria-label={createLabel}
+              onClick={() => (createRoute ? router.push(createRoute) : setCreateOpen(true))}
+              initial={{ opacity: 0, scale: 0.4 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.4 }}
+              whileTap={{ scale: 0.9 }}
+              transition={SPRING}
+              className="pointer-events-auto flex size-12 shrink-0 max-[359px]:size-11 items-center justify-center rounded-full bg-[#017D58] text-white shadow-[0_6px_18px_-6px_rgba(1,125,88,0.55),0_2px_6px_-2px_rgba(0,0,0,0.2)] outline-none focus-visible:ring-2 focus-visible:ring-[#017D58]/40 focus-visible:ring-offset-2 dark:bg-[#2FB585] dark:text-black"
             >
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold tracking-tight">Create New</h2>
-                <button onClick={() => setIsAddMenuOpen(false)} className="p-2 bg-muted rounded-full active:scale-95 transition-transform">
-                  <X className="w-5 h-5 text-muted-foreground" />
-                </button>
-              </div>
-              
-              <div className="grid grid-cols-4 gap-y-6 gap-x-2">
-                <QuickAddButton icon={Contact} label="Lead" onClick={() => { setIsAddMenuOpen(false); router.push("/leads/new"); }} color="bg-blue-500/10 text-blue-600" />
-                <QuickAddButton icon={Building2} label="Inbound" onClick={() => { setIsAddMenuOpen(false); router.push("/inbound/new"); }} color="bg-emerald-500/10 text-emerald-600" />
-                <QuickAddButton icon={Home} label="Property" onClick={() => { setIsAddMenuOpen(false); router.push("/properties/new"); }} color="bg-cyan-500/10 text-cyan-600" />
-                <QuickAddButton icon={Layers} label="Asset" onClick={() => { setIsAddMenuOpen(false); router.push("/asset-inventory/new"); }} color="bg-amber-500/10 text-amber-600" />
-                <QuickAddButton icon={Network} label="Agent" onClick={() => { setIsAddMenuOpen(false); router.push("/agent-network/new"); }} color="bg-indigo-500/10 text-indigo-600" />
-                <QuickAddButton icon={Briefcase} label="Project" onClick={() => { setIsAddMenuOpen(false); router.push("/projects/new"); }} color="bg-rose-500/10 text-rose-600" />
-                <QuickAddButton icon={Users} label="User" onClick={() => { setIsAddMenuOpen(false); router.push("/users/new"); }} color="bg-purple-500/10 text-purple-600" />
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <Plus className="size-5" strokeWidth={2.5} />
+            </motion.button>
+          </AnimatePresence>
+        </LayoutGroup>
+      </MotionConfig>
+    </nav>
+    <CreateSheet open={createOpen} onClose={() => setCreateOpen(false)} />
     </>
-  );
-}
-
-function QuickAddButton({ icon: Icon, label, onClick, color }: any) {
-  return (
-    <button onClick={onClick} className="flex flex-col items-center gap-2 active:scale-95 transition-transform">
-      <div className={cn("w-14 h-14 rounded-[1.2rem] flex items-center justify-center border border-border/50 shadow-sm", color)}>
-        <Icon className="w-6 h-6" strokeWidth={2} />
-      </div>
-      <span className="text-[11px] font-semibold text-muted-foreground">{label}</span>
-    </button>
   );
 }

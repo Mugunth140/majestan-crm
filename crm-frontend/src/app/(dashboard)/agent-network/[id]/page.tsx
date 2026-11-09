@@ -1,614 +1,384 @@
 "use client";
 
-import { apiFetch } from "@/lib/api-fetch";
-
-import { useEffect, useState, useCallback } from "react";
+import { CompletenessRing } from "@/components/record/score-ring";
+import { agentScoreFields } from "@/lib/record-score";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { format } from "date-fns";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { FormSelect } from "@/components/shared/form-select";
-import { DateTimePicker } from "@/components/shared/datetime-picker";
-import dynamic from "next/dynamic";
-
-const FollowUpPanel = dynamic(() => import("@/components/shared/follow-up-panel").then(mod => mod.FollowUpPanel), { ssr: false });
-const ContactModal = dynamic(() => import("@/components/shared/contact-modal").then(mod => mod.ContactModal), { ssr: false });
-import { MobileHeader } from "@/components/layout/mobile-header";
-import { cn } from "@/lib/utils";
+import { Database, History, Info, Loader2, MessagesSquare } from "lucide-react";
+import { apiFetch, apiJson } from "@/lib/api-fetch";
+import { sortContactLogs } from "@/lib/contact-log-utils";
 import {
-  ArrowLeft, Loader2, User, Phone, MapPin, Building2,
-  Briefcase, Mail, MessageSquare, Plus, ArrowUpRight,
-  Clock, RefreshCw, History, Percent, Edit, ChevronLeft
-} from "lucide-react";
-import { contactLogIcon, contactLogAuthor } from "@/lib/contact-log-utils";
-import { MailPanel } from "@/components/mail/mail-panel";
+  AGENT_CATEGORIES, AGENT_STATUSES, AGENT_STATUS_TONES, COMMISSION_TYPES, PARTNER_TYPES, commissionKind, commissionText, partnerTypeLabel,
+} from "@/lib/agent-form";
+import { INDIAN_STATES, inboundErrorMessage } from "@/lib/inbound-form";
+import { statusDot, statusPillClass } from "@/components/tables/cells";
+import { Skeleton } from "@/components/ui/skeleton";
+import { MobileHeader } from "@/components/layout/mobile-header";
+import { PageActions } from "@/components/layout/page-actions";
+import { FieldRow, InlineSelect, InlineText, Section, type Option } from "@/components/record/inline-field";
+import { Feed, TabHeader } from "@/components/record/feed";
+import { type Person } from "@/components/record/assignee-picker";
+import { AssigneeButton, StatusMenu, type StatusOption } from "@/components/record/header-actions";
+import { activityItems, type ActivityEntry } from "@/components/record/activity";
+import { AGENT_ACTIVITY } from "@/components/agents/agent-activity";
+import { AGENT_ENTITY, LeadConversation } from "@/components/record/conversation";
+import { FollowUpComposer } from "@/components/record/follow-up-composer";
+import { AttachmentsArt, EmptyState } from "@/components/record/empty-state";
+import { cn } from "@/lib/utils";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
-const STATUS_STYLES: Record<string, string> = {
-  "New": "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300",
-  "Contacted": "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400",
-  "Meeting Done": "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400",
-  "Documents Pending": "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
-  "Approved": "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400",
-  "Active": "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
-  "Hold": "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400",
-  "Rejected": "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400",
-};
+type Tab = "activity" | "conversation" | "data";
+type Agent = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+type Patch = Record<string, unknown>;
 
-const CONTACT_TYPE_STYLES: Record<string, string> = {
-  email:    "bg-blue-100 text-blue-700 border-blue-200",
-  sms:      "bg-green-100 text-green-700 border-green-200",
-  whatsapp: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  call:     "bg-purple-100 text-purple-700 border-purple-200",
-};
+const YES_NO: Option[] = [{ label: "Yes", value: "yes" }, { label: "No", value: "no" }];
 
-const CONTACT_TYPE_ICONS: Record<string, React.ReactNode> = {
-  email:    <Mail className="h-3.5 w-3.5" />,
-  sms:      <MessageSquare className="h-3.5 w-3.5" />,
-  whatsapp: <Phone className="h-3.5 w-3.5" />,
-  call:     <Phone className="h-3.5 w-3.5" />,
-};
 
-const PRIORITIES = [
-  { label: "Low", value: "low" },
-  { label: "Medium", value: "medium" },
-  { label: "High", value: "high" },
-  { label: "Urgent", value: "urgent" },
-];
-
-const CONTACTED_VIA = [
-  { label: "Call", value: "call" },
-  { label: "WhatsApp", value: "whatsapp" },
-  { label: "SMS", value: "sms" },
-  { label: "Email", value: "email" },
-];
-
-const RNR_OPTIONS = [
-  { label: "RNR 1", value: "rnr1" },
-  { label: "RNR 2", value: "rnr2" },
-  { label: "RNR 3", value: "rnr3" },
-  { label: "RNR 4", value: "rnr4" },
-  { label: "RNR 5", value: "rnr5" },
-];
-
-function formatTimestamp(ts: string) {
-  const d = new Date(ts);
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) +
-    " at " + d.toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true });
-}
+const agentCode = (a: Agent) => `AG${String(a.id).padStart(5, "0")}`;
+/** A picker shows the current value even when it's no longer one of the options. */
+const withCurrent = (options: Option[], value?: string | null) =>
+  !value || options.some((o) => o.value === value) ? options : [{ label: value, value }, ...options];
 
 function PageSkeleton() {
   return (
-    <div className="animate-in fade-in duration-500 md:h-full flex flex-col">
-      <div className="flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-9 w-9 rounded-full shrink-0" />
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <Skeleton className="h-8 w-48" />
-              <Skeleton className="h-6 w-24 rounded-md" />
+    <div className="flex flex-col md:h-full md:flex-row lg:-mx-6 lg:-mb-8 lg:-mt-6 lg:h-[calc(100%+3.5rem)]">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="hidden h-11 items-center gap-5 border-b px-5 md:flex">
+          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-4 w-20" />)}
+        </div>
+        <div className="space-y-6 p-4 md:p-10">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="flex gap-3">
+              <Skeleton className="h-7 w-7 shrink-0 rounded-full" />
+              <div className="flex-1 space-y-2 pt-1">
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-10 w-full max-w-lg rounded-lg" />
+              </div>
             </div>
-            <Skeleton className="h-4 w-40" />
-          </div>
+          ))}
         </div>
       </div>
-      <div className="flex-1 space-y-6 md:overflow-y-auto min-h-0 pb-6 pr-2">
-        <Skeleton className="h-64 w-full rounded-2xl" />
-        <Skeleton className="h-40 w-full rounded-2xl" />
+      <div className="hidden w-[340px] shrink-0 border-l md:block xl:w-[360px]">
+        <div className="flex items-center gap-3 border-b p-4">
+          <Skeleton className="h-12 w-12 rounded-full" />
+          <div className="space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-24" /></div>
+        </div>
+        <div className="space-y-3 p-4">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}</div>
+      </div>
+    </div>
+  );
+}
+
+function TabButton({ active, onClick, icon: Icon, label, count }: {
+  active: boolean; onClick: () => void; icon: typeof Info; label: string; count?: number;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={cn(
+        "relative flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[14px] font-medium transition-colors md:h-11 md:rounded-none md:px-0.5",
+        active
+          ? "bg-[#017D58] text-white dark:bg-[#2FB585] dark:text-black md:bg-transparent md:text-foreground md:dark:bg-transparent md:dark:text-foreground"
+          : "bg-foreground/[0.06] text-foreground/80 md:bg-transparent md:text-muted-foreground md:hover:text-foreground",
+      )}
+    >
+      <Icon className="hidden h-4 w-4 md:block" />
+      {label}
+      {count ? (
+        <span className={cn("rounded-full px-1.5 text-[11px] leading-[18px] tabular-nums", active ? "bg-white/20 md:bg-foreground/[0.08]" : "bg-foreground/[0.08]")}>{count}</span>
+      ) : null}
+      {active && <span aria-hidden className="absolute inset-x-0 -bottom-px hidden h-0.5 rounded-full bg-foreground md:block" />}
+    </button>
+  );
+}
+
+/** One group of fields on the Data tab, two columns wide on desktop. */
+function DataCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="@container overflow-hidden rounded-xl border bg-card">
+      <h3 className="flex h-11 items-center border-b px-4 text-[14px] font-semibold text-foreground">{title}</h3>
+      <div className="grid gap-x-8 px-3 py-2 @xl:grid-cols-2 md:px-4">{children}</div>
+    </section>
+  );
+}
+
+function AgentDetail() {
+  const params = useParams();
+  const router = useRouter();
+  const id = params.id as string;
+
+  const [agent, setAgent] = useState<Agent | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<Tab>("activity");
+  const [activity, setActivity] = useState<ActivityEntry[] | null>(null);
+  const [mailRefresh, setMailRefresh] = useState(0);
+  const [cities, setCities] = useState<Option[]>([]);
+  const [staff, setStaff] = useState<{ canAssign: boolean; people: Person[] }>({ canAssign: false, people: [] });
+  // Editing or deleting someone's follow-up is for admins, as on the lead page.
+  const [isAdmin] = useState(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem("crm_user") || "{}");
+      return ["Admin", "Super Admin"].includes(u?.role?.name || u?.role);
+    } catch { return false; }
+  });
+
+  const loadAgent = useCallback(async (): Promise<Agent | null> => {
+    try {
+      const res = await apiFetch(`${API_URL}/agents/${id}`);
+      const result = await res.json();
+      if (res.ok && result?.data?.id) return result.data;
+      toast.error("Agent not found");
+      router.push("/agent-network");
+    } catch {
+      toast.error("Failed to load the agent");
+    }
+    return null;
+  }, [id, router]);
+  const loadActivity = useCallback(
+    () => apiJson<{ data?: ActivityEntry[] }>(`${API_URL}/agents/${id}/activity`).then((r) => r.data ?? [], () => []),
+    [id],
+  );
+  const refreshActivity = useCallback(() => { void loadActivity().then(setActivity); }, [loadActivity]);
+  const fetchAgent = useCallback(() => loadAgent().then((data) => { if (data) setAgent(data); }), [loadAgent]);
+
+  useEffect(() => {
+    let live = true;
+    loadAgent().then((data) => {
+      if (!live) return;
+      if (data) setAgent(data);
+      setIsLoading(false);
+    });
+    loadActivity().then((entries) => { if (live) setActivity(entries); });
+    return () => { live = false; };
+  }, [loadAgent, loadActivity]);
+
+  useEffect(() => {
+    let live = true;
+    apiFetch(`${API_URL}/master/cities`).then((r) => r.json()).then((d) => { if (live && d.success) setCities(d.data); }).catch(() => {});
+    apiJson<{ canAssign?: boolean; data?: Person[] }>(`${API_URL}/agents/staff-list`)
+      .then((r) => { if (live) setStaff({ canAssign: !!r.canAssign, people: r.data ?? [] }); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, []);
+
+  // A switches between Activity and Conversation, as on the lead page.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = document.activeElement as HTMLElement | null;
+      if (e.key.toLowerCase() === "a" && !e.metaKey && !e.ctrlKey && !e.altKey && el?.tagName !== "INPUT" && el?.tagName !== "TEXTAREA" && !el?.isContentEditable) {
+        e.preventDefault();
+        setActiveTab((prev) => (prev === "conversation" ? "activity" : "conversation"));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  /** Saves some fields in place and takes just those back from the reply. */
+  const save = async (patch: Patch) => {
+    try {
+      const res = await apiFetch(`${API_URL}/agents/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const result = await res.json().catch(() => null);
+      if (!res.ok || !result?.success) throw new Error(inboundErrorMessage(result) || "Couldn't save the change");
+      const saved = result.data ?? {};
+      setAgent((prev) => prev && {
+        ...prev,
+        ...Object.fromEntries(Object.keys(patch).map((k) => [k, k in saved ? saved[k] : patch[k]])),
+        updated_at: saved.updated_at ?? prev.updated_at,
+      });
+      toast.success("Saved");
+      refreshActivity();
+      if ("status" in patch) setMailRefresh((n) => n + 1); // a status change can draft an email
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : "Couldn't save the change");
+      throw reason;
+    }
+  };
+  const saveText = (key: string) => (v: string) => save({ [key]: v.trim() === "" ? null : v.trim() });
+  /** For fields the agent can't be without (name, mobile). */
+  const saveRequired = (key: string, what: string) => async (v: string) => {
+    if (!v.trim()) {
+      toast.error(`The ${what} can't be empty.`);
+      throw new Error("required");
+    }
+    return save({ [key]: v.trim() });
+  };
+
+  const followUps = useMemo(() => agent?.follow_ups ?? [], [agent]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- API rows, as on the lead page
+  const contactLogs: any[] = useMemo(() => sortContactLogs(agent?.contact_logs ?? []), [agent]);
+  const activityFeed = useMemo(() => activityItems(activity ?? [], AGENT_ACTIVITY), [activity]);
+
+  if (isLoading) return <PageSkeleton />;
+  if (!agent) return null;
+
+  const status: string = agent.status || "New";
+  const statusOptions: Option[] = [...(AGENT_STATUSES.includes(status) ? [] : [status]), ...AGENT_STATUSES]
+    .map((s) => ({ label: s, value: s, dot: statusDot(s, AGENT_STATUS_TONES[s]) }));
+  const assignee: string | undefined = staff.people.find((p) => p.id === agent.assigned_staff_id)?.name ?? agent.assigned_staff?.name;
+  const subtitle = [agent.company_name, partnerTypeLabel(agent.partner_type)].filter(Boolean).join(" · ") || agentCode(agent);
+  const added = new Date(agent.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
+
+  const statusMenu = (size: "h-7" | "h-8", align: "start" | "end" = "end") => (
+    <StatusMenu status={status} options={statusOptions as StatusOption[]} pillClass={statusPillClass(status, AGENT_STATUS_TONES[status])}
+      onChange={(v) => void save({ status: v }).catch(() => {})} size={size} align={align} />
+  );
+  const assign = (staffId: number | null) =>
+    save({ assigned_staff_id: staffId }).then(() => setAgent((prev) => prev && { ...prev, assigned_staff: staff.people.find((p) => p.id === staffId) ?? null }));
+  const assigneeButton = (variant: "header" | "field" | "phone") => (
+    <AssigneeButton name={assignee} variant={variant} people={staff.people} value={agent.assigned_staff_id} onPick={staff.canAssign ? assign : undefined} />
+  );
+  const assigneeField = <FieldRow label="Assigned to">{assigneeButton("field")}</FieldRow>;
+  const fixedCommission = commissionKind(agent.commission_type) === "fixed_amount";
+  const commissionField = agent.commission_accepted ? (
+    <InlineText label={fixedCommission ? "Amount (₹)" : "Percentage"} value={agent.commission_value}
+      placeholder={fixedCommission ? "50000" : "2"} inWords={fixedCommission} onSave={saveText("commission_value")} />
+  ) : null;
+
+  const summary = (
+    <Section title="Details">
+      <InlineSelect label="Status" value={status} options={statusOptions} onSave={(v) => save({ status: v })} />
+      <InlineSelect label="Partner type" value={agent.partner_type} options={withCurrent(PARTNER_TYPES, agent.partner_type)} onSave={(v) => save({ partner_type: v })} />
+      {assigneeField}
+      <InlineText label="Mobile" type="tel" value={agent.mobile_number} onSave={saveRequired("mobile_number", "mobile number")} />
+      <InlineSelect searchable label="City" value={agent.city} options={withCurrent(cities, agent.city)} onSave={(v) => save({ city: v })} />
+      {agent.commission_accepted && (
+        <FieldRow label="Commission"><span className="px-2 text-[14px] text-foreground">{commissionText(agent.commission_type, agent.commission_value) || "—"}</span></FieldRow>
+      )}
+      <FieldRow label="Added"><span className="px-2 text-[14px] text-foreground">{added}</span></FieldRow>
+    </Section>
+  );
+
+  const data: ReactNode = (
+    <div className="pb-6">
+      <TabHeader title="Data" />
+      <div className="space-y-5 px-3 sm:px-10">
+        <DataCard title="Partner">
+          <InlineText label="Name" value={agent.name} onSave={saveRequired("name", "name")} />
+          <InlineText label="Company" value={agent.company_name} onSave={saveText("company_name")} />
+          <InlineSelect label="Partner type" value={agent.partner_type} options={withCurrent(PARTNER_TYPES, agent.partner_type)} onSave={(v) => save({ partner_type: v })} />
+          <InlineSelect label="Category" value={agent.property_category} options={withCurrent(AGENT_CATEGORIES, agent.property_category)} onSave={(v) => save({ property_category: v })} />
+          <InlineSelect label="Status" value={status} options={statusOptions} onSave={(v) => save({ status: v })} />
+          {assigneeField}
+          <FieldRow label="Added"><span className="px-2 text-[14px] text-foreground">{added}</span></FieldRow>
+        </DataCard>
+
+        <DataCard title="Contact">
+          <InlineText label="Mobile" type="tel" value={agent.mobile_number} onSave={saveRequired("mobile_number", "mobile number")} />
+          <InlineText label="WhatsApp" type="tel" value={agent.whatsapp_number} onSave={saveText("whatsapp_number")} />
+          <InlineText label="Email" type="email" value={agent.email} onSave={saveText("email")} />
+          <InlineSelect searchable label="City" value={agent.city} options={withCurrent(cities, agent.city)} onSave={(v) => save({ city: v })} />
+          <InlineSelect searchable label="State" value={agent.state} options={withCurrent(INDIAN_STATES, agent.state)} onSave={(v) => save({ state: v })} />
+        </DataCard>
+
+        <DataCard title="Commission">
+          <InlineSelect label="On commission" value={agent.commission_accepted ? "yes" : "no"} options={YES_NO} onSave={(v) => save({ commission_accepted: v === "yes" })} />
+          {agent.commission_accepted && (
+            <InlineSelect label="Paid as" value={agent.commission_type} options={withCurrent(COMMISSION_TYPES, agent.commission_type)} onSave={(v) => save({ commission_type: v })} />
+          )}
+          {commissionField}
+          <InlineText label="Remarks" multiline value={agent.remarks} placeholder="For the team only" onSave={saveText("remarks")} />
+        </DataCard>
+      </div>
+    </div>
+  );
+
+  const tabs: { key: Tab; label: string; icon: typeof Info; count?: number }[] = [
+    { key: "activity", label: "Activity", icon: History },
+    { key: "conversation", label: "Conversation", icon: MessagesSquare, count: followUps.length + contactLogs.length },
+    { key: "data", label: "Data", icon: Database },
+  ];
+
+  return (
+    <div className="flex flex-col md:h-full lg:-mx-6 lg:-mb-8 lg:-mt-6 lg:h-[calc(100%+3.5rem)]">
+      <MobileHeader title={agent.name} showBack />
+
+      <PageActions>
+        <div className="flex items-center gap-2">
+          {statusMenu("h-8")}
+          {assigneeButton("header")}
+        </div>
+      </PageActions>
+
+      {/* ── Phone summary ── */}
+      <div className="space-y-3 px-4 pb-4 pt-1 md:hidden">
+        <div className="flex flex-wrap items-center gap-2 text-[14px] text-muted-foreground">
+          {statusMenu("h-7", "start")}
+          <span className="truncate">{subtitle}</span>
+        </div>
+        {assigneeButton("phone")}
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        <div className="flex min-w-0 flex-1 flex-col md:min-h-0">
+          <div role="tablist" aria-label="Agent sections"
+            className="sticky top-[calc(env(safe-area-inset-top)+2.75rem)] z-20 flex shrink-0 gap-1.5 overflow-x-auto bg-background px-4 py-2 scrollbar-hide md:static md:gap-5 md:border-b md:px-5 md:py-0">
+            {tabs.map((t) => (
+              <TabButton key={t.key} active={activeTab === t.key} onClick={() => setActiveTab(t.key)} icon={t.icon} label={t.label} count={t.count} />
+            ))}
+          </div>
+
+          <div className={cn("md:min-h-0 md:flex-1", activeTab === "conversation" ? "md:flex md:flex-col" : "md:overflow-y-auto")}>
+            {activeTab === "activity" && (
+              <div className="pb-4">
+                <TabHeader title="Activity" />
+                {activity === null ? (
+                  <p className="flex items-center gap-2 px-3 text-[13px] text-muted-foreground sm:px-10"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…</p>
+                ) : activityFeed.length ? (
+                  <Feed items={activityFeed} />
+                ) : (
+                  <EmptyState art={<AttachmentsArt />} title="Nothing recorded yet" hint="Status changes, edits and assignments will show up here." />
+                )}
+              </div>
+            )}
+            {activeTab === "conversation" && (
+              <LeadConversation
+                leadId={agent.id}
+                leadName={agent.name}
+                entity={AGENT_ENTITY}
+                email={agent.email}
+                mobile={agent.mobile_number}
+                whatsapp={agent.whatsapp_number}
+                followUps={followUps}
+                contactLogs={contactLogs}
+                composer={<FollowUpComposer api="agents" entityId={agent.id} noun="partner" followUps={followUps} onSaved={() => fetchAgent()} />}
+                canEdit
+                isAdmin={isAdmin}
+                refreshKey={mailRefresh}
+                onRefresh={() => fetchAgent()}
+              />
+            )}
+            {activeTab === "data" && data}
+          </div>
+        </div>
+
+        <aside className="hidden w-[340px] shrink-0 flex-col overflow-y-auto border-l md:flex xl:w-[360px]">
+          <div className="flex items-center gap-3 border-b p-4">
+            <CompletenessRing fields={agentScoreFields(agent)} />
+            <div className="min-w-0">
+              <p className="truncate text-[17px] font-semibold leading-6 text-foreground" title={agent.name}>{agent.name}</p>
+              <p className="truncate text-[13px] text-muted-foreground" title={subtitle}>{subtitle}</p>
+            </div>
+          </div>
+          {summary}
+          <p className="mt-auto hidden items-center gap-1.5 px-4 py-3 text-[12px] text-muted-foreground md:flex">
+            Press <kbd className="rounded border px-1 font-mono text-[11px]">A</kbd> to switch between activity and conversation.
+          </p>
+        </aside>
       </div>
     </div>
   );
 }
 
 export default function AgentViewPage() {
-  const params = useParams();
-  const router = useRouter();
-  const id = params.id as string;
-
-  const [agent, setAgent] = useState<any>(null);
-  const [mailRefresh, setMailRefresh] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  const [contactModal, setContactModal] = useState<{ open: boolean; type: string; to: string }>({ open: false, type: "", to: "" });
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (
-        e.key.toLowerCase() === 'a' && 
-        document.activeElement?.tagName !== 'INPUT' && 
-        document.activeElement?.tagName !== 'TEXTAREA'
-      ) {
-        e.preventDefault();
-        setIsHistoryOpen(prev => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  const [fuForm, setFuForm] = useState({
-    contactedVia: "",
-    nextFollowUpDate: "",
-    nextFollowUpTime: "",
-    priority: "",
-    rnr: "",
-    notes: "",
-  });
-  const [isSavingFu, setIsSavingFu] = useState(false);
-
-  const fetchAgent = useCallback(async (silent = false) => {
-    if (!id) return;
-    if (!silent) setIsLoading(true);
-    else setIsRefreshing(true);
-    try {
-      const res = await apiFetch(`${API_URL}/agents/${id}`);
-      const result = await res.json();
-      if (result.success) setAgent(result.data);
-      else { toast.error("Agent not found"); router.push("/agent-network"); }
-    } catch {
-      toast.error("Failed to load agent details");
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [id, router]);
-
-  useEffect(() => { fetchAgent(); }, [fetchAgent]);
-
-  const openContact = (type: string, to: string) => setContactModal({ open: true, type, to });
-
-  const getFuDateObj = (d: string, t: string) => {
-    if (!d) return undefined;
-    const date = new Date(d);
-    if (t) {
-      const [hh, mm] = t.split(":");
-      date.setHours(parseInt(hh, 10), parseInt(mm, 10), 0, 0);
-    }
-    return date;
-  };
-
-  const handleFuDateTimeChange = (dateObj: Date | undefined) => {
-    if (!dateObj) {
-      setFuForm(f => ({ ...f, nextFollowUpDate: "", nextFollowUpTime: "" }));
-      return;
-    }
-    setFuForm(f => ({
-      ...f,
-      nextFollowUpDate: format(dateObj, "yyyy-MM-dd"),
-      nextFollowUpTime: format(dateObj, "HH:mm"),
-    }));
-  };
-
-  const handleSaveFollowUp = async () => {
-    if (!fuForm.contactedVia) return toast.error("Please select how you contacted the agent.");
-    setIsSavingFu(true);
-    const now = new Date();
-    const payload = {
-      ...fuForm,
-      followUpDate: format(now, "yyyy-MM-dd"),
-      followUpTime: format(now, "HH:mm"),
-    };
-    try {
-      const res = await apiFetch(`${API_URL}/agents/${id}/follow-ups`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (data.success) {
-        toast.success("Follow-up logged successfully.");
-        setFuForm({ contactedVia: "", nextFollowUpDate: "", nextFollowUpTime: "", priority: "", rnr: "", notes: "" });
-        fetchAgent(true);
-      } else toast.error(data.message || "Failed to save follow-up");
-    } catch { toast.error("Failed to save follow-up"); }
-    finally { setIsSavingFu(false); }
-  };
-
-  const contactCounts = agent?.contact_logs?.reduce((acc: any, log: any) => {
-    acc[log.contact_type] = (acc[log.contact_type] || 0) + 1;
-    return acc;
-  }, {}) ?? {};
-
-  if (isLoading) return <PageSkeleton />;
-  if (!agent) return null;
-
-  const statusName = agent.status || "New";
-  const badgeCls = STATUS_STYLES[statusName] ?? "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300";
-  const followUps: any[] = agent.follow_ups || [];
-  const contactLogs: any[] = agent.contact_logs || [];
-
-  // RNR Calculation
-  let highestRnr = 0;
-  if (followUps.length > 0) {
-    const sortedFollowUps = [...followUps].sort((a, b) => {
-      const dateA = new Date(`${a.follow_up_date}T${a.follow_up_time || '00:00:00'}`).getTime();
-      const dateB = new Date(`${b.follow_up_date}T${b.follow_up_time || '00:00:00'}`).getTime();
-      return dateB - dateA;
-    });
-    
-    const latestFu = sortedFollowUps[0];
-    if (latestFu.rnr && typeof latestFu.rnr === 'string' && latestFu.rnr.startsWith("rnr")) {
-      const num = parseInt(latestFu.rnr.replace("rnr", ""), 10);
-      if (!isNaN(num)) {
-        highestRnr = num;
-      }
-    }
-  }
-  const nextRnrNumber = highestRnr + 1;
-  const nextRnrValue = `rnr${nextRnrNumber}`;
-  const isRnrMaxed = highestRnr >= 5;
-
-  return (
-    <div className="flex flex-col md:h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* ── Mobile Header ── */}
-      <MobileHeader title={agent.name || "Agent Details"} showBack />
-
-      {/* ── Header (desktop only) ── */}
-      <div className="hidden md:flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shrink-0" onClick={() => router.push("/agent-network")}>
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </Button>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">{agent.name}</h1>
-            <Badge className={`font-medium px-2.5 py-0.5 shadow-sm border ${badgeCls}`}>{statusName}</Badge>
-            <span className="text-sm font-semibold text-muted-foreground ml-2">A{String(agent.id).padStart(5, "0")}</span>
-            <span className="text-muted-foreground/40 text-xs">&bull;</span>
-            <span className="text-sm text-muted-foreground flex items-center gap-1.5">
-              Added on {new Date(agent.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full" onClick={() => fetchAgent(true)} title="Refresh">
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-          </Button>
-          <Button onClick={() => router.push(`/agent-network/new?edit=${agent.id}`)} className="rounded-full px-8 py-5 bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md">
-            Edit Agent
-          </Button>
-        </div>
-      </div>
-
-      {/* ── Mobile Summary Strip ── */}
-      <div className="md:hidden flex flex-col gap-3 px-4 pb-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge className={`font-medium px-2.5 py-0.5 shadow-sm border ${badgeCls}`}>{statusName}</Badge>
-          <span className="text-sm font-semibold text-muted-foreground">A{String(agent.id).padStart(5, "0")}</span>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Button variant="outline" onClick={() => router.push(`/agent-network/new?edit=${agent.id}`)} className="h-11 rounded-xl text-foreground font-semibold border-border/60">
-            <Edit className="w-4 h-4 mr-2 text-muted-foreground" /> Edit
-          </Button>
-          <Button variant="outline" onClick={() => fetchAgent(true)} className="h-11 rounded-xl border-border/60 font-semibold text-foreground">
-            <RefreshCw className={`w-4 h-4 mr-2 text-muted-foreground ${isRefreshing ? "animate-spin" : ""}`} /> Refresh
-          </Button>
-        </div>
-      </div>
-
-      {/* ── Main Layout ── */}
-      <div className="flex-1 md:overflow-y-auto min-h-0 pb-6 space-y-6 px-4 lg:px-0 lg:pr-2">
-        {/* ── Row 1 ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-card border rounded-2xl p-6 shadow-sm h-full">
-            <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-              <User className="h-4 w-4 text-muted-foreground" /> Agent Information
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-6 gap-x-6">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Company Name</p>
-                <p className="text-[14px] font-medium text-foreground/80">{agent.company_name || "\u2014"}</p>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Mobile</p>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button onClick={() => openContact("call", agent.mobile_number)} className="flex items-center gap-1.5 text-[14px] font-medium text-foreground hover:text-[#0052FF] transition-colors group">
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground group-hover:text-[#0052FF]" /> {agent.mobile_number || "\u2014"}
-                  </button>
-                  {agent.mobile_number && (
-                    <button onClick={() => openContact("sms", agent.mobile_number)} className="text-[11px] px-2 py-0.5 rounded-full border bg-green-50 text-green-700 border-green-200 hover:bg-green-100 transition-colors">SMS</button>
-                  )}
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">WhatsApp</p>
-                <button disabled={!agent.whatsapp_number} onClick={() => openContact("whatsapp", agent.whatsapp_number)} className="flex items-center gap-1.5 text-[14px] font-medium text-foreground hover:text-emerald-600 transition-colors group disabled:opacity-40 disabled:cursor-default">
-                  <Phone className="h-3.5 w-3.5 text-emerald-600" /> {agent.whatsapp_number || "\u2014"}
-                </button>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Email</p>
-                <button disabled={!agent.email} onClick={() => openContact("email", agent.email)} className="flex items-center gap-1.5 text-[14px] font-medium text-foreground hover:text-[#0052FF] transition-colors group disabled:opacity-40 disabled:cursor-default">
-                  <Mail className="h-3.5 w-3.5 text-muted-foreground group-hover:text-[#0052FF]" />
-                  <span className="truncate max-w-[160px]">{agent.email || "\u2014"}</span>
-                </button>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">City</p>
-                <p className="flex items-center gap-1.5 text-[14px] font-medium">
-                  <MapPin className="h-3.5 w-3.5 text-muted-foreground" /> {agent.city || "\u2014"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">State</p>
-                <p className="text-[14px] font-medium text-foreground/80">{agent.state || "\u2014"}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="lg:col-span-1 bg-card border rounded-2xl p-6 shadow-sm h-full flex flex-col">
-            <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-              <RefreshCw className="h-4 w-4 text-muted-foreground" /> Quick Actions
-            </h3>
-            <div className="flex flex-col gap-6 flex-1">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Agent Status</p>
-                <FormSelect
-                  name="quickAgentStatus"
-                  placeholder="Select Status"
-                  options={Object.keys(STATUS_STYLES).map(k => ({ label: k, value: k }))}
-                  value={agent.status || ""}
-                  onValueChange={async (v) => {
-                    if (!v) return;
-                    try {
-                      const res = await apiFetch(`${API_URL}/agents/${id}/status`, {
-                        method: "PUT",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ status_name: v }),
-                      });
-                      const data = await res.json();
-                      if (data.success) {
-                        toast.success("Agent status updated.");
-                        fetchAgent(true);
-                        setMailRefresh((n) => n + 1); // "Welcome partner" draft
-                      } else toast.error("Failed to update status");
-                    } catch {
-                      toast.error("Failed to update status");
-                    }
-                  }}
-                />
-              </div>
-              <div className="mt-auto pt-2">
-                <Button 
-                  onClick={() => setIsHistoryOpen(true)} 
-                  className="w-full h-12 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 font-semibold shadow-sm border border-blue-200 dark:border-blue-800 rounded-xl flex items-center justify-between px-4"
-                >
-                  <span className="flex items-center">
-                    <History className="mr-2 h-4 w-4" /> Follow-up History
-                  </span>
-                  <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border border-blue-200 dark:border-blue-800 bg-background/50 px-1.5 font-mono text-[10px] font-medium text-blue-700 dark:text-blue-400 opacity-100">
-                    A
-                  </kbd>
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Row 2: Log New Follow Up Form ── */}
-        <div className="bg-card border rounded-2xl p-6 shadow-sm">
-          <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-            <Plus className="h-4 w-4 text-[#0052FF]" /> Log New Follow Up
-          </h3>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contacted Via *</label>
-                  <FormSelect name="contactedVia" placeholder="Select..." options={CONTACTED_VIA} value={fuForm.contactedVia} onValueChange={v => setFuForm(f => ({ ...f, contactedVia: v || "" }))} />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Follow-Up</label>
-                  <DateTimePicker
-                    value={getFuDateObj(fuForm.nextFollowUpDate, fuForm.nextFollowUpTime)}
-                    onChange={handleFuDateTimeChange}
-                    placeholder="Pick date..."
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Priority</label>
-                  <FormSelect name="priority" placeholder="Select..." options={PRIORITIES} value={fuForm.priority} onValueChange={v => setFuForm(f => ({ ...f, priority: v || "" }))} />
-                </div>
-                <div className="space-y-1.5 flex flex-col justify-end">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">RNR Status</label>
-                  <Button
-                    type="button"
-                    variant={fuForm.rnr === nextRnrValue ? "default" : "outline"}
-                    className={cn(
-                      "w-full h-12 rounded-xl transition-all font-semibold",
-                      fuForm.rnr === nextRnrValue 
-                        ? "bg-orange-500 hover:bg-orange-600 text-white border-orange-500" 
-                        : "border-border/60 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 text-foreground/80"
-                    )}
-                    disabled={isRnrMaxed}
-                    onClick={() => {
-                      const isApplying = fuForm.rnr !== nextRnrValue;
-                      setFuForm(f => ({
-                        ...f,
-                        rnr: isApplying ? nextRnrValue : "",
-                        notes: isApplying ? `RNR ${nextRnrNumber} for this agent` : (f.notes === `RNR ${nextRnrNumber} for this agent` ? "" : f.notes)
-                      }));
-                    }}
-                  >
-                    {isRnrMaxed ? "Max RNR (5) Reached" : (fuForm.rnr === nextRnrValue ? `RNR ${nextRnrNumber} Applied` : `Apply RNR ${nextRnrNumber}`)}
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-4">
-              <div className="space-y-1.5 flex-1 flex flex-col">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Notes</label>
-                <Textarea
-                  value={fuForm.notes}
-                  onChange={e => setFuForm(f => ({ ...f, notes: e.target.value }))}
-                  placeholder="What was discussed?..."
-                  disabled={!!fuForm.rnr}
-                  className={cn("bg-muted/20 rounded-xl resize-none text-sm flex-1 min-h-[100px]", fuForm.rnr ? "opacity-70 cursor-not-allowed bg-muted" : "")}
-                />
-              </div>
-              <Button
-                onClick={handleSaveFollowUp}
-                disabled={isSavingFu}
-                className="w-full h-11 bg-[#0052FF] text-white hover:bg-[#0040CC] rounded-xl shadow font-semibold text-sm gap-2"
-              >
-                {isSavingFu ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpRight className="h-4 w-4" />}
-                Save Follow Up
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Row 3: Contact Log + Commission Details ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-card border rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center justify-between border-b pb-3 mb-5">
-              <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" /> Contact Log
-              </h3>
-              <div className="flex items-center gap-2 flex-wrap">
-                {(["call", "whatsapp", "sms", "email"] as const).map(type => (
-                  <div key={type} className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold ${CONTACT_TYPE_STYLES[type]}`}>
-                    {CONTACT_TYPE_ICONS[type]}
-                    <span className="capitalize">{type}</span>
-                    <span className="ml-0.5 font-bold">{contactCounts[type] || 0}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {contactLogs.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic text-center py-6">No contact attempts recorded yet. Use the buttons on the contact details above to log one.</p>
-            ) : (
-              <div className="relative space-y-0">
-                <div className="absolute left-[19px] top-0 bottom-0 w-px bg-border/50" />
-                {contactLogs.map((log: any) => (
-                  <div key={log.id} className="flex gap-4 pb-4 relative">
-                    <div className={`relative z-10 h-10 w-10 shrink-0 rounded-full border-2 border-background flex items-center justify-center ${CONTACT_TYPE_STYLES[log.contact_type] || "bg-gray-100"}`}>
-                      {contactLogIcon(log)}
-                    </div>
-                    <div className="flex-1 pt-1.5">
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <p className="text-[13.5px] font-semibold text-foreground">
-                          <span className="capitalize">{log.contact_type}</span> by{" "}
-                          <span className="text-[#0052FF]">{contactLogAuthor(log)}</span>
-                        </p>
-                        <span className="text-xs text-muted-foreground">{formatTimestamp(log.created_at)}</span>
-                      </div>
-                      {log.subject && <p className="text-xs text-muted-foreground mt-0.5">Subject: {log.subject}</p>}
-                      {log.message && <p className="text-[13px] text-foreground/70 mt-1 bg-muted/30 rounded-lg px-3 py-2">{log.message}</p>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="lg:col-span-1 space-y-6">
-            <div className="bg-card border rounded-2xl p-6 shadow-sm">
-              <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-                <Briefcase className="h-4 w-4 text-muted-foreground" /> Business Details
-              </h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between items-center py-1.5 border-b border-border/30">
-                  <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Partner Type</span>
-                  <span className="font-medium capitalize text-[14px]">{agent.partner_type ? agent.partner_type.replace(/_/g, " ") : "\u2014"}</span>
-                </div>
-                <div className="flex justify-between items-center py-1.5 border-b border-border/30">
-                  <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Property Category</span>
-                  <span className="font-medium capitalize text-[14px]">{agent.property_category || "\u2014"}</span>
-                </div>
-                <div className="flex justify-between items-center py-1.5 border-b border-border/30">
-                  <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Assigned Staff</span>
-                  <span className="font-medium text-[14px]">{agent.assigned_staff?.name || "Unassigned"}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-card border rounded-2xl p-6 shadow-sm">
-              <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-                <Percent className="h-4 w-4 text-muted-foreground" /> Commission Info
-              </h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between items-center py-1.5 border-b border-border/30">
-                  <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Accepted</span>
-                  <span className="font-medium capitalize text-[14px]">{agent.commission_accepted ? "Yes" : "No"}</span>
-                </div>
-                {agent.commission_accepted && (
-                  <>
-                    <div className="flex justify-between items-center py-1.5 border-b border-border/30">
-                      <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Type</span>
-                      <span className="font-medium capitalize text-[14px]">{agent.commission_type ? agent.commission_type.replace(/_/g, " ") : "\u2014"}</span>
-                    </div>
-                    <div className="flex justify-between items-center py-1.5 border-b border-border/30">
-                      <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Value</span>
-                      <span className="font-medium text-[14px]">{agent.commission_value || "\u2014"}</span>
-                    </div>
-                  </>
-                )}
-                {agent.remarks && (
-                  <div className="pt-2">
-                    <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide block mb-1">Remarks</span>
-                    <p className="text-[13px] text-foreground/80 bg-muted/20 p-3 rounded-lg border">{agent.remarks}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <MailPanel entityType="agent" entityId={agent.id} refreshKey={mailRefresh} recipients={agent.email ? [agent.email] : []} />
-          </div>
-        </div>
-      </div>
-
-      <Sheet open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-        <SheetContent side="right" className="!w-full sm:!w-[450px] sm:!max-w-[450px] p-0 flex flex-col border-l [&>button[data-slot='sheet-close']]:hidden sm:[&>button[data-slot='sheet-close']]:flex">
-          <div className="md:hidden flex flex-col shrink-0 bg-background/90 backdrop-blur-xl border-b z-10">
-            <div className="h-[env(safe-area-inset-top)] w-full" />
-            <div className="flex items-center justify-between px-4 h-14">
-              <button onClick={() => setIsHistoryOpen(false)} className="flex items-center text-[#007AFF] dark:text-[#0A84FF] active:opacity-70 -ml-2 shrink-0">
-                <ChevronLeft className="w-[28px] h-[28px]" strokeWidth={2.5} />
-                <span className="text-[17px] font-medium tracking-tight">Back</span>
-              </button>
-              <span className="absolute inset-x-0 text-center pointer-events-none text-[17px] font-semibold tracking-tight text-foreground truncate px-20">Timeline</span>
-              <div className="w-10 shrink-0" />
-            </div>
-          </div>
-          <SheetHeader className="hidden md:block p-6 border-b shrink-0 bg-blue-50 dark:bg-blue-900/20">
-            <SheetTitle className="text-lg text-[#0052FF] dark:text-blue-400">Follow Up History {followUps.length > 0 && `(${followUps.length})`}</SheetTitle>
-            <SheetDescription>
-              Timeline of all logged follow-ups and interactions for this agent.
-            </SheetDescription>
-          </SheetHeader>
-          <div className="flex-1 overflow-hidden relative">
-            <FollowUpPanel
-              entityId={Number(id)}
-              entityType="agents"
-              followUps={followUps}
-              onRefresh={() => fetchAgent(true)}
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      <ContactModal
-        open={contactModal.open}
-        type={contactModal.type}
-        to={contactModal.to}
-        entityId={Number(id)}
-        entityType="agents"
-        onClose={() => setContactModal({ open: false, type: "", to: "" })}
-        onSent={() => fetchAgent(true)}
-      />
-    </div>
-  );
+  return <AgentDetail />;
 }

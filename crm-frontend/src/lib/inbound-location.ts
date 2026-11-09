@@ -46,7 +46,7 @@ export const inboundLocation = new InboundLocationQueue({
     if (!response.ok && response.status !== 404) throw new Error('Location update failed');
   },
   notify: (message, retry) => toast.error(message, {
-    id: 'inbound-location', duration: Infinity,
+    id: 'inbound-location', duration: 10000,
     action: { label: 'Retry location', onClick: retry },
   }),
   complete: () => toast.dismiss('inbound-location'),

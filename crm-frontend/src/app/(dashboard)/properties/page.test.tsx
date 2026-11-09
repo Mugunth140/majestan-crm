@@ -17,13 +17,14 @@ beforeEach(()=>{sessionStorage.clear();localStorage.clear();mock.fetch.mockClear
 it('shows the uploader column and combines staff/date filters before fetching the list',async()=>{
  render(<PropertiesPage/>);
  expect(screen.getByText('Kavya')).toBeTruthy();expect(screen.getByText('Uploaded on')).toBeTruthy();
- fireEvent.click(screen.getByRole('button',{name:'Filters',exact:true}));
- const staff=await screen.findByRole('combobox',{name:'Uploaded by'});
- fireEvent.click(staff);
+ // Filters sit in the toolbar as chips.
+ fireEvent.click(screen.getByRole('button',{name:'Uploaded by',exact:true}));
  fireEvent.click(await screen.findByRole('option',{name:'Kavya',exact:true}));
- fireEvent.change(screen.getByLabelText('Uploaded from'),{target:{value:'2026-11-01'}});
- fireEvent.change(screen.getByLabelText('Uploaded to'),{target:{value:'2026-11-02'}});
+ fireEvent.click(screen.getByRole('button',{name:'Uploaded',exact:true}));
+ fireEvent.change(await screen.findByLabelText('From'),{target:{value:'2026-11-01'}});
+ fireEvent.change(screen.getByLabelText('To'),{target:{value:'2026-11-02'}});
  await waitFor(()=>expect(mock.fetch).toHaveBeenLastCalledWith(expect.objectContaining({pagination:{pageIndex:0,pageSize:10},filters:expect.objectContaining({uploadedById:'7',uploadedFrom:'2026-11-01',uploadedTo:'2026-11-02'})})));
- fireEvent.click(screen.getByRole('button',{name:'Clear All'}));
+ expect(screen.getByRole('button',{name:/Uploaded by: Kavya/})).toBeTruthy();
+ fireEvent.click(screen.getByRole('button',{name:'Clear all'}));
  await waitFor(()=>expect(mock.fetch).toHaveBeenLastCalledWith(expect.objectContaining({filters:expect.objectContaining({uploadedById:'',uploadedFrom:'',uploadedTo:''})})));
 });

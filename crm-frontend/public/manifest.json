@@ -1,7 +1,8 @@
 {
-  "name": "Majestan CRM",
-  "short_name": "Majestan",
-  "description": "Majestan CRM and Field App",
+  "id": "/",
+  "name": "Prismark CRM",
+  "short_name": "Prismark",
+  "description": "Prismark CRM and Field App",
   "theme_color": "#ffffff",
   "background_color": "#ffffff",
   "display": "standalone",
@@ -20,10 +21,43 @@
       "type": "image/png"
     },
     {
-      "src": "/favicon/android-chrome-512x512.png",
+      "src": "/favicon/maskable-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New lead",
+      "short_name": "New lead",
+      "url": "/leads/new",
+      "icons": [
+        {
+          "src": "/favicon/android-chrome-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Tasks",
+      "url": "/tasks",
+      "icons": [
+        {
+          "src": "/favicon/android-chrome-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Inbox",
+      "url": "/inbox",
+      "icons": [
+        {
+          "src": "/favicon/android-chrome-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }

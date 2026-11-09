@@ -1,13 +1,17 @@
 "use client";
 
+import { isAdmin } from "@/lib/permissions";
+import { INDIA_STATES } from "@/lib/master-kinds";
 import { apiFetch } from "@/lib/api-fetch";
 import { useState, useEffect, useCallback } from "react";
 import { DataTable } from "@/components/tables/data-table";
+import { ActiveCell, IdCell, statusDot } from "@/components/tables/cells";
+import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { activeValue, moveRow } from "@/lib/move-row";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Plus, Loader2, MapPin } from "lucide-react";
+import { Edit, Trash2, Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -22,22 +26,24 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { PageActions } from "@/components/layout/page-actions";
+import { ListBody, ListFrame, ListToolbar, ToolbarSearch, headerPrimaryClass } from "@/components/layout/list-page";
+import { TableSkeleton } from "@/components/tables/table-skeleton";
+import { cn } from "@/lib/utils";
+
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
-const INDIA_STATES = [
-  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
-  "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
-  "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram",
-  "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu",
-  "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
-  "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu",
-  "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry",
-];
 
 const emptyForm = { city_name: "", state_name: "", country_name: "India", country_code: "IN", is_active: 1 };
 
+const FIELDS: ViewField[] = [
+  { id: "status", label: "Status", get: (r) => (r.is_active ? "Active" : "Inactive"), order: ["Active", "Inactive"], dot: (v) => statusDot(v) },
+  { id: "state", label: "State", get: (r) => r.state_name },
+];
+
 export default function MasterCitiesPage() {
+  const views = useModuleView("master-cities", FIELDS);
   const [cities, setCities] = useState<any[]>([]);
   const [search, setSearch] = usePersistedState("master-cities:search", "");
   const [isLoading, setIsLoading] = useState(true);
@@ -221,7 +227,7 @@ export default function MasterCitiesPage() {
         </div>
       ),
     },
-    { accessorKey: "id", header: "ID" },
+    { accessorKey: "id", header: "ID", cell: ({ row }) => <IdCell onClick={() => openEdit(row.original)}>{row.original.id}</IdCell> },
     {
       accessorKey: "city_name",
       header: "City",
@@ -242,16 +248,7 @@ export default function MasterCitiesPage() {
     {
       accessorKey: "is_active",
       header: "Status",
-      cell: ({ row }) => (
-        <Badge
-          variant={row.original.is_active ? "default" : "secondary"}
-          className={row.original.is_active
-            ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border-none shadow-none"
-            : "bg-gray-100 text-gray-600 hover:bg-gray-200 border-none shadow-none"}
-        >
-          {row.original.is_active ? "Active" : "Inactive"}
-        </Badge>
-      ),
+      cell: ({ row }) => <ActiveCell active={row.original.is_active} />,
     },
     {
       id: "actions",
@@ -271,42 +268,60 @@ export default function MasterCitiesPage() {
   ];
 
   return (
-    <div className="flex flex-col space-y-6 mb-20 md:mb-0 px-4 md:px-8 mt-2 md:mt-0">
+    <div className="w-full flex flex-col md:h-full">
       <MobileHeader title="Master: Cities" showBack />
+      {views.switcher}
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pr-0 md:pr-[150px] min-h-12">
-        <h1 className="text-3xl font-bold tracking-tight hidden md:block">Master: Cities</h1>
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-          <Input
-            placeholder="Search cities..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-11 rounded-xl w-full sm:w-64 bg-background"
-          />
-          <Button
-            className="h-11 px-5 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC] shrink-0 w-full sm:w-auto"
-            onClick={() => { setForm({ ...emptyForm }); setIsAddOpen(true); }}
-          >
-            <Plus className="mr-1.5 h-4 w-4" /> Add City
-          </Button>
-        </div>
-      </div>
+      <PageActions>
+        <button type="button" className={headerPrimaryClass} onClick={() => { setForm({ ...emptyForm }); setIsAddOpen(true); }}>
+          <Plus className="size-4" /> Add City
+        </button>
+      </PageActions>
 
-      <div className="bg-card border rounded-2xl overflow-hidden shadow-sm p-4 md:p-6">
-        {isLoading ? (
-          <div className="flex h-40 items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <DataTable 
-            columns={columns} 
-            data={cities}
-            showToolbar={true}
-            showDeleteAction={true}
-            onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
-          />
-        )}
-      </div>
+      <ListFrame>
+        <ListToolbar>
+          <ToolbarSearch value={search} onChange={setSearch} placeholder="Search cities" className="flex-1 md:flex-none" />
+          <button type="button" className={cn(headerPrimaryClass, "md:hidden")} onClick={() => { setForm({ ...emptyForm }); setIsAddOpen(true); }}>
+            <Plus className="size-4" /> Add City
+          </button>
+          {views.picker && <div className="ml-auto">{views.picker}</div>}
+        </ListToolbar>
+        <ListBody>
+          {isLoading ? (
+            <TableSkeleton columns={5} rows={8} flush />
+          ) : (
+            <ModuleViews
+              state={views}
+              data={cities}
+              columns={columns}
+              list={
+                <DataTable
+                variant="list" 
+              columns={columns} 
+              data={cities}
+              showToolbar={true}
+              showDeleteAction={isAdmin()}
+              onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
+            />
+              }
+              getKey={(r) => r.id}
+              onOpen={openEdit}
+              onMove={(r, column) => {
+                const is_active = activeValue(r.is_active, column === "Active");
+                moveRow({
+                  setRows: setCities,
+                  row: r,
+                  same: (a, b) => a.id === b.id,
+                  patch: { is_active },
+                  request: { path: `/master/cities/${r.id}`, method: "PATCH", body: { city_name: r.city_name, state_name: r.state_name, country_name: r.country_name ?? "India", country_code: r.country_code ?? "IN", is_active } },
+                  success: `Marked ${column.toLowerCase()}`,
+                });
+              }}
+              card={(r) => ({ title: r.city_name, avatar: false, id: r.id, subtitle: r.state_name })}
+            />
+          )}
+        </ListBody>
+      </ListFrame>
 
       {/* Add Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>

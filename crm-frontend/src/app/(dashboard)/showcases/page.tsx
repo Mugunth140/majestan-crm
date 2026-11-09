@@ -3,12 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "motion/react";
-import { ChevronDown, ChevronUp, ImageOff, Plus, RefreshCw, Search, X, Check, Info } from "lucide-react";
+import { Building2, Check, ChevronDown, ChevronUp, House, ImageOff, Info, Loader2, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { PageActions } from "@/components/layout/page-actions";
+import { HEADER_BUTTON, HEADER_PRIMARY } from "@/components/record/header-actions";
+import { TabHeader } from "@/components/record/feed";
+import { EmptyState, AttachmentsArt } from "@/components/record/empty-state";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useLeaveGuard } from "@/hooks/use-leave-guard";
@@ -20,15 +22,17 @@ import {
   type ShowcaseSummary,
 } from "@/lib/showcases-api";
 
-const SECTIONS: { value: ShowcaseSection; label: string; noun: string; description: string }[] = [
+const SECTIONS: { value: ShowcaseSection; label: string; noun: string; description: string; icon: typeof House }[] = [
   {
     value: "handpicked_properties",
+    icon: House,
     label: "Handpicked Properties",
     noun: "property",
     description: "The property carousel on the home page. Only available, approved properties can be picked.",
   },
   {
     value: "featured_projects",
+    icon: Building2,
     label: "Featured Projects",
     noun: "project",
     description: "The project carousel on the home page. Only published projects can be picked.",
@@ -41,7 +45,7 @@ const sameOrder = (a: ShowcaseSummary[], b: ShowcaseSummary[]) =>
 function Thumb({ src, className }: { src: string | null; className?: string }) {
   const [failed, setFailed] = useState(false);
   return (
-    <div className={cn("shrink-0 overflow-hidden rounded-lg bg-muted flex items-center justify-center", className)}>
+    <div className={cn("flex shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted", className)}>
       {src && !failed ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={src} alt="" className="h-full w-full object-cover" onError={() => setFailed(true)} />
@@ -62,8 +66,7 @@ export default function ShowcasesPage() {
   const [draft, setDraft] = useState<ShowcaseSummary[]>([]);
   // Loading/searching are derived: a request's result is stored with the key
   // it was made for, and the view is "loading" until the current key lands.
-  const [reloadToken, setReloadToken] = useState(0);
-  const loadKey = `${section}:${reloadToken}`;
+  const loadKey = section;
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const isLoading = loadedKey !== loadKey;
   const [isSaving, setIsSaving] = useState(false);
@@ -158,209 +161,190 @@ export default function ShowcasesPage() {
 
   const notLiveCount = draft.filter((d) => !d.isLive).length;
 
+  const plural = spec.noun === "property" ? "properties" : "projects";
+  const NotLive = () => (
+    <span className="shrink-0 rounded-md bg-amber-500/10 px-1.5 text-[12px] font-medium leading-5 text-amber-700 dark:text-amber-300">Not on site</span>
+  );
+
   const sectionTabs = (
-    <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
-      {SECTIONS.map((s) => (
-        <button
-          key={s.value}
-          onClick={() => switchSection(s.value)}
-          className={cn(
-            "h-10 px-5 rounded-full text-[14px] font-semibold whitespace-nowrap transition-all border active:scale-95",
-            section === s.value
-              ? "bg-[#0052FF] text-white border-[#0052FF] shadow-sm"
-              : "bg-card text-muted-foreground border-border hover:bg-muted hover:text-foreground",
-          )}
-        >
-          {s.label}
-        </button>
-      ))}
+    <div role="tablist" aria-label="Showcase sections"
+      className="flex shrink-0 gap-1.5 overflow-x-auto px-4 py-2 scrollbar-hide md:gap-5 md:border-b md:px-5 md:py-0">
+      {SECTIONS.map((s) => {
+        const active = section === s.value;
+        return (
+          <button
+            key={s.value}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => switchSection(s.value)}
+            className={cn(
+              "relative flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[14px] font-medium transition-colors md:h-11 md:rounded-none md:px-0.5",
+              active
+                ? "bg-[#017D58] text-white dark:bg-[#2FB585] dark:text-black md:bg-transparent md:text-foreground md:dark:bg-transparent md:dark:text-foreground"
+                : "bg-foreground/[0.06] text-foreground/80 md:bg-transparent md:text-muted-foreground md:hover:text-foreground",
+            )}
+          >
+            <s.icon className="hidden h-4 w-4 md:block" />
+            {s.label}
+            {active && !isLoading ? (
+              <span className={cn("rounded-full px-1.5 text-[11px] leading-[18px] tabular-nums", "bg-white/20 md:bg-foreground/[0.08]")}>{draft.length}</span>
+            ) : null}
+            {active && <span aria-hidden className="absolute inset-x-0 -bottom-px hidden h-0.5 rounded-full bg-foreground md:block" />}
+          </button>
+        );
+      })}
     </div>
   );
 
   const pickedList = (
-    <section className="bg-card border rounded-xl shadow-sm overflow-hidden flex flex-col min-h-0">
-      <div className="flex items-center justify-between gap-3 px-5 py-4 border-b bg-muted/10">
-        <div>
-          <h2 className="text-[16px] font-semibold">On the home page</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {draft.length} of {SHOWCASE_MAX_ITEMS} · shown in this order
-          </p>
-        </div>
+    <div className="pb-6">
+      <TabHeader title="On the home page" action={<span className="text-[13px] tabular-nums text-muted-foreground">{draft.length} of {SHOWCASE_MAX_ITEMS}</span>} />
+      <div className="px-3 sm:px-10">
+        <p className="mb-4 text-[14px] text-muted-foreground">{spec.description} Shown in this order.</p>
+        {isLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 4 }, (_, i) => <div key={i} className="h-[60px] animate-pulse rounded-lg bg-muted/60" />)}
+          </div>
+        ) : draft.length === 0 ? (
+          <EmptyState art={<AttachmentsArt />} title="Nothing picked yet"
+            hint={`Until you pick some, the home page shows the newest ${spec.noun === "property" ? "apartments" : "published projects"} automatically.`} />
+        ) : (
+          <ol className="overflow-hidden rounded-xl border bg-card">
+            <AnimatePresence initial={false}>
+              {draft.map((item, index) => (
+                <motion.li
+                  key={item.id}
+                  layout
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.18 }}
+                  className="group flex items-center gap-3 border-b px-3 py-2.5 last:border-b-0 md:px-4"
+                >
+                  <span className="w-5 shrink-0 text-center text-[13px] tabular-nums text-muted-foreground">{index + 1}</span>
+                  <Thumb src={item.imageUrl} className="h-10 w-14" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <p className="truncate text-[14px] font-medium text-foreground">{item.title}</p>
+                      {!item.isLive && <NotLive />}
+                    </div>
+                    <p className="truncate text-[13px] text-muted-foreground">{[item.meta, item.location].filter(Boolean).join(" · ")}</p>
+                  </div>
+                  <div className="flex items-center gap-0.5 text-muted-foreground md:opacity-60 md:transition-opacity md:group-hover:opacity-100">
+                    <button type="button" onClick={() => move(index, -1)} disabled={index === 0} aria-label={`Move ${item.title} up`}
+                      className="flex h-7 w-7 items-center justify-center rounded-md hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30">
+                      <ChevronUp className="h-4 w-4" />
+                    </button>
+                    <button type="button" onClick={() => move(index, 1)} disabled={index === draft.length - 1} aria-label={`Move ${item.title} down`}
+                      className="flex h-7 w-7 items-center justify-center rounded-md hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30">
+                      <ChevronDown className="h-4 w-4" />
+                    </button>
+                    <button type="button" onClick={() => remove(item.id)} aria-label={`Remove ${item.title}`}
+                      className="flex h-7 w-7 items-center justify-center rounded-md hover:bg-red-500/10 hover:text-red-600">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </motion.li>
+              ))}
+            </AnimatePresence>
+          </ol>
+        )}
         {notLiveCount > 0 && (
-          <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-            {notLiveCount} not on site
-          </Badge>
+          <p className="mt-3 flex items-start gap-2 text-[13px] text-muted-foreground">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+            {notLiveCount === 1 ? "One item is" : `${notLiveCount} items are`} sold, unpublished or awaiting approval. The home page skips them until they&apos;re live again.
+          </p>
         )}
       </div>
-
-      {isLoading ? (
-        <div className="p-5 space-y-3">
-          {Array.from({ length: 4 }, (_, i) => (
-            <div key={i} className="h-16 rounded-lg bg-muted/60 animate-pulse" />
-          ))}
-        </div>
-      ) : draft.length === 0 ? (
-        <div className="px-6 py-14 text-center">
-          <p className="text-[15px] font-semibold">Nothing picked yet</p>
-          <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
-            Until you pick some, the home page shows the newest {spec.noun === "property" ? "apartments" : "published projects"} automatically.
-          </p>
-        </div>
-      ) : (
-        <ol className="divide-y overflow-y-auto">
-          <AnimatePresence initial={false}>
-            {draft.map((item, index) => (
-              <motion.li
-                key={item.id}
-                layout
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.18 }}
-                className="flex items-center gap-3 px-4 py-3"
-              >
-                <span className="w-6 text-center text-sm font-semibold tabular-nums text-muted-foreground">{index + 1}</span>
-                <Thumb src={item.imageUrl} className="h-12 w-16" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <p className="truncate text-[14px] font-semibold">{item.title}</p>
-                    {!item.isLive && (
-                      <Badge variant="outline" className="shrink-0 border-amber-300 bg-amber-50 text-amber-800 text-[11px] dark:bg-amber-950/40 dark:text-amber-300">
-                        Not on site
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="truncate text-xs text-muted-foreground mt-0.5">
-                    {[item.meta, item.location].filter(Boolean).join(" · ")}
-                  </p>
-                </div>
-                <div className="flex items-center gap-0.5">
-                  <button
-                    onClick={() => move(index, -1)}
-                    disabled={index === 0}
-                    className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:pointer-events-none"
-                    aria-label={`Move ${item.title} up`}
-                  >
-                    <ChevronUp className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => move(index, 1)}
-                    disabled={index === draft.length - 1}
-                    className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:pointer-events-none"
-                    aria-label={`Move ${item.title} down`}
-                  >
-                    <ChevronDown className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => remove(item.id)}
-                    className="ml-1 p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
-                    aria-label={`Remove ${item.title}`}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              </motion.li>
-            ))}
-          </AnimatePresence>
-        </ol>
-      )}
-
-      {notLiveCount > 0 && (
-        <p className="flex items-start gap-2 border-t bg-amber-50/60 dark:bg-amber-950/20 px-5 py-3 text-xs text-amber-900 dark:text-amber-200">
-          <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-          Items marked “Not on site” were sold, unpublished or are awaiting approval. They are skipped on the home page until they are live again.
-        </p>
-      )}
-    </section>
+    </div>
   );
 
   const picker = (
-    <section className="bg-card border rounded-xl shadow-sm overflow-hidden flex flex-col min-h-0">
-      <div className="px-5 py-4 border-b bg-muted/10">
-        <h2 className="text-[16px] font-semibold">Add {spec.noun === "property" ? "properties" : "projects"}</h2>
-        <div className="relative mt-3">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
+    <div className="flex min-h-0 flex-col">
+      <div className="space-y-2 border-b p-4">
+        <h2 className="text-[15px] font-semibold text-foreground">Add {plural}</h2>
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={spec.noun === "property" ? "Search by title, city or ID…" : "Search by name, location or builder…"}
-            className="pl-9 h-10 bg-muted/30 rounded-xl border-border/60 text-[13.5px]"
+            placeholder={spec.noun === "property" ? "Search title, city or ID" : "Search name, location or builder"}
+            aria-label={`Search ${plural}`}
+            className="h-8 w-full rounded-md border bg-background pl-8 pr-8 text-[14px] outline-none placeholder:text-muted-foreground/70 focus:border-foreground/30 dark:bg-white/[0.04]"
           />
           {query && (
-            <button onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-muted-foreground hover:bg-muted" aria-label="Clear search">
-              <X className="h-3 w-3" />
+            <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground">
+              <X className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
-        {isFull && (
-          <p className="text-xs text-amber-700 dark:text-amber-300 mt-2">This section is full ({SHOWCASE_MAX_ITEMS}). Remove one to add another.</p>
-        )}
+        {isFull && <p className="text-[13px] text-amber-700 dark:text-amber-300">Full ({SHOWCASE_MAX_ITEMS}). Remove one to add another.</p>}
       </div>
-
-      <ul className="divide-y overflow-y-auto max-h-[60vh] md:max-h-none md:flex-1">
+      <ul className="max-h-[60vh] overflow-y-auto md:max-h-none md:flex-1">
         {isSearching && candidates.length === 0 ? (
-          Array.from({ length: 5 }, (_, i) => (
-            <li key={i} className="px-4 py-3"><div className="h-12 rounded-lg bg-muted/60 animate-pulse" /></li>
-          ))
+          Array.from({ length: 6 }, (_, i) => <li key={i} className="px-4 py-2"><div className="h-11 animate-pulse rounded-md bg-muted/60" /></li>)
         ) : candidates.length === 0 ? (
-          <li className="px-6 py-12 text-center text-sm text-muted-foreground">
-            {query ? `No live ${spec.noun === "property" ? "properties" : "projects"} match “${query}”.` : `No live ${spec.noun === "property" ? "properties" : "projects"} yet.`}
+          <li className="px-4 py-10 text-center text-[14px] text-muted-foreground">
+            {query ? `No live ${plural} match “${query}”.` : `No live ${plural} yet.`}
           </li>
         ) : (
           candidates.map((item) => {
             const picked = pickedIds.has(item.id);
             return (
-              <li key={item.id} className="flex items-center gap-3 px-4 py-3">
-                <Thumb src={item.imageUrl} className="h-11 w-14" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[14px] font-medium">{item.title}</p>
-                  <p className="truncate text-xs text-muted-foreground mt-0.5">
-                    {[item.meta, item.location].filter(Boolean).join(" · ")}
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  variant={picked ? "ghost" : "outline"}
+              <li key={item.id}>
+                <button
+                  type="button"
                   disabled={picked || isFull}
                   onClick={() => add(item)}
-                  className="shrink-0 rounded-full h-8"
+                  aria-label={picked ? `${item.title} is already added` : `Add ${item.title}`}
+                  className="group flex w-full items-center gap-3 px-4 py-2 text-left transition-colors hover:bg-foreground/[0.04] disabled:cursor-default disabled:hover:bg-transparent"
                 >
-                  {picked ? (<><Check className="h-3.5 w-3.5 mr-1" /> Added</>) : (<><Plus className="h-3.5 w-3.5 mr-1" /> Add</>)}
-                </Button>
+                  <Thumb src={item.imageUrl} className="h-9 w-12" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14px] text-foreground">{item.title}</span>
+                    <span className="block truncate text-[12px] text-muted-foreground">{[item.meta, item.location].filter(Boolean).join(" · ")}</span>
+                  </span>
+                  {picked ? (
+                    <Check className="h-4 w-4 shrink-0 text-emerald-600" />
+                  ) : (
+                    <Plus className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-opacity group-hover:text-foreground", isFull ? "opacity-30" : "md:opacity-0 md:group-hover:opacity-100")} />
+                  )}
+                </button>
               </li>
             );
           })
         )}
       </ul>
-    </section>
+    </div>
   );
 
   return (
     <>
       <MobileHeader title="Showcases" />
-      <div className="w-full flex flex-col gap-5 px-4 pt-4 pb-28 md:px-0 md:pt-0 md:pb-24 md:h-full">
-        <div className="hidden md:flex items-center justify-between pr-[150px] min-h-[48px]">
-          <div>
-            <h1 className="text-[28px] font-bold tracking-tight">Showcases</h1>
-            <p className="text-muted-foreground text-sm mt-0.5">Pick what the home page features, and in what order.</p>
+      <PageActions>
+        {isDirty && !isLoading && (
+          <div className="flex items-center gap-2">
+            <span className="hidden text-[13px] text-muted-foreground lg:inline">Unsaved changes</span>
+            <button type="button" className={HEADER_BUTTON} onClick={() => setDraft(saved)} disabled={isSaving}>Discard</button>
+            <button type="button" className={HEADER_PRIMARY} onClick={() => void save()} disabled={isSaving}>
+              {isSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save changes
+            </button>
           </div>
-          <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={() => setReloadToken((t) => t + 1)} title="Refresh" disabled={isDirty}>
-            <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
-          </Button>
-        </div>
+        )}
+      </PageActions>
 
-        <div className="flex flex-col gap-2">
-          {sectionTabs}
-          <p className="text-xs text-muted-foreground">{spec.description}</p>
-        </div>
-
-        <div className="grid gap-5 md:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] md:flex-1 md:min-h-0">
-          {pickedList}
-          {picker}
+      <div className="flex flex-col pb-28 md:h-full md:pb-0 lg:-mx-6 lg:-mb-8 lg:-mt-6 lg:h-[calc(100%+3.5rem)]">
+        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+          <div className="flex min-w-0 flex-1 flex-col md:min-h-0">
+            {sectionTabs}
+            <div className="md:min-h-0 md:flex-1 md:overflow-y-auto">{pickedList}</div>
+          </div>
+          <aside className="mx-4 flex flex-col overflow-hidden rounded-xl border md:mx-0 md:w-[340px] md:shrink-0 md:rounded-none md:border-0 md:border-l xl:w-[360px]">{picker}</aside>
         </div>
       </div>
 
-      {/* Save bar: only while there are unsaved changes */}
+      {/* Phones have no top bar: save from a bar at the bottom. */}
       <AnimatePresence>
         {isDirty && !isLoading && (
           <motion.div
@@ -368,13 +352,13 @@ export default function ShowcasesPage() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 24, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-xl"
+            className="fixed inset-x-4 bottom-24 z-50 md:hidden"
           >
-            <div className="flex items-center justify-between gap-3 rounded-2xl border bg-card/95 backdrop-blur px-4 py-3 shadow-lg">
-              <p className="text-sm font-medium">Unsaved changes to {spec.label}</p>
+            <div className="flex items-center justify-between gap-3 rounded-2xl border bg-card/95 px-4 py-3 shadow-lg backdrop-blur">
+              <p className="text-sm font-medium">Unsaved changes</p>
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="sm" onClick={() => setDraft(saved)} disabled={isSaving}>Discard</Button>
-                <Button size="sm" onClick={save} disabled={isSaving} className="bg-[#0052FF] hover:bg-[#0052FF]/90 text-white rounded-full px-5">
+                <Button size="sm" onClick={save} disabled={isSaving} className="bg-foreground text-background hover:bg-foreground/85">
                   {isSaving ? "Saving…" : "Save"}
                 </Button>
               </div>
@@ -413,7 +397,7 @@ export default function ShowcasesPage() {
             </Button>
             <Button
               disabled={isSaving}
-              className="bg-[#0052FF] hover:bg-[#0052FF]/90 text-white"
+              className="bg-foreground text-background hover:bg-foreground/85"
               onClick={async () => {
                 const ok = await save();
                 if (!ok) return;

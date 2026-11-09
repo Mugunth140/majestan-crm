@@ -12,6 +12,8 @@ import {
 } from '@nestjs/common';
 import { BuildersService } from './builders.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('api/v1/builders')
 @UseGuards(JwtAuthGuard)
@@ -55,6 +57,8 @@ export class BuildersController {
     return { success: true, data };
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
   @Delete(':id')
   async remove(@Param('id', ParseIntPipe) id: number) {
     const data = await this.buildersService.remove(id);

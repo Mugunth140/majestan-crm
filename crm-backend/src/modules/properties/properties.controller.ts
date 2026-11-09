@@ -76,8 +76,9 @@ export class PropertiesController {
   }
 
   @Get('form-data')
-  async findFormData() {
-    const data = await this.propertiesService.findFormData();
+  async findFormData(@Query('fresh') fresh?: string) {
+    // `fresh` skips the 5-minute cache, e.g. right after adding a master item from a form.
+    const data = await this.propertiesService.findFormData(fresh === '1');
     return { success: true, data };
   }
 
@@ -129,7 +130,10 @@ export class PropertiesController {
     return { success: true, data };
   }
 
+  // Deleting is for admins (the list only offers it to them).
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Admin')
   async remove(@Param('id', ParseIntPipe) id: number) {
     const data = await this.propertiesService.remove(id);
     return { success: true, data };

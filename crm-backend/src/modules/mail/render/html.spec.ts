@@ -27,15 +27,15 @@ describe('branded layout', () => {
       subject: 'Hello\r\nBcc: evil@x.com',
       bodyHtml: '<p>Body</p>',
       note: 'Bring <b>certificates</b>',
-      signature: ['Priya', 'HR Team, Majestan Realty', ''],
+      signature: ['Priya', 'HR Team · Majestan Realty', ''],
     });
     expect(mail.subject).toBe('Hello Bcc: evil@x.com');
     expect(mail.html).toContain('assets/images/logo/logo.png');
     expect(mail.html).toContain('<p>Body</p>');
     expect(mail.html).toContain('Bring &lt;b&gt;certificates&lt;/b&gt;');
-    expect(mail.html).toContain('<strong>Priya</strong>');
+    expect(mail.html).toContain('>Priya</strong>');
     expect(mail.html).toContain('47/1 Aandal Street');
     expect(mail.text).toContain('Body');
-    expect(mail.text).toContain('Regards,\nPriya\nHR Team, Majestan Realty');
+    expect(mail.text).toContain('Warm regards,\nPriya\nHR Team · Majestan Realty');
   });
 });

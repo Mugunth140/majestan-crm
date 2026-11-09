@@ -10,11 +10,13 @@ export const BRAND = { navy: '#27427f', gold: '#ffc900', ink: '#1f2937', muted: 
 export function detailsCard(rows: [string, string | SafeHtml | null | undefined][]): SafeHtml {
   const visible = rows.filter(([, value]) => value !== null && value !== undefined && value !== '');
   if (!visible.length) return html``;
-  return html`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;border-collapse:separate;background:${BRAND.soft};border:1px solid ${BRAND.line};border-radius:10px"><tbody>
-${visible.map(
-  ([label, value], i) =>
-    html`<tr><td style="padding:${i === 0 ? '16px' : '6px'} 8px ${i === visible.length - 1 ? '16px' : '6px'} 20px;width:132px;font-size:13px;color:${BRAND.muted};vertical-align:top;white-space:nowrap">${label}</td><td style="padding:${i === 0 ? '16px' : '6px'} 20px ${i === visible.length - 1 ? '16px' : '6px'} 8px;font-size:15px;font-weight:600;color:${BRAND.ink};vertical-align:top">${value}</td></tr>`,
-)}
+  return html`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="dl" style="margin:24px 0;border-collapse:separate;background:${BRAND.soft};border:1px solid ${BRAND.line};border-radius:10px"><tbody>
+${visible.map((row, i) => {
+  const [label, value] = row;
+  const top = i === 0 ? '18px' : '7px';
+  const bottom = i === visible.length - 1 ? '18px' : '7px';
+  return html`<tr><td class="dl-label" style="padding:${top} 8px ${bottom} 20px;width:120px;font-size:13px;color:${BRAND.muted};vertical-align:top;white-space:nowrap">${label}</td><td class="dl-value" style="padding:${top} 20px ${bottom} 8px;font-size:15px;font-weight:600;color:${BRAND.ink};vertical-align:top">${value}</td></tr>`;
+})}
 </tbody></table>`;
 }
 

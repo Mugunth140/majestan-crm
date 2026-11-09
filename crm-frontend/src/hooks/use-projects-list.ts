@@ -86,5 +86,5 @@ export function useProjectsList() {
     }
   };
 
-  return { projects, totalCount, isLoading, error, fetchProjects, deleteBulk };
+  return { projects, setProjects, totalCount, isLoading, error, fetchProjects, deleteBulk };
 }

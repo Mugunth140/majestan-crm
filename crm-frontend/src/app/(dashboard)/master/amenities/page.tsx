@@ -1,14 +1,18 @@
 "use client";
 
+import { isAdmin } from "@/lib/permissions";
+import { AMENITY_CATEGORIES } from "@/lib/master-kinds";
 import { apiFetch } from "@/lib/api-fetch";
 
 import { useState, useEffect, useCallback } from "react";
 import { DataTable } from "@/components/tables/data-table";
+import { ActiveCell, IdCell, statusDot } from "@/components/tables/cells";
+import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { activeValue, moveRow } from "@/lib/move-row";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Plus, Loader2, Search } from "lucide-react";
+import { Edit, Trash2, Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -18,28 +22,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { IconPicker, resolveIcon } from "@/components/shared/icon-picker";
 
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { PageActions } from "@/components/layout/page-actions";
+import { ListBody, ListFrame, ListToolbar, ToolbarSearch, headerPrimaryClass } from "@/components/layout/list-page";
+import { TableSkeleton } from "@/components/tables/table-skeleton";
+import { cn } from "@/lib/utils";
+
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
-// Mirrors the site AmenityCategory enum (site amenities table).
-const AMENITY_CATEGORIES = [
-  { value: "security", label: "Security" },
-  { value: "utilities", label: "Utilities" },
-  { value: "recreation", label: "Recreation" },
-  { value: "community", label: "Community" },
-  { value: "connectivity", label: "Connectivity" },
-  { value: "interior", label: "Interior" },
-  { value: "other", label: "Other" },
-  { value: "feature", label: "Feature" },
-  { value: "utility", label: "Utility" },
-];
 
 const categoryLabel = (value: string | null | undefined) =>
   AMENITY_CATEGORIES.find((c) => c.value === value)?.label ?? value ?? "—";
 
 const emptyForm = { name: "", category: "other", icon_key: "", is_active: true };
 
+const FIELDS: ViewField[] = [
+  { id: "status", label: "Status", get: (r) => (r.is_active ? "Active" : "Inactive"), order: ["Active", "Inactive"], dot: (v) => statusDot(v) },
+  { id: "category", label: "Category", get: (r) => categoryLabel(r.category), capitalize: true },
+];
+
 export default function AmenitiesMasterPage() {
+  const views = useModuleView("master-amenities", FIELDS);
   const [amenities, setAmenities] = useState<any[]>([]);
   const [search, setSearch] = usePersistedState("master-amenities:search", "");
   const [isLoading, setIsLoading] = useState(true);
@@ -222,17 +225,17 @@ export default function AmenitiesMasterPage() {
         </div>
       ),
     },
-    { accessorKey: "id", header: "ID" },
+    { accessorKey: "id", header: "ID", cell: ({ row }) => <IdCell onClick={() => openEdit(row.original)}>{row.original.id}</IdCell> },
     {
       accessorKey: "name",
       header: "Amenity",
       cell: ({ row }) => {
         const Icon = resolveIcon(row.original.icon_key);
         return (
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted">
               {Icon ? (
-                <Icon className="h-4 w-4 text-muted-foreground" />
+                <Icon className="size-3.5 text-muted-foreground" />
               ) : (
                 <span className="text-xs text-muted-foreground">—</span>
               )}
@@ -246,24 +249,13 @@ export default function AmenitiesMasterPage() {
       accessorKey: "category",
       header: "Category",
       cell: ({ row }) => (
-        <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-200 border-none shadow-none capitalize">
-          {categoryLabel(row.original.category)}
-        </Badge>
+        <span className="capitalize">{categoryLabel(row.original.category)}</span>
       ),
     },
     {
       accessorKey: "is_active",
       header: "Status",
-      cell: ({ row }) => (
-        <Badge
-          variant={row.original.is_active ? "default" : "secondary"}
-          className={row.original.is_active
-            ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border-none shadow-none"
-            : "bg-gray-100 text-gray-600 hover:bg-gray-200 border-none shadow-none"}
-        >
-          {row.original.is_active ? "Active" : "Inactive"}
-        </Badge>
-      ),
+      cell: ({ row }) => <ActiveCell active={row.original.is_active} />,
     },
     {
       id: "actions",
@@ -316,48 +308,59 @@ export default function AmenitiesMasterPage() {
   return (
     <>
       <MobileHeader title="Master: Amenities" showBack />
-      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:h-full px-4 md:px-8">
+      {views.switcher}
+      <div className="w-full flex flex-col md:h-full">
 
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pr-0 md:pr-[150px] min-h-[48px]">
-          <h1 className="text-[28px] font-bold tracking-tight hidden md:block">Master: Amenities</h1>
-        </div>
+        <PageActions>
+          <button type="button" className={headerPrimaryClass} onClick={() => { setFormData(emptyForm); setIsAddOpen(true); }}>
+            <Plus className="size-4" /> Add Amenity
+          </button>
+        </PageActions>
 
-        <div className="bg-card border rounded-xl overflow-hidden shadow-sm md:flex md:flex-col md:flex-1 md:min-h-0 mb-20 md:mb-0">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 md:px-6 py-4 border-b bg-background">
-            <div className="relative flex-1 min-w-[200px] max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search amenities..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-10 bg-muted/30 rounded-xl border-border/60 text-[13.5px]"
+        <ListFrame>
+          <ListToolbar>
+            <ToolbarSearch value={search} onChange={setSearch} placeholder="Search amenities" className="flex-1 md:flex-none" />
+            <button type="button" className={cn(headerPrimaryClass, "md:hidden")} onClick={() => { setFormData(emptyForm); setIsAddOpen(true); }}>
+              <Plus className="size-4" /> Add Amenity
+            </button>
+            {views.picker && <div className="ml-auto">{views.picker}</div>}
+          </ListToolbar>
+          <ListBody>
+            {isLoading ? (
+              <TableSkeleton columns={5} rows={8} flush />
+            ) : (
+              <ModuleViews
+                state={views}
+                data={filteredAmenities}
+                columns={columns}
+                list={
+                  <DataTable
+                variant="list"
+                columns={columns}
+                data={filteredAmenities}
+                showToolbar={true}
+                showDeleteAction={isAdmin()}
+                onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
               />
-            </div>
-            <Button
-              className="h-10 px-5 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC] shrink-0 w-full sm:w-auto sm:ml-auto shadow-sm"
-              onClick={() => { setFormData(emptyForm); setIsAddOpen(true); }}
-            >
-              <Plus className="mr-1.5 h-4 w-4" /> Add Amenity
-            </Button>
-          </div>
-
-          <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col">
-          {isLoading ? (
-            <div className="flex h-40 items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <DataTable
-              columns={columns}
-              data={filteredAmenities}
-              flush
-              showToolbar={true}
-              showDeleteAction={true}
-              onDeleteSelected={(rows) => setBulkDeleteIds(rows.map((r) => r.id))}
-            />
-          )}
-          </div>
-        </div>
+                }
+                getKey={(r) => r.id}
+                onOpen={openEdit}
+                onMove={(r, column) => {
+                  const is_active = activeValue(r.is_active, column === "Active");
+                  moveRow({
+                    setRows: setAmenities,
+                    row: r,
+                    same: (a, b) => a.id === b.id,
+                    patch: { is_active },
+                    request: { path: `/master/amenities/${r.id}`, method: "PATCH", body: { name: r.name, category: r.category ?? "other", icon_key: r.icon_key || null, is_active } },
+                    success: `Marked ${column.toLowerCase()}`,
+                  });
+                }}
+                card={(r) => ({ title: r.name, avatar: false, id: r.id, subtitle: categoryLabel(r.category) })}
+              />
+            )}
+          </ListBody>
+        </ListFrame>
 
         {/* Add Dialog */}
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>

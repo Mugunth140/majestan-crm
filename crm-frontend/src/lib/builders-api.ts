@@ -1,6 +1,24 @@
 // builders-api.ts
 import { apiJson } from "./api-fetch";
 
+export interface BuilderRecord {
+  id: number;
+  name: string;
+  slug?: string;
+  logoUrl?: string;
+  rawLogoKey?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  experienceYears?: number;
+  completedProjects?: number;
+  ongoingProjects?: number;
+  description?: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 const BASE = `${API_URL}/builders`;
 

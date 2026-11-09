@@ -96,7 +96,7 @@ export function HrImportReview({ rows, existing, onCancel, onImported }: {
   const known = new Set(existing.map(candidate => normalizeHrMobile(candidate.mobile)));
   const duplicateCount = rows.filter(row => known.has(row.mobile)).length;
   const columns: ColumnDef<HrImportRow>[] = [
-    { accessorKey: 'rowNumber', header: '#' }, { accessorKey: 'name', header: 'Candidate Name' },
+    { accessorKey: 'rowNumber', header: 'Row' }, { accessorKey: 'name', header: 'Candidate Name' },
     { accessorKey: 'mobile', header: 'Candidate Number' }, { accessorKey: 'role', header: 'Role' },
     { accessorKey: 'experience', header: 'Experience' },
     { accessorKey: 'location', header: 'Location' },

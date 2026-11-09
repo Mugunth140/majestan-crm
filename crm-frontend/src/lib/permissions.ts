@@ -11,6 +11,13 @@ function currentUser(): any {
   }
 }
 
+/** Admin or Super Admin: the only roles that may delete records. */
+export function isAdmin(user?: any): boolean {
+  const u = user ?? currentUser();
+  const role = u?.role?.name || u?.role || '';
+  return role === 'Admin' || role === 'Super Admin';
+}
+
 /** Namespaced permission check, e.g. can('properties.view_contacts'). Admin bypasses. */
 export function can(key: string, user?: any): boolean {
   const u = user ?? currentUser();

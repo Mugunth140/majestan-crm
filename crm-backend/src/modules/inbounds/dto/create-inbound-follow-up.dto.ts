@@ -1,25 +1,30 @@
-import { IsString, IsOptional, IsDateString, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsDateString, IsBoolean, ValidateIf } from 'class-validator';
+
+// camelCase, as every page sends it and the service reads it. (The old
+// snake_case fields were stripped by the whitelist pipe, dropping how the owner
+// was contacted and every date.) "" counts as an unset date.
+const unlessBlank = ValidateIf((_, v) => v !== '' && v !== null && v !== undefined);
 
 export class CreateInboundFollowUpDto {
-  @IsOptional()
+  @unlessBlank
   @IsDateString()
-  follow_up_date?: string;
+  followUpDate?: string;
 
   @IsOptional()
   @IsString()
-  follow_up_time?: string;
+  followUpTime?: string;
 
   @IsOptional()
   @IsString()
-  contacted_via?: string;
+  contactedVia?: string;
 
-  @IsOptional()
+  @unlessBlank
   @IsDateString()
-  next_follow_up_date?: string;
+  nextFollowUpDate?: string;
 
   @IsOptional()
   @IsString()
-  next_follow_up_time?: string;
+  nextFollowUpTime?: string;
 
   @IsOptional()
   @IsString()
@@ -43,5 +48,5 @@ export class CreateInboundFollowUpDto {
 
   @IsOptional()
   @IsBoolean()
-  is_completed?: boolean;
+  isCompleted?: boolean;
 }

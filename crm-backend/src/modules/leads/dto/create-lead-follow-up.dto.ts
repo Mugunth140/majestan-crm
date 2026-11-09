@@ -1,7 +1,10 @@
-import { IsString, IsOptional, IsDateString, IsBoolean, IsNumber } from 'class-validator';
+import { IsString, IsOptional, IsDateString, IsBoolean, IsNumber, ValidateIf } from 'class-validator';
+
+// The lead page sends "" for an unset date; treat it like a missing one.
+const unlessBlank = ValidateIf((_, v) => v !== '' && v !== null && v !== undefined);
 
 export class CreateLeadFollowUpDto {
-  @IsOptional()
+  @unlessBlank
   @IsDateString()
   followUpDate?: string;
 
@@ -13,7 +16,7 @@ export class CreateLeadFollowUpDto {
   @IsString()
   contactedVia?: string;
 
-  @IsOptional()
+  @unlessBlank
   @IsDateString()
   nextFollowUpDate?: string;
 

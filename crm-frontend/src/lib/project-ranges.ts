@@ -53,7 +53,7 @@ function trimDecimals(value: number): string {
 }
 
 export function formatPriceRange(min: number | null, max: number | null): string {
-  if (min == null && max == null) return '-';
+  if (min == null && max == null) return '—';
   if (min != null && max != null && min !== max) return `${formatPrice(min)} - ${formatPrice(max)}`;
   return formatPrice(min ?? max);
 }

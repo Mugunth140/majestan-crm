@@ -66,7 +66,7 @@ export const partnerMailEntity = defineMailEntity<PartnerMailData>({
     'partner.type': d.partnerType ?? '',
     'partner.city': d.city ?? '',
     'partner.commission': d.commission ?? '',
-    'manager.name': d.manager?.name ?? 'Our partnerships team',
+    'manager.name': d.manager?.name ?? 'our partnerships team',
     'manager.phone': d.manager?.phone ?? COMPANY.phone,
     partner_details: detailsCard([
       ['Partner', d.company ? `${d.name} · ${d.company}` : d.name],
@@ -83,7 +83,7 @@ export const partnerMailEntity = defineMailEntity<PartnerMailData>({
     { key: 'partner.type', label: 'Partner type', sample: 'Individual Broker' },
     { key: 'partner.city', label: 'City', sample: 'Coimbatore' },
     { key: 'partner.commission', label: 'Agreed commission (blank if none)', sample: '2%' },
-    { key: 'manager.name', label: 'Assigned staff name', sample: 'Priya Raman' },
+    { key: 'manager.name', label: 'Assigned staff name (or "our partnerships team")', sample: 'Priya Raman' },
     { key: 'manager.phone', label: 'Assigned staff phone', sample: '+91 98765 43210' },
     { key: 'partner_details', label: 'Partner details card', sample: '[partner, type, city, commission, contact]', block: true },
   ],

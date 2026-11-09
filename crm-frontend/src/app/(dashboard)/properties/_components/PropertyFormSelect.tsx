@@ -1,7 +1,9 @@
 "use client";
 
 import type { ComponentProps } from "react";
-import { FormSelect } from "@/components/shared/form-select";
+import { FormSelect, SearchableFormSelect } from "@/components/shared/form-select";
+import { cn } from "@/lib/utils";
+import { PROPERTY_SELECT } from "./property-form-styles";
 
 const ABBREVIATIONS = new Set([
   "BPO", "ATM", "RC", "PEB", "VDF", "IPS", "TNPCB", "EIA", "CEIG", "PESO", "CTE", "CTO", "CC", "OC", "CLU", "NOC", "R", "D", "AC", "BHK", "CMDA", "DTCP", "EB", "FMB", "GST", "HP", "HT", "INR",
@@ -19,11 +21,18 @@ export function propertyOptionLabel(label: string): string {
   });
 }
 
-export function PropertyFormSelect(props: ComponentProps<typeof FormSelect>) {
+/** With `onCreate`, the list gets a search box and can add a missing value to its master list. */
+export function PropertyFormSelect({ onCreate, createNoun, ...props }: ComponentProps<typeof FormSelect> & { onCreate?: (query: string) => void; createNoun?: string }) {
   const current = props.value ?? props.defaultValue;
   const options = props.options.map((option) => ({ ...option, label: propertyOptionLabel(option.label) }));
   if (current && !options.some((option) => option.value === current)) {
     options.push({ value: current, label: propertyOptionLabel(current) });
   }
-  return <FormSelect {...props} options={options} />;
+  if (onCreate) {
+    return (
+      <SearchableFormSelect id={props.id} name={props.name} placeholder={props.placeholder} value={props.value} disabled={props.disabled}
+        onValueChange={props.onValueChange} className={cn(PROPERTY_SELECT, props.className)} options={options} onCreate={onCreate} createNoun={createNoun} />
+    );
+  }
+  return <FormSelect {...props} className={cn(PROPERTY_SELECT, props.className)} options={options} />;
 }

@@ -11,7 +11,7 @@ function PropertyFormLoader() {
   return (
     <div className="flex h-[60vh] w-full items-center justify-center">
       <div className="flex flex-col items-center gap-4">
-        <Loader2 className="h-8 w-8 animate-spin text-[#0052FF]" />
+        <Loader2 className="h-8 w-8 animate-spin" />
         <p className="text-muted-foreground font-medium">Loading property data...</p>
       </div>
     </div>
@@ -49,7 +49,7 @@ function PropertyFormPage() {
   if (isLoading) return <PropertyFormLoader />;
   if (editId && !initialData) return null;
 
-  return <PropertyForm mode={editId ? "edit" : "create"} initialData={initialData ?? undefined} />;
+  return <PropertyForm mode={editId ? "edit" : "create"} initialData={initialData ?? undefined} onClose={() => router.push(editId ? `/properties/${editId}` : "/properties")} />;
 }
 
 export default function NewPropertyPage() {

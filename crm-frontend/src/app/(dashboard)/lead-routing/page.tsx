@@ -1,34 +1,40 @@
 "use client";
 
+import { isAdmin } from "@/lib/permissions";
 import { apiFetch } from "@/lib/api-fetch";
 import { normalizeDepartment } from "@/lib/department";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { format } from "date-fns";
 import { DataTable } from "@/components/tables/data-table";
+import { DateCell, IdCell, NameCell, StatusCell, formatTableDate, statusDot, type StatusTone } from "@/components/tables/cells";
+import { BOARD_PAGE, ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { LEAD_STATUS_DOTS, LEAD_STATUS_ORDER, leadStatusPill } from "@/lib/lead-constants";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ColumnDef } from "@tanstack/react-table";
+import type { ColumnDef, PaginationState } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, RefreshCw, Filter, ChevronDown, Check, X } from "lucide-react";
+import { Loader2, Check, X } from "lucide-react";
 import { toast } from "sonner";
-import { motion } from "motion/react";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
+import { EmptyState } from "@/components/shared/empty-state";
 import { AssignLeadModal } from "@/components/shared/assign-lead-modal";
-import { FormSelect } from "@/components/shared/form-select";
-import { DatePicker } from "@/components/shared/date-picker";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { Device } from "@/components/shared/device";
+import { SegmentTabs } from "@/components/layout/list-page";
+import { ClearFilters, DateQuickFilter, FilterDivider, FilterStrip, QuickFilter } from "@/components/shared/quick-filters";
 import { canTakeLeadFromQueue, canConvertEnquiry, assignRoutingLeads } from "@/lib/lead-routing";
+import { VerificationQueue } from "./verification-queue";
 import { timeAgo } from "@/lib/time-ago";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { StaffName } from "@/components/shared/name-avatar";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 type MainTab = "queue" | "enquiry" | "history";
-type DeptTab = "telecalling" | "sales";
+type DeptTab = "telecalling" | "sales" | "verification";
 
 interface QueueLead {
   id: number;
@@ -97,14 +103,18 @@ interface HistoryEntry {
   created_at: string;
   lead?: { id: number; name: string };
   event_type?: string;
-  from_staff?: { name: string };
-  to_staff?: { name: string };
-  department?: { name: string };
-  feedback?: string;
+  from_user?: { name: string } | null;
+  to_user?: { name: string } | null;
+  department?: string | null;
+  feedback?: string | null;
 }
 
+/** The filter chips speak YYYY-MM-DD; this page keeps local Dates. */
+const dayOf = (d?: Date) => (d ? format(d, "yyyy-MM-dd") : "");
+const dateOf = (day: string) => { if (!day) return undefined; const [y, m, dd] = day.split("-").map(Number); return new Date(y, m - 1, dd); };
+
 const EVENT_TYPE_OPTIONS = [
-  { label: "All Events", value: "" },
+  { label: "All events", value: "" },
   { label: "Assigned", value: "Assigned" },
   { label: "Auto-transferred", value: "Auto-transferred" },
   { label: "Auto-unassigned", value: "Auto-unassigned" },
@@ -115,10 +125,28 @@ const EVENT_TYPE_OPTIONS = [
   { label: "Queued", value: "Queued" },
 ];
 
-function formatDate(d?: string) {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-}
+const EVENT_TONES: Record<string, StatusTone> = { assigned: "blue", claimed: "green", released: "amber", converted: "violet" };
+
+const QUEUE_FIELDS: ViewField<QueueLead>[] = [
+  { id: "status", label: "Last status", get: (l) => l.status, order: LEAD_STATUS_ORDER, dot: (v) => LEAD_STATUS_DOTS[v] ?? "bg-gray-400" },
+  { id: "held_by", label: "Previously held by", get: (l) => l.previously_held_by },
+  { id: "reason", label: "Release reason", get: (l) => l.release_reason },
+];
+
+const ENQUIRY_FIELDS: ViewField<EnquiryLead>[] = [
+  { id: "type", label: "Type", get: (e) => e.type, order: ["New", "Repeat"], dot: (v) => statusDot(v, v === "Repeat" ? "amber" : "blue") },
+  { id: "intent", label: "Purpose", get: (e) => (e.intent === "site_visit" ? "Site Visit" : "Enquiry"), dot: (v) => statusDot(v, v === "Site Visit" ? "violet" : "gray") },
+  { id: "assigned", label: "Assigned", get: (e) => e.assigned_staff_name || "Unassigned" },
+  { id: "source", label: "Source", get: (e) => sourceLabel(e.source) },
+];
+
+const HISTORY_FIELDS: ViewField<HistoryEntry>[] = [
+  { id: "event", label: "Event type", get: (h) => h.event_type, dot: (v) => statusDot(v, EVENT_TONES[v.toLowerCase()] ?? "gray"), capitalize: true },
+  { id: "to_staff", label: "To staff", get: (h) => h.to_user?.name },
+  { id: "department", label: "Department", get: (h) => h.department, capitalize: true },
+];
+
+type PaginationUpdate = PaginationState | ((old: PaginationState) => PaginationState);
 
 function formatDateTime(d?: string) {
   if (!d) return "—";
@@ -129,11 +157,7 @@ function formatDateTime(d?: string) {
 
 function PurposeBadge({ intent }: { intent: string }) {
   const isVisit = intent === "site_visit";
-  return (
-    <Badge className={`border text-xs whitespace-nowrap ${isVisit ? "bg-violet-100 text-violet-700 border-violet-200" : "bg-slate-100 text-slate-600 border-slate-200"}`}>
-      {isVisit ? "Site Visit" : "Enquiry"}
-    </Badge>
-  );
+  return <StatusCell status={isVisit ? "Site Visit" : "Enquiry"} tone={isVisit ? "violet" : "gray"} />;
 }
 
 // ── Matched-lead decision dialog ─────────────────────────────────────────────
@@ -264,10 +288,15 @@ export default function LeadRoutingPage() {
   const router = useRouter();
   const [role, setRole] = useState<string>("");
   const [userDept, setUserDept] = useState<string>("");
+  const [sourcing, setSourcing] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
   const [mainTab, setMainTab] = usePersistedState<MainTab>("routing:tab", "queue", { allowed: ["queue", "enquiry", "history"] });
-  const [deptTab, setDeptTab] = usePersistedState<DeptTab>("routing:dept", "telecalling", { allowed: ["telecalling", "sales"] });
+  const queueView = useModuleView("routing-queue", QUEUE_FIELDS);
+  const enquiryView = useModuleView("routing-enquiry", ENQUIRY_FIELDS);
+  const historyView = useModuleView("routing-history", HISTORY_FIELDS);
+  const activeView = mainTab === "queue" ? queueView : mainTab === "enquiry" ? enquiryView : historyView;
+  const [deptTab, setDeptTab] = usePersistedState<DeptTab>("routing:dept", "telecalling", { allowed: ["telecalling", "sales", "verification"] });
 
   // Queue state
   const [queue, setQueue] = useState<QueueLead[]>([]);
@@ -289,11 +318,6 @@ export default function LeadRoutingPage() {
   const enquiryHasFilters =
     enquiryTypeFilter !== "" || enquiryIntentFilter !== "" || enquirySourceFilter !== "" ||
     enquiryDateFrom !== undefined || enquiryDateTo !== undefined;
-  const enquiryActiveFilterCount =
-    (enquiryTypeFilter !== "" ? 1 : 0) + (enquiryIntentFilter !== "" ? 1 : 0) +
-    (enquirySourceFilter !== "" ? 1 : 0) +
-    (enquiryDateFrom !== undefined ? 1 : 0) + (enquiryDateTo !== undefined ? 1 : 0);
-  const [enquiryFilterOpen, setEnquiryFilterOpen] = useState(false);
 
   // History state
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -330,12 +354,15 @@ export default function LeadRoutingPage() {
       try {
         const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
         const roleName = user?.role?.name || user?.role || "";
-        const deptName = normalizeDepartment(user?.department?.name || user?.department);
+        const rawDept = user?.department?.name || user?.department;
+        const deptName = normalizeDepartment(rawDept);
+        const isSourcing = /sourcing/i.test(String(rawDept ?? ""));
         if (user?.id != null) setCurrentUserId(Number(user.id));
         setRole(roleName);
         setUserDept(deptName);
-        if (roleName === "Staff") {
-          setDeptTab(deptName);
+        setSourcing(isSourcing);
+        if (roleName === "Staff" || isSourcing) {
+          setDeptTab(isSourcing ? "verification" : deptName);
         }
       } catch {
         // ignore
@@ -348,8 +375,8 @@ export default function LeadRoutingPage() {
     try {
       const params = new URLSearchParams({
         department: deptTab,
-        page: String(queuePage),
-        limit: String(LIMIT),
+        page: String(queueView.isBoard ? 1 : queuePage),
+        limit: String(queueView.isBoard ? BOARD_PAGE.pageSize : LIMIT),
       });
       const res = await apiFetch(`${API_URL}/lead-routing/queue?${params}`);
       const data = await res.json();
@@ -364,14 +391,14 @@ export default function LeadRoutingPage() {
     } finally {
       setQueueLoading(false);
     }
-  }, [deptTab, queuePage]);
+  }, [deptTab, queuePage, queueView.isBoard]);
 
   const fetchEnquiry = useCallback(async () => {
     setEnquiryLoading(true);
     try {
       const params = new URLSearchParams({
-        page: String(enquiryPage),
-        limit: String(LIMIT),
+        page: String(enquiryView.isBoard ? 1 : enquiryPage),
+        limit: String(enquiryView.isBoard ? BOARD_PAGE.pageSize : LIMIT),
       });
       if (enquiryTypeFilter) params.set("propertyType", enquiryTypeFilter);
       if (enquiryIntentFilter) params.set("intent", enquiryIntentFilter);
@@ -391,18 +418,18 @@ export default function LeadRoutingPage() {
     } finally {
       setEnquiryLoading(false);
     }
-  }, [enquiryPage, enquiryTypeFilter, enquiryIntentFilter, enquirySourceFilter, enquiryDateFrom, enquiryDateTo]);
+  }, [enquiryPage, enquiryTypeFilter, enquiryIntentFilter, enquirySourceFilter, enquiryDateFrom, enquiryDateTo, enquiryView.isBoard]);
 
   const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
       const params = new URLSearchParams({
-        page: String(historyPage),
-        limit: String(LIMIT),
+        page: String(historyView.isBoard ? 1 : historyPage),
+        limit: String(historyView.isBoard ? BOARD_PAGE.pageSize : LIMIT),
       });
       if (historyEventFilter) params.set("event_type", historyEventFilter);
-      if (historyDateFrom) params.set("date_from", format(historyDateFrom, "yyyy-MM-dd"));
-      if (historyDateTo) params.set("date_to", format(historyDateTo, "yyyy-MM-dd"));
+      if (historyDateFrom) params.set("from_date", format(historyDateFrom, "yyyy-MM-dd"));
+      if (historyDateTo) params.set("to_date", format(historyDateTo, "yyyy-MM-dd"));
       const res = await apiFetch(`${API_URL}/lead-routing/history?${params}`);
       const data = await res.json();
       if (data.success) {
@@ -416,11 +443,11 @@ export default function LeadRoutingPage() {
     } finally {
       setHistoryLoading(false);
     }
-  }, [historyPage, historyEventFilter, historyDateFrom, historyDateTo]);
+  }, [historyPage, historyEventFilter, historyDateFrom, historyDateTo, historyView.isBoard]);
 
   useEffect(() => {
-    if (mainTab === "queue") fetchQueue();
-  }, [mainTab, fetchQueue]);
+    if (mainTab === "queue" && deptTab !== "verification") fetchQueue();
+  }, [mainTab, deptTab, fetchQueue]);
 
   useEffect(() => {
     if (mainTab === "enquiry") fetchEnquiry();
@@ -690,57 +717,45 @@ export default function LeadRoutingPage() {
     },
     {
       accessorKey: "display_id",
-      header: "Lead ID",
+      header: "ID",
       cell: ({ row }) => (
-        <span 
-          onClick={() => router.push(`/leads/${row.original.id}`)}
-          className="font-mono text-[13px] text-[#0052FF] font-medium cursor-pointer hover:underline"
-        >
-          {row.original.display_id || `L${String(row.original.id).padStart(5, "0")}`}
-        </span>
+        <IdCell href={`/leads/${row.original.id}`}>{row.original.display_id || `L${String(row.original.id).padStart(5, "0")}`}</IdCell>
       ),
     },
     {
       accessorKey: "name",
       header: "Name",
       cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center font-bold text-xs text-blue-900 dark:text-blue-300 shrink-0">
-            {row.original.name?.charAt(0)?.toUpperCase() ?? "?"}
-          </div>
-          <span className="font-medium">{row.original.name}</span>
-        </div>
+        <NameCell name={row.original.name} avatar />
       ),
     },
     {
       accessorKey: "mobile_number",
       header: "Mobile",
-      cell: ({ row }) => <span>{row.original.mobile_number || "—"}</span>,
+      cell: ({ row }) => <span className="tabular-nums">{row.original.mobile_number || "—"}</span>,
     },
     {
       accessorKey: "status",
       header: "Last Status",
       cell: ({ row }) => (
-        <Badge variant="outline" className="text-xs whitespace-nowrap">
-          {row.original.status || "—"}
-        </Badge>
+        <StatusCell status={row.original.status} pillClass={leadStatusPill(row.original.status)} />
       ),
     },
     {
       accessorKey: "last_follow_up_date",
       header: "Last Follow-up",
-      cell: ({ row }) => <span className="text-sm">{formatDate(row.original.last_follow_up_date)}</span>,
+      cell: ({ row }) => <DateCell value={row.original.last_follow_up_date} />,
     },
     {
       accessorKey: "previously_held_by",
       header: "Previously Held By",
-      cell: ({ row }) => <span className="text-sm">{row.original.previously_held_by || "—"}</span>,
+      cell: ({ row }) => <span>{row.original.previously_held_by || "—"}</span>,
     },
     {
       accessorKey: "release_reason",
       header: "Release Reason",
       cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground max-w-[140px] truncate block">
+        <span className="block max-w-[160px] truncate text-muted-foreground">
           {row.original.release_reason || "—"}
         </span>
       ),
@@ -751,7 +766,7 @@ export default function LeadRoutingPage() {
       cell: ({ row }) => {
         const days = row.original.days_in_queue ?? 0;
         return (
-          <span className={`font-semibold text-sm ${days > 7 ? "text-red-500" : days > 3 ? "text-amber-500" : "text-green-600"}`}>
+          <span className={`tabular-nums ${days > 7 ? "text-rose-600 dark:text-rose-400" : days > 3 ? "text-amber-600 dark:text-amber-400" : "text-foreground"}`}>
             {days}d
           </span>
         );
@@ -811,48 +826,30 @@ export default function LeadRoutingPage() {
     },
     {
       accessorKey: "display_id",
-      header: "Lead ID",
+      header: "ID",
       cell: ({ row }) => {
         const ev = row.original;
-        return ev.id != null ? (
-          <span
-            onClick={() => router.push(`/leads/${ev.id}`)}
-            className="font-mono text-[13px] text-[#0052FF] font-medium cursor-pointer hover:underline"
-          >
-            {ev.display_id}
-          </span>
-        ) : (
-          <span className="font-mono text-[13px] text-muted-foreground">{ev.display_id}</span>
-        );
+        return <IdCell href={ev.id != null ? `/leads/${ev.id}` : undefined}>{ev.display_id}</IdCell>;
       },
     },
     {
       accessorKey: "name",
       header: "Name",
       cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center font-bold text-xs text-blue-900 dark:text-blue-300 shrink-0">
-            {row.original.name?.charAt(0)?.toUpperCase() ?? "?"}
-          </div>
-          <span className="font-medium">{row.original.name}</span>
-        </div>
+        <NameCell name={row.original.name} avatar />
       ),
     },
     {
       accessorKey: "mobile_number",
       header: "Mobile",
-      cell: ({ row }) => <span>{row.original.mobile_number || "—"}</span>,
+      cell: ({ row }) => <span className="tabular-nums">{row.original.mobile_number || "—"}</span>,
     },
     {
       accessorKey: "type",
       header: "Type",
       cell: ({ row }) => {
         const isRepeat = row.original.type === "Repeat";
-        return (
-          <Badge className={`border text-xs whitespace-nowrap ${isRepeat ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-blue-100 text-blue-700 border-blue-200"}`}>
-            {row.original.type}
-          </Badge>
-        );
+        return <StatusCell status={row.original.type} tone={isRepeat ? "amber" : "blue"} />;
       },
     },
     {
@@ -894,25 +891,21 @@ export default function LeadRoutingPage() {
       },
     },
     {
-      accessorKey: "enquiry_at",
-      header: "Enquired On",
-      cell: ({ row }) => (
-        <span className="text-sm whitespace-nowrap" title={formatDateTime(row.original.enquiry_at)}>
-          {timeAgo(row.original.enquiry_at) || "—"}
-        </span>
-      ),
-    },
-    {
       id: "assigned",
       header: "Assigned",
       cell: ({ row }) => {
         const ev = row.original;
-        return ev.assigned_staff_name ? (
-          <span className="text-sm truncate">{ev.assigned_staff_name}</span>
-        ) : (
-          <Badge variant="outline" className="text-xs whitespace-nowrap">Unassigned</Badge>
-        );
+        return <StaffName name={ev.assigned_staff_name} />;
       },
+    },
+    {
+      accessorKey: "enquiry_at",
+      header: "Enquired On",
+      cell: ({ row }) => (
+        <span className="whitespace-nowrap text-muted-foreground" title={formatDateTime(row.original.enquiry_at)}>
+          {timeAgo(row.original.enquiry_at) || "—"}
+        </span>
+      ),
     },
     {
       id: "actions",
@@ -969,25 +962,17 @@ export default function LeadRoutingPage() {
 
   const historyColumns = useMemo<ColumnDef<HistoryEntry>[]>(() => [
     {
-      accessorKey: "created_at",
-      header: "Date",
-      cell: ({ row }) => <span className="text-sm">{formatDateTime(row.original.created_at)}</span>,
-    },
-    {
       id: "lead_name",
-      header: "Lead Name",
+      header: "Lead",
       cell: ({ row }) => {
         if (row.original.lead?.id) {
           return (
-            <span 
-              onClick={() => router.push(`/leads/${row.original.lead!.id}`)}
-              className="font-medium text-[#0052FF] cursor-pointer hover:underline"
-            >
-              {row.original.lead?.name || "—"}
-            </span>
+            <Link href={`/leads/${row.original.lead.id}`} className="hover:underline">
+              <NameCell name={row.original.lead?.name} avatar />
+            </Link>
           );
         }
-        return <span className="font-medium">{row.original.lead?.name || "—"}</span>;
+        return <NameCell name={row.original.lead?.name} avatar />;
       },
     },
     {
@@ -995,54 +980,60 @@ export default function LeadRoutingPage() {
       header: "Event Type",
       cell: ({ row }) => {
         const evt = row.original.event_type || "";
-        const styles: Record<string, string> = {
-          assigned: "bg-blue-100 text-blue-700 border-blue-200",
-          claimed: "bg-green-100 text-green-700 border-green-200",
-          released: "bg-amber-100 text-amber-700 border-amber-200",
-          converted: "bg-purple-100 text-purple-700 border-purple-200",
-        };
-        const cls = styles[evt.toLowerCase()] || "bg-gray-100 text-gray-700 border-gray-200";
-        return (
-          <Badge className={`capitalize border text-xs ${cls}`}>{evt || "—"}</Badge>
-        );
+        return <span className="capitalize"><StatusCell status={evt} tone={EVENT_TONES[evt.toLowerCase()] ?? "gray"} /></span>;
       },
     },
     {
       id: "from_staff",
       header: "From Staff",
-      cell: ({ row }) => <span className="text-sm">{row.original.from_staff?.name || "—"}</span>,
+      cell: ({ row }) => <span>{row.original.from_user?.name || "—"}</span>,
     },
     {
       id: "to_staff",
       header: "To Staff",
-      cell: ({ row }) => <span className="text-sm">{row.original.to_staff?.name || "—"}</span>,
+      cell: ({ row }) => <span>{row.original.to_user?.name || "—"}</span>,
     },
     {
       id: "department",
       header: "Department",
       cell: ({ row }) => (
-        <span className="text-sm capitalize">{row.original.department?.name || "—"}</span>
+        <span className="capitalize">{row.original.department || "—"}</span>
       ),
     },
     {
       accessorKey: "feedback",
       header: "Feedback",
       cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground max-w-[200px] truncate block">
+        <span className="block max-w-[220px] truncate text-muted-foreground">
           {row.original.feedback || "—"}
         </span>
       ),
+    },
+    {
+      accessorKey: "created_at",
+      header: "Date",
+      cell: ({ row }) => <DateCell value={row.original.created_at} withTime />,
     },
   ], [router]);
 
   const deptTabs: { label: string; value: DeptTab }[] = [
     { label: "Telecalling Queue", value: "telecalling" },
     { label: "Sales Queue", value: "sales" },
+    { label: "Verification Queue", value: "verification" },
   ];
 
-  const visibleDeptTabs = role === "Staff"
-    ? deptTabs.filter((d) => d.value === (userDept || "telecalling"))
-    : deptTabs;
+  // The sourcing team only works the Verification Queue; admins and managers see every queue.
+  const seesAll = ["Admin", "Super Admin", "Manager"].includes(role);
+  const visibleDeptTabs = sourcing
+    ? deptTabs.filter((d) => d.value === "verification")
+    : role === "Staff"
+      ? deptTabs.filter((d) => d.value === (userDept || "telecalling"))
+      : deptTabs.filter((d) => d.value !== "verification" || seesAll);
+  const verifying = mainTab === "queue" && deptTab === "verification";
+  // A remembered tab this person can't see (say, after a department change) falls back to one they can.
+  useEffect(() => {
+    if (role && !visibleDeptTabs.some((d) => d.value === deptTab)) setDeptTab(visibleDeptTabs[0].value);
+  }, [role, deptTab, visibleDeptTabs, setDeptTab]);
 
   const totalQueuePages = Math.max(1, Math.ceil(queueTotal / LIMIT));
   const totalEnquiryPages = Math.max(1, Math.ceil(enquiryTotal / LIMIT));
@@ -1050,277 +1041,139 @@ export default function LeadRoutingPage() {
 
   return (
     <>
-      <MobileHeader title="Lead Routing" />
-      <div className="w-full flex flex-col space-y-4 md:space-y-6 pt-4 lg:p-0 md:h-full">
-        <Device
-          mobile={null}
-          desktop={
-            <div className="flex h-[48px] items-center justify-between pr-[150px]">
-              <h1 className="text-[28px] font-bold tracking-tight">Lead Routing</h1>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-10 w-10 rounded-full border-border/60"
-                onClick={() => mainTab === "queue" ? fetchQueue() : mainTab === "enquiry" ? fetchEnquiry() : fetchHistory()}
-                title="Refresh"
-              >
-                <RefreshCw size={16} className={(queueLoading || enquiryLoading || historyLoading) ? "animate-spin" : ""} />
-              </Button>
-            </div>
-          }
-        />
+      <MobileHeader title="Routing" />
+      {!verifying && activeView.switcher}
+      <div className="w-full flex flex-col space-y-4 pt-4 md:space-y-0 md:pt-0 md:h-full">
+        <div className="flex flex-col md:min-h-0 md:flex-1 lg:-mx-6 lg:-mb-8 lg:-mt-6">
+        <div className="flex flex-wrap items-center gap-2 px-4 pb-2 pt-3 md:flex-nowrap md:px-5">
+          <SegmentTabs
+            label="Routing views"
+            value={mainTab}
+            onChange={setMainTab}
+            tabs={[
+              { value: "queue", label: "Routing Queue" },
+              { value: "enquiry", label: "Enquiry Queue" },
+              { value: "history", label: "Routing History" },
+            ]}
+          />
 
-        <div className="bg-card border-y md:border md:rounded-xl overflow-hidden shadow-sm md:flex md:flex-col md:flex-1 md:min-h-0">
-        <div className="flex flex-col xl:flex-row xl:items-center justify-between px-4 md:px-6 border-b bg-muted/10 pt-4 gap-4">
-          <div className="flex items-center gap-8">
-            {(["queue", "enquiry", "history"] as MainTab[]).map((tab) => {
-              const labels = { queue: "Routing Queue", enquiry: "Enquiry Queue", history: "Routing History" };
-              return (
-                <button
-                  key={tab}
-                  onClick={() => setMainTab(tab)}
-                  className={[
-                    "relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out",
-                    mainTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground",
-                  ].join(" ")}
-                >
-                  {labels[tab]}
-                  {mainTab === tab && (
-                    <motion.div
-                      layoutId="routingTabUnderline"
-                      className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full"
-                      initial={false}
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          {!verifying && (mainTab !== "queue" || visibleDeptTabs.length > 1) && <FilterDivider />}
+          <FilterStrip>
+            {mainTab === "queue" && visibleDeptTabs.length > 1 && (
+              <QuickFilter label="Pipeline" required value={deptTab} options={visibleDeptTabs.map((d) => ({ value: d.value, label: d.label }))} onChange={(v) => setDeptTab(v as typeof deptTab)} />
+            )}
+            {mainTab === "history" && (
+              <>
+                <DateQuickFilter label="Date" from={dayOf(historyDateFrom)} to={dayOf(historyDateTo)}
+                  onChange={(from, to) => { setHistoryDateFrom(dateOf(from)); setHistoryDateTo(dateOf(to)); setHistoryPage(1); }} />
+                <QuickFilter label="Event" value={historyEventFilter} options={EVENT_TYPE_OPTIONS} onChange={(v) => { setHistoryEventFilter(v); setHistoryPage(1); }} />
+                <ClearFilters show={historyDateFrom !== undefined || historyDateTo !== undefined || !!historyEventFilter}
+                  onClick={() => { setHistoryDateFrom(undefined); setHistoryDateTo(undefined); setHistoryEventFilter(""); setHistoryPage(1); }} />
+              </>
+            )}
+            {mainTab === "enquiry" && (
+              <>
+                <DateQuickFilter label="Enquiry date" from={dayOf(enquiryDateFrom)} to={dayOf(enquiryDateTo)}
+                  onChange={(from, to) => { setEnquiryDateFrom(dateOf(from)); setEnquiryDateTo(dateOf(to)); setEnquiryPage(1); }} />
+                <QuickFilter label="Property type" value={enquiryTypeFilter} onChange={(v) => { setEnquiryTypeFilter(v); setEnquiryPage(1); }}
+                  options={[{ label: "Apartment", value: "apartment" }, { label: "Villa", value: "villa" }, { label: "Individual House", value: "individual_portion" }, { label: "Plot", value: "plot" }, { label: "Commercial", value: "commercial" }, { label: "Farmland", value: "farmland" }]} />
+                <QuickFilter label="Source" value={enquirySourceFilter} options={ENQUIRY_SOURCE_OPTIONS} onChange={(v) => { setEnquirySourceFilter(v); setEnquiryPage(1); }} />
+                <QuickFilter label="Purpose" value={enquiryIntentFilter} options={[{ label: "Enquiry", value: "enquiry" }, { label: "Site Visit", value: "site_visit" }]} onChange={(v) => { setEnquiryIntentFilter(v); setEnquiryPage(1); }} />
+                <ClearFilters show={enquiryHasFilters} onClick={() => { setEnquiryTypeFilter(""); setEnquiryIntentFilter(""); setEnquirySourceFilter(""); setEnquiryDateFrom(undefined); setEnquiryDateTo(undefined); setEnquiryPage(1); }} />
+              </>
+            )}
+          </FilterStrip>
 
-          {mainTab === "queue" && visibleDeptTabs.length > 1 && (
-            <div className="flex items-center gap-2 pb-3 sm:pb-4">
-              {visibleDeptTabs.map((d) => (
-                <button
-                  key={d.value}
-                  onClick={() => setDeptTab(d.value)}
-                  className={[
-                    "h-9 px-4 rounded-full text-[13px] font-medium border transition-all duration-200",
-                    deptTab === d.value
-                      ? "bg-[#0052FF] text-white border-[#0052FF] shadow-sm"
-                      : "bg-background text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground",
-                  ].join(" ")}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {mainTab === "enquiry" && (
-            <div className="relative pb-3 sm:pb-4">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 gap-2 border-border/60"
-                onClick={() => setEnquiryFilterOpen((o) => !o)}
-              >
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                Filters
-                {enquiryActiveFilterCount > 0 && (
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#0052FF] text-[11px] font-semibold text-white">
-                    {enquiryActiveFilterCount}
-                  </span>
-                )}
-                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${enquiryFilterOpen ? "rotate-180" : ""}`} />
-              </Button>
-
-              {enquiryFilterOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setEnquiryFilterOpen(false)}
-                  />
-                  <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-border bg-card p-4 shadow-lg space-y-4">
-                    <div className="space-y-1.5">
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Property Type</p>
-                      <FormSelect
-                        name="enquiryPropertyType"
-                        options={[
-                          { label: "Apartment", value: "apartment" },
-                          { label: "Villa", value: "villa" },
-                          { label: "Individual House", value: "individual_portion" },
-                          { label: "Plot", value: "plot" },
-                          { label: "Commercial", value: "commercial" },
-                          { label: "Farmland", value: "farmland" },
-                        ]}
-                        value={enquiryTypeFilter}
-                        onValueChange={(v) => { setEnquiryTypeFilter(v || ""); setEnquiryPage(1); }}
-                        placeholder="All Types"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Source</p>
-                      <FormSelect
-                        name="enquirySource"
-                        options={ENQUIRY_SOURCE_OPTIONS}
-                        value={enquirySourceFilter}
-                        onValueChange={(v) => { setEnquirySourceFilter(v || ""); setEnquiryPage(1); }}
-                        placeholder="All Sources"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Purpose</p>
-                      <FormSelect
-                        name="enquiryIntent"
-                        options={[
-                          { label: "Enquiry", value: "enquiry" },
-                          { label: "Site Visit", value: "site_visit" },
-                        ]}
-                        value={enquiryIntentFilter}
-                        onValueChange={(v) => { setEnquiryIntentFilter(v || ""); setEnquiryPage(1); }}
-                        placeholder="All Purposes"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Enquiry Date</p>
-                      <div className="space-y-2">
-                        <DatePicker
-                          value={enquiryDateFrom}
-                          onChange={(d) => { setEnquiryDateFrom(d); setEnquiryPage(1); }}
-                          placeholder="From date"
-                          className="w-full"
-                        />
-                        <DatePicker
-                          value={enquiryDateTo}
-                          onChange={(d) => { setEnquiryDateTo(d); setEnquiryPage(1); }}
-                          placeholder="To date"
-                          className="w-full"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between pt-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-2 text-muted-foreground hover:text-red-500"
-                        disabled={!enquiryHasFilters}
-                        onClick={() => {
-                          setEnquiryTypeFilter("");
-                          setEnquiryIntentFilter("");
-                          setEnquirySourceFilter("");
-                          setEnquiryDateFrom(undefined);
-                          setEnquiryDateTo(undefined);
-                          setEnquiryPage(1);
-                        }}
-                      >
-                        Clear all
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="h-8"
-                        onClick={() => setEnquiryFilterOpen(false)}
-                      >
-                        Done
-                      </Button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+          {activeView.picker && !verifying && <div className="shrink-0">{activeView.picker}</div>}
         </div>
 
         {/* Queue Tab */}
-        {mainTab === "queue" && (
+        {verifying && (
+          <div className="w-full md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col p-4 md:p-0 pt-2">
+            <VerificationQueue />
+          </div>
+        )}
+
+        {mainTab === "queue" && !verifying && (
           <div className="w-full md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col p-4 md:p-0">
             {queueLoading ? (
               <TableSkeleton />
             ) : (
               <>
                 <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col pt-2">
-                <DataTable 
-                  flush={true}
-                  hidePagination={true}
-                  pageSize={100}
-                  persistKey="queue"
-                  columns={queueColumns} 
-                  data={queue} 
-                  showToolbar={true}
-                  showDeleteAction={role === "Admin"}
-                  onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
-                  renderToolbarActions={(selectedRows, clearSelection) => {
-                    return (
-                      <>
-                        {canTakeLeadFromQueue(role) && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
-                            onClick={async () => {
-                              try {
-                                const promises = selectedRows.map(r => 
-                                  apiFetch(`${API_URL}/lead-routing/claim/${r.id}`, { 
-                                    method: "POST", headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ actioned_by_id: null }) 
-                                  })
-                                );
-                                await Promise.all(promises);
-                                toast.success(`${selectedRows.length} lead(s) claimed successfully`);
-                                fetchQueue();
-                                clearSelection();
-                              } catch {
-                                toast.error("Failed to claim leads");
-                              }
-                            }}
-                          >
-                            Take Lead
-                          </Button>
-                        )}
-                        {role !== "Staff" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
-                            onClick={() => {
-                              if (selectedRows.length > 0) {
-                                setAssignLeadIds(selectedRows.map((r) => r.id));
-                              }
-                            }}
-                          >
-                            Assign Lead
-                          </Button>
-                        )}
-                      </>
-                    );
-                  }}
+                <ModuleViews
+                  state={queueView}
+                  data={queue}
+                  columns={queueColumns}
+                  list={
+                    <DataTable
+                    variant="list"
+                    flush={true}
+  manualPagination
+                    pageCount={totalQueuePages}
+                    totalCount={queueTotal}
+                    pagination={{ pageIndex: queuePage - 1, pageSize: LIMIT }}
+                    onPaginationChange={(u: PaginationUpdate) => setQueuePage((p) => (typeof u === "function" ? u({ pageIndex: p - 1, pageSize: LIMIT }) : u).pageIndex + 1)}
+                    pageSizeOptions={[LIMIT]}
+                    persistKey="queue"
+                    columns={queueColumns} 
+                    data={queue} 
+                    showToolbar={true}
+                    showDeleteAction={isAdmin({ role })}
+                    onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
+                    renderToolbarActions={(selectedRows, clearSelection) => {
+                      return (
+                        <>
+                          {canTakeLeadFromQueue(role) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+                              onClick={async () => {
+                                try {
+                                  const promises = selectedRows.map(r => 
+                                    apiFetch(`${API_URL}/lead-routing/claim/${r.id}`, { 
+                                      method: "POST", headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ actioned_by_id: null }) 
+                                    })
+                                  );
+                                  await Promise.all(promises);
+                                  toast.success(`${selectedRows.length} lead(s) claimed successfully`);
+                                  fetchQueue();
+                                  clearSelection();
+                                } catch {
+                                  toast.error("Failed to claim leads");
+                                }
+                              }}
+                            >
+                              Take Lead
+                            </Button>
+                          )}
+                          {role !== "Staff" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+                              onClick={() => {
+                                if (selectedRows.length > 0) {
+                                  setAssignLeadIds(selectedRows.map((r) => r.id));
+                                }
+                              }}
+                            >
+                              Assign Lead
+                            </Button>
+                          )}
+                        </>
+                      );
+                    }}
+                  />
+                  }
+                  getKey={(l) => l.id}
+                  onOpen={(l) => router.push(`/leads/${l.id}`)}
+                  card={(l) => ({ title: l.name, id: l.display_id || `L${String(l.id).padStart(5, "0")}`, href: `/leads/${l.id}`, subtitle: l.mobile_number, footer: l.previously_held_by ? `Held by ${l.previously_held_by}` : undefined, tag: `${l.days_in_queue ?? 0}d in queue` })}
+                  totalCount={queueTotal}
+                  noun="leads"
                 />
-                {/* Server-side pagination */}
-                {true && (
-                  <div className="flex items-center justify-between px-6 pb-24 pt-4 md:py-4 border-t border-border/40 mt-auto sticky bottom-0 bg-card z-30 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none">
-                    <span className="text-sm text-muted-foreground">
-                      Showing {queueTotal > 0 ? Math.min((queuePage - 1) * LIMIT + 1, queueTotal) : 0} to {Math.min(queuePage * LIMIT, queueTotal)} of {queueTotal} entries
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setQueuePage((p) => Math.max(1, p - 1))}
-                        disabled={queuePage <= 1}
-                      >
-                        Previous
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setQueuePage((p) => Math.min(totalQueuePages, p + 1))}
-                        disabled={queuePage >= totalQueuePages}
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </div>
               </>
             )}
@@ -1336,87 +1189,78 @@ export default function LeadRoutingPage() {
               <>
                 <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col pt-2">
                 {groupedEnquiry.length === 0 ? (
-                  <p className="px-4 md:px-6 py-8 text-sm text-muted-foreground text-center">No open enquiries.</p>
+                  <EmptyState kind="inbox" title="No open enquiries" description="New website and app enquiries will show up here." />
                 ) : (
-                <DataTable
-                  flush={true}
-                  hidePagination={true}
-                  pageSize={100}
-                  persistKey="enquiry"
-                  columns={enquiryColumns}
+                <ModuleViews
+                  state={enquiryView}
                   data={groupedEnquiry}
-                  showToolbar={true}
-                  renderToolbarActions={(selectedRows, clearSelection) => {
-                    if (selectedRows.length === 0) return null;
-                    return (
-                      <>
-                        <span className="text-sm text-muted-foreground">{selectedRows.length} selected</span>
-                        {canConvertEnquiry(role) && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
-                            disabled={enquiryBulkBusy}
-                            onClick={() => handleBulkConvert(selectedRows, clearSelection)}
-                          >
-                            Convert Selected
+                  columns={enquiryColumns}
+                  list={
+                    <DataTable
+                    variant="list"
+                    flush={true}
+  manualPagination
+                    pageCount={totalEnquiryPages}
+                    totalCount={enquiryTotal}
+                    pagination={{ pageIndex: enquiryPage - 1, pageSize: LIMIT }}
+                    onPaginationChange={(u: PaginationUpdate) => setEnquiryPage((p) => (typeof u === "function" ? u({ pageIndex: p - 1, pageSize: LIMIT }) : u).pageIndex + 1)}
+                    pageSizeOptions={[LIMIT]}
+                    persistKey="enquiry"
+                    columns={enquiryColumns}
+                    data={groupedEnquiry}
+                    showToolbar={true}
+                    renderToolbarActions={(selectedRows, clearSelection) => {
+                      if (selectedRows.length === 0) return null;
+                      return (
+                        <>
+                          <span className="text-sm text-muted-foreground">{selectedRows.length} selected</span>
+                          {canConvertEnquiry(role) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+                              disabled={enquiryBulkBusy}
+                              onClick={() => handleBulkConvert(selectedRows, clearSelection)}
+                            >
+                              Convert Selected
+                            </Button>
+                          )}
+                          {role !== "Staff" && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-green-500/30 text-green-600 hover:bg-green-500/10"
+                                disabled={enquiryBulkBusy}
+                                onClick={() => handleBulkMatched("accept", selectedRows, clearSelection)}
+                              >
+                                Accept Selected
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-border/60"
+                                disabled={enquiryBulkBusy}
+                                onClick={() => handleBulkMatched("ack", selectedRows, clearSelection)}
+                              >
+                                Acknowledge Selected
+                              </Button>
+                            </>
+                          )}
+                          <Button variant="ghost" size="sm" onClick={clearSelection}>
+                            Clear
                           </Button>
-                        )}
-                        {role !== "Staff" && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="border-green-500/30 text-green-600 hover:bg-green-500/10"
-                              disabled={enquiryBulkBusy}
-                              onClick={() => handleBulkMatched("accept", selectedRows, clearSelection)}
-                            >
-                              Accept Selected
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="border-border/60"
-                              disabled={enquiryBulkBusy}
-                              onClick={() => handleBulkMatched("ack", selectedRows, clearSelection)}
-                            >
-                              Acknowledge Selected
-                            </Button>
-                          </>
-                        )}
-                        <Button variant="ghost" size="sm" onClick={clearSelection}>
-                          Clear
-                        </Button>
-                      </>
-                    );
-                  }}
+                        </>
+                      );
+                    }}
+                  />
+                  }
+                  getKey={(e) => e.enquiry_id}
+                  onOpen={(e) => { if (e.id != null) router.push(`/leads/${e.id}`); }}
+                  card={(e) => ({ title: e.name, id: e.display_id, href: e.id != null ? `/leads/${e.id}` : undefined, subtitle: e.property_title || sourceLabel(e.source), footer: e.assigned_staff_name ?? <span className="text-muted-foreground">Unassigned</span>, tag: timeAgo(e.enquiry_at) || undefined })}
+                  totalCount={enquiryTotal}
+                  noun="enquiries"
                 />
-                )}
-                {/* Server-side pagination */}
-                {true && (
-                  <div className="flex items-center justify-between px-6 pb-24 pt-4 md:py-4 border-t border-border/40 mt-auto sticky bottom-0 bg-card z-30 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none">
-                    <span className="text-sm text-muted-foreground">
-                      Showing {enquiryTotal > 0 ? Math.min((enquiryPage - 1) * LIMIT + 1, enquiryTotal) : 0} to {Math.min(enquiryPage * LIMIT, enquiryTotal)} of {enquiryTotal} entries
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setEnquiryPage((p) => Math.max(1, p - 1))}
-                        disabled={enquiryPage <= 1}
-                      >
-                        Previous
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setEnquiryPage((p) => Math.min(totalEnquiryPages, p + 1))}
-                        disabled={enquiryPage >= totalEnquiryPages}
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  </div>
                 )}
               </div>
               </>
@@ -1427,84 +1271,36 @@ export default function LeadRoutingPage() {
         {/* History Tab */}
         {mainTab === "history" && (
           <div className="w-full md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col p-4 md:p-0">
-            {/* Filters */}
-            <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide pb-2 md:pb-0 md:flex-wrap md:px-6 md:pt-4">
-              <div className="flex items-center gap-2">
-                <DatePicker
-                  value={historyDateFrom}
-                  onChange={(d) => { setHistoryDateFrom(d); setHistoryPage(1); }}
-                  placeholder="From date"
-                  className="w-40"
-                />
-                <span className="text-muted-foreground text-sm">to</span>
-                <DatePicker
-                  value={historyDateTo}
-                  onChange={(d) => { setHistoryDateTo(d); setHistoryPage(1); }}
-                  placeholder="To date"
-                  className="w-40"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <div className="w-44">
-                  <FormSelect
-                    name="eventType"
-                    options={EVENT_TYPE_OPTIONS}
-                    value={historyEventFilter}
-                    onValueChange={(v) => { setHistoryEventFilter(v || ""); setHistoryPage(1); }}
-                    placeholder="All Events"
-                  />
-                </div>
-              </div>
-              {(historyDateFrom !== undefined || historyDateTo !== undefined || historyEventFilter) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-9 text-muted-foreground hover:text-red-500"
-                  onClick={() => {
-                    setHistoryDateFrom(undefined);
-                    setHistoryDateTo(undefined);
-                    setHistoryEventFilter("");
-                    setHistoryPage(1);
-                  }}
-                >
-                  Clear
-                </Button>
-              )}
-            </div>
-
             {historyLoading ? (
               <TableSkeleton />
             ) : (
               <>
                 <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col pt-2">
-                  <DataTable flush={true} hidePagination={true} pageSize={100} persistKey="history" columns={historyColumns} data={history} />
-                {/* Server-side pagination */}
-                {true && (
-                  <div className="flex items-center justify-between px-6 pb-24 pt-4 md:py-4 border-t border-border/40 mt-auto sticky bottom-0 bg-card z-30 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none">
-                    <span className="text-sm text-muted-foreground">
-                      Showing {historyTotal > 0 ? Math.min((historyPage - 1) * LIMIT + 1, historyTotal) : 0} to {Math.min(historyPage * LIMIT, historyTotal)} of {historyTotal} entries
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
-                        disabled={historyPage <= 1}
-                      >
-                        Previous
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setHistoryPage((p) => Math.min(totalHistoryPages, p + 1))}
-                        disabled={historyPage >= totalHistoryPages}
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                  <ModuleViews
+                    state={historyView}
+                    data={history}
+                    columns={historyColumns}
+                    list={
+                      <DataTable
+                      variant="list"
+                      flush={true}
+                      manualPagination
+                      pageCount={totalHistoryPages}
+                      totalCount={historyTotal}
+                      pagination={{ pageIndex: historyPage - 1, pageSize: LIMIT }}
+                      onPaginationChange={(u: PaginationUpdate) => setHistoryPage((p) => (typeof u === "function" ? u({ pageIndex: p - 1, pageSize: LIMIT }) : u).pageIndex + 1)}
+                      pageSizeOptions={[LIMIT]}
+                      persistKey="history"
+                      columns={historyColumns}
+                      data={history}
+                    />
+                    }
+                    getKey={(h) => h.id}
+                    onOpen={(h) => { if (h.lead?.id) router.push(`/leads/${h.lead.id}`); }}
+                    card={(h) => ({ title: h.lead?.name || "—", id: formatTableDate(h.created_at), href: h.lead?.id ? `/leads/${h.lead.id}` : undefined, subtitle: [h.from_user?.name, h.to_user?.name].filter(Boolean).join(" → ") || undefined, tag: h.event_type })}
+                    totalCount={historyTotal}
+                    noun="events"
+                  />
               </div>
               </>
             )}

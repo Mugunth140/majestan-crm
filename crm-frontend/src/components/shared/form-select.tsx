@@ -1,7 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { OptionSearchList } from "@/components/shared/option-search-list";
+import { Avatar } from "@/components/record/feed";
 import { cn } from "@/lib/utils";
 
 interface FormSelectProps {
@@ -15,6 +19,19 @@ interface FormSelectProps {
   defaultValue?: string | null;
   onValueChange?: (value: any) => void;
   disabled?: boolean;
+  /** Options are staff (value = user id): each gets the person's photo or initials. */
+  staff?: boolean;
+}
+
+/** A staff option's label with their photo; options that aren't a user id ("me", "queue") stay plain. */
+function OptionLabel({ label, value, staff }: { label: string; value: string; staff?: boolean }) {
+  if (!staff || !/^\d+$/.test(value)) return <>{label}</>;
+  return (
+    <span className="inline-flex min-w-0 items-center gap-2">
+      <Avatar name={label} userId={Number(value)} staff className="h-5 w-5 text-[9px]" />
+      <span className="truncate">{label}</span>
+    </span>
+  );
 }
 
 export function FormSelect({
@@ -28,6 +45,7 @@ export function FormSelect({
   defaultValue,
   onValueChange,
   disabled,
+  staff,
 }: FormSelectProps) {
   // Build a value→label lookup so Select.Value can show the label, not the raw value string.
   // @base-ui resolves display text by calling the children render prop with the current value.
@@ -51,16 +69,66 @@ export function FormSelect({
         )}
       >
         <SelectValue placeholder={placeholder}>
-          {(val: string | null) => (val && val !== "" ? (labelMap[val] ?? val) : placeholder)}
+          {(val: string | null) => (val && val !== "" ? <OptionLabel label={labelMap[val] ?? val} value={val} staff={staff} /> : placeholder)}
         </SelectValue>
       </SelectTrigger>
       <SelectContent className="max-h-[300px]" alignItemWithTrigger={false} side="bottom" align="start">
         {options.map((opt) => (
           <SelectItem key={opt.value} value={opt.value} className="text-[14.5px] py-2.5 px-5 cursor-pointer">
-            {opt.label}
+            <OptionLabel label={opt.label} value={opt.value} staff={staff} />
           </SelectItem>
         ))}
       </SelectContent>
     </Select>
   );
 }
+
+/**
+ * FormSelect with a search box, for long lists (localities). Looks like the
+ * other selects; the list opens in a popover so typing filters it.
+ */
+export function SearchableFormSelect({
+  id, name, placeholder, options, className, value, onValueChange, disabled, searchPlaceholder, onCreate, createNoun,
+}: Omit<FormSelectProps, "defaultValue" | "required"> & {
+  searchPlaceholder?: string;
+  /** Offered when a search matches nothing: add the typed value (e.g. to its master list). */
+  onCreate?: (query: string) => void;
+  createNoun?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const current = options.find((o) => o.value === value);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <button
+            id={id}
+            type="button"
+            name={name}
+            disabled={disabled}
+            aria-haspopup="listbox"
+            className={cn(
+              "flex w-full h-12! items-center justify-between gap-2 rounded-xl border border-border/60 bg-muted/30 px-3 text-left text-[15px] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0052FF]/20 disabled:cursor-not-allowed disabled:opacity-50 data-[popup-open]:border-ring",
+              className,
+            )}
+          />
+        }
+      >
+        <span className={cn("min-w-0 flex-1 truncate", !current && !value && "text-muted-foreground")}>{current?.label ?? (value || placeholder)}</span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-(--anchor-width) min-w-[240px] gap-0 p-0">
+        <OptionSearchList
+          options={options}
+          value={value}
+          label={placeholder}
+          placeholder={searchPlaceholder}
+          onPick={(v) => { setOpen(false); if (v !== value) onValueChange?.(v); }}
+          onCreate={onCreate && ((q) => { setOpen(false); onCreate(q); })}
+          createNoun={createNoun}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+

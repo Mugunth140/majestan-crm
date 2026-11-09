@@ -42,6 +42,18 @@ export class User {
   @Column({ nullable: true })
   qualification: string;
 
+  /** Profile photo on the public CDN; null shows initials. */
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  avatar_url: string | null;
+
+  /** Sidebar modules this user sees; null means the defaults for their role and department. */
+  @Column({ type: 'json', nullable: true })
+  nav_access: string[] | null;
+
+  /** Welcome, tours and checklist progress; null means nothing seen yet (see migration 078). */
+  @Column({ type: 'json', nullable: true })
+  onboarding: Record<string, unknown> | null;
+
   @Column({ name: 'role_id' })
   role_id: number;
 
@@ -70,4 +82,33 @@ export class User {
   @ManyToOne(() => Department)
   @JoinColumn({ name: 'department_id' })
   department: Department;
+
+  /**
+   * What a user looks like inside any other record (a lead's assignee, who
+   * logged a follow-up…): enough to show and link them, never the password
+   * hash or personal details like Aadhaar, bank account, phone or address.
+   * The admin Users screens ask for more through `fullUser`.
+   */
+  toJSON() {
+    return {
+      id: this.id,
+      name: this.name,
+      email: this.email,
+      role_id: this.role_id,
+      department_id: this.department_id,
+      is_active: this.is_active,
+      avatar_url: this.avatar_url ?? null,
+      role: this.role,
+      department: this.department,
+      created_at: this.created_at,
+      updated_at: this.updated_at,
+    };
+  }
 }
+
+/** Every column except the password hash, for the admin Users screens. */
+export function fullUser(user: User) {
+  const { password_hash: _hash, ...rest } = user;
+  return rest;
+}
+

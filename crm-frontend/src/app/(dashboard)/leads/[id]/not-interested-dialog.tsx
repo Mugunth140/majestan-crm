@@ -46,7 +46,7 @@ export function NotInterestedDialog({ open, onClose, onConfirm, busy }: NotInter
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-3">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Reason *</label>
+            <label className="text-[13px] font-medium text-foreground/80">Reason *</label>
             <div className="flex flex-wrap gap-2">
               {PREDEFINED_NOT_INTERESTED_REASONS.map((option) => (
                 <button

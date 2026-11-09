@@ -10,7 +10,7 @@ export const interviewScheduledMail = defineMailEvent({
   label: 'Interview invitation',
   description: 'Invites the candidate with the date, time, mode and venue or meeting link. Created again when the interview changes.',
   mode: 'confirm',
-  version: 2,
+  version: 3,
   triggers: [
     { on: 'hr.candidate.status_changed', when: (p) => p.to === HrCandidateStatus.INTERVIEW_SCHEDULED },
     { on: 'hr.candidate.interview_rescheduled' },
@@ -30,13 +30,13 @@ export const interviewScheduledMail = defineMailEvent({
   idempotencyKey: (d, id) =>
     `hr.interview_scheduled:${id}:${d.interviewDate}T${d.interviewTime}:${d.interviewMode}:${d.interviewLocation ?? ''}:${d.interviewLink ?? ''}`.slice(0, 255),
   template: {
-    subject: 'Interview invitation – {{candidate.position}} at Majestan Realty',
+    subject: 'Interview invitation – {{candidate.position}}',
     preheader: '{{interview.date}}, {{interview.time}}',
     body: `<p>Dear {{candidate.first_name}},</p>
-<p>Thank you for your interest in the <strong>{{candidate.position}}</strong> role. We are pleased to invite you for an interview.</p>
+<p>Thank you for your interest in {{candidate.role}} at Majestan Realty. We are pleased to invite you for an interview.</p>
 <p>{{interview_details}}</p>
 <p>{{interview_button}}</p>
 <p>{{interview.instructions}}</p>
-<p>Please reply to this email to confirm that you can attend, or let us know if you need a different time.</p>`,
+<p>Please reply to this email to confirm your attendance, or let us know if you need a different time.</p>`,
   },
 });

@@ -1,0 +1,44 @@
+/* Beat timer: fills while a beat plays, then the next beat starts */
+.ob-fill {
+  width: 100%;
+  transform-origin: left;
+  animation-name: ob-fill;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+@keyframes ob-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+/* Behind the screenshots: a quiet green glow on the page colour */
+.ob-stage-bg {
+  background:
+    radial-gradient(80% 70% at 20% 0%, color-mix(in oklab, #2FB585 9%, transparent), transparent 70%),
+    radial-gradient(60% 60% at 100% 100%, color-mix(in oklab, #017D58 7%, transparent), transparent 70%),
+    color-mix(in oklab, var(--foreground) 3%, var(--background));
+}
+
+/* The badge on the last step: a slow shine */
+.ob-badge { animation: ob-badge-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both 0.15s; }
+@keyframes ob-badge-in {
+  from { opacity: 0; transform: scale(0.6) rotate(-12deg); }
+}
+.ob-shine { animation: ob-shine 3.2s ease-in-out infinite 1s; }
+@keyframes ob-shine {
+  0%, 60% { transform: translateX(-120%) skewX(-20deg); }
+  100% { transform: translateX(220%) skewX(-20deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ob-fill { animation-duration: 0s !important; animation-play-state: paused !important; }
+  .ob-badge, .ob-shine { animation: none; }
+}
+
+/* Welcome: the name rises in once the mark has assembled */
+.ob-rise { animation: ob-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: 0.85s; }
+@keyframes ob-rise {
+  from { opacity: 0; transform: translateY(8px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ob-rise { animation: none; }
+}

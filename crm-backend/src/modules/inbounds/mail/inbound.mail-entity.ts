@@ -14,7 +14,7 @@ export interface InboundMailData {
   ownerName: string;
   email: string | null;
   status: string;
-  /** available | not_available | fixed_verification | null */
+  /** available | not_available | fixed_verification | verification_done | null */
   availability: string | null;
   property: string;
   purpose: string | null;
@@ -99,7 +99,7 @@ export const inboundMailEntity = defineMailEntity<InboundMailData>({
       'listing.purpose': purpose ?? '',
       'listing.location': d.location ?? '',
       'listing.price': d.price ?? '',
-      'advisor.name': d.advisor?.name ?? 'Our listings team',
+      'advisor.name': d.advisor?.name ?? 'our listings team',
       'advisor.phone': d.advisor?.phone ?? COMPANY.phone,
       listing_details: detailsCard([
         ['Reference', d.reference],
@@ -119,7 +119,7 @@ export const inboundMailEntity = defineMailEntity<InboundMailData>({
     { key: 'listing.purpose', label: '"For sale" / "For rent"', sample: 'For rent' },
     { key: 'listing.location', label: 'Locality, area and city', sample: 'Saravanampatti, Coimbatore' },
     { key: 'listing.price', label: 'Asking price or expected rent', sample: '₹25,000 per month' },
-    { key: 'advisor.name', label: 'Assigned staff name', sample: 'Priya Raman' },
+    { key: 'advisor.name', label: 'Assigned staff name (or "our listings team")', sample: 'Priya Raman' },
     { key: 'advisor.phone', label: 'Assigned staff phone', sample: '+91 98765 43210' },
     { key: 'listing_details', label: 'Property details card', sample: '[reference, property, purpose, location, price, contact]', block: true },
   ],

@@ -3,15 +3,20 @@
 import { InboundLocationSync } from "@/components/layout/inbound-location-sync";
 import { Suspense } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
-import { Topbar } from "@/components/layout/topbar";
+import { PageHeader } from "@/components/layout/page-header";
+import { PageActionsProvider } from "@/components/layout/page-actions";
+import { RefreshPill } from "@/components/layout/refresh-pill";
 import { SidebarProvider } from "@/components/layout/sidebar-context";
+import { NavGuard } from "@/components/layout/nav-guard";
 import { MobileNavbar } from "@/components/layout/mobile-navbar";
 import { MobileGlassHeader } from "@/components/layout/mobile-glass-header";
 import { MobileHeaderProvider } from "@/components/layout/mobile-header-context";
 import { MainScrollArea } from "@/components/layout/mobile-main-scroller";
 import { NotificationProvider } from "@/context/notification-context";
+import { Onboarding } from "@/components/onboarding/onboarding";
 import { useIsClient } from "@/hooks/use-is-client";
 import DashboardLoading from "./loading";
+import "@/components/mobile/mobile.css";
 
 export default function DashboardLayout({
   children,
@@ -27,19 +32,24 @@ export default function DashboardLayout({
       <InboundLocationSync />
       <SidebarProvider>
         <MobileHeaderProvider>
-          <div className="flex w-full min-h-[100dvh] md:h-[100dvh] md:overflow-hidden bg-card md:bg-muted/30 transition-colors duration-500 relative">
-            <Suspense fallback={<div className="w-64 bg-card border-r h-full hidden lg:block" />}>
-              <Sidebar />
-            </Suspense>
-            <div className="flex flex-col flex-1 w-full relative md:overflow-hidden">
-              <Topbar />
-              <MobileGlassHeader />
-              <MainScrollArea>
-                {isClient ? children : <DashboardLoading />}
-              </MainScrollArea>
-              <MobileNavbar />
+          <PageActionsProvider>
+            <RefreshPill />
+            {/* `isolate` keeps page z-indexes (sticky table headers etc.) below portalled Kumo overlays */}
+            <div className="relative isolate flex w-full min-h-[100dvh] bg-background md:h-[100dvh] md:overflow-hidden">
+              <Suspense fallback={<div className="hidden h-full w-[232px] shrink-0 border-r bg-sidebar md:block" />}>
+                <Sidebar />
+              </Suspense>
+              <div className="relative flex w-full min-w-0 flex-1 flex-col md:overflow-hidden">
+                <PageHeader />
+                <MobileGlassHeader />
+                <MainScrollArea>
+                  {isClient ? <NavGuard>{children}</NavGuard> : <DashboardLoading />}
+                </MainScrollArea>
+                <MobileNavbar />
+                {isClient && <Onboarding />}
+              </div>
             </div>
-          </div>
+          </PageActionsProvider>
         </MobileHeaderProvider>
       </SidebarProvider>
     </NotificationProvider>

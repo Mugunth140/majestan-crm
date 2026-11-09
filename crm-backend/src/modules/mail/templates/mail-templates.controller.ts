@@ -37,7 +37,7 @@ export class MailTemplatesController {
   }
 
   @Delete('system/:eventKey')
-  @Roles(...EDITORS)
+  @Roles('Admin')
   resetSystem(@Param('eventKey') eventKey: string) {
     return this.templates.resetEventOverride(eventKey);
   }
@@ -55,7 +55,7 @@ export class MailTemplatesController {
   }
 
   @Delete('saved/:id')
-  @Roles(...EDITORS)
+  @Roles('Admin')
   deleteSaved(@Param('id', ParseIntPipe) id: number) {
     return this.templates.deleteSaved(id);
   }

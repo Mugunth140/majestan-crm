@@ -1,3 +1,4 @@
+import { validateInboundRequiredEdits } from './dto/update-inbound.dto';
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -12,6 +13,8 @@ import { S3Client } from 'bun';
 import { extname } from 'path';
 import { readInboundPhotoCoordinates, submissionStatuses } from './inbound-submissions';
 import { buildWatermarkedImageUrl } from '../../common/imgproxy-watermark';
+import { RecordEventsService } from '../record-events/record-events.service';
+import { availabilityRoute, isSourcingDepartment } from './inbound-availability';
 
 // Sensitive contact values masked for Team Lead / Staff without the
 // `inbounds.call_tracking` grant. Names, roles and the property address stay
@@ -30,6 +33,12 @@ const INBOUND_CONTACT_KEYS = [
   'broker_mobile',
 ] as const;
 
+// Columns the Activity tab doesn't describe: bookkeeping, or recorded as their own event.
+const UNTRACKED = new Set([
+  'id', 'property_id', 'created_at', 'updated_at', 'quality_score', 'image_url', 'uploaded_by_id',
+  'is_queued', 'assigned_staff_id', 'follow_ups', 'contact_logs', 'units', 'assigned_staff', 'uploaded_by',
+]);
+
 @Injectable()
 export class InboundsService {
   private _s3Client: S3Client | null = null;
@@ -45,6 +54,7 @@ export class InboundsService {
     private unitsRepository: Repository<InboundUnit>,
     private readonly permissionsService: PermissionsService,
     @Optional() private readonly events?: EventEmitter2,
+    @Optional() private readonly recordEvents?: RecordEventsService,
   ) {}
 
   private get s3Client(): S3Client {
@@ -60,8 +70,9 @@ export class InboundsService {
     return this._s3Client;
   }
 
-  async uploadImage(id: number, file: Express.Multer.File) {
+  async uploadImage(id: number, file: Express.Multer.File, actorId: number | null = null) {
     const inbound = await this.mustFindOne(id);
+    const hadPhoto = !!inbound.image_url;
 
     if (file.size > 10 * 1024 * 1024) {
       throw new BadRequestException('Image size exceeds 10MB limit');
@@ -115,6 +126,7 @@ export class InboundsService {
       inbound.image_url = tempFileUrl;
     }
     
+    await this.recordEvents?.record({ entity: 'inbound', entityId: id, actorId, type: hadPhoto ? 'photo_replaced' : 'photo_added' });
     // Serialize the final image save with late GPS updates, including after an app reload.
     return this.inboundsRepository.manager.transaction(async manager => {
       const current = await manager.findOne(Inbound, {
@@ -153,7 +165,8 @@ export class InboundsService {
       rest.assigned_staff_id = null as any;
       if (!rest.property_type) throw new BadRequestException('Select a property type');
     }
-    const newInbound = this.inboundsRepository.create({ ...rest, uploaded_by_id: actorId, is_queued: !!quick_capture });
+    const route = availabilityRoute(rest.inbound_status, { status: rest.status, assigned_staff_id: rest.assigned_staff_id });
+    const newInbound = this.inboundsRepository.create({ ...rest, uploaded_by_id: actorId, is_queued: !!quick_capture, ...route });
     
     // Save to get the auto-incremented ID
     let savedInbound = await this.inboundsRepository.save(newInbound);
@@ -176,6 +189,10 @@ export class InboundsService {
     }
 
     // listings@ "property received" draft (only reaches owners with an email).
+    await this.recordEvents?.record({
+      entity: 'inbound', entityId: savedInbound.id, actorId, type: 'created', to: savedInbound.status,
+      meta: { quick: !!quick_capture },
+    });
     await this.events?.emitAsync('listings.inbound.created', { entityId: savedInbound.id, actorId });
     return savedInbound;
   }
@@ -206,6 +223,36 @@ export class InboundsService {
     return !!person?.department?.name?.toLowerCase().replace(/[^a-z]/g, '').startsWith('inbound');
   }
 
+  /** Admins, managers and the sourcing department work the Verification Queue. */
+  async canVerify(user?: any): Promise<boolean> {
+    if (['Admin', 'Super Admin', 'Manager'].includes(user?.role?.name || user?.role)) return true;
+    if (!user?.id) return false;
+    const person = await this.userRepository().findOne({ where: { id: Number(user.id), is_active: true }, relations: { department: true } });
+    return isSourcingDepartment(person?.department?.name);
+  }
+
+  /** Inbounds waiting for a fixed verification, oldest first. */
+  async verificationQueue(user: any, page = 1, limit = 25) {
+    if (!(await this.canVerify(user))) throw new ForbiddenException('Only the sourcing team and managers can see the Verification Queue');
+    const take = Math.min(Math.max(Number(limit) || 25, 1), 100);
+    const [rows, total] = await this.inboundsRepository.findAndCount({
+      where: { inbound_status: 'fixed_verification' },
+      order: { updated_at: 'ASC', id: 'ASC' },
+      skip: (Math.max(Number(page) || 1, 1) - 1) * take,
+      take,
+    });
+    const personIds = [...new Set(rows.flatMap(r => [r.uploaded_by_id, r.assigned_staff_id]).filter((id): id is number => !!id))];
+    const people = personIds.length ? await this.userRepository().find({ where: { id: In(personIds) }, select: { id: true, name: true } }) : [];
+    const name = (id: number | null) => people.find(p => p.id === id)?.name ?? null;
+    const canSee = await this.canSeeContacts(user);
+    const items = rows.map(r => ({
+      ...(canSee ? r : this.stripContacts(r)),
+      uploaded_by_name: name(r.uploaded_by_id),
+      assigned_staff_name: name(r.assigned_staff_id),
+    }));
+    return { items, total, page: Number(page) || 1, limit: take };
+  }
+
   async assignableStaff() {
     const people = await this.userRepository().find({ where: { is_active: true }, relations: { department: true },
       select: { id: true, name: true, department: { id: true, name: true } }, order: { name: 'ASC' } });
@@ -218,9 +265,17 @@ export class InboundsService {
     if (staffId !== null && !(await this.assignableStaff()).some(person => person.id === staffId)) {
       throw new BadRequestException('Choose an active inbound staff member');
     }
-    const records = await this.inboundsRepository.find({ where: { id: In(ids) }, select: { id: true } });
+    const records = await this.inboundsRepository.find({ where: { id: In(ids) }, select: { id: true, assigned_staff_id: true } });
     if (records.length !== ids.length) throw new NotFoundException('One or more inbounds were not found');
     await this.inboundsRepository.update({ id: In(ids) }, { assigned_staff_id: staffId as any, is_queued: staffId === null });
+    const people = await this.userRepository().find({
+      where: { id: In([staffId, ...records.map(r => r.assigned_staff_id)].filter((x): x is number => !!x)) }, select: { id: true, name: true },
+    });
+    const name = (personId: number | null) => people.find(p => p.id === personId)?.name ?? null;
+    await this.recordEvents?.record(records.filter(r => r.assigned_staff_id !== staffId).map(r => ({
+      entity: 'inbound' as const, entityId: r.id, actorId: actor?.id ?? null,
+      type: staffId === null ? 'unassigned' : 'assigned', from: name(r.assigned_staff_id), to: name(staffId),
+    })));
     return { success: true, assigned: ids.length };
   }
 
@@ -263,7 +318,9 @@ export class InboundsService {
     const canSee = await this.canSeeContacts(user);
     return inbounds.map(inbound => {
       let nextFollowUpDate = null;
+      let nextFollowUpTime = null;
       let lastFollowedUpDate = null;
+      let lastFollowedUpTime = null;
       
       if (inbound.follow_ups && inbound.follow_ups.length > 0) {
         // Find latest scheduled follow-up
@@ -271,6 +328,7 @@ export class InboundsService {
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
         nextFollowUpDate = scheduledFus.length > 0 ? scheduledFus[0].next_follow_up_date : null;
+        nextFollowUpTime = scheduledFus.length > 0 ? scheduledFus[0].next_follow_up_time : null;
 
         // Find latest actual follow up (where follow_up_date is set)
         const actualFus = [...inbound.follow_ups]
@@ -278,6 +336,7 @@ export class InboundsService {
           .sort((a, b) => new Date(b.follow_up_date!).getTime() - new Date(a.follow_up_date!).getTime());
         
         lastFollowedUpDate = actualFus.length > 0 ? actualFus[0].follow_up_date : null;
+        lastFollowedUpTime = actualFus.length > 0 ? actualFus[0].follow_up_time : null;
       }
 
       return {
@@ -286,15 +345,24 @@ export class InboundsService {
         assigned: names.get(inbound.assigned_staff_id) || null,
         submission_status: statuses.get(inbound.id) || 'New',
         nextFollowUpDate,
-        lastFollowedUpDate
+        nextFollowUpTime,
+        lastFollowedUpDate,
+        lastFollowedUpTime
       };
     });
+  }
+
+  /** The inbound's Activity, for anyone who can open it. */
+  async activity(id: number, user?: any) {
+    await this.findOne(id, user);
+    return this.recordEvents?.activity('inbound', id) ?? [];
   }
 
   async findOne(id: number, user?: any): Promise<Inbound> {
     const inbound = await this.mustFindOne(id);
 
-    if (user && user.role === 'Staff' && inbound.assigned_staff_id !== user.id && inbound.uploaded_by_id !== user.id && !(inbound.is_queued && await this.canManageQueue(user))) {
+    if (user && user.role === 'Staff' && inbound.assigned_staff_id !== user.id && inbound.uploaded_by_id !== user.id && !(inbound.is_queued && await this.canManageQueue(user))
+      && !(inbound.inbound_status === 'fixed_verification' && await this.canVerify(user))) {
       throw new NotFoundException(`Inbound with ID ${id} not found`);
     }
 
@@ -307,7 +375,7 @@ export class InboundsService {
     const inbound = await this.inboundsRepository.findOne({
       where: { id },
       relations: {
-        follow_ups: true,
+        follow_ups: { created_by: true },
         contact_logs: {
           sent_by: true
         },
@@ -351,14 +419,23 @@ export class InboundsService {
 
   async update(id: number, updateInboundDto: Omit<Partial<Inbound>, 'units'> & { units?: any[] }, actorId: number | null = null): Promise<Inbound> {
     const inbound = await this.mustFindOne(id);
-    const previousStatus = inbound.status;
-
     const { units, uploaded_by_id: _uploader, is_queued: _queued, quick_capture: _quick, ...rest } = updateInboundDto as typeof updateInboundDto & { quick_capture?: boolean };
+    validateInboundRequiredEdits(rest);
+    const previousStatus = inbound.status;
+    const before: Record<string, unknown> = { ...inbound };
+    const previousUnits = units !== undefined ? await this.unitsRepository.find({ where: { inbound_id: id }, order: { id: 'ASC' } }) : [];
+
     // update properties (TypeORM hooks will trigger on save)
+    const availabilityChanged = rest.inbound_status !== undefined && rest.inbound_status !== inbound.inbound_status;
     Object.assign(inbound, rest);
+    // A new availability moves the inbound: to the Queue, Closed, or the Verification Queue.
+    if (availabilityChanged) Object.assign(inbound, availabilityRoute(inbound.inbound_status, inbound));
 
     const saved = await this.inboundsRepository.save(inbound);
+    const changed = Object.keys(rest).filter((k) => !UNTRACKED.has(k) && k !== 'status');
+    await this.recordEvents?.recordChanges('inbound', id, actorId, before, saved as unknown as Record<string, unknown>, changed, [...INBOUND_CONTACT_KEYS]);
     if (saved.status !== previousStatus) {
+      await this.recordEvents?.record({ entity: 'inbound', entityId: id, actorId, type: 'status_changed', field: 'status', from: previousStatus, to: saved.status });
       await this.events?.emitAsync('listings.inbound.status_changed', { entityId: id, actorId, from: previousStatus, to: saved.status });
     }
 
@@ -366,6 +443,10 @@ export class InboundsService {
     if (units !== undefined) {
       await this.unitsRepository.delete({ inbound_id: id });
       const cleanUnits = this.sanitizeUnits(units);
+      const floors = (rows: { floor_label: string }[]) => rows.map((u) => u.floor_label).join(', ');
+      if (floors(previousUnits) !== floors(cleanUnits) || JSON.stringify(previousUnits.map((u) => [u.area ?? null, u.price == null ? null : Number(u.price), u.notes ?? null])) !== JSON.stringify(cleanUnits.map((u) => [u.area ?? null, u.price ?? null, u.notes ?? null]))) {
+        await this.recordEvents?.record({ entity: 'inbound', entityId: id, actorId, type: 'floors_changed', from: floors(previousUnits), to: floors(cleanUnits) });
+      }
       (saved as any).units = cleanUnits.length > 0
         ? await this.unitsRepository.save(
             cleanUnits.map((u) => this.unitsRepository.create({ ...u, inbound_id: id })),
@@ -382,25 +463,26 @@ export class InboundsService {
   }
 
   
-  async addContactLog(inboundId: number, payload: Partial<InboundContactLog>, userId: number): Promise<InboundContactLog> {
+  async addContactLog(inboundId: number, payload: Partial<InboundContactLog>, userId: number | null): Promise<InboundContactLog> {
     const inbound = await this.mustFindOne(inboundId);
     
     const contactLog = this.contactLogsRepository.create({
       ...payload,
       inbound_id: inboundId,
-      sent_by_id: userId,
+      sent_by_id: userId ?? undefined,
     });
     
     return this.contactLogsRepository.save(contactLog);
   }
 
-  async addFollowUp(inboundId: number, body: any, userId: number): Promise<InboundFollowUp> {
+  async addFollowUp(inboundId: number, body: any, userId: number | null): Promise<InboundFollowUp> {
     const inbound = await this.mustFindOne(inboundId);
     
     const followUp = this.followUpsRepository.create({
       inbound_id: inboundId,
-      created_by_id: userId,
-      follow_up_date: body.followUpDate || null,
+      created_by_id: userId ?? undefined,
+      // A follow-up logged without a date happened now.
+      follow_up_date: body.followUpDate || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
       follow_up_time: body.followUpTime || null,
       contacted_via: body.contactedVia || null,
       next_follow_up_date: body.nextFollowUpDate || null,
@@ -423,14 +505,14 @@ export class InboundsService {
       throw new NotFoundException(`Follow-up with ID ${followUpId} not found`);
     }
     
-    if (body.followUpDate !== undefined) followUp.follow_up_date = body.followUpDate;
-    if (body.followUpTime !== undefined) followUp.follow_up_time = body.followUpTime;
-    if (body.contactedVia !== undefined) followUp.contacted_via = body.contactedVia;
-    if (body.nextFollowUpDate !== undefined) followUp.next_follow_up_date = body.nextFollowUpDate;
-    if (body.nextFollowUpTime !== undefined) followUp.next_follow_up_time = body.nextFollowUpTime;
+    if (body.followUpDate !== undefined) followUp.follow_up_date = body.followUpDate || null;
+    if (body.followUpTime !== undefined) followUp.follow_up_time = body.followUpTime || null;
+    if (body.contactedVia !== undefined) followUp.contacted_via = body.contactedVia || null;
+    if (body.nextFollowUpDate !== undefined) followUp.next_follow_up_date = body.nextFollowUpDate || null;
+    if (body.nextFollowUpTime !== undefined) followUp.next_follow_up_time = body.nextFollowUpTime || null;
     if (body.purpose !== undefined) followUp.purpose = body.purpose;
-    if (body.priority !== undefined) followUp.priority = body.priority;
-    if (body.rnr !== undefined) followUp.rnr = body.rnr;
+    if (body.priority !== undefined) followUp.priority = body.priority || null;
+    if (body.rnr !== undefined) followUp.rnr = body.rnr || null;
     if (body.notes !== undefined) followUp.notes = body.notes;
 
     return this.followUpsRepository.save(followUp);

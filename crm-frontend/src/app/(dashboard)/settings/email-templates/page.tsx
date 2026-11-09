@@ -1,9 +1,9 @@
 "use client";
 
+import { useIsAdmin } from "@/hooks/use-is-admin";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { useRouter } from "next/navigation";
 import type { Editor } from "@tiptap/react";
-import { AlertTriangle, ArrowLeft, Eye, FilePlus2, Loader2, Lock, Mail, PencilLine, RotateCcw, Save, Trash2, Zap } from "lucide-react";
+import { AlertTriangle, Eye, FilePlus2, Loader2, Lock, Mail, PencilLine, RotateCcw, Save, Trash2, Zap } from "lucide-react";
 import { toast } from "sonner";
 import {
   canEditTemplates,
@@ -30,7 +30,6 @@ type Draft = { name: string; subject: string; body: string; isActive: boolean; s
 const EMPTY_BODY = "<p>Dear {{lead.name}},</p><p></p>";
 
 export default function EmailTemplatesPage() {
-  const router = useRouter();
   const [entities, setEntities] = useState<MailTemplateEntity[] | null>(null);
   const [entityType, setEntityType] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<MailTemplateCatalog | null>(null);
@@ -42,6 +41,8 @@ export default function EmailTemplatesPage() {
   const [busy, setBusy] = useState<"save" | "reset" | "delete" | null>(null);
   // Role comes from localStorage: read it on the client only (false during SSR).
   const editable = useSyncExternalStore(noopSubscribe, canEditTemplates, () => false);
+  // Resetting and deleting templates are for admins.
+  const admin = useIsAdmin();
   const subjectRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<Editor | null>(null);
 
@@ -180,15 +181,7 @@ export default function EmailTemplatesPage() {
     <div className="flex flex-col md:h-full animate-in fade-in duration-500">
       <MobileHeader title="Email templates" showBack />
 
-      <div className="hidden md:flex items-center gap-4 pr-[150px] min-h-[48px] mb-6 shrink-0">
-        <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shrink-0" onClick={() => router.push("/settings")}>
-          <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Email templates</h1>
-          <p className="text-sm text-muted-foreground">The wording of emails the CRM sends, and saved templates for writing your own.</p>
-        </div>
-      </div>
+      <p className="mb-3 hidden shrink-0 text-[13px] text-muted-foreground md:block">The wording of emails the CRM sends, and saved templates for writing your own.</p>
 
       {entities === null ? (
         <div className="flex flex-1 items-center justify-center py-20"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
@@ -368,12 +361,12 @@ export default function EmailTemplatesPage() {
                   {editable && (
                     <div className="flex flex-wrap items-center justify-between gap-2 border-t px-5 py-3">
                       <div className="flex gap-2">
-                        {system?.customized && (
+                        {admin && system?.customized && (
                           <Button variant="outline" onClick={reset} disabled={busy !== null} className="rounded-xl">
                             {busy === "reset" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />} Reset to original
                           </Button>
                         )}
-                        {selection?.kind === "saved" && (
+                        {admin && selection?.kind === "saved" && (
                           <Button variant="outline" onClick={remove} disabled={busy !== null} className="rounded-xl text-red-600 hover:text-red-700 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/40">
                             {busy === "delete" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />} Delete
                           </Button>

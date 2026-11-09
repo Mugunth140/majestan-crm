@@ -1,5 +1,6 @@
 "use client";
 
+import { isAdmin } from "@/lib/permissions";
 import { apiFetch, apiJson } from "@/lib/api-fetch";
 import { normalizeDepartment } from "@/lib/department";
 
@@ -8,13 +9,14 @@ import { DataTable } from "@/components/tables/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Plus, FileSpreadsheet, UploadCloud, RefreshCw, Eye, Search, Filter, X, Loader2, Download } from "lucide-react";
+import { Plus, FileSpreadsheet, RefreshCw, Search, Filter, X, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FormSelect } from "@/components/shared/form-select";
+import { DateQuickFilter, FilterStrip, QuickFilter, RangeQuickFilter } from "@/components/shared/quick-filters";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -23,12 +25,21 @@ import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
 import { AssignLeadModal } from "@/components/shared/assign-lead-modal";
 import { ContactModal } from "@/components/shared/contact-modal";
+import { PageActions } from "@/components/layout/page-actions";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { MobileLeadList } from "@/components/leads/mobile-lead-list";
 import { LastFollowupCell } from "./last-followup-column";
 import { Device } from "@/components/shared/device";
-import { LEAD_STATUS_STYLES as STATUS_STYLES } from "@/lib/lead-constants";
-import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
+import { LEAD_STATUS_DOTS, LEAD_STATUS_ORDER, leadStatusPill } from "@/lib/lead-constants";
+import { StatusCell, statusDot } from "@/components/tables/cells";
+import { ViewSwitcher, type ViewType } from "@/components/views/view-switcher";
+import { LeadsKanban, leadCard, type KanbanLead } from "@/components/leads/leads-kanban";
+import { MobileRowsProvider, type MobileRowData } from "@/components/mobile/mobile-rows";
+import { NameAvatar } from "@/components/shared/name-avatar";
+import { EmptyState } from "@/components/shared/empty-state";
+import { GroupedList } from "@/components/tables/grouped-list";
+import { ImportDialog } from "@/components/shared/import-dialog";
+import { NewLeadModal } from "@/components/leads/new-lead-modal";
+import { GroupByPicker, LEAD_GROUP_FIELDS, type LeadGroupField } from "@/components/leads/group-by-picker";
 import { getBulkImportDestination, mapImportSheetRow, resolveLeadImportSource, normalizeIndianMobile, partitionPendingImports, resolveStaffAssignments } from "@/lib/lead-import";
 import type { DuplicateLeadInfo, PendingImportRow, StaffOption, LeadImportSource } from "@/lib/lead-import";
 import { resetPageIndex } from "@/lib/pagination";
@@ -58,11 +69,15 @@ type PendingImport = PendingImportRow & {
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
+// Kanban and Group By show one board, not pages: load up to this many leads for them.
+const BOARD_LIMIT = 500;
 
-const LEADS_TABS = ["All Leads", "Open Pipeline", "Action Required", "Unqualified"];
+const LEADS_TABS = ["All Leads", "Unqualified", "Open Pipeline"];
 // Open Pipeline only shows an in-memory import review that doesn't survive
 // navigation, so it's never restored — that would land on an empty placeholder.
 const RESTORABLE_LEADS_TABS = LEADS_TABS.filter((t) => t !== "Open Pipeline");
+const PRIORITY_OPTIONS = [{ label: "Low", value: "low" }, { label: "Medium", value: "medium" }, { label: "High", value: "high" }, { label: "Urgent", value: "urgent" }];
+
 const EMPTY_LEADS_FILTERS = {
   dateFrom: "",
   dateTo: "",
@@ -87,10 +102,16 @@ type LeadsFilterOptions = {
 };
 const EMPTY_FILTER_OPTIONS: LeadsFilterOptions = { statuses: [], sources: [], categories: [], types: [], staff: [] };
 
+/** A lead as a phone list row: its board card, with the pipeline status beside the phone number. */
+const leadRow = (lead: KanbanLead): MobileRowData => ({
+  ...leadCard(lead),
+  status: lead.status ? { label: lead.status, dot: LEAD_STATUS_DOTS[lead.status] ?? "bg-gray-400" } : undefined,
+});
+
 export default function LeadsPage() {
   const router = useRouter();
+  const [creating, setCreating] = useState(false);
   const [activeTab, setActiveTab] = usePersistedState<string>("leads:tab", "All Leads", { allowed: RESTORABLE_LEADS_TABS });
-  const [actionFilter, setActionFilter] = usePersistedState<string>("leads:actionFilter", "Today", { allowed: ACTION_FILTERS });
   const [leads, setLeads] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -253,9 +274,14 @@ export default function LeadsPage() {
   const [filters, setFilters] = usePersistedState("leads:filters", EMPTY_LEADS_FILTERS);
   const [filterOptions, setFilterOptions] = useState<LeadsFilterOptions>(EMPTY_FILTER_OPTIONS);
 
-  const [todayViewMode, setTodayViewMode] = usePersistedState<"pending" | "completed">("leads:todayViewMode", "pending", { allowed: ["pending", "completed"] });
   const [totalCount, setTotalCount] = useState(0);
   const [pagination, setPagination] = usePersistedState("leads:page", { pageIndex: 0, pageSize: 10 });
+  const [view, setView] = usePersistedState<ViewType>("leads:view", "list", { allowed: ["list", "kanban", "group"] });
+  const [groupField, setGroupField] = usePersistedState<LeadGroupField>("leads:groupBy", "status", {
+    allowed: LEAD_GROUP_FIELDS.map((f) => f.id),
+  });
+  // The import review is a list-only flow
+  const boardView = view !== "list" && !(activeTab === "Open Pipeline" && pendingImports.length > 0);
 
   // Role-based state
   const [role, setRole] = useState<string>("");
@@ -295,8 +321,10 @@ export default function LeadsPage() {
     }
   }, []);
 
-  const tabs = [...LEADS_TABS];
-  const actionFilters = [...ACTION_FILTERS];
+  // Import review is a tab only while there are rows to review.
+  const tabs = LEADS_TABS.filter((t) => t !== "Open Pipeline" || pendingImports.length > 0);
+  const shownTab = activeTab === "Open Pipeline" && pendingImports.length === 0 ? "All Leads" : activeTab;
+  const tabLabel = (t: string) => (t === "Open Pipeline" ? `Import review · ${pendingImports.length}` : t);
 
   const resetPage = () => setPagination((prev) => (prev.pageIndex === 0 ? prev : resetPageIndex(prev)));
   const updateFilters = (updater: (prev: typeof filters) => typeof filters) => {
@@ -311,16 +339,12 @@ export default function LeadsPage() {
       }
       setIsLoading(true);
       const params = new URLSearchParams({
-        page: (pagination.pageIndex + 1).toString(),
-        limit: pagination.pageSize.toString(),
+        page: boardView ? "1" : (pagination.pageIndex + 1).toString(),
+        limit: (boardView ? BOARD_LIMIT : pagination.pageSize).toString(),
       });
       if (debouncedSearchQuery.trim()) params.append('search', debouncedSearchQuery.trim());
       if (activeTab && activeTab !== "Open Pipeline") params.append('tab', activeTab);
       if (deptFilter) params.append('dept', deptFilter);
-      if (activeTab === "Action Required" && actionFilter) {
-        params.append('actionFilter', actionFilter);
-        params.append('todayViewMode', todayViewMode);
-      }
       if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
       if (filters.dateTo) params.append('dateTo', filters.dateTo);
       if (filters.category) params.append('category', filters.category);
@@ -345,7 +369,7 @@ export default function LeadsPage() {
         const total = data.meta?.total || 0;
         // A restored page can now be past the end (leads reassigned/closed)
         const lastPage = Math.max(0, Math.ceil(total / pagination.pageSize) - 1);
-        if (pagination.pageIndex > lastPage) {
+        if (!boardView && pagination.pageIndex > lastPage) {
           setPagination((prev) => ({ ...prev, pageIndex: lastPage }));
           return;
         }
@@ -358,7 +382,7 @@ export default function LeadsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [pagination, debouncedSearchQuery, activeTab, deptFilter, actionFilter, todayViewMode, filters, pendingImports.length]);
+  }, [pagination, debouncedSearchQuery, activeTab, deptFilter, filters, pendingImports.length, boardView]);
 
   useEffect(() => {
     fetchLeads();
@@ -373,6 +397,26 @@ export default function LeadsPage() {
     }
     return leads;
   }, [activeTab, pendingImports, leads]);
+
+  // Kanban drag: show the new status straight away, put it back if the server says no.
+  const handleMoveLead = async (lead: { rawId: number; name: string; status: string }, status: string) => {
+    const previous = lead.status;
+    const setStatus = (s: string) => setLeads(prev => prev.map(l => (l.rawId === lead.rawId ? { ...l, status: s } : l)));
+    setStatus(status);
+    try {
+      const res = await apiFetch(`${API_URL}/leads/${lead.rawId}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status_name: status }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error();
+      toast.success(data.transferredToSales ? `${lead.name} moved to the Sales pipeline.` : `${lead.name} → ${status}`);
+    } catch {
+      setStatus(previous);
+      toast.error(`Couldn't move ${lead.name}. Status unchanged.`);
+    }
+  };
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -476,7 +520,8 @@ export default function LeadsPage() {
     setContactModal({ open: true, type, to: lead.mobile, rawId: lead.rawId });
   };
 
-  const columns: ColumnDef<any>[] = [
+  // Memoised: a new array each render would make the table rebuild every row.
+  const columns = useMemo<ColumnDef<any>[]>(() => [
     {
       id: "select",
       header: ({ table }) => (
@@ -485,7 +530,7 @@ export default function LeadsPage() {
             checked={table.getIsAllPageRowsSelected()}
             onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
             aria-label="Select all"
-            className="data-[state=checked]:bg-[#0052FF] data-[state=checked]:border-[#0052FF]"
+            className="data-[state=checked]:bg-[#017D58] data-[state=checked]:border-[#017D58] data-checked:bg-[#017D58] data-checked:border-[#017D58]"
           />
         </div>
       ),
@@ -495,63 +540,47 @@ export default function LeadsPage() {
             checked={row.getIsSelected()}
             onCheckedChange={(value) => row.toggleSelected(!!value)}
             aria-label="Select row"
-            className="data-[state=checked]:bg-[#0052FF] data-[state=checked]:border-[#0052FF]"
+            className="data-[state=checked]:bg-[#017D58] data-[state=checked]:border-[#017D58] data-checked:bg-[#017D58] data-checked:border-[#017D58]"
           />
         </div>
       ),
       enableSorting: false,
       enableHiding: false,
     },
-    { accessorKey: "sno", header: "#" },
     {
       accessorKey: "id",
-      header: "Id",
+      header: "ID",
       cell: ({ row }) => row.original.isPendingImport ? (
         <span className="text-muted-foreground">—</span>
       ) : (
-        <Link href={`/leads/${row.original.rawId}`} className="text-[#0052FF] hover:underline font-medium">
+        <Link href={`/leads/${row.original.rawId}`} className="tabular-nums text-muted-foreground hover:text-foreground hover:underline">
           {row.getValue("id")}
         </Link>
       ),
-    },
-    { 
-      accessorKey: "date", 
-      header: activeTab === "Action Required" 
-        ? (todayViewMode === "completed" ? "Followed Up" : "Next Follow Up") 
-        : "Date",
-      cell: ({ row }) => {
-        if (activeTab === "Action Required") {
-          if (todayViewMode === "completed") {
-            if (row.original.lastFollowedUpDate) {
-              const dateStr = new Date(row.original.lastFollowedUpDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-              return <span>{dateStr}{row.original.lastFollowedUpTime ? ` ${row.original.lastFollowedUpTime.slice(0,5)}` : ''}</span>;
-            }
-            return <span className="text-muted-foreground italic">No record</span>;
-          }
-          if (todayViewMode === "pending") {
-            if (row.original.nextFollowUpDate) {
-              const dateStr = new Date(row.original.nextFollowUpDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-              return <span>{dateStr}{row.original.nextFollowUpTime ? ` ${row.original.nextFollowUpTime.slice(0,5)}` : ''}</span>;
-            }
-            return <span className="text-muted-foreground italic">Not Scheduled</span>;
-          }
-        }
-        return <span>{row.original.date}</span>;
-      }
     },
     {
       accessorKey: "name",
       header: "Name",
       cell: ({ row }) => (
-        <div className="flex items-center justify-center gap-2">
-          <div className="h-7 w-7 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center font-bold text-xs text-blue-900 dark:text-blue-300 shrink-0">
-            {row.original.name.charAt(0).toUpperCase()}
-          </div>
+        <span className="inline-flex items-center gap-2">
+          <NameAvatar name={row.original.name} />
           <span className="font-medium text-foreground">{row.original.name}</span>
-        </div>
+        </span>
       ),
     },
-    { accessorKey: "mobile", header: "Mobile Number" },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const s = row.original.status as string;
+        return <StatusCell status={s} pillClass={leadStatusPill(s)} />;
+      },
+    },
+    {
+      accessorKey: "mobile",
+      header: "Mobile",
+      cell: ({ row }) => <span className="tabular-nums">{row.original.mobile}</span>,
+    },
     {
       accessorKey: "propertyType",
       header: "Property Type",
@@ -578,31 +607,23 @@ export default function LeadsPage() {
         const assignedStaff = preAssignee ?? p.staff;
         if (assignedStaff && assignedStaff !== "Unassigned") {
           return (
-            <div className="flex items-center justify-center gap-1.5" title={preAssignee ? "Assigned on insert" : undefined}>
-              <div className="h-5 w-5 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center font-bold text-[10px] text-blue-900 dark:text-blue-300 shrink-0">
-                {assignedStaff.charAt(0).toUpperCase()}
-              </div>
-              <span className="text-sm font-medium">{assignedStaff}</span>
-            </div>
+            <span className="inline-flex items-center gap-1.5" title={preAssignee ? "Assigned on insert" : undefined}>
+              <NameAvatar name={assignedStaff} staff className="size-5 text-[10px]" />
+              <span>{assignedStaff}</span>
+            </span>
           );
         }
-        // Unassigned — flag an unresolvable sheet id in place of the plain badge
-        return (
-          <div className="flex items-center justify-center">
-            {unresolvedSheetId !== undefined ? (
-              <Badge
-                variant="outline"
-                className="bg-muted/40 text-muted-foreground border-dashed border-border/60"
-                title="Staff ID not matched in your assignable list — this lead will import unassigned"
-              >
-                Unknown (#{unresolvedSheetId})
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="bg-muted/40 text-muted-foreground border-border/60">
-                Unassigned
-              </Badge>
-            )}
-          </div>
+        // Unassigned — flag an unresolvable sheet id in place of the plain label
+        return unresolvedSheetId !== undefined ? (
+          <Badge
+            variant="outline"
+            className="bg-muted/40 text-muted-foreground border-dashed border-border/60"
+            title="Staff ID not matched in your assignable list — this lead will import unassigned"
+          >
+            Unknown (#{unresolvedSheetId})
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground">Unassigned</span>
         );
       },
     },
@@ -614,17 +635,15 @@ export default function LeadsPage() {
       enableSorting: false,
       cell: ({ row }) => <LastFollowupCell row={row.original} />,
     },
-    { accessorKey: "source", header: "Lead Source" },
-    {
-      accessorKey: "status",
-      header: "Status",
+    { accessorKey: "source", header: "Source" },
+    { 
+      accessorKey: "date", 
+      header: "Date",
       cell: ({ row }) => {
-        const s = row.original.status as string;
-        const cls = STATUS_STYLES[s] ?? "bg-gray-100 text-gray-800 border-gray-200";
-        return <Badge className={"font-medium shadow-sm border whitespace-nowrap " + cls}>{s}</Badge>;
-      },
+        return <span className="text-muted-foreground">{row.original.date}</span>;
+      }
     },
-  ];
+  ], [activeTab, pendingAssignments, unresolvedStaffIds]);
 
   // Pending-review extras: duplicate badge + per-row remove (Open Pipeline only)
   const reviewColumn: ColumnDef<any> = {
@@ -661,13 +680,10 @@ export default function LeadsPage() {
     enableHiding: false,
   };
 
-  const visibleColumns = isReviewingImports ? [...columns, reviewColumn] : columns;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- reviewColumn only reads existingByMobile
+  const visibleColumns = useMemo(() => (isReviewingImports ? [...columns, reviewColumn] : columns), [columns, isReviewingImports, existingByMobile]);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    // Reset so picking the same file again still fires onChange
-    e.target.value = "";
-    if (!file) return;
+  const readImportFile = (file: File) => {
 
     // Snapshot: a completed parse must not silently discard this review
     const hadPendingReview = pendingImports.length > 0;
@@ -871,8 +887,8 @@ export default function LeadsPage() {
   };
 
   const deptPipelines: { label: string; value: "telecalling" | "sales" }[] = [
-    { label: "Telecalling Pipeline", value: "telecalling" },
-    { label: "Sales Pipeline", value: "sales" },
+    { label: "Telecalling", value: "telecalling" },
+    { label: "Sales", value: "sales" },
   ];
 
   // Staff only see their own dept tab
@@ -885,22 +901,22 @@ export default function LeadsPage() {
     <Popover>
       <PopoverTrigger render={
         isMobile ? (
-          <Button variant="outline" size="icon" className="h-12 w-12 rounded-2xl bg-black/5 dark:bg-white/10 border-transparent relative shrink-0">
+          <Button variant="outline" size="icon" className="h-10 w-10 rounded-[11px] bg-foreground/[0.06] border-transparent relative shrink-0">
             <Filter className="h-5 w-5 text-foreground" />
             {activeFiltersCount > 0 && (
-              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#0052FF] border-2 border-background text-white text-[10px] font-bold flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#017D58] border-2 border-background text-white text-[10px] font-bold flex items-center justify-center">
                 {activeFiltersCount}
               </span>
             )}
           </Button>
         ) : (
-          <Button variant="outline" className="h-10 rounded-xl bg-muted/30 border-border/60 px-4 flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium text-[13.5px]">Filters</span>
+          <button type="button" className="flex h-8 items-center gap-1.5 rounded-md bg-muted/70 px-2.5 text-[13px] text-foreground outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-[#017D58]/40 data-[popup-open]:bg-muted">
+            <Filter className="size-4 text-muted-foreground" strokeWidth={1.75} />
+            Filter
             {activeFiltersCount > 0 && (
-              <Badge className="ml-1 bg-[#0052FF] text-white px-1.5 py-0.5 rounded-md text-[10px]">{activeFiltersCount}</Badge>
+              <span className="rounded bg-[#017D58] px-1.5 text-[11px] font-medium leading-[18px] text-white">{activeFiltersCount}</span>
             )}
-          </Button>
+          </button>
         )
       } />
       <PopoverContent align="start" className="w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60">
@@ -961,11 +977,19 @@ export default function LeadsPage() {
   
   const tableProps = {
     flush: true as const,
+    emptyState: (
+      <EmptyState
+        className="sticky left-0"
+        kind="people"
+        title={searchQuery || activeFiltersCount > 0 ? "No leads match" : "No leads here yet"}
+        description={searchQuery || activeFiltersCount > 0 ? "Try a different search or clear the filters." : "New leads will show up here as they come in."}
+      />
+    ),
     columns: visibleColumns,
     data: displayedLeads,
     showToolbar: !isReviewingImports,
     onSelectionChange: setPendingSelection,
-    showDeleteAction: role === "Admin" && activeTab !== "Open Pipeline",
+    showDeleteAction: isAdmin({ role }) && !isReviewingImports,
     onDeleteSelected: (rows: any[]) => setBulkDeleteIds(rows.map(r => r.rawId)),
     renderToolbarActions: (selectedRows: any[], clearSelection: any) => {
       const isSingle = selectedRows.length === 1;
@@ -1035,120 +1059,78 @@ export default function LeadsPage() {
     onPaginationChange: setPagination,
   };
 
+  const segmentClass = (active: boolean) =>
+    cn(
+      "relative h-7 whitespace-nowrap rounded px-2.5 text-[13px] transition-colors",
+      active
+        ? "bg-background font-medium text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.08),0_0_0_1px_rgba(0,0,0,0.04)] dark:bg-white/10"
+        : "text-muted-foreground hover:text-foreground",
+    );
+
+  const groupKey = (lead: { staff?: string; propertyType?: string; source?: string; status?: string }): string => {
+    if (groupField === "staff") return lead.staff && lead.staff !== "Unassigned" ? lead.staff : "Unassigned";
+    if (groupField === "propertyType") return lead.propertyType ? String(lead.propertyType).replace(/_/g, " ") : "No property type";
+    if (groupField === "source") return lead.source || "No source";
+    return lead.status || "No status";
+  };
+
   const desktopFilters = (
-    <div className="bg-card border rounded-xl overflow-hidden shadow-sm md:flex md:flex-col md:flex-1 md:min-h-0">
-      {/* Tabs & Pipeline Toggles Row */}
-      <div className="flex items-center justify-between px-6 border-b bg-muted/10 pt-4 gap-4">
-        <div className="flex items-center gap-8 overflow-x-auto scrollbar-hide relative">
+    <div className="md:flex md:min-h-0 md:flex-1 md:flex-col lg:-mx-6 lg:-mb-8 lg:-mt-6">
+      {/* Toolbar: which leads, then every filter in one sideways-scrolling strip, search at the end */}
+      <div className="flex items-center gap-2 px-5 pb-2 pt-3">
+        <div className="flex shrink-0 items-center rounded-md bg-muted/70 p-0.5" role="group" aria-label="Leads">
           {tabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => { setActiveTab(tab); resetPage(); }}
-              className={"relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " + (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")}
-            >
-              {tab}
-              {activeTab === tab && (
-                <motion.div layoutId="desktopActiveTabUnderline" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full" initial={false} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
-              )}
+            <button key={tab} type="button" aria-pressed={shownTab === tab} onClick={() => { setActiveTab(tab); resetPage(); }}
+              className={cn(segmentClass(shownTab === tab), tab === "Open Pipeline" && shownTab !== tab && "text-[#017D58] dark:text-[#2FB585]")}>
+              {tabLabel(tab)}
             </button>
           ))}
         </div>
 
-        {visiblePipelines.length > 1 && (
-          <div className="flex items-center gap-2 pb-4 shrink-0">
-            {visiblePipelines.map((d) => (
-              <button
-                key={d.value}
-                onClick={() => { setDeptFilter(d.value); resetPage(); }}
-                className={[
-                  "h-9 px-4 rounded-full text-[13px] font-medium transition-all duration-200 border",
-                  deptFilter === d.value
-                    ? "bg-[#0052FF] text-white border-[#0052FF] shadow-sm"
-                    : "bg-background text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground",
-                ].join(" ")}
-              >
-                {d.label}
-              </button>
-            ))}
-          </div>
+        {isReviewingImports ? <div className="flex-1" /> : (
+          <>
+            <span aria-hidden className="h-5 w-px shrink-0 bg-border" />
+            <FilterStrip>
+              {visiblePipelines.length > 1 && (
+                <QuickFilter label="Pipeline" required value={deptFilter} options={visiblePipelines}
+                  onChange={(v) => { setDeptFilter(v as "telecalling" | "sales"); resetPage(); }} />
+              )}
+              <DateQuickFilter label="Created" from={filters.dateFrom} to={filters.dateTo} onChange={(dateFrom, dateTo) => updateFilters((f) => ({ ...f, dateFrom, dateTo }))} />
+              <QuickFilter label="Status" value={filters.status} options={filterOptions.statuses.map((v) => ({ label: v, value: v, dot: statusDot(v) }))} onChange={(v) => updateFilters((f) => ({ ...f, status: v }))} />
+              {role !== "Staff" && <QuickFilter label="Assigned to" value={filters.staff} options={filterOptions.staff.map((v) => ({ label: v, value: v }))} onChange={(v) => updateFilters((f) => ({ ...f, staff: v }))} />}
+              <QuickFilter label="Source" value={filters.source} options={filterOptions.sources.map((v) => ({ label: v, value: v }))} onChange={(v) => updateFilters((f) => ({ ...f, source: v }))} />
+              <QuickFilter label="Priority" value={filters.priority} options={PRIORITY_OPTIONS} onChange={(v) => updateFilters((f) => ({ ...f, priority: v }))} />
+              <QuickFilter label="Category" value={filters.category} options={filterOptions.categories.map((v) => ({ label: v, value: v }))} onChange={(v) => updateFilters((f) => ({ ...f, category: v }))} />
+              <QuickFilter label="Property type" value={filters.type} options={filterOptions.types.map((v) => ({ label: v.replace(/_/g, " "), value: v }))} onChange={(v) => updateFilters((f) => ({ ...f, type: v }))} />
+              <RangeQuickFilter label="Budget" unit="lakh" min={filters.minBudgetLakh} max={filters.maxBudgetLakh} onChange={(minBudgetLakh, maxBudgetLakh) => updateFilters((f) => ({ ...f, minBudgetLakh, maxBudgetLakh }))} />
+              {(searchQuery || activeFiltersCount > 0) && (
+                <button type="button" onClick={() => { setSearchQuery(""); clearFilters(); }}
+                  className="h-8 shrink-0 rounded-md px-2 text-[13px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                  Clear all
+                </button>
+              )}
+            </FilterStrip>
+            <div className="flex shrink-0 items-center gap-2">
+              {boardView && view === "group" && <GroupByPicker value={groupField} onChange={setGroupField} />}
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.75} />
+                <input
+                  type="search"
+                  aria-label="Search leads"
+                  placeholder="Search ID, name, phone, email"
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); resetPage(); }}
+                  className="h-8 w-56 rounded-md border border-transparent bg-muted/70 pl-8 pr-2 text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground hover:bg-muted focus:border-border focus:bg-background focus:shadow-sm"
+                />
+              </div>
+            </div>
+          </>
         )}
       </div>
 
-      {/* Search & Filters Row (hidden during import review — it only filters saved leads) */}
-      {!isReviewingImports && (
-      <div className="flex flex-wrap items-center gap-3 px-6 py-4 border-b bg-background">
-        <div className="relative flex-1 min-w-[240px] max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search ID, Name, Phone, Email..." 
-            value={searchQuery}
-            onChange={e => { setSearchQuery(e.target.value); resetPage(); }}
-            className="pl-9 h-10 bg-muted/30 rounded-xl border-border/60 text-[13.5px]"
-          />
-        </div>
-        
-        {renderFilterPopover(false)}
-        
-        {(searchQuery || activeFiltersCount > 0) && (
-          <Button variant="ghost" size="icon" onClick={() => { setSearchQuery(""); clearFilters(); }} className="h-10 w-10 rounded-full text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors" title="Clear Search & Filters">
-            <X className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
-      )}
 
-      {activeTab === "Action Required" && (
-        <div className="flex items-center gap-2 px-6 pb-0.5 min-h-[60px] animate-in slide-in-from-top-2 fade-in duration-200 flex-wrap">
-          <div className="flex h-10 items-center gap-2">
-            {actionFilters.map((filter) => {
-              const isActive = actionFilter === filter;
-              let activeClass = "bg-primary/10 text-primary border-primary/30";
-              if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
-              else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
-              else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
-              return (
-                <button
-                  key={filter}
-                  className={"h-10 shrink-0 flex items-center justify-center cursor-pointer px-5 rounded-full text-[13.5px] font-medium leading-none transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
-                  onClick={() => { setActionFilter(filter); resetPage(); }}
-                >
-                  {getActionFilterLabel(filter)}
-                </button>
-              );
-            })}
-          </div>
-          
-          <div className={`ml-auto flex h-10 shrink-0 self-center items-center bg-muted/60 p-0.5 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "opacity-0 pointer-events-none w-0 overflow-hidden"}`}>
-            {[
-              { id: "pending", label: "Follow Up" },
-              { id: "completed", label: "Followed Up" }
-            ].map((mode) => {
-              const isSelected = todayViewMode === mode.id;
-              return (
-                <button
-                  key={mode.id}
-                  onClick={() => { setTodayViewMode(mode.id as "pending" | "completed"); resetPage(); }}
-                  className={`relative h-full flex items-center px-4 rounded-full text-[13px] font-bold leading-none transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
-                >
-                  {isSelected && (
-                    <motion.div
-                      layoutId="desktopTodayToggleBg"
-                      className="absolute inset-0 bg-[#0052FF] shadow-md rounded-full"
-                      initial={false}
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                      style={{ zIndex: -1 }}
-                    />
-                  )}
-                  <span className="relative z-10">{mode.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Table Content */}
-      <div className="w-full md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col">
+      {/* Content */}
+      <div className="flex w-full flex-col md:min-h-0 md:flex-1 md:overflow-hidden">
         {pendingImports.length > 0 && activeTab === "Open Pipeline" && (
              <div className="px-4 sm:px-6 py-2.5 bg-card border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -1182,38 +1164,56 @@ export default function LeadsPage() {
                 </div>
              </div>
         )}
-        {activeTab === "Open Pipeline" && pendingImports.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-border rounded-xl bg-muted/10 mx-6 mb-6 mt-4">
-            <div className="h-16 w-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-4 shadow-sm border border-blue-100">
-              <FileSpreadsheet className="h-8 w-8" />
-            </div>
-            <h3 className="text-xl font-bold text-foreground mb-2">No Imported Leads</h3>
-            <p className="text-muted-foreground max-w-sm mb-6">You haven't imported any leads yet. Use the bulk import feature to add an Excel file.</p>
-            <Button onClick={() => setIsImportOpen(true)} className="bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md px-6">
-              <UploadCloud className="h-4 w-4 mr-2" /> Bulk Import
-            </Button>
-          </div>
+        {isLoading ? (
+          <div className="px-5 pt-3"><TableSkeleton /></div>
+        ) : boardView && view === "kanban" ? (
+          <LeadsKanban leads={displayedLeads} onMove={handleMoveLead} />
+        ) : boardView && view === "group" ? (
+          <GroupedList
+            columns={visibleColumns.filter((c) => c.id !== "select")}
+            data={displayedLeads}
+            groupBy={(lead) => groupKey(lead)}
+            groupOrder={groupField === "status" ? LEAD_STATUS_ORDER : undefined}
+            renderGroupLabel={(key) =>
+              groupField === "status" ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className={"size-2 rounded-full " + (LEAD_STATUS_DOTS[key] ?? "bg-gray-400")} />
+                  {key}
+                </span>
+              ) : (
+                <span className="capitalize">{key}</span>
+              )
+            }
+            onRowClick={(lead) => router.push(`/leads/${lead.rawId}`)}
+            emptyState={<EmptyState className="sticky left-0" kind="people" title="No leads to show" description="Try a different search or filter." />}
+          />
         ) : (
-          <div className="flex-1 min-h-0 overflow-hidden w-full h-full flex flex-col">
-            {isLoading ? <TableSkeleton /> : <DataTable key={isReviewingImports ? `review-${reviewEpoch}` : "leads"} {...tableProps} />}
+          <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden">
+            <DataTable key={isReviewingImports ? `review-${reviewEpoch}` : "leads"} {...tableProps} variant="list" pageSizeOptions={[10, 20, 50, 100]} />
           </div>
         )}
+        {boardView && !isLoading && totalCount > displayedLeads.length && (
+          <p className="border-t px-5 py-2 text-[13px] text-muted-foreground">
+            Showing the first {displayedLeads.length} of {totalCount} leads. Narrow it down with search or filters.
+          </p>
+        )}
       </div>
+      <ViewSwitcher value={view} onChange={(v) => { setView(v); resetPage(); }} />
     </div>
   );
 
   const mobileFilters = (
-    <div className="px-4 pb-2 space-y-4">
+    <div className="px-4 pb-2 space-y-3">
       {/* iOS Search Bar & Filter (hidden during import review — it only filters saved leads) */}
       {!isReviewingImports && (
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-muted-foreground" />
           <Input 
             placeholder="Search leads..." 
             value={searchQuery}
             onChange={e => { setSearchQuery(e.target.value); resetPage(); }}
-            className="pl-11 h-12 bg-black/5 dark:bg-white/10 border-transparent rounded-2xl text-[16px] focus-visible:ring-1 focus-visible:ring-primary shadow-none"
+            className="pl-10 h-10 bg-foreground/[0.06] border-transparent rounded-[11px] text-[16px] placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-[#017D58]/30 shadow-none"
           />
           {searchQuery && (
             <button onClick={() => { setSearchQuery(""); resetPage(); }} className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 bg-muted-foreground/20 rounded-full text-foreground hover:bg-muted-foreground/30">
@@ -1228,17 +1228,17 @@ export default function LeadsPage() {
       {/* Pill Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 -mx-4 px-4">
         {tabs.map(tab => {
-          const isActive = activeTab === tab;
+          const isActive = shownTab === tab;
           return (
             <button 
               key={tab}
               onClick={() => { setActiveTab(tab); resetPage(); }}
               className={cn(
-                "px-5 h-10 rounded-full text-[14px] font-semibold whitespace-nowrap transition-all border active:scale-95",
-                isActive ? "bg-foreground text-background border-foreground shadow-sm" : "bg-card text-muted-foreground border-border hover:bg-muted"
+                "px-3.5 h-8 rounded-full text-[14px] font-medium whitespace-nowrap transition-colors active:opacity-60",
+                isActive ? "bg-[#017D58] text-white dark:bg-[#2FB585] dark:text-black" : "bg-foreground/[0.06] text-foreground"
               )}
             >
-              {tab}
+              {tabLabel(tab)}
             </button>
           )
         })}
@@ -1252,8 +1252,8 @@ export default function LeadsPage() {
               key={d.value}
               onClick={() => { setDeptFilter(d.value); resetPage(); }}
               className={cn(
-                "px-4 h-9 rounded-full text-[13px] font-medium whitespace-nowrap transition-all border active:scale-95",
-                deptFilter === d.value ? "bg-[#0052FF] text-white border-[#0052FF] shadow-sm" : "bg-background text-muted-foreground border-border hover:bg-muted"
+                "px-3 h-7 rounded-full text-[13px] font-medium whitespace-nowrap transition-colors border active:opacity-60",
+                deptFilter === d.value ? "border-foreground/70 text-foreground" : "border-border text-muted-foreground"
               )}
             >
               {d.label}
@@ -1262,56 +1262,6 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {/* Action Required Row */}
-      {activeTab === "Action Required" && (
-        <div className="flex flex-col gap-3 pt-1">
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
-            {actionFilters.map((filter) => {
-              const isActive = actionFilter === filter;
-              let activeClass = "bg-primary/10 text-primary border-primary/30";
-              if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
-              else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
-              else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
-              return (
-                <button
-                  key={filter}
-                  className={"h-9 flex items-center justify-center cursor-pointer px-4 rounded-full text-[13px] font-medium transition-all ease-out active:scale-95 border whitespace-nowrap " + (isActive ? activeClass : "bg-card text-muted-foreground border-border hover:bg-muted")}
-                  onClick={() => { setActionFilter(filter); resetPage(); }}
-                >
-                  {getActionFilterLabel(filter)}
-                </button>
-              );
-            })}
-          </div>
-          
-          <div className={`flex items-center h-10 bg-black/5 dark:bg-white/10 p-1 rounded-xl relative transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "opacity-0 pointer-events-none h-0 overflow-hidden"}`}>
-            {[
-              { id: "pending", label: "Follow Up" },
-              { id: "completed", label: "Followed Up" }
-            ].map((mode) => {
-              const isSelected = todayViewMode === mode.id;
-              return (
-                <button
-                  key={mode.id}
-                  onClick={() => { setTodayViewMode(mode.id as "pending" | "completed"); resetPage(); }}
-                  className={`flex-1 relative h-full flex items-center justify-center rounded-lg text-[13px] font-bold transition-colors z-10 active:scale-[0.98] ${isSelected ? "text-foreground" : "text-muted-foreground"}`}
-                >
-                  {isSelected && (
-                    <motion.div
-                      layoutId="mobileTodayToggleBg"
-                      className="absolute inset-0 bg-background shadow-sm rounded-lg"
-                      initial={false}
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                      style={{ zIndex: -1 }}
-                    />
-                  )}
-                  <span className="relative z-10">{mode.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 
@@ -1349,71 +1299,33 @@ export default function LeadsPage() {
 
   return (
     <>
-      <MobileHeader title="Leads Dashboard" />
+      <MobileHeader title="Leads" />
       <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:h-full">
-        <Device
-          mobile={null}
-          desktop={
-            <div className="flex h-[48px] items-center justify-between pr-[150px]">
-              <h1 className="text-[28px] font-bold tracking-tight">Leads Dashboard</h1>
-
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={fetchLeads} title="Refresh">
-            <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
-          </Button>
-
-          <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
-            <DialogTrigger className="inline-flex h-12 rounded-full bg-card px-5 text-[14px] font-medium shadow-sm border border-border/60 hover:bg-muted/50 items-center gap-2">
-              <FileSpreadsheet size={16} className="text-muted-foreground" />
-              Bulk Import
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader className="pr-8">
-                <div className="flex items-center justify-between gap-2">
-                <DialogTitle className="block">Import Leads</DialogTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={downloadTemplate}
-                  className="h-8 text-xs"
-                >
-                  <Download className="h-3.5 w-3.5 mr-1.5" />
-                  Sample Template
-                </Button>
-              </div>
-              </DialogHeader>
-              
-              <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-xl bg-muted/20 border-border/60">
-                {isImporting ? (
-                  <div className="w-full space-y-4">
-                    <div className="flex items-center justify-between text-sm font-medium">
-                      <span>Processing...</span>
-                      <span>{importProgress}%</span>
-                    </div>
-                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-[#0052FF] transition-all duration-200" style={{ width: `${importProgress}%` }}></div>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <UploadCloud className="h-10 w-10 text-muted-foreground mb-4" />
-                    <p className="text-sm font-medium text-foreground mb-1">Click to upload or drag and drop</p>
-                    <p className="text-xs text-muted-foreground mb-4">.xlsx, .xls, or .csv files</p>
-                    <Input type="file" accept=".xlsx, .xls, .csv" className="max-w-[250px] cursor-pointer" onChange={handleFileUpload} />
-                  </>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          <Link href="/leads/new" className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
-            <Plus size={18} />
-            Add New Lead
-          </Link>
-        </div>
-          </div>
-        }
-      />
+        <PageActions>
+          <button type="button" onClick={() => setIsImportOpen(true)} className="inline-flex h-8 items-center gap-1.5 rounded-md border bg-background px-3 text-[14px] font-medium text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors hover:bg-muted">
+            <FileSpreadsheet size={15} className="text-muted-foreground" />
+            Import
+          </button>
+          <button type="button" onClick={() => setCreating(true)} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-foreground px-3 text-[14px] font-medium text-background transition-colors hover:bg-foreground/85">
+            <Plus size={16} />
+            Create
+          </button>
+        </PageActions>
+        <ImportDialog
+          open={isImportOpen}
+          onOpenChange={setIsImportOpen}
+          title="Import leads"
+          description="Upload a spreadsheet of leads. You'll review every row, with duplicates flagged, before anything is added."
+          onFile={readImportFile}
+          onTemplate={() => void downloadTemplate()}
+          busy={isImporting}
+          progress={importProgress}
+        />
+        <NewLeadModal
+          open={creating}
+          onOpenChange={setCreating}
+          onCreated={(id, toQueue) => router.push(toQueue ? "/lead-routing" : id ? `/leads/${id}` : "/leads")}
+        />
 
       <Device mobile={mobileFilters} desktop={desktopFilters} />
         <Device
@@ -1449,8 +1361,14 @@ export default function LeadsPage() {
                   <h3 className="text-lg font-bold text-foreground mb-2">No Imported Leads</h3>
                 </div>
               ) : (
-                <div className="w-full overflow-x-auto">
-                  {isLoading ? <TableSkeleton /> : <DataTable key={isReviewingImports ? `review-${reviewEpoch}` : "leads"} {...tableProps} />}
+                <div className={isReviewingImports ? "w-full overflow-x-auto" : "-mx-4"}>
+                  {isLoading ? <TableSkeleton /> : isReviewingImports ? (
+                    <DataTable key={`review-${reviewEpoch}`} {...tableProps} />
+                  ) : (
+                    <MobileRowsProvider row={leadRow} onOpen={(lead: KanbanLead) => router.push(`/leads/${lead.rawId}`)}>
+                      <DataTable key="leads" {...tableProps} />
+                    </MobileRowsProvider>
+                  )}
                 </div>
               )}
             </div>

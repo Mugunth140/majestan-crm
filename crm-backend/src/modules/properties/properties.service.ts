@@ -193,8 +193,8 @@ export class PropertiesService {
     return items.map(item => ({ ...item, uploadedByName: names.get(Number(item.uploadedByCrmUserId)) ?? null }));
   }
 
-  private async formDataCached(): Promise<{ cities: any[]; sublocations: any[]; amenities: any[]; furnishings: any[]; utilities: any[] }> {
-    if (this.citiesCache && Date.now() - this.citiesCache.at < 5 * 60 * 1000) {
+  private async formDataCached(fresh = false): Promise<{ cities: any[]; sublocations: any[]; amenities: any[]; furnishings: any[]; utilities: any[] }> {
+    if (!fresh && this.citiesCache && Date.now() - this.citiesCache.at < 5 * 60 * 1000) {
       return this.citiesCache;
     }
     const data = await this.siteApi.get('/properties/form-data');
@@ -246,14 +246,14 @@ export class PropertiesService {
 
   // ── findFormData ───────────────────────────────────────────────────────────
   // One failing source must never 500 the whole form: each part degrades to [].
-  async findFormData() {
+  async findFormData(fresh = false) {
     let cities: any[] = [];
     let sublocations: any[] = [];
     let amenities: any[] = [];
     let furnishings: any[] = [];
     let utilities: any[] = [];
     try {
-      ({ cities, sublocations, amenities, furnishings, utilities } = await this.formDataCached());
+      ({ cities, sublocations, amenities, furnishings, utilities } = await this.formDataCached(fresh));
     } catch (e) {
       console.error('[Properties] formDataCached failed, degrading to empty lists', e);
     }
@@ -722,9 +722,8 @@ export class PropertiesService {
     if (['investment_property', 'farm_house'].includes(body.propertyType) && body.listingType === 'Rent') {
       throw new BadRequestException('This property type is available for Buy only.');
     }
-    if (!(await this.canSeeContacts(reqUser))) {
-      for (const k of PropertiesService.CONTACT_KEYS) delete body[k];
-    }
+    // Anyone may record the owner and agent on a new property; seeing them
+    // afterwards still needs properties.view_contacts.
     const payload = await this.buildSitePayload(body);
     payload.uploadedByCrmUserId = this.uploaderId(reqUser);
     const created = await this.siteApi.post(`/admin/properties/${payload.propertyType}`, payload);

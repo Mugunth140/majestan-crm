@@ -77,6 +77,7 @@ export class AuthService {
           role: user.role?.name,
           department_id: user.department_id,
           department: user.department?.name,
+          nav_access: user.nav_access ?? null,
           permissions
         }
       }
@@ -105,6 +106,7 @@ export class AuthService {
         department_id: user.department_id,
         department: user.department?.name,
         device_last_sync_at: user.device_last_sync_at,
+        nav_access: user.nav_access ?? null,
         permissions
       }
     };

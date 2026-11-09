@@ -120,7 +120,7 @@ export class MailComposer {
       bodyHtml: body.html,
       preheader: preheader.text,
       note: opts.note,
-      signature: sender ? [sender.name, `${team.signature}, ${COMPANY.name}`, sender.phone ?? ''] : [team.signature, COMPANY.name],
+      signature: sender ? [sender.name, `${team.signature} · ${COMPANY.name}`, sender.phone ?? ''] : [team.signature, COMPANY.name],
     });
     return {
       definition,

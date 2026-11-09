@@ -19,6 +19,31 @@ export const LEAD_STATUS_STYLES: Record<string, string> = {
   "Future Follow-up":     "bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-800 dark:text-slate-300",
 };
 
+// Solid dot colour per status, for list rows, kanban columns and group headers.
+export const LEAD_STATUS_DOTS: Record<string, string> = {
+  "New Lead": "bg-gray-400",
+  "Contacted": "bg-blue-500",
+  "Qualified": "bg-indigo-500",
+  "Property Shared": "bg-purple-500",
+  "Other Location": "bg-violet-500",
+  "Interested": "bg-fuchsia-500",
+  "Site Visit Scheduled": "bg-amber-500",
+  "Site Visit Completed": "bg-yellow-500",
+  "Re Visit Scheduled": "bg-orange-500",
+  "Re Visit Completed": "bg-rose-500",
+  "Negotiation": "bg-pink-500",
+  "Booking Advance": "bg-emerald-500",
+  "Agreement": "bg-teal-500",
+  "Closed Won": "bg-green-600",
+  "Not Interested": "bg-red-500",
+  "Dropped": "bg-red-600",
+  "Lost": "bg-red-700",
+  "Future Follow-up": "bg-slate-500",
+};
+
+// Pipeline order, used for kanban columns and status grouping.
+export const LEAD_STATUS_ORDER = Object.keys(LEAD_STATUS_STYLES);
+
 export const PURCHASE_TYPES = [
   { label: "Rental", value: "rental" },
   { label: "Construction", value: "construction" },
@@ -105,3 +130,32 @@ export const PROJECTS = [
   { label: "Majestan Enclave", value: "majestan_enclave" },
   { label: "Majestan Grand", value: "majestan_grand" },
 ];
+
+// Older statuses still on some leads, shown with the colours of their current name.
+const LEGACY_STATUS: Record<string, string> = { "Follow Up": "Future Follow-up" };
+
+/** Pill classes for a status, the same on the leads table and the lead page. */
+// Requirement preferences, shared by the new-lead form and the lead page.
+export const BHK_OPTIONS = [
+  { label: "1", value: "1" }, { label: "2", value: "2" }, { label: "3", value: "3" }, { label: "4+", value: "4" },
+];
+export const FURNISHING_OPTIONS = [
+  { label: "Furnished", value: "1" }, { label: "Semi furnished", value: "2" }, { label: "Unfurnished", value: "0" },
+];
+export const FACING_OPTIONS = [
+  { label: "North", value: "North" }, { label: "East", value: "East" }, { label: "South", value: "South" }, { label: "West", value: "West" },
+  { label: "North-East", value: "North-East" }, { label: "North-West", value: "North-West" },
+  { label: "South-East", value: "South-East" }, { label: "South-West", value: "South-West" }, { label: "Any", value: "Any" },
+];
+export const DECISION_MAKERS = [
+  "Self", "Spouse", "Father", "Mother", "Son", "Daughter", "Brother", "Sister", "Father-in-law", "Mother-in-law",
+  "Business Partner", "Joint Family", "Other Relative",
+].map((v) => ({ label: v, value: v }));
+/** Categories whose preferences are an area range rather than BHK / facing. */
+export const AREA_CATEGORIES = ["commercial", "industrial", "agricultural", "institutional"];
+
+export const leadStatusPill = (status?: string | null) =>
+  LEAD_STATUS_STYLES[status ?? ""] ?? LEAD_STATUS_STYLES[LEGACY_STATUS[status ?? ""]] ?? "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
+
+export const leadStatusDot = (status?: string | null) =>
+  LEAD_STATUS_DOTS[status ?? ""] ?? LEAD_STATUS_DOTS[LEGACY_STATUS[status ?? ""]] ?? "bg-gray-400";

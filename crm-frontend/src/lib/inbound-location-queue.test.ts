@@ -66,6 +66,20 @@ describe('background inbound location outbox', () => {
     dependencies.notify.mock.calls[0][1](); await tick();
     expect(dependencies.save).toHaveBeenCalledWith(12, coordinates);
   });
+  it('retries quietly in the background and drops locations stuck for days', async () => {
+    const { queue, fix, dependencies, persisted } = setup();
+    const capture = queue.startCapture(); queue.enqueue(capture, 12, false);
+    fix.reject(new Error('Denied')); await tick();
+    dependencies.notify.mockClear();
+    dependencies.locate.mockRejectedValue(new Error('Denied'));
+    const reloaded = new InboundLocationQueue(dependencies);
+    reloaded.retry(true); await tick();
+    expect(dependencies.notify).not.toHaveBeenCalled();
+    persisted.set('staff-1', [{ id: 13, capture: `${Date.now() - 3 * 86_400_000}-1`, ready: true }]);
+    const later = new InboundLocationQueue(dependencies);
+    later.retry(true); await tick();
+    expect(persisted.get('staff-1')).toEqual([]);
+  });
   it('persists a failed location update and retries it after app reload', async () => {
     const { queue, fix, dependencies, persisted } = setup();
     dependencies.save.mockRejectedValueOnce(new Error('Offline'));

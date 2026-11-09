@@ -55,7 +55,7 @@ describe('HR HTTP body parsing', () => {
     const response = await fetch(base + '/api/v1/hr/7/upload/resume', { method: 'POST', body });
     expect(response.status).toBe(201); expect(await response.json()).toMatchObject({ success: true });
     expect(documents.upload).toHaveBeenCalledWith(7, 'resume', expect.objectContaining({ buffer: expect.any(Buffer) }));
-    expect(service.saveDocument).toHaveBeenCalledWith(7, 'resume', 'hr-private://document-reference');
+    expect(service.saveDocument).toHaveBeenCalledWith(7, 'resume', 'hr-private://document-reference', undefined);
   });
   it('serves private document bytes with download and no-cache headers', async () => {
     const response = await fetch(base + '/api/v1/hr/7/documents/resume');

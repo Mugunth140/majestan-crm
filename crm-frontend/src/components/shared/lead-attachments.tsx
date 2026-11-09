@@ -2,10 +2,11 @@
 
 import { apiFetch } from "@/lib/api-fetch";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, type ReactNode } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Paperclip, Download, Trash2, File, Loader2, UploadCloud } from "lucide-react";
+import { Download, FileImage, FileText, File as FileIcon, Loader2, Trash2, Upload } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 
 interface Document {
   id: number;
@@ -18,167 +19,145 @@ interface LeadAttachmentsProps {
   leadId: string | number;
   documents?: Document[];
   onRefresh: () => void;
+  /** Shown instead of the list when there are no files; receives the upload button. */
+  empty?: (upload: ReactNode) => ReactNode;
+  /** Renders a header above everything that carries the upload button (the list then leaves it out). */
+  header?: (upload: ReactNode) => ReactNode;
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
+const MAX_FILES = 2;
+const MAX_BYTES = 10 * 1024 * 1024;
 
-export function LeadAttachments({ leadId, documents = [], onRefresh }: LeadAttachmentsProps) {
+const kind = (name: string) => {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  if (["png", "jpg", "jpeg", "webp", "gif", "heic"].includes(ext)) return { icon: FileImage, tone: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400" };
+  if (["pdf", "doc", "docx", "txt"].includes(ext)) return { icon: FileText, tone: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" };
+  return { icon: FileIcon, tone: "bg-foreground/[0.07] text-foreground/70" };
+};
+
+export function LeadAttachments({ leadId, documents = [], onRefresh, empty, header }: LeadAttachmentsProps) {
+  // Removing a file is for admins; everyone can upload and download.
+  const canDelete = useIsAdmin();
   const [isUploading, setIsUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const maxFiles = 2;
-  const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+  const full = documents.length >= MAX_FILES;
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    if (fileInputRef.current) fileInputRef.current.value = "";
     if (!file) return;
-
-    if (documents.length >= maxFiles) {
-      toast.error(`You can only attach up to ${maxFiles} documents.`);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
-
-    if (file.size > maxSizeBytes) {
-      toast.error("File size must be less than 10MB.");
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
+    if (full) return toast.error(`You can attach up to ${MAX_FILES} files.`);
+    if (file.size > MAX_BYTES) return toast.error("Files must be smaller than 10 MB.");
 
     setIsUploading(true);
     const formData = new FormData();
     formData.append("file", file);
-
     try {
-      const res = await apiFetch(`${API_URL}/leads/${leadId}/documents`, {
-        method: "POST",
-        body: formData,
-      });
+      const res = await apiFetch(`${API_URL}/leads/${leadId}/documents`, { method: "POST", body: formData });
       const data = await res.json();
       if (data.success) {
-        toast.success("Document uploaded successfully.");
+        toast.success("File attached.");
         onRefresh();
       } else {
-        toast.error(data.message || "Failed to upload document");
+        toast.error(data.message || "Failed to upload the file");
       }
-    } catch (err) {
-      toast.error("An error occurred while uploading.");
+    } catch {
+      toast.error("Failed to upload the file");
     } finally {
       setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
   const handleDelete = async (docId: number) => {
-    if (!confirm("Are you sure you want to delete this document?")) return;
+    if (!confirm("Remove this file from the lead?")) return;
     setDeletingId(docId);
     try {
-      const res = await apiFetch(`${API_URL}/leads/${leadId}/documents/${docId}`, {
-        method: "DELETE",
-      });
+      const res = await apiFetch(`${API_URL}/leads/${leadId}/documents/${docId}`, { method: "DELETE" });
       const data = await res.json();
       if (data.success) {
-        toast.success("Document deleted.");
+        toast.success("File removed.");
         onRefresh();
       } else {
-        toast.error(data.message || "Failed to delete document");
+        toast.error(data.message || "Failed to remove the file");
       }
-    } catch (err) {
-      toast.error("An error occurred while deleting.");
+    } catch {
+      toast.error("Failed to remove the file");
     } finally {
       setDeletingId(null);
     }
   };
 
+  const upload = (
+    <button
+      type="button"
+      onClick={() => fileInputRef.current?.click()}
+      disabled={isUploading || full}
+      title={full ? `Up to ${MAX_FILES} files. Remove one to add another.` : undefined}
+      className="inline-flex h-8 items-center gap-1.5 rounded-md bg-foreground px-3 text-[13px] font-medium text-background transition-colors hover:bg-foreground/85 disabled:opacity-50"
+    >
+      {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+      {isUploading ? "Uploading…" : "Upload file"}
+    </button>
+  );
+
+  const input = <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} disabled={isUploading} />;
+
+  if (!documents.length && empty) {
+    return <>{header?.(upload)}{empty(upload)}{input}</>;
+  }
+
   return (
-    <div className="bg-card border rounded-2xl p-6 shadow-sm">
-      <div className="flex items-center justify-between border-b pb-3 mb-5">
-        <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-          <Paperclip className="h-4 w-4 text-muted-foreground" /> Documents & Attachments
-        </h3>
-        <span className="text-xs font-semibold text-muted-foreground bg-muted/40 px-2 py-1 rounded-md">
-          {documents.length} / {maxFiles} Files
-        </span>
+    <div>
+      {header?.(upload)}
+      <div className={cn("mb-3 flex items-center gap-3", header && "mx-3 sm:mx-10")}>
+        <p className="flex-1 text-[13px] text-muted-foreground">
+          {documents.length} of {MAX_FILES} files · up to 10 MB each
+        </p>
+        {!header && upload}
       </div>
-
-      <div className="space-y-4">
-        {/* Upload Area */}
-        {documents.length < maxFiles && (
-          <div 
-            onClick={() => !isUploading && fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center gap-3 transition-colors ${isUploading ? 'bg-muted/50 border-muted opacity-70 cursor-not-allowed' : 'bg-muted/20 border-border hover:bg-muted/40 hover:border-[#0052FF]/50 cursor-pointer'}`}
-          >
-            {isUploading ? (
-              <Loader2 className="h-8 w-8 text-[#0052FF] animate-spin" />
-            ) : (
-              <UploadCloud className="h-8 w-8 text-muted-foreground" />
-            )}
-            <div className="text-center">
-              <p className="text-sm font-semibold text-foreground">
-                {isUploading ? "Uploading..." : "Click to upload document"}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Max file size: 10MB
-              </p>
-            </div>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              className="hidden" 
-              onChange={handleFileChange}
-              disabled={isUploading}
-            />
-          </div>
-        )}
-
-        {documents.length >= maxFiles && (
-          <div className="text-sm text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400 p-3 rounded-xl border border-amber-200 dark:border-amber-900/50 flex items-center gap-2 font-medium">
-            Maximum of {maxFiles} documents reached. Please delete an existing document to upload a new one.
-          </div>
-        )}
-
-        {/* Document List */}
-        {documents.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-            {documents.map(doc => (
-              <div key={doc.id} className="flex items-center gap-3 p-3 border rounded-xl bg-background shadow-sm group">
-                <div className="h-10 w-10 shrink-0 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-center justify-center text-[#0052FF] dark:text-blue-400">
-                  <File className="h-5 w-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground truncate" title={doc.file_name}>
-                    {doc.file_name}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    {new Date(doc.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-[#0052FF] hover:bg-blue-50 dark:hover:bg-blue-900/20">
-                      <Download className="h-4 w-4" />
-                    </Button>
-                  </a>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                    onClick={() => handleDelete(doc.id)}
-                    disabled={deletingId === doc.id}
-                  >
-                    {deletingId === doc.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
+      {input}
+      <ul className={cn("divide-y overflow-hidden rounded-xl border", header && "mx-3 sm:mx-10")}>
+        {documents.map((doc) => {
+          const { icon: Icon, tone } = kind(doc.file_name);
+          return (
+            <li key={doc.id} className="group flex items-center gap-3 bg-card px-3.5 py-3">
+              <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", tone)}>
+                <Icon className="h-[18px] w-[18px]" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <a href={doc.file_url} target="_blank" rel="noopener noreferrer" title={doc.file_name} className="block truncate text-[14px] font-medium text-foreground hover:underline">
+                  {doc.file_name}
+                </a>
+                <p className="text-[12px] text-muted-foreground">
+                  Added {new Date(doc.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                </p>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+              <div className="flex shrink-0 items-center gap-0.5 md:opacity-0 md:transition-opacity md:group-hover:opacity-100 md:focus-within:opacity-100">
+                <a
+                  href={doc.file_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Download ${doc.file_name}`}
+                  className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  <Download className="h-4 w-4" />
+                </a>
+                {canDelete && <button
+                  type="button"
+                  aria-label={`Remove ${doc.file_name}`}
+                  onClick={() => handleDelete(doc.id)}
+                  disabled={deletingId === doc.id}
+                  className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
+                >
+                  {deletingId === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                </button>}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

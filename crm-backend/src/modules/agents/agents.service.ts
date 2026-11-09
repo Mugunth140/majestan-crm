@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
@@ -6,6 +6,15 @@ import { Agent } from '../../database/entities/agent.entity';
 import { AgentFollowUp } from '../../database/entities/agent-follow-up.entity';
 import { AgentContactLog } from '../../database/entities/agent-contact-log.entity';
 import { User } from '../../database/entities/user.entity';
+import { RecordEventsService } from '../record-events/record-events.service';
+
+// Columns the agent page edits one at a time (PATCH /agents/:id).
+const EDITABLE = [
+  'name', 'company_name', 'mobile_number', 'whatsapp_number', 'email', 'city', 'state', 'partner_type',
+  'property_category', 'commission_accepted', 'commission_type', 'commission_value', 'remarks',
+] as const;
+
+const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
 export interface CreateAgentResult {
   agent: Agent;
@@ -18,7 +27,86 @@ export class AgentsService {
   constructor(
     @InjectDataSource() private dataSource: DataSource,
     @Optional() private readonly events?: EventEmitter2,
+    @Optional() private readonly recordEvents?: RecordEventsService,
   ) {}
+
+  /** Who an agent can be assigned to, and whether this user may reassign. */
+  async staffList(user?: any) {
+    const people = await this.dataSource.getRepository(User).find({
+      where: { is_active: true }, relations: { department: true },
+      select: { id: true, name: true, department: { id: true, name: true } }, order: { name: 'ASC' },
+    });
+    return {
+      canAssign: !!user && user.role !== 'Staff',
+      data: people.map((p) => ({ id: p.id, name: p.name, hint: p.department?.name ?? undefined })),
+    };
+  }
+
+  async activity(id: number, user?: any) {
+    await this.mustSee(id, user);
+    return this.recordEvents?.activity('agent', id) ?? [];
+  }
+
+  private async mustSee(id: number, user?: any) {
+    const agent = await this.dataSource.getRepository(Agent).findOne({ where: { id } });
+    if (!agent || (user && user.role === 'Staff' && agent.assigned_staff_id !== user.id)) throw new NotFoundException('Agent not found');
+    return agent;
+  }
+
+  /**
+   * Saves the fields sent, by column name; null clears one. Status and the
+   * assignee are recorded as their own events; staff can't reassign.
+   */
+  async patchAgent(id: number, body: Record<string, unknown>, user?: any) {
+    const actorId = user?.id ?? null;
+    const repo = this.dataSource.getRepository(Agent);
+    const agent = await this.mustSee(id, user);
+    const before: Record<string, unknown> = { ...agent };
+
+    const fields = EDITABLE.filter((k) => k in body);
+    for (const k of fields) {
+      const v = body[k];
+      if (k === 'commission_accepted') agent.commission_accepted = !!v;
+      else (agent as any)[k] = typeof v === 'string' ? (v.trim() || null) : v ?? null;
+    }
+    if (fields.includes('name') && !agent.name) throw new BadRequestException('Name is required');
+    if (fields.includes('mobile_number')) {
+      if (!agent.mobile_number) throw new BadRequestException('Mobile number is required');
+      if (agent.mobile_number !== before.mobile_number && await repo.findOne({ where: { mobile_number: agent.mobile_number } })) {
+        throw new BadRequestException('Another agent already has this mobile number');
+      }
+    }
+
+    let assigned: { from: number | null; to: number | null } | null = null;
+    if ('assigned_staff_id' in body) {
+      if (!user || user.role === 'Staff') throw new ForbiddenException('Only managers can reassign agents');
+      const to = body.assigned_staff_id == null ? null : Number(body.assigned_staff_id);
+      if (to !== null && !(await this.dataSource.getRepository(User).findOne({ where: { id: to, is_active: true } }))) {
+        throw new BadRequestException('Choose an active staff member');
+      }
+      if (to !== agent.assigned_staff_id) assigned = { from: agent.assigned_staff_id ?? null, to };
+      agent.assigned_staff_id = to as number;
+    }
+    const previousStatus = agent.status;
+    if (typeof body.status === 'string' && body.status.trim()) agent.status = body.status.trim();
+
+    const saved = await repo.save(agent);
+    await this.recordEvents?.recordChanges('agent', id, actorId, before, saved as unknown as Record<string, unknown>, [...fields]);
+    if (assigned) {
+      const names = await this.dataSource.getRepository(User).find({
+        where: [assigned.from, assigned.to].filter((x): x is number => !!x).map((uid) => ({ id: uid })), select: { id: true, name: true },
+      });
+      const name = (uid: number | null) => names.find((n) => n.id === uid)?.name ?? null;
+      await this.recordEvents?.record({
+        entity: 'agent', entityId: id, actorId, type: assigned.to === null ? 'unassigned' : 'assigned', from: name(assigned.from), to: name(assigned.to),
+      });
+    }
+    if (saved.status !== previousStatus) {
+      await this.recordEvents?.record({ entity: 'agent', entityId: id, actorId, type: 'status_changed', field: 'status', from: previousStatus, to: saved.status });
+      await this.events?.emitAsync('partners.agent.status_changed', { entityId: id, actorId, from: previousStatus, to: saved.status });
+    }
+    return this.dataSource.getRepository(Agent).findOne({ where: { id }, relations: { assigned_staff: true } });
+  }
 
   async getAgents(user?: any): Promise<any[]> {
     let roleWhere = '1=1';
@@ -49,16 +137,18 @@ export class AgentsService {
         a.created_at as createdAt,
         s.name as staff,
         latest_f.next_follow_up_date as nextFollowUpDate,
-        latest_actual_f.follow_up_date as lastFollowedUpDate
+        latest_f.next_follow_up_time as nextFollowUpTime,
+        latest_actual_f.follow_up_date as lastFollowedUpDate,
+        latest_actual_f.follow_up_time as lastFollowedUpTime
       FROM agents a
       LEFT JOIN users s ON a.assigned_staff_id = s.id
       LEFT JOIN (
-        SELECT agent_id, next_follow_up_date,
+        SELECT agent_id, next_follow_up_date, next_follow_up_time,
                ROW_NUMBER() OVER(PARTITION BY agent_id ORDER BY created_at DESC) as rn
         FROM agent_follow_ups
       ) latest_f ON latest_f.agent_id = a.id AND latest_f.rn = 1
       LEFT JOIN (
-        SELECT agent_id, follow_up_date,
+        SELECT agent_id, follow_up_date, follow_up_time,
                ROW_NUMBER() OVER(PARTITION BY agent_id ORDER BY follow_up_date DESC) as rn
         FROM agent_follow_ups
         WHERE follow_up_date IS NOT NULL
@@ -78,7 +168,9 @@ export class AgentsService {
       staff: row.staff ?? 'Unassigned',
       status: row.status ?? 'New',
       nextFollowUpDate: row.nextFollowUpDate || null,
+      nextFollowUpTime: row.nextFollowUpTime || null,
       lastFollowedUpDate: row.lastFollowedUpDate || null,
+      lastFollowedUpTime: row.lastFollowedUpTime || null,
     }));
   }
 
@@ -194,11 +286,38 @@ export class AgentsService {
     });
   }
 
+  /** The agent with this exact mobile (as the add form sends it), with only what a repeat add would reveal. */
+  async findByMobile(mobile: string): Promise<{ id: number; name: string; existingStaff: string } | null> {
+    const value = mobile.trim();
+    if (!value) return null;
+    const agent = await this.dataSource.getRepository(Agent).findOne({ where: { mobile_number: value }, relations: { assigned_staff: true } });
+    return agent ? { id: agent.id, name: agent.name, existingStaff: agent.assigned_staff?.name ?? 'Unassigned' } : null;
+  }
+
   async createAgent(body: any, actorId: number | null = null): Promise<CreateAgentResult> {
     const result = await this.createAgentRecord(body, actorId);
     // partners@ "thanks for connecting" draft, after commit (only reaches partners with an email).
-    if (!result.isExistingAgent) await this.events?.emitAsync('partners.agent.created', { entityId: result.agent.id, actorId });
+    if (!result.isExistingAgent) {
+      await this.recordEvents?.record({ entity: 'agent', entityId: result.agent.id, actorId, type: 'created', to: result.agent.status });
+      await this.events?.emitAsync('partners.agent.created', { entityId: result.agent.id, actorId });
+    }
     return result;
+  }
+
+  /** The follow-up logged with a new agent, by whoever added them. */
+  private firstFollowUp(agentId: number, body: any, actorId: number | null): Partial<AgentFollowUp> {
+    return {
+      agent_id: agentId,
+      follow_up_date: body.followUpDate || today(),
+      follow_up_time: body.followUpTime || null,
+      contacted_via: body.contactedVia || null,
+      next_follow_up_date: body.nextFollowUpDate || null,
+      next_follow_up_time: body.nextFollowUpTime || null,
+      priority: body.priority || null,
+      rnr: body.rnr || null,
+      notes: body.notes || null,
+      created_by_id: actorId ?? undefined,
+    };
   }
 
   private async createAgentRecord(body: any, actorId: number | null): Promise<CreateAgentResult> {
@@ -209,15 +328,8 @@ export class AgentsService {
       });
 
       if (existingAgent) {
-        if (body.followUpDate || body.priority || body.notes || body.rnr) {
-          const followUp = manager.getRepository(AgentFollowUp).create({
-            agent_id: existingAgent.id,
-            follow_up_date: body.followUpDate || null,
-            follow_up_time: body.followUpTime || null,
-            priority: body.priority || null,
-            rnr: body.rnr || null,
-            notes: body.notes || null,
-          });
+        if (body.followUpDate || body.contactedVia || body.priority || body.notes || body.rnr) {
+          const followUp = manager.getRepository(AgentFollowUp).create(this.firstFollowUp(existingAgent.id, body, actorId));
           await manager.save(followUp);
         }
 
@@ -256,15 +368,8 @@ export class AgentsService {
       });
       const savedAgent: Agent = await manager.save(agent);
 
-      if (body.followUpDate || body.priority || body.notes || body.rnr) {
-        const followUp = manager.getRepository(AgentFollowUp).create({
-          agent_id: savedAgent.id,
-          follow_up_date: body.followUpDate || null,
-          follow_up_time: body.followUpTime || null,
-          priority: body.priority || null,
-          rnr: body.rnr || null,
-          notes: body.notes || null,
-        });
+      if (body.followUpDate || body.contactedVia || body.priority || body.notes || body.rnr) {
+        const followUp = manager.getRepository(AgentFollowUp).create(this.firstFollowUp(savedAgent.id, body, actorId));
         await manager.save(followUp);
       }
 
@@ -284,6 +389,7 @@ export class AgentsService {
 
     const saved = await agentRepo.save(existingAgent);
     if (saved.status !== previousStatus) {
+      await this.recordEvents?.record({ entity: 'agent', entityId: id, actorId, type: 'status_changed', field: 'status', from: previousStatus, to: saved.status });
       await this.events?.emitAsync('partners.agent.status_changed', { entityId: id, actorId, from: previousStatus, to: saved.status });
     }
     return saved;
@@ -329,15 +435,10 @@ export class AgentsService {
   }
 
   // ── Contact Log ────────────────────────────────────────────────────────────
-  async addContactLog(agentId: number, body: { contact_type: string; subject?: string; message?: string; sent_by_id?: number }) {
+  async addContactLog(agentId: number, body: { contact_type: string; subject?: string; message?: string }, userId: number | null = null) {
     const agent = await this.dataSource.getRepository(Agent).findOne({ where: { id: agentId } });
     if (!agent) throw new NotFoundException('Agent not found');
-
-    let sentById = body.sent_by_id;
-    if (!sentById) {
-      const adminRole = await this.dataSource.getRepository(User).findOne({ where: { role: { name: 'Admin' } }, relations: { role: true } });
-      if (adminRole) sentById = adminRole.id;
-    }
+    const sentById = userId ?? undefined;
 
     const log = this.dataSource.getRepository(AgentContactLog).create({
       agent_id: agentId,
@@ -350,28 +451,23 @@ export class AgentsService {
   }
 
   // ── Follow-Up CRUD ─────────────────────────────────────────────────────────
-  async addFollowUp(agentId: number, body: any) {
+  async addFollowUp(agentId: number, body: any, userId: number | null = null) {
     const agent = await this.dataSource.getRepository(Agent).findOne({ where: { id: agentId } });
     if (!agent) throw new NotFoundException('Agent not found');
-
-    let createdById = body.created_by_id;
-    if (!createdById) {
-      const adminRole = await this.dataSource.getRepository(User).findOne({ where: { role: { name: 'Admin' } }, relations: { role: true } });
-      if (adminRole) createdById = adminRole.id;
-    }
 
     const repo = this.dataSource.getRepository(AgentFollowUp);
     const fu = repo.create({
       agent_id: agentId,
-      follow_up_date: body.followUpDate,
-      follow_up_time: body.followUpTime,
-      contacted_via: body.contactedVia,
-      next_follow_up_date: body.nextFollowUpDate,
-      next_follow_up_time: body.nextFollowUpTime,
-      priority: body.priority,
-      rnr: body.rnr,
-      notes: body.notes,
-      created_by_id: createdById,
+      // A follow-up logged without a date happened now.
+      follow_up_date: body.followUpDate || today(),
+      follow_up_time: body.followUpTime || null,
+      contacted_via: body.contactedVia || null,
+      next_follow_up_date: body.nextFollowUpDate || null,
+      next_follow_up_time: body.nextFollowUpTime || null,
+      priority: body.priority || null,
+      rnr: body.rnr || null,
+      notes: body.notes || null,
+      created_by_id: userId ?? undefined,
     });
     return repo.save(fu);
   }

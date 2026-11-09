@@ -13,6 +13,8 @@ import {
 import { ProjectsService } from './projects.service';
 import { ProjectQueryDto } from './dto/project-query.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('api/v1/projects')
 @UseGuards(JwtAuthGuard)
@@ -49,7 +51,10 @@ export class ProjectsController {
     return { success: true, data };
   }
 
+  // Deleting is for admins (the list only offers it to them).
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('Admin')
   async remove(@Param('id', ParseIntPipe) id: number) {
     const data = await this.projectsService.remove(id);
     return { success: true, data };

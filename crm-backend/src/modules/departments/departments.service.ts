@@ -18,6 +18,7 @@ export class DepartmentsService implements OnModuleInit {
       'Designing Department',
       'Digital Department',
       'HR Department',
+      'Sourcing Department',
     ];
 
     for (const name of defaultDepartments) {

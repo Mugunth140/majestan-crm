@@ -200,7 +200,7 @@ describe('MailService', () => {
     await expect(service.composePreview(input, actor)).rejects.toBeInstanceOf(ForbiddenException); // sales@ by default
     const pv = await service.composePreview({ ...input, sender: 'finance' }, actor);
     expect(pv.from).toBe('Majestan Realty Accounts <finance@majestanrealty.com>');
-    expect(pv.html).toContain('Accounts Team, Majestan Realty');
+    expect(pv.html).toContain('Accounts Team · Majestan Realty');
     const sent = await service.composeSend({ ...input, sender: 'finance', hash: pv.hash }, actor);
     expect(sent).toMatchObject({ event: 'manual.lead@finance', label: 'Email from finance@majestanrealty.com' });
     expect(rows[0]).toMatchObject({ identity: 'finance', module: 'finance', entity_type: 'lead' });

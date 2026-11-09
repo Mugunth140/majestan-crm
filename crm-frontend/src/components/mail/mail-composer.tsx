@@ -17,13 +17,19 @@ import { mailTemplatesApi, type MailTemplateCatalog } from "@/lib/mail-templates
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormSelect } from "@/components/shared/form-select";
+import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import type { SharedListing } from "@/lib/listing-share";
 import { EmailEditor } from "./email-editor";
 import { VariablePicker } from "./variable-picker";
 
 /** Where the composer starts: a blank email, a saved template, a system email, or an existing draft. */
 export type ComposerStart =
-  | { kind: "blank" }
+  /**
+   * A reply carries the subject ("Re: …") and, for reply-all, the earlier Cc.
+   * A share arrives written, with its brochures already attached.
+   */
+  | { kind: "blank"; subject?: string; cc?: string[]; body?: string; attachments?: MailAttachment[]; share?: SharedListing[] }
   | { kind: "saved"; id: number }
   | { kind: "system"; key: string }
   | { kind: "draft"; id: number; eventKey: string };
@@ -37,6 +43,8 @@ type Props = {
   recipients?: string[];
   /** Mailboxes this user may write from (own first). Omit to allow all of the record's. */
   senders?: { key: string; from: string }[];
+  /** Render in place (e.g. a page's composer dock) instead of as a dialog. */
+  inline?: boolean;
   onClose: () => void;
   onSent: () => void;
 };
@@ -48,7 +56,7 @@ export function MailComposer(props: Props) {
 const startValue = (start: ComposerStart) =>
   start.kind === "saved" ? `saved:${start.id}` : start.kind === "system" ? `system:${start.key}` : start.kind === "draft" ? `draft:${start.id}` : "blank";
 
-function OpenComposer({ entityType, entityId, start, recipients = [], senders, onClose, onSent }: Props & { start: ComposerStart }) {
+function OpenComposer({ entityType, entityId, start, recipients = [], senders, inline, onClose, onSent }: Props & { start: ComposerStart }) {
   const [catalog, setCatalog] = useState<MailTemplateCatalog | null>(null);
   const [source, setSource] = useState(startValue(start));
   const [sender, setSender] = useState<string | null>(null);
@@ -79,6 +87,12 @@ function OpenComposer({ entityType, entityId, start, recipients = [], senders, o
         setCatalog(next);
         const text = textFor(next, startValue(start), draft?.eventKey);
         if (text) { setSubject(text.subject); setBody(text.body); }
+        else if (start.kind === "blank") {
+          if (start.subject) setSubject(start.subject);
+          if (start.cc?.length) setCcText(start.cc.join(", "));
+          if (start.body) setBody(start.body);
+          if (start.attachments?.length) setFiles(start.attachments);
+        }
         setSender(startSender(next, start, senders));
       })
       .catch(() => toast.error("Could not load email templates"));
@@ -211,34 +225,34 @@ function OpenComposer({ entityType, entityId, start, recipients = [], senders, o
   // A choice only for new hand-written emails; drafts and standard emails keep their mailbox.
   const canPickSender = !draft && !source.startsWith("system:") && allowed.length > 1;
 
-  return (
-    <Dialog open onOpenChange={(open) => { if (!open && !busy && (!touched || window.confirm("Discard this email?"))) onClose(); }}>
-      <DialogContent className="sm:max-w-4xl max-h-[94vh] flex flex-col gap-0 p-0 overflow-hidden" showCloseButton={!busy}>
-        <DialogHeader className="px-6 pt-5 pb-4 border-b shrink-0">
-          <DialogTitle>{draft ? `Edit before sending: ${draftLabel ?? "draft"}` : "New email"}</DialogTitle>
-          <DialogDescription>
-            {catalog ? <>From <span className="font-medium text-foreground">{fromOf(sender)}</span></> : "Loading…"}
-            {recipients.length > 0 && <> to <span className="font-medium text-foreground">{recipients.join(", ")}</span></>}
-          </DialogDescription>
-        </DialogHeader>
+  const title = draft ? `Edit before sending: ${draftLabel ?? "draft"}` : "New email";
+  const route = (
+    <>
+      {catalog ? <>From <span className="font-medium text-foreground">{fromOf(sender)}</span></> : "Loading…"}
+      {recipients.length > 0 && <> to <span className="font-medium text-foreground">{recipients.join(", ")}</span></>}
+    </>
+  );
+  const pad = inline ? "px-4" : "px-6";
 
+  const content = (
+    <>
         {stage === "write" ? (
-          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+          <div className={cn("flex-1 overflow-y-auto py-5 space-y-4", pad)}>
             {canPickSender && (
               <div className="grid gap-1.5 sm:grid-cols-[120px_1fr] sm:items-center">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">From</label>
+                <label className="text-[13px] font-medium text-foreground/80">From</label>
                 <FormSelect name="mailSender" value={sender ?? ""} onValueChange={(v: string) => v && setSender(v)}
                   options={allowed.map((s) => ({ label: s.from, value: s.key }))} placeholder="Choose a mailbox" />
               </div>
             )}
             {!draft && (
               <div className="grid gap-1.5 sm:grid-cols-[120px_1fr] sm:items-center">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Start from</label>
+                <label className="text-[13px] font-medium text-foreground/80">Start from</label>
                 <FormSelect name="mailSource" value={source} onValueChange={(v: string) => chooseSource(v)} options={sourceOptions} placeholder="Blank email" />
               </div>
             )}
             <div className="grid gap-1.5 sm:grid-cols-[120px_1fr] sm:items-center">
-              <label htmlFor="mail-cc" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Cc</label>
+              <label htmlFor="mail-cc" className="text-[13px] font-medium text-foreground/80">Cc</label>
               <div>
                 <Input id="mail-cc" value={ccText} onChange={(e) => setCcText(e.target.value)} placeholder="Optional, e.g. manager@majestanrealty.com"
                   className={`h-10 rounded-xl ${cc.invalid.length ? "border-red-400 focus-visible:ring-red-200" : ""}`} />
@@ -246,7 +260,7 @@ function OpenComposer({ entityType, entityId, start, recipients = [], senders, o
               </div>
             </div>
             <div className="grid gap-1.5 sm:grid-cols-[120px_1fr] sm:items-center">
-              <label htmlFor="mail-subject" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Subject</label>
+              <label htmlFor="mail-subject" className="text-[13px] font-medium text-foreground/80">Subject</label>
               <div className="flex gap-2">
                 <Input id="mail-subject" ref={subjectRef} value={subject} maxLength={500} placeholder="Subject line"
                   onChange={(e) => { setSubject(e.target.value); setTouched(true); }} className="h-10 rounded-xl" />
@@ -286,7 +300,7 @@ function OpenComposer({ entityType, entityId, start, recipients = [], senders, o
             </div>
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-3">
+          <div className={cn("flex-1 overflow-y-auto py-5 space-y-3", pad)}>
             {preview && (
               <>
                 <dl className="grid grid-cols-[72px_1fr] gap-x-3 gap-y-1 text-sm">
@@ -313,18 +327,18 @@ function OpenComposer({ entityType, entityId, start, recipients = [], senders, o
                 )}
                 <div className="overflow-hidden rounded-xl border bg-white">
                   {/* sandbox="" blocks scripts, forms and navigation inside the preview */}
-                  <iframe title="Email preview" sandbox="" srcDoc={preview.html} className="block h-[480px] w-full" />
+                  <iframe title="Email preview" sandbox="" srcDoc={preview.html} className={cn("block w-full", inline ? "h-[320px]" : "h-[480px]")} />
                 </div>
               </>
             )}
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t px-6 py-3.5 shrink-0">
+        <div className={cn("flex flex-wrap items-center justify-between gap-2 border-t py-3.5 shrink-0", pad)}>
           {stage === "write" ? (
             <>
               <Button variant="outline" onClick={() => { if (!touched || window.confirm("Discard this email?")) onClose(); }} disabled={busy !== null} className="rounded-xl">Cancel</Button>
-              <Button onClick={review} disabled={!canReview} className="rounded-xl px-6 bg-[#0052FF] text-white hover:bg-[#0040CC]">
+              <Button onClick={review} disabled={!canReview} className="px-5 bg-foreground text-background hover:bg-foreground/85">
                 {busy === "review" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Review email
               </Button>
             </>
@@ -333,12 +347,35 @@ function OpenComposer({ entityType, entityId, start, recipients = [], senders, o
               <Button variant="outline" onClick={() => setStage("write")} disabled={busy !== null} className="rounded-xl">
                 <ArrowLeft className="mr-2 h-4 w-4" /> Back to editing
               </Button>
-              <Button onClick={send} disabled={busy !== null || !preview || preview.issues.length > 0} className="rounded-xl px-6 bg-[#0052FF] text-white hover:bg-[#0040CC]">
+              <Button onClick={send} disabled={busy !== null || !preview || preview.issues.length > 0} className="px-5 bg-foreground text-background hover:bg-foreground/85">
                 {busy === "send" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />} Send email
               </Button>
             </>
           )}
         </div>
+    </>
+  );
+
+  if (inline) {
+    return (
+      <div className="flex max-h-[min(70vh,680px)] flex-col">
+        <div className="shrink-0 border-b px-4 py-2.5 text-[13px]">
+          <span className="font-semibold text-foreground">{title}</span>
+          <span className="ml-2 text-muted-foreground">{route}</span>
+        </div>
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open && !busy && (!touched || window.confirm("Discard this email?"))) onClose(); }}>
+      <DialogContent className="sm:max-w-4xl max-h-[94vh] flex flex-col gap-0 p-0 overflow-hidden" showCloseButton={!busy}>
+        <DialogHeader className="px-6 pt-5 pb-4 border-b shrink-0">
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{route}</DialogDescription>
+        </DialogHeader>
+        {content}
       </DialogContent>
     </Dialog>
   );

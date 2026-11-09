@@ -1,4 +1,5 @@
 "use client";
+import { PROPERTY_FIELD } from "./property-form-styles";
 import { plotBoundaryGeometry } from "./plot-boundary-geometry";
 import { Input } from "@/components/ui/input";
 import { PropertyFormSelect } from "./PropertyFormSelect";
@@ -138,7 +139,7 @@ export function PropertyPlotBoundaries({
                     onChange={(event) =>
                       change(index, "length", event.target.value)
                     }
-                    className="h-12 rounded-xl"
+                    className={PROPERTY_FIELD}
                   />
                   <PropertyFormSelect
                     name={`boundaryUnit${index}`}
@@ -155,7 +156,7 @@ export function PropertyPlotBoundaries({
             ))}
           </div>
         )}
-        <figure className="rounded-xl border bg-muted/20 p-4">
+        <figure className="rounded-lg border bg-muted/20 p-4">
           {facing ? (
             <div
               aria-label="Boundary legend"

@@ -1,0 +1,24 @@
+/* Refresh pill drops in from above the viewport, and lifts back out */
+.refresh-pill {
+  animation-name: refresh-pill-in;
+  animation-duration: 0.45s;
+  animation-timing-function: cubic-bezier(0.34, 1.4, 0.64, 1);
+  animation-fill-mode: both;
+}
+.refresh-pill--out {
+  animation-name: refresh-pill-out;
+  animation-duration: 0.35s;
+  animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+}
+@keyframes refresh-pill-in {
+  from { opacity: 0; transform: translateY(-140%) scale(0.92); }
+}
+@keyframes refresh-pill-out {
+  to { opacity: 0; transform: translateY(-140%) scale(0.92); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .refresh-pill { animation-name: refresh-pill-fade; animation-duration: 0.2s; }
+  .refresh-pill--out { animation-name: refresh-pill-fade-out; }
+  @keyframes refresh-pill-fade { from { opacity: 0; } }
+  @keyframes refresh-pill-fade-out { to { opacity: 0; } }
+}

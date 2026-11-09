@@ -1,18 +1,24 @@
 "use client";
 
+import { isAdmin } from "@/lib/permissions";
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ProjectForm } from "./_components/ProjectForm";
 import { DataTable } from "@/components/tables/data-table";
+import { IdCell, NameCell, StatusCell, statusDot } from "@/components/tables/cells";
+import { BOARD_PAGE, ModuleMobileRows, ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { moveRow } from "@/lib/move-row";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { FormSelect } from "@/components/shared/form-select";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { ListBody, ListFrame, ListToolbar, SegmentTabs, ToolbarEnd, ToolbarSearch, headerPrimaryClass, toolbarFilterButton } from "@/components/layout/list-page";
+import { ClearFilters, FilterDivider, FilterStrip, QuickFilter, RangeQuickFilter } from "@/components/shared/quick-filters";
+import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -21,8 +27,7 @@ import { useProjectsList } from "@/hooks/use-projects-list";
 import { computeProjectRanges, formatPriceRange } from "@/lib/project-ranges";
 import { apiFetch } from "@/lib/api-fetch";
 import { cn } from "@/lib/utils";
-import { motion } from "motion/react";
-import { Edit, Eye, Filter, Plus, RefreshCw, Search, X } from "lucide-react";
+import { Edit, Eye, Filter, Plus, Search, X } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -42,26 +47,20 @@ const UNITS_FILTER_OPTIONS = [
   { value: "100", label: "100+ units" },
 ];
 
-const STATUS_STYLES: Record<string, string> = {
-  published: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
-  draft: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
-  booked: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400",
-  archived: "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400",
-};
-
-const PROJECT_TYPE_STYLES: Record<string, string> = {
-  apartment: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400",
-  villa: "bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400",
-  plot: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400",
-};
-
 const PROJECT_TABS = ["All", "Published", "Draft", "Booked", "Archived"];
+
+const PROJECT_FIELDS: ViewField[] = [
+  { id: "status", label: "Status", get: (p) => p.status, order: ["published", "draft", "booked", "archived"], dot: (v) => statusDot(v), capitalize: true },
+  { id: "projectType", label: "Type", get: (p) => p.projectType, capitalize: true },
+  { id: "city", label: "City", get: (p) => p.city },
+];
 
 export default function ProjectsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = usePersistedState<string>("projects:tab", "All", { allowed: PROJECT_TABS });
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   const [searchQuery, setSearchQuery] = usePersistedState("projects:search", "");
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
@@ -70,7 +69,8 @@ export default function ProjectsPage() {
   const [role, setRole] = useState("");
   const [localityOptions, setLocalityOptions] = useState<{ value: string; label: string }[]>([]);
 
-  const { projects, totalCount, isLoading, fetchProjects, deleteBulk } = useProjectsList();
+  const views = useModuleView("projects", PROJECT_FIELDS);
+  const { projects, setProjects, totalCount, isLoading, fetchProjects, deleteBulk } = useProjectsList();
   useClampedPage(pagination, setPagination, totalCount, isLoading);
 
   useEffect(() => {
@@ -101,8 +101,9 @@ export default function ProjectsPage() {
   const tabs = PROJECT_TABS;
 
   useEffect(() => {
-    fetchProjects({ pagination, debouncedSearchQuery, activeTab, filters });
-  }, [fetchProjects, pagination, debouncedSearchQuery, activeTab, filters]);
+    fetchProjects({ pagination: views.isBoard ? BOARD_PAGE : pagination, debouncedSearchQuery, activeTab, filters });
+  }, [fetchProjects, pagination, debouncedSearchQuery, activeTab, filters, views.isBoard]);
+  const reloadProjects = () => fetchProjects({ pagination: views.isBoard ? BOARD_PAGE : pagination, debouncedSearchQuery, activeTab, filters });
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -148,44 +149,24 @@ export default function ProjectsPage() {
     },
     {
       accessorKey: "id",
-      header: "Id",
+      header: "ID",
       cell: ({ row }) => (
-        <Link href={`/projects/${row.original.id}`} className="text-[#0052FF] hover:underline font-medium font-mono text-xs tracking-wide">
-          {row.original.projectCode || row.original.id}
-        </Link>
+        <IdCell href={`/projects/${row.original.id}`}>{row.original.projectCode || row.original.id}</IdCell>
       ),
     },
     {
       accessorKey: "name",
       header: "Project",
       cell: ({ row }) => {
-        const name = row.original.name || "-";
-        return (
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="h-7 w-7 rounded-full bg-rose-100 dark:bg-rose-900/40 flex items-center justify-center font-bold text-xs text-rose-900 dark:text-rose-300 shrink-0">
-              {name.charAt(0).toUpperCase()}
-            </div>
-            <div className="min-w-0">
-              <Link href={`/projects/${row.original.id}`} className="font-medium text-foreground hover:text-[#0052FF] hover:underline truncate max-w-[220px] block" title={name}>
-                {name}
-              </Link>
-              {row.original.city && <div className="text-xs text-muted-foreground truncate">{row.original.city}</div>}
-            </div>
-          </div>
-        );
+        const name = row.original.name || "—";
+        return <NameCell name={name} avatar sub={row.original.city} className="max-w-[260px]" />;
       },
     },
     {
       accessorKey: "projectType",
       header: "Type",
       cell: ({ row }) => {
-        const t = (row.original.projectType || "").toLowerCase();
-        const cls = PROJECT_TYPE_STYLES[t] ?? "bg-gray-100 text-gray-800 border-gray-200";
-        return (
-          <Badge className={"font-medium shadow-sm border capitalize " + cls}>
-            {row.original.projectType || "-"}
-          </Badge>
-        );
+        return <span className="capitalize">{row.original.projectType || "—"}</span>;
       },
     },
     {
@@ -193,7 +174,7 @@ export default function ProjectsPage() {
       header: "Price Range",
       cell: ({ row }) => {
         const r = computeProjectRanges(row.original.units);
-        return <span className="font-semibold whitespace-nowrap">{formatPriceRange(r.minPrice, r.maxPrice)}</span>;
+        return <span className="whitespace-nowrap tabular-nums">{formatPriceRange(r.minPrice, r.maxPrice)}</span>;
       },
     },
     {
@@ -201,7 +182,7 @@ export default function ProjectsPage() {
       header: "BHK",
       cell: ({ row }) => {
         const r = computeProjectRanges(row.original.units);
-        return <span className="whitespace-nowrap">{r.bhk.length ? `${r.bhk.join(",")} BHK` : "-"}</span>;
+        return <span className="whitespace-nowrap">{r.bhk.length ? `${r.bhk.join(",")} BHK` : "—"}</span>;
       },
     },
     {
@@ -209,7 +190,7 @@ export default function ProjectsPage() {
       header: "Units",
       cell: ({ row }) => {
         const count = (row.original.units ?? []).length;
-        return <span>{count}</span>;
+        return <span className="tabular-nums">{count}</span>;
       },
     },
     {
@@ -217,8 +198,7 @@ export default function ProjectsPage() {
       header: "Status",
       cell: ({ row }) => {
         const s = (row.original.status || "").toLowerCase();
-        const cls = STATUS_STYLES[s] ?? "bg-gray-100 text-gray-800 border-gray-200";
-        return <Badge className={"font-medium shadow-sm border whitespace-nowrap capitalize " + cls}>{s || "-"}</Badge>;
+        return <span className="capitalize"><StatusCell status={s} /></span>;
       },
     },
   ];
@@ -228,7 +208,7 @@ export default function ProjectsPage() {
     columns,
     data: projects,
     showToolbar: true,
-    showDeleteAction: role === "Admin",
+    showDeleteAction: isAdmin({ role }),
     onDeleteSelected: (rows: any[]) => setBulkDeleteIds(rows.map((r) => r.id)),
     renderToolbarActions: (selectedRows: any[], clearSelection: () => void) => {
       const isSingle = selectedRows.length === 1;
@@ -274,22 +254,16 @@ export default function ProjectsPage() {
     <Popover>
       <PopoverTrigger render={
         isMobile ? (
-          <Button variant="outline" size="icon" className="h-12 w-12 rounded-2xl bg-black/5 dark:bg-white/10 border-transparent relative shrink-0">
+          <Button variant="outline" size="icon" className="h-10 w-10 rounded-[11px] bg-foreground/[0.06] border-transparent relative shrink-0">
             <Filter className="h-5 w-5 text-foreground" />
             {activeFiltersCount > 0 && (
-              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#0052FF] border-2 border-background text-white text-[10px] font-bold flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#017D58] border-2 border-background text-white text-[10px] font-bold flex items-center justify-center">
                 {activeFiltersCount}
               </span>
             )}
           </Button>
         ) : (
-          <Button variant="outline" className="h-10 rounded-xl bg-muted/30 border-border/60 px-4 flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium text-[13.5px]">Filters</span>
-            {activeFiltersCount > 0 && (
-              <Badge className="ml-1 bg-[#0052FF] text-white px-1.5 py-0.5 rounded-md text-[10px]">{activeFiltersCount}</Badge>
-            )}
-          </Button>
+          toolbarFilterButton(activeFiltersCount)
         )
       } />
       <PopoverContent align="start" className="w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60">
@@ -347,13 +321,13 @@ export default function ProjectsPage() {
 
   const searchBar = (isMobile: boolean) => (
     <div className="relative flex-1">
-      <Search className={isMobile ? "absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" : "absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"} />
+      <Search className={isMobile ? "absolute left-3 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-muted-foreground" : "absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"} />
       <Input
         placeholder={isMobile ? "Search projects..." : "Search name, builder, city..."}
         value={searchQuery}
         onChange={(e) => { setSearchQuery(e.target.value); resetPage(); }}
         className={isMobile
-          ? "pl-11 h-12 bg-black/5 dark:bg-white/10 border-transparent rounded-2xl text-[16px] focus-visible:ring-1 focus-visible:ring-primary shadow-none"
+          ? "pl-10 h-10 bg-foreground/[0.06] border-transparent rounded-[11px] text-[16px] placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-[#017D58]/30 shadow-none"
           : "pl-9 h-10 bg-muted/30 rounded-xl border-border/60 text-[13.5px]"}
       />
       {isMobile && searchQuery && (
@@ -373,8 +347,8 @@ export default function ProjectsPage() {
             key={tab}
             onClick={() => { setActiveTab(tab); resetPage(); }}
             className={cn(
-              "px-5 h-10 rouTrusted and Reliable Liaisoningnded-full text-[14px] font-semibold whitespace-nowrap transition-all border active:scale-95",
-              isActive ? "bg-foreground text-background border-foreground shadow-sm" : "bg-card text-muted-foreground border-border hover:bg-muted"
+              "px-3.5 h-8 rounded-full text-[14px] font-medium whitespace-nowrap transition-colors active:opacity-60",
+              isActive ? "bg-[#017D58] text-white dark:bg-[#2FB585] dark:text-black" : "bg-foreground/[0.06] text-foreground"
             )}
           >
             {tab}
@@ -384,6 +358,16 @@ export default function ProjectsPage() {
     </div>
   );
 
+  type Row = (typeof projects)[number];
+  const rowCard = (p: Row) => ({
+    title: p.name,
+    id: p.projectCode || p.id,
+    href: `/projects/${p.id}`,
+    subtitle: [p.city, formatPriceRange(computeProjectRanges(p.units).minPrice, computeProjectRanges(p.units).maxPrice)].filter((x) => x && x !== "—").join(" · "),
+    tag: p.projectType,
+  });
+  const openRow = (p: Row) => router.push(`/projects/${p.id}`);
+
   const tableSection = (
     <div className="w-full max-w-full min-w-0 md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col">
       {isLoading ? <TableSkeleton columns={8} rows={10} flush /> : <DataTable {...tableProps} />}
@@ -391,48 +375,50 @@ export default function ProjectsPage() {
   );
 
   const desktopFilters = (
-    <div className="bg-card border rounded-xl overflow-hidden shadow-sm md:flex md:flex-col md:flex-1 md:min-h-0">
-      <div className="flex items-center justify-between px-6 border-b bg-muted/10 pt-4 gap-4">
-        <div className="flex items-center gap-8 overflow-x-auto scrollbar-hide relative">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => { setActiveTab(tab); resetPage(); }}
-              className={"relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " + (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")}
-            >
-              {tab}
-              {activeTab === tab && (
-                <motion.div layoutId="desktopActiveTabUnderline" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full" initial={false} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3 px-6 py-4 border-b bg-background">
-        <div className="flex-1 min-w-[240px] max-w-md">{searchBar(false)}</div>
-        {renderFilterPopover(false)}
-        {(searchQuery || activeFiltersCount > 0) && (
-          <Button variant="ghost" size="icon" onClick={() => { setSearchQuery(""); clearFilters(); }} className="h-10 w-10 rounded-full text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors" title="Clear Search & Filters">
-            <X className="h-4 w-4" />
-          </Button>
+    <ListFrame>
+      <ListToolbar className="md:flex-nowrap">
+        <SegmentTabs tabs={tabs} value={activeTab} onChange={(tab) => { setActiveTab(tab); resetPage(); }} label="Projects views" />
+        <FilterDivider />
+        <FilterStrip>
+          <QuickFilter label="Project type" value={filters.projectType} options={PROJECT_TYPE_OPTIONS} onChange={(v) => { setFilters((f) => ({ ...f, projectType: v })); resetPage(); }} />
+          <QuickFilter label="Locality" value={filters.locality} options={localityOptions} onChange={(v) => { setFilters((f) => ({ ...f, locality: v })); resetPage(); }} />
+          <QuickFilter label="BHK" value={filters.bhk[0] != null ? String(filters.bhk[0]) : ""} options={BHK_FILTER_OPTIONS} onChange={(v) => setBhkFilter(v)} />
+          <RangeQuickFilter label="Price" unit="₹" min={filters.minPrice} max={filters.maxPrice} onChange={(minPrice, maxPrice) => { setFilters((f) => ({ ...f, minPrice, maxPrice })); resetPage(); }} />
+          <QuickFilter label="Units" value={filters.minUnits} options={UNITS_FILTER_OPTIONS} onChange={(v) => { setFilters((f) => ({ ...f, minUnits: v })); resetPage(); }} />
+          <ClearFilters show={activeFiltersCount > 0 || !!searchQuery} onClick={() => { setSearchQuery(""); clearFilters(); }} />
+        </FilterStrip>
+        <ToolbarEnd>
+          {views.picker}
+          <ToolbarSearch value={searchQuery} onChange={(v) => { setSearchQuery(v); resetPage(); }} placeholder="Search name, builder, city" className="md:[&_input]:w-56" />
+        </ToolbarEnd>
+      </ListToolbar>
+      <ListBody>
+        {isLoading ? <TableSkeleton columns={8} rows={10} flush /> : (
+          <ModuleViews
+            state={views}
+            data={projects}
+            columns={columns}
+            list={<DataTable {...tableProps} variant="list" />}
+            getKey={(p) => p.id}
+            onOpen={openRow}
+            onMove={(p, status) =>
+              moveRow({ setRows: setProjects, row: p, same: (a, b) => a.id === b.id, patch: { status }, request: { path: `/projects/${p.id}/status`, method: "PATCH", body: { status } }, success: `Moved to ${status.charAt(0).toUpperCase()}${status.slice(1)}` })
+            }
+            card={rowCard}
+            totalCount={totalCount}
+            noun="projects"
+          />
         )}
-      </div>
-
-      <div className="w-full max-w-full min-w-0 md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col">{tableSection}</div>
-    </div>
+      </ListBody>
+    </ListFrame>
   );
 
   const mobileFilters = (
-    <div className="px-4 pb-2 space-y-4">
+    <div className="px-4 pb-2 space-y-3">
       <div className="flex items-center gap-2">
         {searchBar(true)}
         {renderFilterPopover(true)}
       </div>
-      <Link href="/projects/new" className="flex h-11 w-full rounded-xl bg-[#0052FF] px-4 text-[14px] font-semibold text-white shadow-md hover:bg-[#0052FF]/90 items-center justify-center gap-2 transition-transform active:scale-95">
-        <Plus size={18} />
-        Add Project
-      </Link>
       {pillTabs}
     </div>
   );
@@ -440,30 +426,24 @@ export default function ProjectsPage() {
   return (
     <>
       <MobileHeader title="Projects" />
-      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:h-full">
-        <Device
-          mobile={null}
-          desktop={
-            <div className="flex h-[48px] items-center justify-between pr-[150px]">
-              <div>
-                <h1 className="text-[28px] font-bold tracking-tight">Projects</h1>
-                {/* <p className="text-muted-foreground text-sm mt-0.5">Manage your villa and apartment projects</p> */}
-              </div>
-              <div className="flex items-center gap-3">
-                <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={() => fetchProjects({ pagination, debouncedSearchQuery, activeTab, filters })} title="Refresh">
-                  <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
-                </Button>
-                <Link href="/projects/new" className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
-                  <Plus size={18} />
-                  Add Project
-                </Link>
-              </div>
-            </div>
-          }
-        />
+      {views.switcher}
+      <div className="w-full flex flex-col space-y-6 pt-4 md:space-y-0 md:pt-0 md:h-full">
+        <PageActions>
+          <button type="button" onClick={() => setCreating(true)} className={headerPrimaryClass}>
+            <Plus className="size-4" />
+            Add Project
+          </button>
+        </PageActions>
 
         <Device mobile={mobileFilters} desktop={desktopFilters} />
-        <Device desktop={null} mobile={<div className="w-full px-4 md:px-0">{tableSection}</div>} />
+        <Device
+          desktop={null}
+          mobile={
+            <ModuleMobileRows state={views} card={rowCard} onOpen={openRow}>
+              <div className="w-full">{tableSection}</div>
+            </ModuleMobileRows>
+          }
+        />
 
       </div>
 
@@ -483,6 +463,9 @@ export default function ProjectsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {creating && (
+        <ProjectForm mode="create" onClose={() => setCreating(false)} onSuccess={() => { setCreating(false); reloadProjects(); }} />
+      )}
     </>
   );
 }

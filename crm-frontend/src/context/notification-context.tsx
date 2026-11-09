@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { apiFetch } from "@/lib/api-fetch";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { notificationHref, notificationSentence } from "@/lib/notification-text";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
@@ -27,6 +28,30 @@ interface NotificationContextType {
   clearAll: () => Promise<void>;
   deleteNotification: (id: number) => Promise<void>;
   refresh: () => void;
+}
+
+// Already alerted, so a notification sent again by the stream alerts once.
+const alerted = new Set<number>();
+
+/** A pop-up in the app, and a desktop alert too while the CRM is in the background. */
+function alertUser(n: Notification, go: (href: string) => void) {
+  if (alerted.has(n.id)) return;
+  alerted.add(n.id);
+  const href = notificationHref(n);
+  const text = notificationSentence(n);
+  toast(n.title || "Notification", {
+    description: text,
+    duration: 10000,
+    action: href ? { label: "Open", onClick: () => go(href) } : undefined,
+  });
+  if (typeof window === "undefined" || typeof window.Notification === "undefined") return;
+  if (window.Notification.permission !== "granted" || !document.hidden) return;
+  const desktop = new window.Notification(n.title || "Notification", { body: text, tag: `crm-${n.id}` });
+  desktop.onclick = () => {
+    window.focus();
+    if (href) go(href);
+    desktop.close();
+  };
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -59,33 +84,30 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       token = localStorage.getItem("crm_token") || "";
     }
     
-    // We can just use an EventSource
-    // Note: If EventSource doesn't support headers directly in browser,
-    // some implementations use URL params for auth.
-    // Assuming backend accepts it or relies on cookies, but given it's jwt-auth.guard, 
-    // EventSource doesn't send Authorization headers natively.
-    // For simplicity we will still poll if SSE auth is complex, OR wait! 
-    // The user explicitly asked:
-    // "replace interval with EventSource". 
-    // Let's implement it.
-    
+    // The stream sends only what arrived since its last check, so add those
+    // to the list, and alert the user to each follow-up that just came due.
     let url = `${API_URL}/notifications/stream`;
     if (token) url += `?token=${token}`;
-    
+
     const eventSource = new EventSource(url);
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data && data.notifications) {
-          setNotifications(data.notifications);
-        }
-      } catch (err) {}
+        if (!data || !Array.isArray(data.notifications) || data.notifications.length === 0) return;
+        const incoming: Notification[] = data.notifications;
+        incoming.filter((n) => n.type === "followup_reminder").forEach((n) => alertUser(n, router.push));
+        setNotifications((prev) => {
+          const known = new Set(prev.map((n) => n.id));
+          const fresh = incoming.filter((n) => !known.has(n.id));
+          return fresh.length ? [...fresh, ...prev] : prev;
+        });
+      } catch {}
     };
 
     return () => {
       eventSource.close();
     };
-  }, [fetchNotifications]);
+  }, [fetchNotifications, router]);
 
   const markRead = async (id: number) => {
     try {

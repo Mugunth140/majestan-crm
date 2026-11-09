@@ -1,4 +1,6 @@
 "use client";
+import { cn } from "@/lib/utils";
+import { PROPERTY_FIELD, PROPERTY_GROUP, PROPERTY_LABEL } from "./property-form-styles";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PriceInput } from "@/components/shared/price-input";
@@ -40,7 +42,7 @@ export function PgAccommodationFields({
   const furnished = isPgFurnished(furnishingStatus);
   const select = (key: string, label: string, values: string[]) => (
     <div key={key} className="space-y-2">
-      <label htmlFor={`pg-${key}`} className="text-sm font-semibold">
+      <label htmlFor={`pg-${key}`} className={PROPERTY_LABEL}>
         {label}
       </label>
       <PropertyFormSelect
@@ -55,7 +57,7 @@ export function PgAccommodationFields({
   );
   return (
     <>
-      <h4 className="text-base font-semibold md:col-span-2 lg:col-span-3">
+      <h4 className="text-[16px] font-medium text-foreground md:col-span-2 lg:col-span-3">
         Accommodation and occupancy
       </h4>
       {PG_SELECTS.slice(0, 3).map(([key, label, items]) =>
@@ -65,7 +67,7 @@ export function PgAccommodationFields({
         ([key, label]) =>
           pgFieldVisible(key, value) && (
             <div key={key} className="space-y-2">
-              <label htmlFor={`pg-${key}`} className="text-sm font-semibold">
+              <label htmlFor={`pg-${key}`} className={PROPERTY_LABEL}>
                 {key === "totalCapacity"
                   ? `Total ${value.roomType === "Private" ? "rooms" : "beds"} in PG`
                   : key === "availableCapacity"
@@ -77,7 +79,7 @@ export function PgAccommodationFields({
                 type="number"
                 min={key === "sharingCount" ? 2 : 0}
                 step={1}
-                className="h-12"
+                className={PROPERTY_FIELD}
                 value={value[key] ?? ""}
                 onChange={(e) => change(key, e.target.value)}
               />
@@ -98,7 +100,7 @@ export function PgAccommodationFields({
       ))}
       {PG_MULTI.slice(0, 2).map(([key, label, items]) => (
         <div key={key} className="space-y-2">
-          <label className="text-sm font-semibold">{label}</label>
+          <label className={PROPERTY_LABEL}>{label}</label>
           <PropertyMultiSelect
             name={label}
             value={value[key] ?? ""}
@@ -117,7 +119,7 @@ export function PgAccommodationFields({
         ).map(([key, label, items]) => (
           <details
             key={key}
-            className="rounded-xl border p-4 md:col-span-2 lg:col-span-3"
+            className={cn(PROPERTY_GROUP, "md:col-span-2 lg:col-span-3")}
           >
             <summary className="cursor-pointer text-sm font-semibold">
               {label}
@@ -137,7 +139,7 @@ export function PgAccommodationFields({
                       min={0}
                       step={1}
                       placeholder="Count"
-                      className="h-12"
+                      className={PROPERTY_FIELD}
                       value={row?.count ?? ""}
                       onChange={(e) =>
                         change(
@@ -157,7 +159,7 @@ export function PgAccommodationFields({
             </div>
           </details>
         ))}
-      <h4 className="text-base font-semibold md:col-span-2 lg:col-span-3">
+      <h4 className="text-[16px] font-medium text-foreground md:col-span-2 lg:col-span-3">
         Rent, deposit and services
       </h4>
       {PG_SELECTS.slice(3, 5).map(([key, label, items]) =>
@@ -167,10 +169,10 @@ export function PgAccommodationFields({
         ([key, label]) =>
           pgFieldVisible(key, value) && (
             <div key={key} className="space-y-2">
-              <label htmlFor={`pg-${key}`} className="text-sm font-semibold">
+              <label htmlFor={`pg-${key}`} className={PROPERTY_LABEL}>
                 {label}
               </label>
-              <PriceInput
+              <PriceInput className={PROPERTY_FIELD}
                 placeholder="e.g. 3,000"
                 id={`pg-${key}`}
                 value={value[key] ?? ""}
@@ -181,7 +183,7 @@ export function PgAccommodationFields({
       )}
       {value.depositType === "Multiple of Rent" && (
         <div className="space-y-2">
-          <label htmlFor="pg-depositMonths" className="text-sm font-semibold">
+          <label htmlFor="pg-depositMonths" className={PROPERTY_LABEL}>
             Deposit months
           </label>
           <Input
@@ -190,14 +192,14 @@ export function PgAccommodationFields({
             min={0}
             max={30}
             step={1}
-            className="h-12"
+            className={PROPERTY_FIELD}
             value={value.depositMonths ?? ""}
             onChange={(e) => change("depositMonths", e.target.value)}
           />
         </div>
       )}
       <div className="space-y-4 md:col-span-2 lg:col-span-3">
-        <p className="text-sm font-semibold">
+        <p className={PROPERTY_LABEL}>
           Services included in rent and additional charges
         </p>
         <div className="grid items-start gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -215,7 +217,7 @@ export function PgAccommodationFields({
             return (
               <div
                 key={name}
-                className="min-w-0 space-y-3 rounded-xl border bg-muted/20 p-4"
+                className={cn(PROPERTY_GROUP, "min-w-0 space-y-3")}
               >
                 <div className="space-y-2">
                   <label htmlFor={`pg-service-${name}`} className="text-sm">
@@ -282,7 +284,7 @@ export function PgAccommodationFields({
                           type="number"
                           min={0}
                           step="any"
-                          className="h-12"
+                          className={PROPERTY_FIELD}
                           value={row.amount ?? ""}
                           onChange={(e) =>
                             update({
@@ -301,7 +303,7 @@ export function PgAccommodationFields({
           })}
         </div>
       </div>
-      <h4 className="text-base font-semibold md:col-span-2 lg:col-span-3">
+      <h4 className="text-[16px] font-medium text-foreground md:col-span-2 lg:col-span-3">
         Food and meals
       </h4>
       {PG_SELECTS.slice(5, 8).map(
@@ -312,7 +314,7 @@ export function PgAccommodationFields({
         ([key, label, items]) =>
           pgFieldVisible(key, value) && (
             <div key={key} className="space-y-2">
-              <label className="text-sm font-semibold">{label}</label>
+              <label className={PROPERTY_LABEL}>{label}</label>
               <PropertyMultiSelect
                 name={label}
                 value={value[key] ?? ""}
@@ -327,10 +329,10 @@ export function PgAccommodationFields({
         ([key, label]) =>
           pgFieldVisible(key, value) && (
             <div key={key} className="space-y-2">
-              <label htmlFor={`pg-${key}`} className="text-sm font-semibold">
+              <label htmlFor={`pg-${key}`} className={PROPERTY_LABEL}>
                 {label}
               </label>
-              <PriceInput
+              <PriceInput className={PROPERTY_FIELD}
                 placeholder="e.g. 3,000"
                 id={`pg-${key}`}
                 value={value[key] ?? ""}
@@ -339,7 +341,7 @@ export function PgAccommodationFields({
             </div>
           ),
       )}
-      <h4 className="text-base font-semibold md:col-span-2 lg:col-span-3">
+      <h4 className="text-[16px] font-medium text-foreground md:col-span-2 lg:col-span-3">
         Contract and house rules
       </h4>
       {PG_SELECTS.slice(8).map(([key, label, items]) =>
@@ -349,11 +351,11 @@ export function PgAccommodationFields({
         <div className="space-y-2">
           <label
             htmlFor="pg-earlyLeavingAmount"
-            className="text-sm font-semibold"
+            className={PROPERTY_LABEL}
           >
             Early leaving amount
           </label>
-          <PriceInput
+          <PriceInput className={PROPERTY_FIELD}
             placeholder="e.g. 3,000"
             id="pg-earlyLeavingAmount"
             value={value.earlyLeavingAmount ?? ""}
@@ -365,7 +367,7 @@ export function PgAccommodationFields({
         <div className="space-y-2">
           <label
             htmlFor="pg-earlyLeavingMonths"
-            className="text-sm font-semibold"
+            className={PROPERTY_LABEL}
           >
             Early leaving months
           </label>
@@ -374,14 +376,14 @@ export function PgAccommodationFields({
             type="number"
             min={0}
             step={1}
-            className="h-12"
+            className={PROPERTY_FIELD}
             value={value.earlyLeavingMonths ?? ""}
             onChange={(e) => change("earlyLeavingMonths", e.target.value)}
           />
         </div>
       )}
       <div className="space-y-2 md:col-span-2 lg:col-span-3">
-        <label htmlFor="pg-otherRules" className="text-sm font-semibold">
+        <label htmlFor="pg-otherRules" className={PROPERTY_LABEL}>
           Other house rules
         </label>
         <Input
@@ -389,7 +391,7 @@ export function PgAccommodationFields({
           value={value.otherRules ?? ""}
           onChange={(e) => change("otherRules", e.target.value)}
           maxLength={2000}
-          className="h-12"
+          className={PROPERTY_FIELD}
         />
       </div>
     </>

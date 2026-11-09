@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Post, Put, Delete, Param, Query, UseInterceptors, UploadedFile, BadRequestException, UseGuards, Request } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, Delete, Param, Query, UseInterceptors, UploadedFile, BadRequestException, UseGuards, Request, StreamableFile, Header, ParseIntPipe, ParseEnumPipe } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { LeadsService } from './leads.service';
+import { LeadEventsService } from './lead-events.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GetLeadsQueryDto } from './dto/get-leads-query.dto';
 import { CreateLeadDto } from './dto/create-lead.dto';
@@ -13,11 +14,19 @@ import { UpdateLeadInquiryDto } from './dto/update-lead-inquiry.dto';
 import { CreateLeadContactLogDto } from './dto/create-lead-contact-log.dto';
 import { CreateLeadFollowUpDto } from './dto/create-lead-follow-up.dto';
 import { UpdateLeadFollowUpDto } from './dto/update-lead-follow-up.dto';
+import { RolesGuard } from '../auth/roles.guard';
+import { LeadShareService } from './share/lead-share.service';
+import { LogShareDto, ShareListingsDto } from './dto/share-listings.dto';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('api/v1/leads')
 @UseGuards(JwtAuthGuard)
 export class LeadsController {
-  constructor(private readonly leadsService: LeadsService) {}
+  constructor(
+    private readonly leadsService: LeadsService,
+    private readonly leadEvents: LeadEventsService,
+    private readonly share: LeadShareService,
+  ) {}
 
   @Get('cities')
   async getCities() {
@@ -91,9 +100,50 @@ export class LeadsController {
     return { success: true, data: lead, transferredToSales };
   }
 
+  @Get(':id/timeline')
+  async getTimeline(@Param('id') id: string) {
+    const data = await this.leadEvents.timeline(Number(id));
+    return { success: true, data };
+  }
+
   @Get(':id/auto-match')
-  async autoMatchProperties(@Param('id') id: string) {
-    const data = await this.leadsService.autoMatchProperties(Number(id));
+  async autoMatchProperties(@Param('id') id: string, @Query('inquiryId') inquiryId?: string) {
+    const data = await this.leadsService.autoMatchProperties(Number(id), inquiryId ? Number(inquiryId) : undefined);
+    return { success: true, data };
+  }
+
+  /** A listing's customer brochure, to download or send on WhatsApp. */
+  @Header('Cache-Control', 'private, no-store')
+  @Get(':id/share/pdf/:kind/:listingId')
+  async sharePdf(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('kind', new ParseEnumPipe({ property: 'property', project: 'project' })) kind: 'property' | 'project',
+    @Param('listingId', ParseIntPipe) listingId: number,
+    @Request() req: any,
+    // A WhatsApp share downloads its brochures too; the share itself is the record of that.
+    @Query('via') via?: string,
+  ) {
+    const { buffer, filename } = await this.share.download(id, { kind, id: listingId }, req.user, via !== 'share');
+    return new StreamableFile(buffer, {
+      type: 'application/pdf',
+      length: buffer.length,
+      disposition: `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    });
+  }
+
+  @Post(':id/share/email-draft')
+  async shareEmailDraft(@Param('id', ParseIntPipe) id: number, @Body() body: ShareListingsDto, @Request() req: any) {
+    return { success: true, data: await this.share.emailDraft(id, body.items, req.user) };
+  }
+
+  @Post(':id/share/log')
+  async logShare(@Param('id', ParseIntPipe) id: number, @Body() body: LogShareDto, @Request() req: any) {
+    return { success: true, data: await this.share.log(id, body.channel, body.items, req.user) };
+  }
+
+  @Post(':id/inquiries')
+  async addInquiry(@Param('id') id: string, @Body() body: UpdateLeadInquiryDto, @Request() req: any) {
+    const data = await this.leadsService.addInquiry(Number(id), body, req.user?.id ?? null);
     return { success: true, data };
   }
 
@@ -102,17 +152,28 @@ export class LeadsController {
     @Param('id') id: string,
     @Param('inquiryId') inquiryId: string,
     @Body() body: UpdateLeadInquiryDto,
+    @Request() req: any,
   ) {
-    const data = await this.leadsService.updateInquiry(Number(id), Number(inquiryId), body);
+    const data = await this.leadsService.updateInquiry(Number(id), Number(inquiryId), body, req.user?.id ?? null);
     return { success: true, data };
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
+  @Delete(':id/inquiries/:inquiryId')
+  async deleteInquiry(@Param('id') id: string, @Param('inquiryId') inquiryId: string, @Request() req: any) {
+    await this.leadsService.deleteInquiry(Number(id), Number(inquiryId), req.user?.id ?? null);
+    return { success: true };
   }
 
   @Put(':id')
-  async updateLead(@Param('id') id: string, @Body() body: UpdateLeadDto) {
-    const data = await this.leadsService.updateLead(Number(id), body);
+  async updateLead(@Param('id') id: string, @Body() body: UpdateLeadDto, @Request() req: any) {
+    const data = await this.leadsService.updateLead(Number(id), body, req.user?.id ?? null);
     return { success: true, data };
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
   @Delete(':id')
   async deleteLead(@Param('id') id: string) {
     await this.leadsService.deleteLead(Number(id));
@@ -128,8 +189,8 @@ export class LeadsController {
 
   // ── Follow-Up CRUD ─────────────────────────────────────────────────────────
   @Post(':id/follow-ups')
-  async addFollowUp(@Param('id') id: string, @Body() body: CreateLeadFollowUpDto) {
-    const data = await this.leadsService.addFollowUp(Number(id), body);
+  async addFollowUp(@Param('id') id: string, @Body() body: CreateLeadFollowUpDto, @Request() req: any) {
+    const data = await this.leadsService.addFollowUp(Number(id), body, req.user?.id ?? null);
     return { success: true, data };
   }
 
@@ -149,6 +210,8 @@ export class LeadsController {
     return { success: true, data };
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
   @Delete(':id/follow-ups/:followUpId')
   async deleteFollowUp(
     @Param('id') id: string,
@@ -160,17 +223,19 @@ export class LeadsController {
 
   @Post(':id/documents')
   @UseInterceptors(FileInterceptor('file'))
-  async uploadDocument(@Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
+  async uploadDocument(@Param('id') id: string, @UploadedFile() file: Express.Multer.File, @Request() req: any) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
-    const data = await this.leadsService.uploadDocument(Number(id), file);
+    const data = await this.leadsService.uploadDocument(Number(id), file, req.user?.id ?? null);
     return { success: true, data };
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
   @Delete(':id/documents/:docId')
-  async deleteDocument(@Param('id') id: string, @Param('docId') docId: string) {
-    const data = await this.leadsService.deleteDocument(Number(id), Number(docId));
+  async deleteDocument(@Param('id') id: string, @Param('docId') docId: string, @Request() req: any) {
+    const data = await this.leadsService.deleteDocument(Number(id), Number(docId), req.user?.id ?? null);
     return { success: true, data };
   }
 }

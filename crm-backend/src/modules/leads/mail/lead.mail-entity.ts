@@ -109,7 +109,8 @@ export const leadMailEntity = defineMailEntity<LeadMailData>({
     const meetAt = d.visit?.location ?? d.project?.address ?? null;
     const directions = d.visit?.location ? mapsUrl(d.visit.location) : (d.project?.mapsUrl ?? null);
     const pageUrl = d.project?.url ?? d.propertyUrl;
-    const advisorName = d.advisor?.name ?? 'Our property advisor';
+    // Reads mid-sentence: "…and a member of our sales team will call you".
+    const advisorName = d.advisor?.name ?? 'a member of our sales team';
     const advisorPhone = d.advisor?.phone ?? COMPANY.phone;
     return {
       'lead.name': d.name,
@@ -147,7 +148,7 @@ export const leadMailEntity = defineMailEntity<LeadMailData>({
     { key: 'visit.date', label: 'Site visit date', sample: 'Saturday, 7 November 2026' },
     { key: 'visit.time', label: 'Site visit time', sample: '10:30 AM (IST)' },
     { key: 'visit.location', label: 'Meeting point', sample: 'Emerald Heights site office' },
-    { key: 'advisor.name', label: 'Assigned advisor name', sample: 'Priya Raman' },
+    { key: 'advisor.name', label: 'Assigned advisor name (or "a member of our sales team")', sample: 'Priya Raman' },
     { key: 'advisor.phone', label: 'Assigned advisor phone', sample: '+91 98765 43210' },
     { key: 'visit_details', label: 'Site visit details card', sample: '[project, date, time, meeting point, advisor]', block: true },
     { key: 'map_button', label: 'Directions button', sample: '[Open in Google Maps]', block: true },

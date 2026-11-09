@@ -1,23 +1,29 @@
 "use client";
 
+import { isAdmin } from "@/lib/permissions";
 import { apiFetch } from "@/lib/api-fetch";
 
 import { useEffect, useState, Suspense } from "react";
 import { DataTable } from "@/components/tables/data-table";
+import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { ActiveCell, IdCell, NameCell, statusDot } from "@/components/tables/cells";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ColumnDef } from "@tanstack/react-table";
-import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Plus, ShieldAlert } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { UserForm } from "./_components/UserForm";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
+import { PageActions } from "@/components/layout/page-actions";
+import { ListBody, ListFrame, ListToolbar, ToolbarEnd, ToolbarSearch, headerPrimaryClass } from "@/components/layout/list-page";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 function UsersList() {
   const router = useRouter();
+  const views = useModuleView("users", USER_FIELDS);
   const searchParams = useSearchParams();
   const deptFilter = searchParams.get("dept");
 
@@ -28,6 +34,7 @@ function UsersList() {
   const [role, setRole] = useState<string>("");
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -60,6 +67,11 @@ function UsersList() {
   const displayedUsers = deptFilter 
     ? users.filter(u => u.department?.name === deptFilter)
     : users;
+  const [search, setSearch] = useState("");
+  const q = search.trim().toLowerCase();
+  const searchedUsers = q
+    ? displayedUsers.filter((u: { name?: string; email?: string }) => u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q))
+    : displayedUsers;
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -120,16 +132,15 @@ function UsersList() {
       enableSorting: false,
       enableHiding: false,
     },
-    { accessorKey: "id", header: "ID" },
-    { accessorKey: "name", header: "Name" },
-    { accessorKey: "email", header: "Email" },
+    { accessorKey: "id", header: "ID", cell: ({ row }) => <IdCell href={`/users/${row.original.id}`}>{row.original.id}</IdCell> },
+    { accessorKey: "name", header: "Name", cell: ({ row }) => <NameCell name={row.original.name} image={row.original.avatar_url} avatar /> },
+    { accessorKey: "email", header: "Email", cell: ({ row }) => <span className="text-muted-foreground">{row.original.email}</span> },
+    { accessorKey: "phone", header: "Phone", cell: ({ row }) => <span className="tabular-nums text-muted-foreground">{row.original.phone || "—"}</span> },
     { 
       accessorKey: "role", 
       header: "Role",
       cell: ({ row }) => (
-        <Badge variant="outline" className="font-medium bg-muted/30">
-          {row.original.role?.name || "No Role"}
-        </Badge>
+        <span>{row.original.role?.name || "No Role"}</span>
       )
     },
     { 
@@ -141,51 +152,54 @@ function UsersList() {
       accessorKey: "is_active", 
       header: "Status",
       cell: ({ row }) => (
-        <Badge variant="secondary" className={row.original.is_active ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-red-50 text-red-600 border-red-200"}>
-          {row.original.is_active ? "Active" : "Inactive"}
-        </Badge>
+        <ActiveCell active={row.original.is_active} />
       )
     }
   ];
 
   return (
-    <div className="flex flex-col space-y-6">
-      <div className="flex h-[48px] items-center justify-between pr-[150px]">
-        <div>
-          <h1 className="text-[28px] font-bold tracking-tight">
-            {deptFilter ? `${deptFilter} Users` : "Users Management"}
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1 flex items-center gap-2">
-            <ShieldAlert className="h-4 w-4" /> Only Administrators can view and manage this section.
-          </p>
-        </div>
-
-        <Button onClick={() => router.push("/users/new")} className="bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md h-10 p-5 rounded-full font-semibold gap-2">
-          <Plus size={16} />
+    <div className="flex flex-col md:h-full">
+      {views.switcher}
+      <PageActions>
+        <button type="button" onClick={() => setCreating(true)} className={headerPrimaryClass}>
+          <Plus className="size-4" />
           Add User
-        </Button>
-      </div>
+        </button>
+      </PageActions>
 
-      <div className="bg-card border rounded-xl overflow-hidden shadow-sm p-6">
-        {isLoading ? <TableSkeleton /> : (
-          <DataTable 
-            columns={columns} 
-            data={displayedUsers} 
-            showToolbar={true} 
-            showDeleteAction={role === "Admin"}
-            onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
-            renderToolbarActions={(selectedRows) => {
-              if (selectedRows.length !== 1) return null;
-              const row = selectedRows[0];
-              return (
-                <Button variant="outline" size="sm" onClick={() => router.push("/users/new?edit=" + row.id)}>
-                  <Edit size={15} className="mr-1.5" /> Edit
-                </Button>
-              );
-            }}
-          />
-        )}
-      </div>
+      <ListFrame>
+        <ListToolbar>
+          {deptFilter && <span className="text-[14px] font-medium">{deptFilter} users</span>}
+          <ToolbarEnd>
+            {views.picker}
+            <ToolbarSearch value={search} onChange={setSearch} placeholder="Search name or email" />
+          </ToolbarEnd>
+        </ListToolbar>
+        <ListBody>
+          {isLoading ? <TableSkeleton columns={7} rows={10} flush /> : (
+            <ModuleViews
+              state={views}
+              data={searchedUsers}
+              columns={columns}
+              list={
+                <DataTable
+                variant="list"
+                columns={columns}
+                data={searchedUsers}
+                showToolbar={true}
+                showDeleteAction={isAdmin({ role })}
+                onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
+                onRowClick={(u) => router.push(`/users/${u.id}`)}
+              />
+              }
+              getKey={(u) => u.id}
+              onOpen={(u) => router.push(`/users/${u.id}`)}
+              card={(u) => ({ title: u.name, id: u.id, href: `/users/${u.id}`, subtitle: u.email, footer: u.department?.name, tag: u.role?.name })}
+              noun="users"
+            />
+          )}
+        </ListBody>
+      </ListFrame>
 
       <Dialog open={deleteId !== null || bulkDeleteIds !== null} onOpenChange={(open) => {
         if (!open) {
@@ -206,9 +220,17 @@ function UsersList() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {creating && <UserForm onClose={() => setCreating(false)} onCreated={(id) => router.push(`/users/${id}`)} />}
     </div>
   );
 }
+
+const USER_FIELDS: ViewField[] = [
+  { id: "role", label: "Role", get: (u) => u.role?.name || "No Role" },
+  { id: "department", label: "Department", get: (u) => u.department?.name },
+  { id: "status", label: "Status", get: (u) => (u.is_active ? "Active" : "Inactive"), order: ["Active", "Inactive"], dot: (v) => statusDot(v) },
+];
 
 export default function UsersPage() {
   return (

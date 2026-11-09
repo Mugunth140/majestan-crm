@@ -1,19 +1,21 @@
 "use client";
 
-import { matchesInboundActionFilter } from "@/lib/inbound-action-required";
-import { inboundStatusLabel } from "@/lib/inbound-status";
+import { inboundStatusLabel, inboundStatusTone } from "@/lib/inbound-status";
 import { InboundAssignmentDialog } from "@/components/inbound/inbound-assignment-dialog";
+import { NewInboundModal, showQueueNext } from "@/components/inbound/new-inbound-modal";
+import { useIsMobile } from "@/hooks/use-device";
 import { formatInboundCreated, matchesInboundSearch } from "@/lib/inbound-queue";
 import { apiFetch, apiJson } from "@/lib/api-fetch";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { DataTable } from "@/components/tables/data-table";
+import { ModuleMobileRows, ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { moveRow } from "@/lib/move-row";
+import { DateCell, IdCell, StatusCell, statusDot, type StatusTone } from "@/components/tables/cells";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Plus, RefreshCw, Eye, Search, Filter, X, Lock } from "lucide-react";
-import { motion } from "motion/react";
+import { Plus, Eye, Search, Filter, X, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -21,33 +23,45 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { FormSelect } from "@/components/shared/form-select";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { ListFrame, ListToolbar, SegmentTabs, ToolbarEnd, ToolbarSearch, headerPrimaryClass, toolbarFilterButton } from "@/components/layout/list-page";
+import { ClearFilters, FilterDivider, FilterStrip, DateQuickFilter, QuickFilter, toOptions } from "@/components/shared/quick-filters";
+import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { cn } from "@/lib/utils";
-import { canViewInboundContacts } from "@/lib/permissions";
-import { ACTION_FILTERS, getActionFilterLabel } from "@/lib/action-filters";
+import { canViewInboundContacts, isAdmin } from "@/lib/permissions";
+import { StaffName } from "@/components/shared/name-avatar";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
-const STATUS_STYLES: Record<string, string> = {
-  "New Inbound": "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-300",
-  "Contacting Owner": "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400",
-  "Terms not Accepted": "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400",
-  "On Hold": "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400",
-  "Pending Verification": "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400",
-  "Approved": "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400",
-  "Rejected": "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400",
-  "Closed": "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400",
+const STATUS_TONES: Record<string, StatusTone> = {
+  "New Inbound": "gray",
+  "Contacting Owner": "blue",
+  "Terms not Accepted": "red",
+  "On Hold": "gray",
+  "Pending Verification": "amber",
+  "Approved": "green",
+  "Rejected": "red",
+  "Closed": "green",
 };
+
+const INBOUND_FIELDS: ViewField[] = [
+  { id: "status", label: "Status", get: (i) => i.status || "New Inbound", order: Object.keys(STATUS_TONES), dot: (v) => statusDot(v, STATUS_TONES[v]) },
+  { id: "inbound_status", label: "Inbound status", get: (i) => (i.inbound_status ? inboundStatusLabel(i.inbound_status) : ""), dot: (v) => statusDot(v, inboundStatusTone(v)) },
+  { id: "category", label: "Category", get: (i) => i.property_category || i.propertyCategory, capitalize: true },
+  { id: "assigned", label: "Assigned", get: (i) => i.assigned?.name || "Unassigned" },
+  { id: "uploaded_by", label: "Uploaded by", get: (i) => i.uploaded_by?.name },
+];
 
 export default function InboundPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = usePersistedState<string>("inbound:tab", "All Inbound", { allowed: ["All Inbound", "Queue", "Action Required", "Closed"] });
-  const [actionFilter, setActionFilter] = usePersistedState<string>("inbound:actionFilter", "Today", { allowed: ACTION_FILTERS });
+  const isPhone = useIsMobile();
+  const [creating, setCreating] = useState(false);
+  const views = useModuleView("inbound", INBOUND_FIELDS);
+  const [activeTab, setActiveTab] = usePersistedState<string>("inbound:tab", "All Inbound", { allowed: ["All Inbound", "Queue", "Closed"] });
   const [inbounds, setInbounds] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -95,10 +109,8 @@ export default function InboundPage() {
     status: "",
   });
 
-  const [todayViewMode, setTodayViewMode] = usePersistedState<"pending" | "completed">("inbound:todayViewMode", "pending", { allowed: ["pending", "completed"] });
 
-  const tabs = ["All Inbound", "Queue", "Action Required", "Closed"];
-  const actionFilters = [...ACTION_FILTERS];
+  const tabs = ["All Inbound", "Queue", "Closed"];
 
   const fetchInbounds = useCallback(async () => {
     try {
@@ -156,18 +168,13 @@ export default function InboundPage() {
 
     const closedStatuses = ["Closed"];
 
-    if (activeTab === "Action Required") {
-      const now = new Date();
-      return filtered.filter(record => matchesInboundActionFilter(record, actionFilter, todayViewMode, now, filters.status));
-    }
-
     if (activeTab === "Closed") {
       return filtered.filter(l => closedStatuses.includes(l.status));
     }
 
     // Default: All Inbound (Active Pipeline)
     return filtered.filter(l => !closedStatuses.includes(l.status));
-  }, [inbounds, debouncedSearchQuery, filters, activeTab, queueFilters, actionFilter, todayViewMode]);
+  }, [inbounds, debouncedSearchQuery, filters, activeTab, queueFilters]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -228,29 +235,14 @@ export default function InboundPage() {
       enableSorting: false,
       enableHiding: false,
     },
-    { 
-      id: "sno", 
-      header: "#",
-      
-      cell: ({ row }) => <span>{row.index + 1}</span>
-    },
     {
       accessorKey: "propertyId",
-      header: "Id",
+      header: "ID",
       cell: ({ row }) => (
-        <Link href={`/inbound/${row.original.rawId || row.original.id}`} className="text-[#0052FF] hover:underline font-medium">
-          {row.getValue("propertyId") || row.original.property_id || "N/A"}
-        </Link>
+        <IdCell href={`/inbound/${row.original.rawId || row.original.id}`}>
+          {row.getValue("propertyId") || row.original.property_id || "—"}
+        </IdCell>
       ),
-    },
-    { 
-      accessorKey: "date", 
-      header: activeTab === "Queue" ? "Created at" : "Date",
-      
-      cell: ({ row }) => {
-        const d = row.original.createdAt || row.original.created_at || row.original.date;
-        return <span>{activeTab === "Queue" ? formatInboundCreated(d) : d ? new Date(d).toLocaleDateString() : "-"}</span>;
-      }
     },
     { 
       id: "categoryType", 
@@ -258,7 +250,7 @@ export default function InboundPage() {
       cell: ({ row }) => {
         const cat = (row.original.property_category || row.original.propertyCategory || "");
         const type = (row.original.property_type || row.original.propertyType || "").replace(/_/g, ' ');
-        if (!cat && !type) return <span>-</span>;
+        if (!cat && !type) return <span className="text-muted-foreground">—</span>;
         return <span className="capitalize">{cat} - {type}</span>;
       },
     },
@@ -274,7 +266,7 @@ export default function InboundPage() {
             </span>
           );
         }
-        return <span>{row.original.mobile_number || row.original.owner_mobile || "-"}</span>;
+        return <span>{row.original.mobile_number || row.original.owner_mobile || "—"}</span>;
       },
     },
     ...(activeTab === "Queue" ? [{
@@ -282,18 +274,17 @@ export default function InboundPage() {
       header: "Submission",
       cell: ({ row }) => {
         const repeat = row.original.submission_status === "Repeat";
-        return <Badge variant="outline" title={repeat ? "This mobile number appears on an earlier inbound. Staff verification required." : "First inbound for this mobile number."}
-          className={repeat ? STATUS_STYLES["Pending Verification"] : STATUS_STYLES["Approved"]}>
-          {repeat ? "Repeat" : "New"}
-        </Badge>;
+        return <span title={repeat ? "This mobile number appears on an earlier inbound. Staff verification required." : "First inbound for this mobile number."}>
+          <StatusCell status={repeat ? "Repeat" : "New"} tone={repeat ? "amber" : "green"} />
+        </span>;
       },
     },
     ] as ColumnDef<any>[] : []),
     { id: "uploaded_by", header: "Uploaded by", cell: ({ row }) => row.original.uploaded_by?.name || "Unknown" },
     { id: "assigned", header: "Assigned", cell: ({ row }) => (
       <button type="button" disabled={!canAssign} onClick={() => setAssignmentIds([row.original.id])}
-        className="enabled:text-[#0052FF] enabled:hover:underline disabled:cursor-default">
-        {row.original.assigned?.name || "Unassigned"}
+        className="enabled:hover:underline disabled:cursor-default">
+        <StaffName name={row.original.assigned?.name} userId={row.original.assigned?.id} />
       </button>
     ) },
     {
@@ -302,7 +293,7 @@ export default function InboundPage() {
       
       cell: ({ row }) => {
         const addr = row.original.address || row.original.location || "";
-        if (!addr) return <span>-</span>;
+        if (!addr) return <span className="text-muted-foreground">—</span>;
         
         return (
           <TooltipProvider delay={150}>
@@ -326,9 +317,7 @@ export default function InboundPage() {
       cell: ({ row }) => {
         const value = row.original.inbound_status;
         if (!value) return <span>—</span>;
-        const style = value === "available" ? STATUS_STYLES["Approved"]
-          : value === "not_available" ? STATUS_STYLES["Rejected"] : STATUS_STYLES["Pending Verification"];
-        return <Badge variant="outline" className={style}>{inboundStatusLabel(value)}</Badge>;
+        return <StatusCell status={inboundStatusLabel(value)} tone={inboundStatusTone(value)} />;
       },
     },
     {
@@ -336,20 +325,25 @@ export default function InboundPage() {
       header: "Status",
       cell: ({ row }) => {
         const s = (row.original.status as string) || "New";
-        const cls = STATUS_STYLES[s] ?? "bg-gray-100 text-gray-800 border-gray-200";
-        return <Badge className={"font-medium shadow-sm border whitespace-nowrap " + cls}>{s}</Badge>;
+        return <StatusCell status={s} tone={STATUS_TONES[s] ?? "gray"} />;
       },
+    },
+    { 
+      accessorKey: "date", 
+      header: activeTab === "Queue" ? "Created at" : "Date",
+      
+      cell: ({ row }) => {
+        const d = row.original.createdAt || row.original.created_at || row.original.date;
+        return activeTab === "Queue" ? <span className="whitespace-nowrap tabular-nums text-muted-foreground">{formatInboundCreated(d)}</span> : <DateCell value={d} />;
+      }
     },
   ];
 
   const columnKey = (column: ColumnDef<any>) => column.id || ("accessorKey" in column ? String(column.accessorKey) : "");
   const columns = activeTab === "Queue"
-    ? [
-        ...allColumns.filter(column => !["sno", "assigned", "address", "status", "date"].includes(columnKey(column))),
-        ...allColumns.filter(column => columnKey(column) === "date"),
-      ]
+    ? allColumns.filter(column => !["assigned", "address", "status"].includes(columnKey(column)))
     : activeTab === "All Inbound"
-      ? allColumns.filter(column => !["sno", "date"].includes(columnKey(column)))
+      ? allColumns.filter(column => columnKey(column) !== "date")
       : allColumns;
 
   const uniqueCategories = Array.from(new Set(inbounds.map(l => l.property_category || l.propertyCategory).filter(c => c && c !== "—")));
@@ -366,7 +360,7 @@ export default function InboundPage() {
     columns,
     data: displayedInbounds,
     showToolbar: true,
-    showDeleteAction: role === "Admin",
+    showDeleteAction: isAdmin({ role }),
     onDeleteSelected: (rows: any[]) => setBulkDeleteIds(rows.map(r => r.rawId || r.id)),
     renderToolbarActions: (selectedRows: any[]) => {
       if (!selectedRows.length) return null;
@@ -377,9 +371,6 @@ export default function InboundPage() {
           {canAssign && <Button variant="outline" size="sm" onClick={() => setAssignmentIds(selectedRows.map(row => row.id))}>Assign Selected</Button>}
           {selectedRows.length === 1 && <><Button variant="outline" size="sm" onClick={() => router.push("/inbound/" + id)}>
             <Eye size={15} className="mr-1.5" /> View
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => router.push("/inbound/new?edit=" + id)}>
-            <Edit size={15} className="mr-1.5" /> Edit
           </Button></>}
         </>
       );
@@ -390,22 +381,16 @@ export default function InboundPage() {
     <Popover>
       <PopoverTrigger render={
         isMobile ? (
-          <Button variant="outline" size="icon" className="h-12 w-12 rounded-2xl bg-black/5 dark:bg-white/10 border-transparent relative shrink-0">
+          <Button variant="outline" size="icon" className="h-10 w-10 rounded-[11px] bg-foreground/[0.06] border-transparent relative shrink-0">
             <Filter className="h-5 w-5 text-foreground" />
             {activeFiltersCount > 0 && (
-              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#0052FF] border-2 border-background text-white text-[10px] font-bold flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#017D58] border-2 border-background text-white text-[10px] font-bold flex items-center justify-center">
                 {activeFiltersCount}
               </span>
             )}
           </Button>
         ) : (
-          <Button variant="outline" className="h-10 rounded-xl bg-muted/30 border-border/60 px-4 flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium text-[13.5px]">Filters</span>
-            {activeFiltersCount > 0 && (
-              <Badge className="ml-1 bg-[#0052FF] text-white px-1.5 py-0.5 rounded-md text-[10px]">{activeFiltersCount}</Badge>
-            )}
-          </Button>
+          toolbarFilterButton(activeFiltersCount)
         )
       } />
       <PopoverContent align={isMobile ? "end" : "start"} className="w-[calc(100vw-32px)] sm:w-80 p-0 rounded-2xl shadow-xl overflow-hidden border-border/60 mx-4 sm:mx-0">
@@ -453,17 +438,21 @@ export default function InboundPage() {
     </Popover>
   );
 
+  type Row = (typeof displayedInbounds)[number];
+  const rowCard = (i: Row) => ({ title: [i.property_category || i.propertyCategory, (i.property_type || i.propertyType || "").replace(/_/g, " ")].filter(Boolean).join(" - ") || "Inbound", avatar: false, id: i.propertyId || i.property_id, href: `/inbound/${i.rawId || i.id}`, subtitle: i.address || i.location, footer: i.assigned?.name ?? <span className="text-muted-foreground">Unassigned</span> });
+  const openRow = (i: Row) => router.push(`/inbound/${i.rawId || i.id}`);
+
   const mobileFilters = (
-    <div className="px-4 pb-2 space-y-4">
+    <div className="px-4 pb-2 space-y-3">
       {/* iOS Search Bar & Filter */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-muted-foreground" />
           <Input 
             placeholder="Search ID, Type, Phone..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="pl-11 h-12 bg-black/5 dark:bg-white/10 border-transparent rounded-2xl text-[16px] focus-visible:ring-1 focus-visible:ring-primary shadow-none"
+            className="pl-10 h-10 bg-foreground/[0.06] border-transparent rounded-[11px] text-[16px] placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-[#017D58]/30 shadow-none"
           />
           {searchQuery && (
             <button onClick={() => setSearchQuery("")} className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 bg-muted-foreground/20 rounded-full text-foreground hover:bg-muted-foreground/30">
@@ -483,8 +472,8 @@ export default function InboundPage() {
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={cn(
-                "px-5 h-10 rounded-full text-[14px] font-semibold whitespace-nowrap transition-all border active:scale-95",
-                isActive ? "bg-foreground text-background border-foreground shadow-sm" : "bg-card text-muted-foreground border-border hover:bg-muted"
+                "px-3.5 h-8 rounded-full text-[14px] font-medium whitespace-nowrap transition-colors active:opacity-60",
+                isActive ? "bg-[#017D58] text-white dark:bg-[#2FB585] dark:text-black" : "bg-foreground/[0.06] text-foreground"
               )}
             >
               {tab}
@@ -493,185 +482,78 @@ export default function InboundPage() {
         })}
       </div>
 
-      {/* Action Required Row */}
-      {activeTab === "Action Required" && (
-        <div className="flex flex-col gap-3 -mx-4 px-4">
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
-            {actionFilters.map((filter) => {
-              const isActive = actionFilter === filter;
-              let activeClass = "bg-primary/10 text-primary border-primary/30";
-              if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
-              else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
-              else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
-              return (
-                <button
-                  key={filter}
-                  className={"h-9 shrink-0 flex items-center justify-center cursor-pointer px-4 rounded-full text-[13px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-card text-muted-foreground border-border hover:bg-muted hover:text-foreground")}
-                  onClick={() => setActionFilter(filter)}
-                >
-                  {getActionFilterLabel(filter)}
-                </button>
-              );
-            })}
-          </div>
-          
-          <div className={`flex items-center h-10 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "hidden opacity-0 pointer-events-none"}`}>
-            {[
-              { id: "pending", label: "Follow Up" },
-              { id: "completed", label: "Followed Up" }
-            ].map((mode) => {
-              const isSelected = todayViewMode === mode.id;
-              return (
-                <button
-                  key={mode.id}
-                  onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
-                  className={`flex-1 relative h-full flex items-center justify-center rounded-full text-[13px] font-bold transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
-                >
-                  {isSelected && (
-                    <motion.div
-                      layoutId="todayToggleBgMobile"
-                      className="absolute inset-0 bg-[#0052FF] shadow-md rounded-full"
-                      initial={false}
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                      style={{ zIndex: -1 }}
-                    />
-                  )}
-                  <span className="relative z-10">{mode.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
     </div>
   );
 
 
   const desktopFilters = (
-    <div className="bg-card border rounded-xl overflow-hidden shadow-sm md:flex md:flex-col md:flex-1 md:min-h-0">
-      {/* Search & Tabs Row */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between px-6 border-b bg-muted/10 pt-4 gap-6">
-        {/* Search & Filters */}
-        <div className="flex items-center gap-3 pb-3 xl:pb-4 w-full xl:w-auto">
-          <div className="relative w-64 xl:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search ID, Type, Phone..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="pl-9 h-10 bg-background rounded-xl border-border/60 shadow-sm text-[13.5px] focus-visible:ring-1 focus-visible:ring-primary"
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-muted-foreground/10 rounded-full text-foreground hover:bg-muted-foreground/20">
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {renderFilterPopover(false)}
-          </div>
-        </div>
+    <ListFrame>
+      <ListToolbar className="md:flex-nowrap">
+        <SegmentTabs tabs={tabs} value={activeTab} onChange={setActiveTab} label="Views" />
+        <FilterDivider />
+        <FilterStrip>
+          {activeTab === "Queue" && (
+            <QuickFilter label="Uploaded by" value={queueFilters.uploader} onChange={(v) => setQueueFilters((f) => ({ ...f, uploader: v }))}
+              options={Array.from(new Map(inbounds.filter((row) => row.uploaded_by).map((row) => [row.uploaded_by.id, row.uploaded_by])).values()).map((person) => ({ label: person.name, value: String(person.id) }))} />
+          )}
+          <QuickFilter label="Assigned to" value={queueFilters.staff} onChange={(v) => setQueueFilters((f) => ({ ...f, staff: v }))}
+            options={[{ label: "Unassigned", value: "unassigned" }, ...staffDirectory.map((person) => ({ label: person.name, value: String(person.id) }))]} />
+          <DateQuickFilter label="Created" from={filters.dateFrom} to={filters.dateTo} onChange={(dateFrom, dateTo) => setFilters((f) => ({ ...f, dateFrom, dateTo }))} />
+          <QuickFilter label="Status" value={filters.status} options={toOptions(uniqueStatuses)} onChange={(v) => setFilters((f) => ({ ...f, status: v }))} />
+          <QuickFilter label="Category" value={filters.category} options={toOptions(uniqueCategories)} onChange={(v) => setFilters((f) => ({ ...f, category: v }))} />
+          <QuickFilter label="Property type" value={filters.type} options={toOptions(uniqueTypes)} onChange={(v) => setFilters((f) => ({ ...f, type: v }))} />
+          <ClearFilters show={activeFiltersCount > 0 || !!searchQuery} onClick={() => { clearFilters(); setSearchQuery(""); }} />
+        </FilterStrip>
+        <ToolbarEnd>
+          {views.picker}
+          <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search ID, Type, Phone" className="md:[&_input]:w-56" />
+        </ToolbarEnd>
+      </ListToolbar>
 
-        {/* Tabs Row */}
-        <div className="flex items-center gap-6 overflow-x-auto scrollbar-hide relative pb-3 xl:pb-4">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={"relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " + (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")}
-            >
-              {tab}
-              {activeTab === tab && (
-                <motion.div layoutId="desktopActiveTabUnderline" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full" initial={false} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Action Required Row */}
-      {activeTab === "Action Required" && (
-        <div className="flex items-center gap-4 px-6 py-3 bg-muted/5 border-b border-border/40 animate-in slide-in-from-top-2 fade-in duration-200">
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
-            {actionFilters.map((filter) => {
-              const isActive = actionFilter === filter;
-              let activeClass = "bg-primary/10 text-primary border-primary/30";
-              if (filter === "Overdue" && isActive) activeClass = "bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400";
-              else if (filter === "Yesterday" && isActive) activeClass = "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300";
-              else if (filter === "Today" && isActive) activeClass = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400";
-              return (
-                <button
-                  key={filter}
-                  className={"h-9 shrink-0 flex items-center justify-center cursor-pointer px-4 rounded-full text-[13px] font-medium transition-all duration-200 ease-out active:scale-[0.96] border " + (isActive ? activeClass : "bg-transparent text-muted-foreground border-border/60 hover:bg-muted hover:text-foreground")}
-                  onClick={() => setActionFilter(filter)}
-                >
-                  {getActionFilterLabel(filter)}
-                </button>
-              );
-            })}
-          </div>
-          
-          <div className={`ml-auto shrink-0 flex items-center h-9 bg-muted/60 p-1 rounded-full border border-border/50 relative shadow-inner transition-opacity duration-200 ${actionFilter === "Today" ? "opacity-100" : "hidden opacity-0 pointer-events-none"}`}>
-            {[
-              { id: "pending", label: "Follow Up" },
-              { id: "completed", label: "Followed Up" }
-            ].map((mode) => {
-              const isSelected = todayViewMode === mode.id;
-              return (
-                <button
-                  key={mode.id}
-                  onClick={() => setTodayViewMode(mode.id as "pending" | "completed")}
-                  className={`relative h-full flex items-center px-4 rounded-full text-[12px] font-bold transition-colors duration-300 z-10 active:scale-[0.96] ${isSelected ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
-                >
-                  {isSelected && (
-                    <motion.div
-                      layoutId="todayToggleBgDesktop"
-                      className="absolute inset-0 bg-[#0052FF] shadow-md rounded-full"
-                      initial={false}
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                      style={{ zIndex: -1 }}
-                    />
-                  )}
-                  <span className="relative z-10">{mode.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Table */}
-      <div className="w-full md:flex-1 md:min-h-0 md:overflow-hidden">
-        {isLoading ? <TableSkeleton /> : <DataTable {...tableProps} />}
+      <div className="flex w-full min-w-0 flex-col md:min-h-0 md:flex-1 md:overflow-hidden">
+        {isLoading ? <TableSkeleton flush /> : <ModuleViews
+          state={views}
+          data={displayedInbounds}
+          columns={columns}
+          list={
+            <DataTable {...tableProps} variant="list" />
+          }
+          getKey={(i) => i.rawId || i.id}
+          onOpen={openRow}
+          onMove={(i, status) =>
+            moveRow({ setRows: setInbounds, row: i, same: (a, b) => (a.rawId || a.id) === (b.rawId || b.id), patch: { status }, request: { path: `/inbounds/${i.rawId || i.id}`, method: "PATCH", body: { status } }, success: `Moved to ${status}` })
+          }
+          card={rowCard}
+          noun="inbounds"
+        />}
       </div>
-    </div>
+    </ListFrame>
   );
 
 
 
   return (
     <>
-      <MobileHeader title="Inbound Dashboard" />
-      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:h-full">
-        <Device
-          mobile={null}
-          desktop={
-            <div className="flex h-[48px] items-center justify-between pr-[150px]">
-              <h1 className="text-[28px] font-bold tracking-tight">Inbound Dashboard</h1>
-
-              <div className="flex items-center gap-3">
-                <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={fetchInbounds} title="Refresh">
-                  <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
-                </Button>
-
-                <Link href="/inbound/new" className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
-                  <Plus size={18} />
-                  Add New Inbound
-                </Link>
-              </div>
-            </div>
-          }
+      <MobileHeader title="Inbound" />
+      {views.switcher}
+      <div className="w-full flex flex-col space-y-6 pt-4 md:space-y-0 md:pt-0 md:h-full">
+        <PageActions>
+          <button type="button" onClick={() => setCreating(true)} className={headerPrimaryClass}>
+            <Plus className="size-4" />
+            Add Inbound
+          </button>
+        </PageActions>
+        <NewInboundModal
+          open={creating}
+          quick={isPhone}
+          onOpenChange={setCreating}
+          onCreated={(id) => {
+            if (isPhone) { showQueueNext(); setActiveTab("Queue"); void fetchInbounds(); }
+            else router.push(id ? `/inbound/${id}` : "/inbound");
+          }}
         />
         
         <Device mobile={mobileFilters} desktop={desktopFilters} />
@@ -680,9 +562,11 @@ export default function InboundPage() {
         <Device
           desktop={null}
           mobile={
-            <div className="w-full px-4 pb-4">
+            <ModuleMobileRows state={views} card={rowCard} onOpen={openRow}>
+            <div className="w-full pb-4">
               {isLoading ? <TableSkeleton /> : <DataTable {...tableProps} />}
             </div>
+            </ModuleMobileRows>
           }
         />
       </div>

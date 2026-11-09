@@ -3,7 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { ThemeStatusBar } from "@/components/layout/theme-status-bar";
-import { Toaster } from "sonner";
+import { Toaster } from "@/components/ui/toaster";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -15,13 +15,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Majestan CRM",
-  description: "Internal CRM for Majestan Realty",
+  title: "CRM",
+  description: "Prismark CRM",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Majestan",
+    title: "CRM",
   },
 };
 
@@ -44,7 +44,9 @@ const themeScript = `
     } else {
       document.documentElement.classList.remove('dark');
     }
-    var color = isDark ? '#1C1C1E' : '#ffffff';
+    // Kumo UI reads dark mode from data-mode
+    document.documentElement.setAttribute('data-mode', isDark ? 'dark' : 'light');
+    var color = isDark ? '#0a0a0a' : '#ffffff';
     var meta = document.querySelector('meta[name="theme-color"]');
     if (!meta) {
       meta = document.createElement('meta');
@@ -69,19 +71,14 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} text-[14px] bg-background text-foreground transition-colors duration-500 ease-in-out antialiased`}>
         <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
+          attribute={["class", "data-mode"]}
+          defaultTheme="dark"
           enableSystem
           storageKey="theme"
         >
           <ThemeStatusBar />
           {children}
-          <Toaster
-            position="top-right"
-            richColors
-            offset={{ top: "calc(env(safe-area-inset-top) + 12px)", right: 16 }}
-            mobileOffset={{ top: "calc(env(safe-area-inset-top) + 12px)", right: 12 }}
-          />
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

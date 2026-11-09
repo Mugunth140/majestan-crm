@@ -5,7 +5,8 @@ import { apiFetch } from "@/lib/api-fetch";
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, User } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { Avatar } from "@/components/record/feed";
 import { toast } from "sonner";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -76,7 +77,7 @@ export function AssignLeadModal({ open, onClose, onConfirm, department, isLoadin
         <div className="space-y-2 max-h-72 overflow-y-auto">
           {isFetching ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="animate-spin text-[#0052FF] h-6 w-6" />
+              <Loader2 className="animate-spin text-muted-foreground h-6 w-6" />
             </div>
           ) : staffList.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">No staff members found.</p>
@@ -88,13 +89,11 @@ export function AssignLeadModal({ open, onClose, onConfirm, department, isLoadin
                 className={[
                   "w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left",
                   selectedId === s.id
-                    ? "border-[#0052FF] bg-[#0052FF]/10"
-                    : "border-border hover:border-[#0052FF]/40 hover:bg-muted/30",
+                    ? "border-foreground/40 bg-foreground/[0.05]"
+                    : "border-border hover:bg-muted/50",
                 ].join(" ")}
               >
-                <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center shrink-0">
-                  <User className="h-4 w-4 text-blue-700 dark:text-blue-300" />
-                </div>
+                <Avatar name={s.name} userId={s.id} staff className="h-8 w-8 text-[11px]" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-foreground truncate">
                     <span className="text-muted-foreground font-medium">#{s.id}</span> {s.name}
@@ -118,7 +117,7 @@ export function AssignLeadModal({ open, onClose, onConfirm, department, isLoadin
           <Button
             onClick={handleConfirm}
             disabled={isLoading || !selectedId}
-            className="bg-[#0052FF] text-white hover:bg-[#0052FF]/90"
+            className="bg-foreground text-background hover:bg-foreground/85"
           >
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Assign

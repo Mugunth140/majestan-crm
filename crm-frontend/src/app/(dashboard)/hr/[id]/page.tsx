@@ -1,729 +1,414 @@
 "use client";
 
-import { HrAssignmentDialog } from "@/components/hr/hr-assignment-dialog";
-import { MailPanel } from "@/components/mail/mail-panel";
-import { INTERVIEW_MODE_LABELS, formatInterviewTime } from "@/lib/hr-interview";
+import { CompletenessRing } from "@/components/record/score-ring";
+import { candidateScoreFields } from "@/lib/record-score";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { CheckCircle2, Database, Download, FileText, History, Loader2, MessagesSquare, Upload } from "lucide-react";
+import { apiFetch, apiJson } from "@/lib/api-fetch";
+import { sortContactLogs } from "@/lib/contact-log-utils";
+import { HR_STATUS_TONES } from "@/lib/hr-status";
+import { HR_DEPARTMENTS, HR_STATUSES, hrSourceOptions, loadHrStates } from "@/lib/hr-candidate-options";
+import { loadHrMasters, type HrSource } from "@/lib/hr-import";
+import { INTERVIEW_MODE_OPTIONS, toTimeInput } from "@/lib/hr-interview";
 import { downloadHrDocument, isHrDocumentAvailable, HR_DOCUMENT_ACCEPT } from "@/lib/hr-documents";
 import { toHrFollowUpPayload } from "@/lib/hr-follow-up";
-import { apiFetch, apiJson } from "@/lib/api-fetch";
-
-import { useState, useEffect, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import { isAdmin as isAdminUser } from "@/lib/permissions";
+import { statusDot, statusPillClass } from "@/components/tables/cells";
+import { FieldRow, InlineSelect, InlineText, Section, type Option } from "@/components/record/inline-field";
+import { Feed, TabHeader } from "@/components/record/feed";
+import { type Person } from "@/components/record/assignee-picker";
+import { AssigneeButton, StatusMenu, type StatusOption } from "@/components/record/header-actions";
+import { activityItems, type ActivityEntry } from "@/components/record/activity";
+import { HR_ACTIVITY, HR_DOCUMENT_LABELS } from "@/components/hr/hr-activity";
+import { HR_ENTITY, LeadConversation } from "@/components/record/conversation";
+import { FollowUpComposer } from "@/components/record/follow-up-composer";
+import { AttachmentsArt, EmptyState } from "@/components/record/empty-state";
+import { DataCard, RecordPage, RecordSkeleton, type RecordTab } from "@/components/record/record-page";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { FormSelect } from "@/components/shared/form-select";
-import { DateTimePicker } from "@/components/shared/datetime-picker";
-import { format } from "date-fns";
-import { toast } from "sonner";
-import { ArrowLeft, User, Phone, PhoneIncoming, Mail, MapPin, Plus, FileText, Briefcase, Clock, Calendar, RefreshCw, Save, History, Shield, Loader2, CheckCircle, Edit, ChevronLeft, MessageSquare } from "lucide-react";
-import dynamic from "next/dynamic";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { MobileHeader } from "@/components/layout/mobile-header";
-import {
-  CONTACT_TYPE_STYLES,
-  CONTACT_TYPE_ICONS,
-  formatTimestamp,
-  formatDuration,
-  sortContactLogs,
-  countByType,
-  countCallDirections,
-  contactLogIcon,
-  contactLogAuthor,
-} from "@/lib/contact-log-utils";
+import { cn } from "@/lib/utils";
 
-const FollowUpPanel = dynamic(() => import("@/components/shared/follow-up-panel").then(mod => mod.FollowUpPanel), { ssr: false });
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
-import { Skeleton } from "@/components/ui/skeleton";
+type Tab = "activity" | "conversation" | "data" | "documents";
+type Candidate = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+type Patch = Record<string, unknown>;
 
-function PageSkeleton() {
+/** Joined candidates also hand in their ID and certificates. */
+const JOINING_DOCUMENTS = ["aadhaar", "pan", "educationCert", "experienceCert", "photo"] as const;
+const PHOTO_ACCEPT = "image/jpeg,image/png,image/webp";
+
+const candidateCode = (c: Candidate) => "HRC" + String(c.id).padStart(4, "0");
+/** A picker shows the current value even when it's no longer one of the options. */
+const withCurrent = (options: Option[], value?: string | null) =>
+  !value || options.some((o) => o.value === value) ? options : [{ label: value, value }, ...options];
+const errorText = (result: { message?: string | string[] } | null) =>
+  Array.isArray(result?.message) ? result.message.join(", ") : result?.message;
+
+function DocumentRow({ label, reference, accept, uploading, disabled, onUpload, onDownload }: {
+  label: string;
+  reference?: string | null;
+  accept: string;
+  uploading: boolean;
+  disabled: boolean;
+  onUpload: (file: File) => void;
+  onDownload: () => void;
+}) {
+  const uploaded = isHrDocumentAvailable(reference);
   return (
-    <div className="animate-in fade-in duration-500 md:h-full flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-9 w-9 rounded-full shrink-0" />
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <Skeleton className="h-8 w-48" />
-              <Skeleton className="h-6 w-24 rounded-md" />
-              <Skeleton className="h-5 w-20" />
-            </div>
-            <Skeleton className="h-4 w-40" />
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-9 w-9 rounded-full" />
-          <Skeleton className="h-10 w-28 rounded-lg" />
-        </div>
+    <div className="flex min-h-14 items-center gap-3 border-b px-4 py-2.5 last:border-b-0">
+      <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", uploaded ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-foreground/[0.06] text-muted-foreground")}>
+        {uploaded ? <CheckCircle2 className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[14px] font-medium text-foreground">{label}</p>
+        <p className="text-[13px] text-muted-foreground">{uploaded ? "Uploaded" : "Not uploaded yet"}</p>
       </div>
-
-      <div className="flex-1 space-y-6 md:overflow-y-auto min-h-0 pb-6 pr-2">
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div className="col-span-2 flex flex-col gap-6">
-             <div className="bg-card border rounded-2xl p-6 shadow-sm">
-                <Skeleton className="h-5 w-48 mb-6" />
-                <div className="grid grid-cols-3 gap-y-6 gap-x-6">
-                  {[...Array(6)].map((_, i) => (
-                    <div key={i}>
-                      <Skeleton className="h-3 w-20 mb-2" />
-                      <Skeleton className="h-4 w-32" />
-                    </div>
-                  ))}
-                </div>
-             </div>
-             <div className="bg-card border rounded-2xl p-6 shadow-sm">
-                <Skeleton className="h-5 w-40 mb-6" />
-                <Skeleton className="h-40 w-full rounded-xl" />
-             </div>
-          </div>
-          <div className="col-span-1 flex flex-col gap-6">
-             <div className="bg-card border rounded-2xl p-6 shadow-sm">
-                <Skeleton className="h-5 w-32 mb-6" />
-                <div className="space-y-6">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i}>
-                      <Skeleton className="h-3 w-24 mb-2" />
-                      <Skeleton className="h-11 w-full rounded-xl" />
-                    </div>
-                  ))}
-                </div>
-             </div>
-          </div>
-        </div>
-      </div>
+      {uploaded ? (
+        <Button variant="outline" size="sm" onClick={onDownload}><Download className="h-3.5 w-3.5" /> Download</Button>
+      ) : (
+        <label className={cn("inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border bg-background px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-muted", disabled && "pointer-events-none opacity-50")}>
+          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+          {uploading ? "Uploading…" : "Upload"}
+          <input type="file" accept={accept} className="hidden" disabled={disabled}
+            onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; if (file) onUpload(file); }} />
+        </label>
+      )}
     </div>
   );
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
-
-const STATUS_STYLES: Record<string, string> = {
-  "New Application": "bg-gray-100 text-gray-800",
-  "Resume Shortlisted": "bg-blue-100 text-blue-800",
-  "Interview Scheduled": "bg-purple-100 text-purple-800",
-  "Interview Completed": "bg-indigo-100 text-indigo-800",
-  "Selected": "bg-emerald-100 text-emerald-800",
-  "Offer Sent": "bg-teal-100 text-teal-800",
-  "Joined": "bg-green-100 text-green-800",
-  "Rejected": "bg-red-200 text-red-900",
-  "Hold": "bg-yellow-100 text-yellow-800",
-};
-
 export default function HrDetail() {
-  const router = useRouter();
   const params = useParams();
+  const router = useRouter();
   const id = params?.id as string;
-  const [candidate, setCandidate] = useState<any>(null);
-  const [assignmentOpen, setAssignmentOpen] = useState(false);
-  const [isAssigning, setIsAssigning] = useState(false);
-  const [canAssign, setCanAssign] = useState(false);
-  useEffect(() => {
-    try { const user = JSON.parse(localStorage.getItem("crm_user") || "{}"); setCanAssign(["Super Admin", "Admin", "Manager", "Team Lead"].includes(user.role?.name || user.role)); } catch {}
-  }, []);
-  const assignCandidate = async (staffId: number | null) => {
-    setIsAssigning(true);
-    try {
-      await apiJson(`${API_URL}/hr/assign`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ candidateIds: [Number(id)], assignedStaffId: staffId }) });
-      setAssignmentOpen(false); toast.success("Candidate assignment updated."); await fetchCandidate();
-    } catch (reason) { toast.error(reason instanceof Error ? reason.message : "Assignment failed"); }
-    finally { setIsAssigning(false); }
-  };
-  
-  const [isFollowUpOpen, setIsFollowUpOpen] = useState(false);
-  const [isContactLogsOpen, setIsContactLogsOpen] = useState(false);
-  const [newFollowUp, setNewFollowUp] = useState<any>({});
-  const [isSavingFu, setIsSavingFu] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState("");
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-  // Bumped after saves that may create an email draft (status changes).
-  const [mailRefresh, setMailRefresh] = useState(0);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
-  const candidateRequest = useRef(0);
 
-  // Keyboard shortcut for history slider
+  const [candidate, setCandidate] = useState<Candidate | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<Tab>("activity");
+  const [activity, setActivity] = useState<ActivityEntry[] | null>(null);
+  const [mailRefresh, setMailRefresh] = useState(0);
+  const [sources, setSources] = useState<HrSource[]>([]);
+  const [states, setStates] = useState<Option[]>([]);
+  // HR staff to assign to, loaded when the picker first opens.
+  const [staff, setStaff] = useState<Person[] | null>(null);
+  const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
+  const [role] = useState(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem("crm_user") || "{}");
+      return (u?.role?.name || u?.role || "") as string;
+    } catch { return ""; }
+  });
+  const canAssign = ["Super Admin", "Admin", "Manager", "Team Lead"].includes(role);
+  // Editing or deleting someone's follow-up is for admins, as on the lead page.
+  const isAdmin = isAdminUser({ role });
+
+  const loadCandidate = useCallback(async (): Promise<Candidate | null> => {
+    try {
+      const data = await apiJson<Candidate>(`${API_URL}/hr/${id}`);
+      if (data?.id) return data;
+      toast.error("Candidate not found");
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : "Failed to load the candidate");
+    }
+    router.push("/hr");
+    return null;
+  }, [id, router]);
+  const loadActivity = useCallback(
+    () => apiJson<{ data?: ActivityEntry[] }>(`${API_URL}/hr/${id}/activity`).then((r) => r.data ?? [], () => []),
+    [id],
+  );
+  const refreshActivity = useCallback(() => { void loadActivity().then(setActivity); }, [loadActivity]);
+  const fetchCandidate = useCallback(() => loadCandidate().then((data) => { if (data) setCandidate(data); }), [loadCandidate]);
+
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (
-        e.key.toLowerCase() === 'a' && 
-        document.activeElement?.tagName !== 'INPUT' && 
-        document.activeElement?.tagName !== 'TEXTAREA'
-      ) {
+    let live = true;
+    loadCandidate().then((data) => {
+      if (!live) return;
+      if (data) setCandidate(data);
+      setIsLoading(false);
+    });
+    loadActivity().then((entries) => { if (live) setActivity(entries); });
+    return () => { live = false; };
+  }, [loadCandidate, loadActivity]);
+
+  useEffect(() => {
+    let live = true;
+    loadHrMasters().then((m) => { if (live) setSources(m.sources); }, () => {});
+    loadHrStates().then((s) => { if (live) setStates(s.map((v) => ({ label: v, value: v }))); }, () => {});
+    return () => { live = false; };
+  }, []);
+
+  // A switches between Activity and Conversation, as on the lead page.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = document.activeElement as HTMLElement | null;
+      if (e.key.toLowerCase() === "a" && !e.metaKey && !e.ctrlKey && !e.altKey && el?.tagName !== "INPUT" && el?.tagName !== "TEXTAREA" && !el?.isContentEditable) {
         e.preventDefault();
-        setIsFollowUpOpen(prev => !prev);
+        setActiveTab((prev) => (prev === "conversation" ? "activity" : "conversation"));
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const fetchCandidate = async () => {
-    if (!id) return;
-    const request = ++candidateRequest.current;
-    setLoadError(null);
-    try {
-      const data = await apiJson(`${API_URL}/hr/${id}`);
-      if (request !== candidateRequest.current) return;
-      if (!data?.id) throw new Error("Candidate not found.");
-      setCandidate(data);
-      setSelectedStatus(data.status || "New Application");
-    } catch (error) {
-      if (request === candidateRequest.current) setLoadError(error instanceof Error ? error.message : "Could not load candidate.");
-    }
+  const loadStaff = () => {
+    if (staff) return;
+    loadHrMasters()
+      .then((m) => setStaff(m.staff.map((p) => ({ id: p.id, name: p.name, hint: p.department?.name }))))
+      .catch(() => { setStaff([]); toast.error("Could not load HR staff."); });
   };
 
-  const handleDirectStatusUpdate = async (newStatus: string) => {
-    if (!newStatus || newStatus === candidate.status) return;
-    setIsUpdatingStatus(true);
+  /** Saves some fields in place; the reply is the whole candidate. */
+  const save = async (patch: Patch) => {
     try {
       const res = await apiFetch(`${API_URL}/hr/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify(patch),
       });
-      if (res.ok) {
-        toast.success("Status updated to " + newStatus);
-        fetchCandidate();
-        setMailRefresh((n) => n + 1);
-      } else {
-        toast.error("Failed to update status");
-      }
-    } catch {
-      toast.error("Failed to update status");
-    } finally {
-      setIsUpdatingStatus(false);
+      const result = await res.json().catch(() => null);
+      if (!res.ok || !result?.id) throw new Error(errorText(result) || "Couldn't save the change");
+      setCandidate(result);
+      toast.success("Saved");
+      refreshActivity();
+      // A status change or a moved interview can draft an email.
+      if (Object.keys(patch).some((k) => k === "status" || k.startsWith("interview"))) setMailRefresh((n) => n + 1);
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : "Couldn't save the change");
+      throw reason;
+    }
+  };
+  const saveText = (key: string) => (v: string) => save({ [key]: v.trim() === "" ? null : v.trim() });
+  /** For fields a candidate can't be without (name, mobile, position). */
+  const saveRequired = (key: string, what: string) => async (v: string) => {
+    if (!v.trim()) {
+      toast.error(`The ${what} can't be empty.`);
+      throw new Error("required");
+    }
+    return save({ [key]: v.trim() });
+  };
+
+  const assign = async (staffId: number | null) => {
+    try {
+      await apiJson(`${API_URL}/hr/assign`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ candidateIds: [Number(id)], assignedStaffId: staffId }) });
+      toast.success("Candidate assignment updated.");
+      await fetchCandidate();
+      refreshActivity();
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : "Assignment failed");
+      throw reason;
     }
   };
 
-  useEffect(() => {
-    setCandidate(null);
-    void fetchCandidate();
-    return () => { candidateRequest.current++; };
-  }, [id]);
-
-  const handleUpload = async (docType: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file || uploadingDoc) return;
+  const upload = async (docType: string, file: File) => {
+    if (uploadingDoc) return;
     if (file.size > 10 * 1024 * 1024) return void toast.error("Document must be 10 MB or smaller.");
-    const formData = new FormData();
-    formData.append("file", file);
-    const request = candidateRequest.current;
+    const form = new FormData();
+    form.append("file", file);
     setUploadingDoc(docType);
     try {
-      const result = await apiJson(`${API_URL}/hr/${id}/upload/${docType}`, { method: "POST", body: formData });
+      const result = await apiJson<{ success?: boolean; message?: string }>(`${API_URL}/hr/${id}/upload/${docType}`, { method: "POST", body: form });
       if (result?.success === false) throw new Error(result.message || "Upload failed.");
-      if (request !== candidateRequest.current) return;
       toast.success("Document uploaded.");
       await fetchCandidate();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not upload document.");
-    } finally { setUploadingDoc(null); }
-  };
-  const handleDownload = async (type: string, reference: string) => {
-    try {
-      if (reference.startsWith("hr-private://")) await downloadHrDocument(API_URL, id, type);
-      else if (isHrDocumentAvailable(reference)) window.open(reference, "_blank", "noopener,noreferrer");
-    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not download document."); }
-  };
-
-  const handleSaveFollowUp = async () => {
-    if (isSavingFu || !newFollowUp.notes?.trim()) return;
-    setIsSavingFu(true);
-    try {
-      const res = await apiFetch(`${API_URL}/hr/${id}/follow-ups`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(toHrFollowUpPayload(newFollowUp, new Date())),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast.success("Follow-up logged successfully");
-        setNewFollowUp({});
-        fetchCandidate();
-      } else {
-        toast.error("Failed to log follow-up");
-      }
-    } catch (err) {
-      toast.error("Failed to log follow-up");
+      refreshActivity();
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : "Could not upload document.");
     } finally {
-      setIsSavingFu(false);
+      setUploadingDoc(null);
+    }
+  };
+  const download = async (docType: string, reference: string) => {
+    try {
+      if (reference.startsWith("hr-private://")) await downloadHrDocument(API_URL, id, docType);
+      else if (isHrDocumentAvailable(reference)) window.open(reference, "_blank", "noopener,noreferrer");
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : "Could not download document.");
     }
   };
 
-  if (!candidate && loadError) return <div role="alert" className="space-y-4 rounded-xl border p-6"><h1 className="text-xl font-semibold">Could not load candidate</h1><p>{loadError}</p><Button variant="outline" onClick={() => fetchCandidate()}>Try again</Button></div>;
-  if (!candidate) return <PageSkeleton />;
+  const followUps = useMemo(() => candidate?.follow_ups ?? [], [candidate]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- API rows, as on the lead page
+  const contactLogs: any[] = useMemo(() => sortContactLogs(candidate?.contact_logs ?? []), [candidate]);
+  const activityFeed = useMemo(() => activityItems(activity ?? [], HR_ACTIVITY), [activity]);
 
-  const badgeCls = STATUS_STYLES[selectedStatus || candidate.status] ?? "bg-gray-100 text-gray-800 border-gray-200";
-  const formattedId = "HRC" + String(candidate.id).padStart(4, "0");
-  const followUps = candidate.follow_ups || [];
-  // Device-synced call history (prismark call logger) + manual logs —
-  // same counting/sort contract as the leads detail page.
-  const contactCounts = countByType(candidate.contact_logs ?? []);
-  const contactLogs: any[] = sortContactLogs(candidate.contact_logs || []);
-  const callDirectionCounts = countCallDirections(contactLogs);
+  if (isLoading) return <RecordSkeleton title="Candidate" />;
+  if (!candidate) return null;
+
+  const c = candidate;
+  const status: string = c.status || "New Application";
+  const statusOptions: Option[] = [...(HR_STATUSES.includes(status) ? [] : [status]), ...HR_STATUSES]
+    .map((s) => ({ label: s, value: s, dot: statusDot(s, HR_STATUS_TONES[s]) }));
+  const source = hrSourceOptions(sources, { hrSourceId: c.hrSourceId != null ? String(c.hrSourceId) : "", recruitmentSource: c.recruitmentSource || "" });
+  const subtitle = [c.position, c.department].filter(Boolean).join(" · ") || candidateCode(c);
+  const added = new Date(c.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
+  const documentTypes = ["resume", ...(status === "Joined" ? JOINING_DOCUMENTS : [])];
+
+  const statusMenu = (size: "h-7" | "h-8", align: "start" | "end" = "end") => (
+    <StatusMenu status={status} options={statusOptions as StatusOption[]} pillClass={statusPillClass(status, HR_STATUS_TONES[status])}
+      onChange={(v) => void save({ status: v }).catch(() => {})} size={size} align={align} />
+  );
+  const assigneeButton = (variant: "header" | "field" | "phone") => (
+    <AssigneeButton name={c.assignedStaff?.name} variant={variant} people={staff ?? []} value={c.assignedStaff?.id ?? c.assignedStaffId}
+      onPick={canAssign ? assign : undefined} loading={staff === null} onOpen={loadStaff} />
+  );
+  const sourceField = (
+    <InlineSelect label="HR source" value={source.value} options={source.options}
+      onSave={(v) => (/^\d+$/.test(v) ? save({ hrSourceId: Number(v) }) : undefined)} />
+  );
+  const fact = (label: string, value: ReactNode) => (
+    <FieldRow label={label}><span className="px-2 text-[14px] text-foreground">{value}</span></FieldRow>
+  );
+
+  const summary = (
+    <Section title="Details">
+      <InlineSelect label="Status" value={status} options={statusOptions} onSave={(v) => save({ status: v })} />
+      <FieldRow label="Assigned to">{assigneeButton("field")}</FieldRow>
+      <InlineText label="Mobile" type="tel" value={c.mobile} onSave={saveRequired("mobile", "mobile number")} />
+      <InlineText label="Email" type="email" value={c.email} onSave={saveText("email")} />
+      <InlineText label="Position" value={c.position} onSave={saveRequired("position", "position")} />
+      {sourceField}
+      {fact("Added", added)}
+    </Section>
+  );
+
+  const data: ReactNode = (
+    <div className="pb-6">
+      <TabHeader title="Data" />
+      <div className="space-y-5 px-3 sm:px-10">
+        <DataCard title="Candidate">
+          <InlineText label="Name" value={c.name} onSave={saveRequired("name", "name")} />
+          <InlineText label="Mobile" type="tel" value={c.mobile} onSave={saveRequired("mobile", "mobile number")} />
+          <InlineText label="WhatsApp" type="tel" value={c.whatsapp} onSave={saveText("whatsapp")} />
+          <InlineText label="Email" type="email" value={c.email} onSave={saveText("email")} />
+          <InlineText label="City" value={c.city} onSave={saveText("city")} />
+          <InlineSelect searchable label="State" value={c.state} options={withCurrent(states, c.state)} onSave={(v) => save({ state: v })} />
+        </DataCard>
+
+        <DataCard title="Job">
+          <InlineSelect label="Department" value={c.department} options={withCurrent(HR_DEPARTMENTS, c.department)} onSave={(v) => save({ department: v })} />
+          <InlineText label="Position" value={c.position} onSave={saveRequired("position", "position")} />
+          <InlineText label="Experience" value={c.experience} placeholder="e.g. 2 years" onSave={saveText("experience")} />
+          <InlineText label="Notice period" value={c.noticePeriod} placeholder="e.g. 30 days" onSave={saveText("noticePeriod")} />
+          <InlineText label="Current CTC" value={c.currentSalary} placeholder="e.g. 3 LPA" onSave={saveText("currentSalary")} />
+          <InlineText label="Expected CTC" value={c.expectedSalary} placeholder="e.g. 4 LPA" onSave={saveText("expectedSalary")} />
+        </DataCard>
+
+        <DataCard title="Recruitment">
+          <InlineSelect label="Status" value={status} options={statusOptions} onSave={(v) => save({ status: v })} />
+          <FieldRow label="Assigned to">{assigneeButton("field")}</FieldRow>
+          {sourceField}
+          {fact("Added", added)}
+        </DataCard>
+
+        <DataCard title="Interview">
+          <InlineText label="Date" type="date" value={c.interviewDate ? String(c.interviewDate).slice(0, 10) : ""} onSave={(v) => save({ interviewDate: v || null })} />
+          <InlineText label="Time (IST)" type="time" value={toTimeInput(c.interviewTime)} onSave={(v) => save({ interviewTime: v || null })} />
+          <InlineSelect label="Mode" value={c.interviewMode} options={INTERVIEW_MODE_OPTIONS} onSave={(v) => save({ interviewMode: v })} />
+          {c.interviewMode === "in_person" && <InlineText label="Venue" value={c.interviewLocation} onSave={saveText("interviewLocation")} />}
+          {c.interviewMode === "video" && <InlineText label="Meeting link" type="url" value={c.interviewLink} placeholder="https://meet.google.com/…" onSave={saveText("interviewLink")} />}
+          <InlineText label="Interviewer" value={c.interviewer} onSave={saveText("interviewer")} />
+          <InlineText label="Round" value={c.interviewRound} placeholder="e.g. Round 1 / Final" onSave={saveText("interviewRound")} />
+          <InlineText label="Feedback" multiline value={c.interviewFeedback} placeholder="How did it go?" onSave={saveText("interviewFeedback")} />
+        </DataCard>
+      </div>
+    </div>
+  );
+
+  const documents: ReactNode = (
+    <div className="pb-6">
+      <TabHeader title="Documents" />
+      <div className="space-y-3 px-3 sm:px-10">
+        <section className="overflow-hidden rounded-xl border bg-card">
+          {documentTypes.map((type) => (
+            <DocumentRow key={type} label={HR_DOCUMENT_LABELS[type]} reference={c[`${type}Url`]} accept={type === "photo" ? PHOTO_ACCEPT : HR_DOCUMENT_ACCEPT}
+              uploading={uploadingDoc === type} disabled={uploadingDoc !== null}
+              onUpload={(file) => void upload(type, file)} onDownload={() => void download(type, c[`${type}Url`])} />
+          ))}
+        </section>
+        <p className="px-1 text-[13px] text-muted-foreground">
+          PDF, JPEG, PNG or WebP, up to 10 MB. Passport photos must be images.
+          {status !== "Joined" && " ID and certificates are asked for once the candidate has joined."}
+        </p>
+      </div>
+    </div>
+  );
+
+  const uploadedCount = documentTypes.filter((t) => isHrDocumentAvailable(c[`${t}Url`])).length;
+  const tabs: RecordTab<Tab>[] = [
+    { key: "activity", label: "Activity", icon: History },
+    { key: "conversation", label: "Conversation", icon: MessagesSquare, count: followUps.length + contactLogs.length },
+    { key: "data", label: "Data", icon: Database },
+    { key: "documents", label: "Documents", icon: FileText, count: uploadedCount },
+  ];
 
   return (
-    <div className="flex flex-col md:h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {loadError && <div role="alert" className="space-y-2 rounded-xl border p-4"><p>{loadError}</p><Button variant="outline" onClick={() => fetchCandidate()}>Try again</Button></div>}
-      
-      <HrAssignmentDialog open={assignmentOpen} count={1} busy={isAssigning} onClose={() => setAssignmentOpen(false)} onConfirm={assignCandidate} />
-      {/* ── Mobile Header ── */}
-      <MobileHeader title={candidate.name || "Candidate"} showBack />
-
-      {/* ── Header (desktop only) ── */}
-      <div className="hidden md:flex items-center justify-between pr-[150px] min-h-[48px] mb-6 shrink-0">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full shrink-0" onClick={() => router.push("/hr")}>
-            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-          </Button>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">{candidate.name}</h1>
-            <Badge className={`font-medium px-2.5 py-0.5 shadow-sm border ${badgeCls}`}>{selectedStatus || candidate.status}</Badge>
-            <span className="text-sm font-semibold text-muted-foreground ml-2">{formattedId}</span>
+    <RecordPage
+      title={c.name}
+      tabs={tabs}
+      active={activeTab}
+      onTab={setActiveTab}
+      actions={<>{statusMenu("h-8")}{assigneeButton("header")}</>}
+      phone={
+        <>
+          <div className="flex flex-wrap items-center gap-2 text-[14px] text-muted-foreground">
+            {statusMenu("h-7", "start")}
+            <span className="truncate">{subtitle}</span>
           </div>
+          {assigneeButton("phone")}
+        </>
+      }
+      aside={
+        <>
+          <div className="flex items-center gap-3 border-b p-4">
+            <CompletenessRing fields={candidateScoreFields(c)} />
+            <div className="min-w-0">
+              <p className="truncate text-[17px] font-semibold leading-6 text-foreground" title={c.name}>{c.name}</p>
+              <p className="truncate text-[13px] text-muted-foreground" title={subtitle}>{subtitle}</p>
+            </div>
+          </div>
+          {summary}
+          <p className="mt-auto hidden items-center gap-1.5 px-4 py-3 text-[12px] text-muted-foreground md:flex">
+            Press <kbd className="rounded border px-1 font-mono text-[11px]">A</kbd> to switch between activity and conversation.
+          </p>
+        </>
+      }
+    >
+      {activeTab === "activity" && (
+        <div className="pb-4">
+          <TabHeader title="Activity" />
+          {activity === null ? (
+            <p className="flex items-center gap-2 px-3 text-[13px] text-muted-foreground sm:px-10"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…</p>
+          ) : activityFeed.length ? (
+            <Feed items={activityFeed} />
+          ) : (
+            <EmptyState art={<AttachmentsArt />} title="Nothing recorded yet" hint="Status changes, edits and assignments will show up here." />
+          )}
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-full" onClick={fetchCandidate} title="Refresh">
-            <RefreshCw size={14} className="text-muted-foreground" />
-          </Button>
-          
-          {canAssign && <Button variant="outline" className="rounded-full" onClick={() => setAssignmentOpen(true)}>Assign Candidate</Button>}
-          <Button onClick={() => router.push(`/hr/new?edit=${candidate.id}`)} className="rounded-full px-8 py-5 bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md">
-            Edit Candidate
-          </Button>
+      )}
+      {activeTab === "conversation" && (
+        <div className="md:flex md:h-full md:flex-col">
+          <LeadConversation
+            leadId={c.id}
+            leadName={c.name}
+            entity={HR_ENTITY}
+            email={c.email}
+            mobile={c.mobile}
+            whatsapp={c.whatsapp}
+            followUps={followUps}
+            contactLogs={contactLogs}
+            composer={<FollowUpComposer api="hr" entityId={c.id} noun="candidate" followUps={followUps} toBody={toHrFollowUpPayload} onSaved={() => void fetchCandidate()} />}
+            canEdit
+            isAdmin={isAdmin}
+            refreshKey={mailRefresh}
+            onRefresh={() => void fetchCandidate()}
+          />
         </div>
-      </div>
-
-      {/* ── Mobile Summary Strip ── */}
-      <div className="md:hidden flex flex-col gap-3 px-4 pb-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge className={`font-medium px-2.5 py-0.5 shadow-sm border ${badgeCls}`}>{selectedStatus || candidate.status}</Badge>
-          <span className="text-sm font-semibold text-muted-foreground">{formattedId}</span>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Button variant="outline" onClick={() => router.push(`/hr/new?edit=${candidate.id}`)} className="h-11 rounded-xl text-foreground font-semibold border-border/60">
-            <Edit className="w-4 h-4 mr-2 text-muted-foreground" /> Edit
-          </Button>
-          <Button variant="outline" onClick={fetchCandidate} className="h-11 rounded-xl border-border/60 font-semibold text-foreground">
-            <RefreshCw className="w-4 h-4 mr-2 text-muted-foreground" /> Refresh
-          </Button>
-        </div>
-      </div>
-
-            {/* ── Main Layout ── */}
-      <div className="flex-1 md:overflow-y-auto min-h-0 pb-6 space-y-6 px-4 lg:px-0 lg:pr-2">
-        
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {/* Left Column */}
-          <div className="xl:col-span-2 flex flex-col gap-6">
-            
-            {/* Candidate Information */}
-            <div className="bg-card border rounded-2xl p-6 shadow-sm">
-              <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" /> Candidate Information
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-6 gap-x-6">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Mobile</p>
-                  <p className="text-[14px] font-medium text-foreground flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-muted-foreground" /> {candidate.mobile || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">WhatsApp</p>
-                  <p className="text-[14px] font-medium text-foreground flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-emerald-600" /> {candidate.whatsapp || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Email</p>
-                  <p className="text-[14px] font-medium text-foreground flex items-center gap-1.5"><Mail className="h-3.5 w-3.5 text-muted-foreground" /> {candidate.email || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">City & State</p>
-                  <p className="text-[14px] font-medium text-foreground flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-muted-foreground" /> {[candidate.city, candidate.state].filter(Boolean).join(", ") || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">HR Source</p>
-                  <p className="text-[14px] font-medium text-foreground">{candidate.recruitmentSource || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Assigned staff</p>
-                  <button type="button" disabled={!canAssign} onClick={() => setAssignmentOpen(true)} className="text-sm font-medium enabled:text-[#0052FF] enabled:hover:underline">{candidate.assignedStaff?.name || "Unassigned"}</button>
-                </div>
-              </div>
-            </div>
-
-            {/* Log New Follow Up */}
-            <div className="bg-card border rounded-2xl p-6 shadow-sm">
-              <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-                <Plus className="h-4 w-4 text-[#0052FF]" /> Log New Follow Up
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="space-y-2 lg:col-span-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Follow-Up</label>
-                  <DateTimePicker 
-                    value={newFollowUp.nextFollowUpDate ? new Date(`${newFollowUp.nextFollowUpDate}T${newFollowUp.nextFollowUpTime || '00:00'}`) : undefined}
-                    onChange={(date) => {
-                      if (!date) return setNewFollowUp((p: any) => ({ ...p, nextFollowUpDate: "", nextFollowUpTime: "" }));
-                      setNewFollowUp((p: any) => ({
-                        ...p,
-                        nextFollowUpDate: format(date, "yyyy-MM-dd"),
-                        nextFollowUpTime: format(date, "HH:mm"),
-                      }));
-                    }}
-                  />
-                </div>
-                <div className="space-y-2 lg:col-span-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Priority Level</label>
-                  <FormSelect name="priority" placeholder="Select Priority" options={[{label: "Low", value: "low"}, {label: "Medium", value: "medium"}, {label: "High", value: "high"}]} value={newFollowUp.priority ?? ""} onValueChange={(v) => setNewFollowUp((p: any) => ({...p, priority: v}))} />
-                </div>
-                <div className="space-y-2 md:col-span-2 lg:col-span-4">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Follow Up Notes</label>
-                  <Textarea name="notes" placeholder="Enter follow up notes..." value={newFollowUp.notes || ""} onChange={(e) => setNewFollowUp((p: any) => ({...p, notes: e.target.value}))} className="bg-muted/30 rounded-xl resize-none text-[15px] p-4" rows={3} />
-                </div>
-              </div>
-              <div className="flex justify-end mt-4">
-                <Button disabled={isSavingFu || !newFollowUp.notes?.trim()} onClick={handleSaveFollowUp} className="rounded-xl px-6 bg-[#0052FF] text-white hover:bg-[#0040CC] shadow-md">
-                  {isSavingFu ? "Saving..." : "Save Follow Up"}
-                </Button>
-              </div>
-            </div>
-
-            {/* ── Row 3: Documents ── */}
-
-        <div className="bg-card border rounded-2xl p-6 shadow-sm">
-          <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-            <FileText className="h-4 w-4 text-muted-foreground" /> Documents
-          </h3>
-          <p className="mb-4 text-sm text-muted-foreground">PDF, JPEG, PNG or WebP, up to 10 MB. Passport photos must be images.</p>
-          {uploadingDoc && <p role="status" className="mb-4 text-sm">Uploading document…</p>}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="p-4 border rounded-xl bg-muted/10 space-y-3">
-              <p className="text-sm font-semibold flex items-center gap-2"><FileText className="h-4 w-4 text-blue-500" /> Resume / CV</p>
-              {isHrDocumentAvailable(candidate.resumeUrl) ? (
-                 <div className="flex gap-2"><Button variant="outline" size="sm" className="w-full text-xs" onClick={() => handleDownload("resume", candidate.resumeUrl)}>Download file</Button></div>
-              ) : (
-                <Input type="file" accept={HR_DOCUMENT_ACCEPT} disabled={uploadingDoc !== null} onChange={(e) => handleUpload('resume', e)} className="text-xs cursor-pointer" />
-              )}
-            </div>
-            
-            {candidate.status === 'Joined' && (
-              <>
-                <div className="p-4 border rounded-xl bg-muted/10 space-y-3">
-                  <p className="text-sm font-semibold flex items-center gap-2"><FileText className="h-4 w-4 text-blue-500" /> Aadhaar Card</p>
-                  {isHrDocumentAvailable(candidate.aadhaarUrl) ? (
-                     <div className="flex gap-2"><Button variant="outline" size="sm" className="w-full text-xs" onClick={() => handleDownload("aadhaar", candidate.aadhaarUrl)}>Download file</Button></div>
-                  ) : (
-                    <Input type="file" accept={HR_DOCUMENT_ACCEPT} disabled={uploadingDoc !== null} onChange={(e) => handleUpload('aadhaar', e)} className="text-xs cursor-pointer" />
-                  )}
-                </div>
-                <div className="p-4 border rounded-xl bg-muted/10 space-y-3">
-                  <p className="text-sm font-semibold flex items-center gap-2"><FileText className="h-4 w-4 text-blue-500" /> PAN Card</p>
-                  {isHrDocumentAvailable(candidate.panUrl) ? (
-                     <div className="flex gap-2"><Button variant="outline" size="sm" className="w-full text-xs" onClick={() => handleDownload("pan", candidate.panUrl)}>Download file</Button></div>
-                  ) : (
-                    <Input type="file" accept={HR_DOCUMENT_ACCEPT} disabled={uploadingDoc !== null} onChange={(e) => handleUpload('pan', e)} className="text-xs cursor-pointer" />
-                  )}
-                </div>
-                <div className="p-4 border rounded-xl bg-muted/10 space-y-3">
-                  <p className="text-sm font-semibold flex items-center gap-2"><FileText className="h-4 w-4 text-blue-500" /> Educational Certs</p>
-                  {isHrDocumentAvailable(candidate.educationCertUrl) ? (
-                     <div className="flex gap-2"><Button variant="outline" size="sm" className="w-full text-xs" onClick={() => handleDownload("educationCert", candidate.educationCertUrl)}>Download file</Button></div>
-                  ) : (
-                    <Input type="file" accept={HR_DOCUMENT_ACCEPT} disabled={uploadingDoc !== null} onChange={(e) => handleUpload('educationCert', e)} className="text-xs cursor-pointer" />
-                  )}
-                </div>
-                <div className="p-4 border rounded-xl bg-muted/10 space-y-3">
-                  <p className="text-sm font-semibold flex items-center gap-2"><FileText className="h-4 w-4 text-blue-500" /> Experience Cert</p>
-                  {isHrDocumentAvailable(candidate.experienceCertUrl) ? (
-                     <div className="flex gap-2"><Button variant="outline" size="sm" className="w-full text-xs" onClick={() => handleDownload("experienceCert", candidate.experienceCertUrl)}>Download file</Button></div>
-                  ) : (
-                    <Input type="file" accept={HR_DOCUMENT_ACCEPT} disabled={uploadingDoc !== null} onChange={(e) => handleUpload('experienceCert', e)} className="text-xs cursor-pointer" />
-                  )}
-                </div>
-                <div className="p-4 border rounded-xl bg-muted/10 space-y-3">
-                  <p className="text-sm font-semibold flex items-center gap-2"><FileText className="h-4 w-4 text-blue-500" /> Passport Photo</p>
-                  {isHrDocumentAvailable(candidate.photoUrl) ? (
-                     <div className="flex gap-2"><Button variant="outline" size="sm" className="w-full text-xs" onClick={() => handleDownload("photo", candidate.photoUrl)}>Download file</Button></div>
-                  ) : (
-                    <Input type="file" accept={"image/jpeg,image/png,image/webp"} disabled={uploadingDoc !== null} onChange={(e) => handleUpload('photo', e)} className="text-xs cursor-pointer" />
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-          </div>
-
-                    {/* Right Column */}
-          <div className="xl:col-span-1 flex flex-col gap-6">
-            
-            {/* Actions & Status */}
-            <div className="bg-card border rounded-2xl p-6 shadow-sm">
-              <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-                <Shield className="h-4 w-4 text-muted-foreground" /> Actions & Status
-              </h3>
-              
-              <div className="flex flex-col gap-4">
-                 <div>
-                    <div className="flex items-center justify-between mb-2">
-                       <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Current Status</p>
-                       {isUpdatingStatus && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-                    </div>
-                    <div className="flex gap-2">
-                       <div className="flex-1">
-                         <FormSelect 
-                           name="hrStatus" 
-                           options={Object.keys(STATUS_STYLES).map(s => ({label: s, value: s}))}
-                           value={selectedStatus}
-                           onValueChange={(v) => {
-                             setSelectedStatus(v || "");
-                             handleDirectStatusUpdate(v || "");
-                           }}
-                           placeholder="Select Status"
-                         />
-                       </div>
-                       <Button 
-                          variant="outline" 
-                          onClick={() => {
-                            setSelectedStatus("Rejected");
-                            handleDirectStatusUpdate("Rejected");
-                          }}
-                          disabled={isUpdatingStatus || selectedStatus === "Rejected"}
-                          className="border-red-500 text-red-600 hover:bg-red-50 hover:text-red-700 h-11 px-6 rounded-xl font-bold transition-all"
-                       >
-                          Reject
-                       </Button>
-                    </div>
-                 </div>
-
-                 <div className="pt-2">
-                   <Button 
-                     onClick={() => setIsFollowUpOpen(true)} 
-                     className="w-full h-11 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/40 dark:hover:text-blue-300 font-semibold shadow-sm border border-blue-200 dark:border-blue-800 rounded-xl flex items-center justify-between px-4 transition-all"
-                   >
-                     <span className="flex items-center">
-                       <History className="mr-2 h-4 w-4" /> View Follow-up History
-                     </span>
-                     <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border border-blue-200 dark:border-blue-800 bg-background/50 px-1.5 font-mono text-[10px] font-medium text-blue-700 dark:text-blue-400 opacity-100">
-                       A
-                     </kbd>
-                   </Button>
-                 </div>
-              </div>
-            </div>
-
-            <MailPanel entityType="hr_candidate" entityId={candidate.id} refreshKey={mailRefresh} recipients={candidate.email ? [candidate.email] : []} />
-
-            {/* Contact activity (device-synced call history, same as leads) */}
-            <div className="bg-card border rounded-2xl p-6 shadow-sm">
-              <div className="flex items-center justify-between border-b pb-3 mb-5">
-                <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" /> Contact activity
-                </h3>
-                <button
-                  onClick={() => setIsContactLogsOpen(true)}
-                  className="text-[13px] font-bold tracking-wide text-blue-400 flex items-center gap-2 bg-[#0052FF]/10 px-3 py-2 rounded-lg transition-colors hover:bg-[#0052FF]/20 outline-blue-600 outline-[1px]"
-                >
-                  <History className="h-3.5 w-3.5" /> View logs
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-y-6">
-                {/* Calls Primary Stat */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                    <PhoneIncoming className="h-3 w-3" /> Calls
-                  </div>
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-3xl font-medium text-foreground tracking-tighter leading-none">{contactCounts.call || 0}</span>
-                    {contactCounts.call > 0 && (
-                      <div className="flex gap-2 text-[10px] font-medium text-muted-foreground/80 uppercase tracking-wide">
-                        <span><strong className="text-yellow-300">{callDirectionCounts.incoming || 0}</strong> IN</span>
-                        <span><strong className="text-green-400">{callDirectionCounts.outgoing || 0}</strong> OUT</span>
-                        <span><strong className="text-red-400">{callDirectionCounts.missed || 0}</strong> MISS</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Secondary Stats */}
-                {(["whatsapp", "sms", "email"] as const).map((type) => (
-                  <div key={type} className="flex flex-col gap-1.5">
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-                      {CONTACT_TYPE_ICONS[type]} {type}
-                    </div>
-                    <span className="text-3xl font-medium text-foreground tracking-tighter leading-none">{contactCounts[type] || 0}</span>
-                  </div>
-                ))}
-              </div>
-
-              {contactLogs.length === 0 && (
-                <p className="mt-5 text-center text-xs text-muted-foreground">No contact attempts recorded yet.</p>
-              )}
-            </div>
-
-            {/* Job Details */}
-            <div className="bg-card border rounded-2xl p-6 shadow-sm">
-              <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-                <Briefcase className="h-4 w-4 text-muted-foreground" /> Job Details
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-4">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Department</p>
-                  <p className="text-[14px] font-medium">{candidate.department || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Position</p>
-                  <p className="text-[14px] font-medium">{candidate.position || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Experience</p>
-                  <p className="text-[14px] font-medium">{candidate.experience || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Current CTC</p>
-                  <p className="text-[14px] font-medium">{candidate.currentSalary || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Expected CTC</p>
-                  <p className="text-[14px] font-medium">{candidate.expectedSalary || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Notice</p>
-                  <p className="text-[14px] font-medium">{candidate.noticePeriod || "—"}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Interview Details */}
-            <div className="bg-card border rounded-2xl p-6 shadow-sm">
-              <h3 className="text-base font-bold text-foreground border-b pb-3 mb-5 flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" /> Interview Details
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Date & Round</p>
-                  <p className="text-[14px] font-medium">
-                    {candidate.interviewDate ? new Date(candidate.interviewDate).toLocaleDateString() : "—"}
-                    {candidate.interviewTime && `, ${formatInterviewTime(candidate.interviewTime)}`} ({candidate.interviewRound || "No Round"})
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Mode</p>
-                  <p className="text-[14px] font-medium">{candidate.interviewMode ? INTERVIEW_MODE_LABELS[candidate.interviewMode as keyof typeof INTERVIEW_MODE_LABELS] : "—"}</p>
-                  {candidate.interviewMode === "in_person" && candidate.interviewLocation && (
-                    <p className="text-[13px] text-muted-foreground mt-0.5">{candidate.interviewLocation}</p>
-                  )}
-                  {candidate.interviewMode === "video" && candidate.interviewLink && (
-                    <a href={candidate.interviewLink} target="_blank" rel="noopener noreferrer" className="text-[13px] text-[#0052FF] hover:underline break-all">{candidate.interviewLink}</a>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Interviewer</p>
-                  <p className="text-[14px] font-medium">{candidate.interviewer || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Feedback</p>
-                  <p className="text-[14px] font-medium bg-muted/30 p-3 rounded-lg mt-1 border">{candidate.interviewFeedback || "No feedback yet."}</p>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-        </div>
-
-      <Sheet open={isFollowUpOpen} onOpenChange={setIsFollowUpOpen}>
-        <SheetContent side="right" className="!w-full sm:!w-[450px] sm:!max-w-[450px] p-0 flex flex-col border-l [&>button[data-slot='sheet-close']]:hidden sm:[&>button[data-slot='sheet-close']]:flex">
-          <div className="md:hidden flex flex-col shrink-0 bg-background/90 backdrop-blur-xl border-b z-10">
-            <div className="h-[env(safe-area-inset-top)] w-full" />
-            <div className="flex items-center justify-between px-4 h-14">
-              <button onClick={() => setIsFollowUpOpen(false)} className="flex items-center text-[#007AFF] dark:text-[#0A84FF] active:opacity-70 -ml-2 shrink-0">
-                <ChevronLeft className="w-[28px] h-[28px]" strokeWidth={2.5} />
-                <span className="text-[17px] font-medium tracking-tight">Back</span>
-              </button>
-              <span className="absolute inset-x-0 text-center pointer-events-none text-[17px] font-semibold tracking-tight text-foreground truncate px-20">Timeline</span>
-              <div className="w-10 shrink-0" />
-            </div>
-          </div>
-          <SheetHeader className="hidden md:block p-6 border-b shrink-0">
-            <SheetTitle className="text-lg">Follow Up Timeline {followUps.length > 0 && `(${followUps.length})`}</SheetTitle>
-          </SheetHeader>
-          <div className="flex-1 overflow-hidden relative">
-            <FollowUpPanel
-              entityId={candidate.id}
-              entityType="hr"
-              followUps={followUps}
-              onRefresh={fetchCandidate}
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      {/* ── Contact Logs Slider (Sheet, same as leads) ── */}
-      <Sheet open={isContactLogsOpen} onOpenChange={setIsContactLogsOpen}>
-        <SheetContent side="right" className="!w-full sm:!w-[450px] sm:!max-w-[450px] p-0 flex flex-col border-l [&>button[data-slot='sheet-close']]:hidden sm:[&>button[data-slot='sheet-close']]:flex">
-          <div className="md:hidden flex flex-col shrink-0 bg-background/90 backdrop-blur-xl border-b z-10">
-            <div className="h-[env(safe-area-inset-top)] w-full" />
-            <div className="flex items-center justify-between px-4 h-14">
-              <button
-                onClick={() => setIsContactLogsOpen(false)}
-                className="flex items-center text-[#007AFF] dark:text-[#0A84FF] active:opacity-70 -ml-2 shrink-0"
-              >
-                <ChevronLeft className="w-[28px] h-[28px]" strokeWidth={2.5} />
-                <span className="text-[17px] font-medium tracking-tight">Back</span>
-              </button>
-              <span className="absolute inset-x-0 text-center pointer-events-none text-[17px] font-semibold tracking-tight text-foreground truncate px-20">Contact logs</span>
-              <div className="w-10 shrink-0" />
-            </div>
-          </div>
-
-          <SheetHeader className="hidden md:block p-6 border-b shrink-0">
-            <SheetTitle className="text-lg">Contact logs {contactLogs.length > 0 && `(${contactLogs.length})`}</SheetTitle>
-            <SheetDescription>Calls, messages, and emails recorded for this candidate.</SheetDescription>
-          </SheetHeader>
-
-          <div className="flex-1 overflow-y-auto p-5">
-            {contactLogs.length === 0 ? (
-              <div className="py-16 text-center">
-                <Clock className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
-                <p className="text-sm font-medium text-foreground">No contact logs yet</p>
-                <p className="mt-1 text-xs text-muted-foreground">New calls and communication will appear here.</p>
-              </div>
-            ) : (
-              <div className="relative space-y-0">
-                <div className="absolute left-[19px] top-2 bottom-2 w-px bg-border" />
-                {contactLogs.map((log: any) => (
-                  <div key={log.id} className="relative flex gap-4 pb-5 last:pb-0">
-                    <div className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-background ${CONTACT_TYPE_STYLES[log.contact_type] || "bg-muted text-muted-foreground"}`}>
-                      {contactLogIcon(log)}
-                    </div>
-                    <div className="min-w-0 flex-1 rounded-xl border bg-card px-3.5 py-3 shadow-sm">
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="text-[13px] font-semibold text-foreground">
-                          <span className="text-[#0052FF]">{contactLogAuthor(log)}</span>
-                          <span className="mx-1.5 text-muted-foreground/60">•</span>
-                          {log.contact_type === "call" ? (
-                            <>{log.call_direction || "Voice"} call <span className="font-normal text-muted-foreground whitespace-nowrap">({formatDuration(log.call_duration)})</span></>
-                          ) : (
-                            <span className="capitalize">{log.contact_type}</span>
-                          )}
-                        </p>
-                        <span className="shrink-0 text-[10px] leading-4 text-muted-foreground">{formatTimestamp(log.created_at)}</span>
-                      </div>
-                      {log.subject && <p className="mt-2 text-xs font-medium text-muted-foreground">Subject: {log.subject}</p>}
-                      {log.message && <p className="mt-2 rounded-lg bg-muted/50 px-2.5 py-2 text-[12px] leading-relaxed text-foreground/75">{log.message}</p>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
-
-    </div>
+      )}
+      {activeTab === "data" && data}
+      {activeTab === "documents" && documents}
+    </RecordPage>
   );
 }

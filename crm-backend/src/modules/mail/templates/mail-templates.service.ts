@@ -152,7 +152,7 @@ export class MailTemplatesService {
     const body = fillHtml(clean.body, vars);
     const unknown = [...new Set([...subject.unknown, ...body.unknown])];
     const team = MAIL_IDENTITIES[identity];
-    const rendered = renderLayout({ subject: subject.text, bodyHtml: body.html, signature: ['Priya Raman', `${team.signature}, Majestan Realty`, '+91 98765 43210'] });
+    const rendered = renderLayout({ subject: subject.text, bodyHtml: body.html, signature: ['Priya Raman', `${team.signature} · Majestan Realty`, '+91 98765 43210'] });
     return {
       subject: rendered.subject,
       html: rendered.html,

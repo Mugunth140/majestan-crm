@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException, UseGuards, Request, Query } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { InboundsService } from './inbounds.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -9,6 +9,8 @@ import { UpdateInboundDto } from './dto/update-inbound.dto';
 import { CreateInboundFollowUpDto } from './dto/create-inbound-follow-up.dto';
 import { UpdateInboundFollowUpDto } from './dto/update-inbound-follow-up.dto';
 import { CreateInboundContactLogDto } from './dto/create-inbound-contact-log.dto';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('api/v1/inbounds')
 @UseGuards(JwtAuthGuard)
@@ -30,11 +32,12 @@ export class InboundsController {
   async uploadImage(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
+    @Request() req: any,
   ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
-    return this.inboundsService.uploadImage(+id, file);
+    return this.inboundsService.uploadImage(+id, file, req.user?.id ?? null);
   }
 
   @Post()
@@ -60,6 +63,16 @@ export class InboundsController {
     return this.inboundsService.assign(body.inboundIds, body.staffId, req.user);
   }
 
+  @Get('verification-queue')
+  async verificationQueue(@Request() req: any, @Query('page') page = '1', @Query('limit') limit = '25') {
+    return { success: true, data: await this.inboundsService.verificationQueue(req.user, Number(page), Number(limit)) };
+  }
+
+  @Get(':id/activity')
+  async activity(@Param('id') id: string, @Request() req: any) {
+    return { success: true, data: await this.inboundsService.activity(+id, req.user) };
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string, @Request() req: any) {
     return this.inboundsService.findOne(+id, req.user);
@@ -83,8 +96,9 @@ export class InboundsController {
   async addFollowUp(
     @Param('id') id: string,
     @Body() payload: CreateInboundFollowUpDto,
+    @Request() req: any,
   ) {
-    const data = await this.inboundsService.addFollowUp(+id, payload, 1);
+    const data = await this.inboundsService.addFollowUp(+id, payload, req.user?.id ?? null);
     return { success: true, data };
   }
 
@@ -92,11 +106,14 @@ export class InboundsController {
   async addContactLog(
     @Param('id') id: string,
     @Body() payload: CreateInboundContactLogDto,
+    @Request() req: any,
   ) {
-    const data = await this.inboundsService.addContactLog(+id, payload, 1);
+    const data = await this.inboundsService.addContactLog(+id, payload, req.user?.id ?? null);
     return { success: true, data };
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
   @Patch(':id/follow-ups/:followUpId')
   async updateFollowUp(
     @Param('id') id: string,
@@ -107,6 +124,8 @@ export class InboundsController {
     return { success: true, data };
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
   @Delete(':id/follow-ups/:followUpId')
   async deleteFollowUp(
     @Param('id') id: string,
@@ -116,6 +135,8 @@ export class InboundsController {
     return { success: true, data };
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('Admin')
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.inboundsService.remove(+id);

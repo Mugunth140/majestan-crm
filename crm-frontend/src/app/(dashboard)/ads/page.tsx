@@ -1,27 +1,33 @@
 "use client";
 
+import { isAdmin } from "@/lib/permissions";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DataTable } from "@/components/tables/data-table";
+import { DateCell, IdCell, NameCell, formatTableDate, statusDot } from "@/components/tables/cells";
+import { ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ColumnDef } from "@tanstack/react-table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MobileHeader } from "@/components/layout/mobile-header";
+import { EmptyState as IllustratedEmpty } from "@/components/shared/empty-state";
+import { ListBody, ListFrame, ListToolbar, ToolbarClear, ToolbarEnd, ToolbarSearch, headerPrimaryClass, headerButtonClass } from "@/components/layout/list-page";
+import { FilterStrip, QuickFilter } from "@/components/shared/quick-filters";
+import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { useDebounce } from "@/hooks/use-debounce";
 import { adsApi } from "@/lib/ads-api";
 import { ADS_PLACEMENTS, getPlacement } from "@/lib/ads-link-presets";
 import { cn } from "@/lib/utils";
-import { motion } from "motion/react";
-import { ChevronDown, ChevronUp, Edit, Plus, RefreshCw, Search, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Edit, Plus, Search, X } from "lucide-react";
+import { AdForm } from "./_components/AdForm";
 
 interface AdItem {
   id: number;
@@ -44,6 +50,13 @@ export default function AdsPage() {
   const [activeTab, setActiveTab] = usePersistedState<string>("ads:tab", "Active", { allowed: ["Active", "Inactive"] });
   const [placement, setPlacement] = usePersistedState<string>("ads:placement", "hero", { allowed: ADS_PLACEMENTS.map((p) => p.value) });
   const placementSpec = getPlacement(placement);
+  const adFields: ViewField<AdItem>[] = [
+    ...(placementSpec.audiences.length
+      ? [{ id: "audience", label: "Shows on", get: (ad: AdItem) => placementSpec.audiences.find((x) => x.value === ad.audience)?.label ?? "All — fallback" }]
+      : []),
+    { id: "status", label: "Status", get: (ad) => (ad.isActive ? "Active" : "Inactive"), order: ["Active", "Inactive"], dot: (v) => statusDot(v) },
+  ];
+  const views = useModuleView("ads", adFields, "status");
   const [ads, setAds] = useState<AdItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -52,6 +65,7 @@ export default function AdsPage() {
   const [isReordering, setIsReordering] = useState(false);
   const [bulkDeleteIds, setBulkDeleteIds] = useState<number[] | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [role] = useState(() => {
     try {
       const user = JSON.parse(localStorage.getItem("crm_user") || "{}");
@@ -194,6 +208,11 @@ export default function AdsPage() {
       enableHiding: false,
     },
     {
+      accessorKey: "id",
+      header: "ID",
+      cell: ({ row }) => <IdCell href={`/ads/${row.original.id}`}>{row.original.id}</IdCell>,
+    },
+    {
       id: "thumbnail",
       header: "Thumbnail",
       cell: ({ row }) => {
@@ -224,11 +243,9 @@ export default function AdsPage() {
       accessorKey: "title",
       header: "Title",
       cell: ({ row }) => {
-        const title = row.original.title || "-";
+        const title = row.original.title || "—";
         return (
-          <span className="font-medium text-foreground truncate max-w-[220px] inline-block" title={title}>
-            {title}
-          </span>
+          <span title={title}><NameCell name={title} className="max-w-[240px]" /></span>
         );
       },
     },
@@ -240,13 +257,9 @@ export default function AdsPage() {
             cell: ({ row }) => {
               const match = placementSpec.audiences.find((x) => x.value === row.original.audience);
               return match ? (
-                <Badge className="bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 font-medium shadow-sm border">
-                  {match.label}
-                </Badge>
+                <span>{match.label}</span>
               ) : (
-                <Badge variant="outline" className="bg-muted/40 text-muted-foreground border-border/60" title="Shown wherever no targeted ad is active">
-                  All — fallback
-                </Badge>
+                <span className="text-muted-foreground" title="Shown wherever no targeted ad is active">All — fallback</span>
               );
             },
           } satisfies ColumnDef<AdItem>,
@@ -259,7 +272,7 @@ export default function AdsPage() {
         const index = displayedAds.findIndex((a) => a.id === row.original.id);
         return (
           <div className="flex items-center justify-center gap-1">
-            <span className="font-semibold tabular-nums min-w-[2ch]">{row.original.sortOrder ?? "-"}</span>
+            <span className="font-semibold tabular-nums min-w-[2ch]">{row.original.sortOrder ?? "—"}</span>
             <div className="flex flex-col">
               <button
                 onClick={(e) => { e.stopPropagation(); handleMove(index, -1); }}
@@ -297,7 +310,7 @@ export default function AdsPage() {
               onCheckedChange={(next) => handleToggleStatus(ad, next)}
               aria-label={`Toggle status for ${ad.title}`}
             />
-            <span className={cn("text-xs font-medium", ad.isActive ? "text-green-700 dark:text-green-400" : "text-muted-foreground")}>
+            <span className={cn("text-[13px]", ad.isActive ? "text-foreground" : "text-muted-foreground")}>
               {ad.isActive ? "Active" : "Inactive"}
             </span>
           </div>
@@ -305,22 +318,9 @@ export default function AdsPage() {
       },
     },
     {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }) => (
-        <Link href={`/ads/new?edit=${row.original.id}`} className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-primary hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring">
-          <Edit className="h-4 w-4" /> Edit
-        </Link>
-      ),
-    },
-    {
       accessorKey: "updatedAt",
       header: "Updated",
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground whitespace-nowrap">
-          {row.original.updatedAt ? new Date(row.original.updatedAt).toLocaleDateString("en-GB") : "-"}
-        </span>
-      ),
+      cell: ({ row }) => <DateCell value={row.original.updatedAt} />,
     },
   ];
 
@@ -329,7 +329,7 @@ export default function AdsPage() {
     columns,
     data: displayedAds,
     showToolbar: true,
-    showDeleteAction: ["Admin", "Super Admin"].includes(role) && !isBusy,
+    showDeleteAction: isAdmin({ role }) && !isBusy,
     persistKey: false as const,
     onDeleteSelected: (rows: AdItem[]) => setBulkDeleteIds(rows.map((r) => r.id)),
     renderToolbarActions: (selectedRows: AdItem[], clearSelection: () => void) => {
@@ -349,14 +349,14 @@ export default function AdsPage() {
 
   const searchBar = (isMobile: boolean) => (
     <div className="relative flex-1">
-      <Search className={isMobile ? "absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" : "absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"} />
+      <Search className={isMobile ? "absolute left-3 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-muted-foreground" : "absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"} />
       <Input
         aria-label="Search advertisements by title"
         placeholder="Search ads by title..."
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         className={isMobile
-          ? "pl-11 h-12 bg-black/5 dark:bg-white/10 border-transparent rounded-2xl text-[16px] focus-visible:ring-1 focus-visible:ring-primary shadow-none"
+          ? "pl-10 h-10 bg-foreground/[0.06] border-transparent rounded-[11px] text-[16px] placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-[#017D58]/30 shadow-none"
           : "pl-9 h-10 bg-muted/30 rounded-xl border-border/60 text-[13.5px]"}
       />
       {isMobile && searchQuery && (
@@ -400,8 +400,8 @@ export default function AdsPage() {
             aria-pressed={activeTab === tab}
             disabled={isBusy}
             className={cn(
-              "px-5 h-10 rounded-full text-[14px] font-semibold whitespace-nowrap transition-all border active:scale-95",
-              isActive ? "bg-foreground text-background border-foreground shadow-sm" : "bg-card text-muted-foreground border-border hover:bg-muted"
+              "px-3.5 h-8 rounded-full text-[14px] font-medium whitespace-nowrap transition-colors active:opacity-60",
+              isActive ? "bg-[#017D58] text-white dark:bg-[#2FB585] dark:text-black" : "bg-foreground/[0.06] text-foreground"
             )}
           >
             {tab} <span className="ml-2 tabular-nums opacity-70">{isLoading ? "…" : tab === "Active" ? activeCount : ads.length - activeCount}</span>
@@ -412,13 +412,21 @@ export default function AdsPage() {
   );
 
   const emptyState = (
-    <div className="flex min-h-64 flex-col items-center justify-center gap-4 p-8 text-center" role={loadError ? "alert" : "status"}>
-      <div className="rounded-2xl bg-muted p-4"><Search className="h-6 w-6 text-muted-foreground" /></div>
-      <div className="space-y-2 max-w-md">
-        <h2 className="text-lg font-semibold">{loadError ? "Could not load advertisements" : searchQuery.trim() ? "No matching advertisements" : `No ${activeTab.toLowerCase()} advertisements`}</h2>
-        <p className="text-sm text-muted-foreground">{loadError || (searchQuery.trim() ? "Try a different title or clear your search." : `Advertisements in ${placementSpec.label.toLowerCase()} will appear here. Add one or check the ${activeTab === "Active" ? "inactive" : "active"} tab.`)}</p>
-      </div>
-      {loadError ? <Button variant="outline" onClick={() => fetchAds()}>Try again</Button> : searchQuery.trim() ? <Button variant="outline" onClick={() => setSearchQuery("")}>Clear search</Button> : <Link href={`/ads/new?placement=${placement}`} className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground">Add advertisement</Link>}
+    <div role={loadError ? "alert" : "status"}>
+      <IllustratedEmpty
+        kind={loadError ? "error" : searchQuery.trim() ? "search" : "records"}
+        title={loadError ? "Couldn't load advertisements" : searchQuery.trim() ? "No matching advertisements" : `No ${activeTab.toLowerCase()} advertisements`}
+        description={loadError || (searchQuery.trim() ? "Try a different title or clear your search." : `Advertisements in ${placementSpec.label.toLowerCase()} will appear here. Add one or set Status to ${activeTab === "Active" ? "Inactive" : "Active"}.`)}
+        action={
+          loadError ? (
+            <button type="button" className={headerButtonClass} onClick={() => fetchAds()}>Try again</button>
+          ) : searchQuery.trim() ? (
+            <button type="button" className={headerButtonClass} onClick={() => setSearchQuery("")}>Clear search</button>
+          ) : (
+            <button type="button" onClick={() => setCreating(true)} className={headerPrimaryClass}>Add advertisement</button>
+          )
+        }
+      />
     </div>
   );
 
@@ -432,7 +440,7 @@ export default function AdsPage() {
           )}
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 space-y-1">
-              <h2 className="break-words text-base font-semibold">{ad.title}</h2>
+              <h2 className="break-words text-base font-semibold"><Link href={`/ads/${ad.id}`} className="hover:underline">{ad.title}</Link></h2>
               <p className="text-xs text-muted-foreground">{placementSpec.audiences.find((a) => a.value === ad.audience)?.label || placementSpec.label}</p>
             </div>
             <Switch checked={ad.isActive} disabled={isBusy} onCheckedChange={(next) => handleToggleStatus(ad, next)} aria-label={`${ad.isActive ? "Deactivate" : "Activate"} ${ad.title}`} />
@@ -453,57 +461,51 @@ export default function AdsPage() {
 
   const tableSection = (
     <div className="w-full max-w-full min-w-0 md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col" aria-busy={isLoading}>
-      {isLoading ? <TableSkeleton columns={8} rows={6} flush /> : loadError || !displayedAds.length ? emptyState : <Device mobile={mobileList} desktop={<DataTable key={displayedAds.map((ad) => ad.id).join(",")} {...tableProps} />} />}
+      {isLoading ? <TableSkeleton columns={8} rows={6} flush /> : loadError || !displayedAds.length ? emptyState : <Device mobile={mobileList} desktop={
+        <ModuleViews
+          state={views}
+          data={displayedAds}
+          columns={columns}
+          list={<DataTable key={displayedAds.map((ad) => ad.id).join(",")} {...tableProps} variant="list" />}
+          getKey={(ad) => ad.id}
+          onOpen={(ad) => router.push(`/ads/${ad.id}`)}
+          onMove={(ad, column) => handleToggleStatus(ad, column === "Active")}
+          card={(ad) => ({ title: ad.title || "Advertisement", avatar: false, id: ad.id, href: `/ads/${ad.id}`, subtitle: ad.updatedAt ? `Updated ${formatTableDate(ad.updatedAt)}` : undefined, tag: ad.isActive ? undefined : "Inactive" })}
+          noun="ads"
+        />
+      } />}
     </div>
   );
 
   const desktopFilters = (
-    <div className="bg-card border rounded-xl overflow-hidden shadow-sm md:flex md:flex-col md:flex-1 md:min-h-0">
-      <div className="flex flex-wrap items-center justify-between px-6 border-b bg-muted/10 pt-4 gap-4">
-        <div className="flex items-center gap-8 overflow-x-auto scrollbar-hide relative">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-            aria-pressed={activeTab === tab}
-            disabled={isBusy}
-              className={"relative pb-4 text-[15px] whitespace-nowrap font-semibold transition-colors duration-200 ease-out " + (activeTab === tab ? "text-[#0052FF]" : "text-muted-foreground hover:text-foreground")}
-            >
-              {tab} <span className="ml-2 tabular-nums opacity-70">{isLoading ? "…" : tab === "Active" ? activeCount : ads.length - activeCount}</span>
-              {activeTab === tab && (
-                <motion.div layoutId="desktopActiveTabUnderline" className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#0052FF] rounded-t-full" initial={false} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
-              )}
-            </button>
-          ))}
-        </div>
-        {placementPicker(false)}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3 px-6 py-4 border-b bg-background">
-        <div className="flex-1 min-w-[240px] max-w-md">{searchBar(false)}</div>
-        <p className="text-xs text-muted-foreground max-w-md">{placementSpec.description}</p>
-        {searchQuery && (
-          <Button variant="ghost" size="icon" onClick={() => setSearchQuery("")} aria-label="Clear search" className="h-10 w-10 rounded-full text-muted-foreground hover:bg-red-50 hover:text-red-500 transition-colors" title="Clear Search">
-            <X className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
-
-      <div className="w-full max-w-full min-w-0 md:flex-1 md:min-h-0 md:overflow-hidden flex flex-col">{tableSection}</div>
-    </div>
+    <ListFrame>
+      <ListToolbar className="md:flex-nowrap">
+        <FilterStrip>
+          <QuickFilter label="Placement" required value={placement} onChange={(v) => setPlacement(v as typeof placement)}
+            options={ADS_PLACEMENTS.map((p) => ({ value: p.value, label: p.label }))} />
+          <QuickFilter label="Status" required value={activeTab} onChange={(v) => setActiveTab(v as typeof activeTab)}
+            options={tabs.map((tab) => ({ value: tab, label: isLoading ? tab : `${tab} · ${tab === "Active" ? activeCount : ads.length - activeCount}` }))} />
+        </FilterStrip>
+        <ToolbarEnd>
+          {views.picker}
+          <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search ads by title" />
+          {searchQuery && <ToolbarClear onClick={() => setSearchQuery("")} title="Clear search" />}
+        </ToolbarEnd>
+      </ListToolbar>
+      <ListBody>{tableSection}</ListBody>
+    </ListFrame>
   );
 
   const mobileFilters = (
-    <div className="px-4 pb-2 space-y-4">
+    <div className="px-4 pb-2 space-y-3">
       <div className="flex items-center gap-2">
         {searchBar(true)}
       </div>
-      <Link href={`/ads/new?placement=${placement}`} className="flex h-11 w-full rounded-xl bg-[#0052FF] px-4 text-[14px] font-semibold text-white shadow-md hover:bg-[#0052FF]/90 items-center justify-center gap-2 transition-transform active:scale-95">
+      <button type="button" onClick={() => setCreating(true)} className="flex h-11 w-full rounded-xl bg-[#0052FF] px-4 text-[14px] font-semibold text-white shadow-md hover:bg-[#0052FF]/90 items-center justify-center gap-2 transition-transform active:scale-95">
         <Plus size={18} />
         Add Advertisement
-      </Link>
+      </button>
       {placementPicker(true)}
-      <p className="text-xs text-muted-foreground">{placementSpec.description}</p>
       {pillTabs}
     </div>
   );
@@ -511,33 +513,35 @@ export default function AdsPage() {
   return (
     <>
       <MobileHeader title="Advertisement" />
-      <div className="w-full flex flex-col space-y-6 pt-4 lg:p-0 md:h-full">
-        <Device
-          mobile={null}
-          desktop={
-            <div className="flex flex-wrap items-center justify-between gap-4 min-h-12">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight">Advertisements</h1>
-                <p className="mt-1 text-sm text-muted-foreground">Manage website creatives, visibility, and display order.</p>
-                {/* <p className="text-muted-foreground text-sm mt-0.5">Manage your hero carousel advertisements</p> */}
-              </div>
-              <div className="flex items-center gap-3">
-                <Button variant="outline" size="icon" className="h-10 w-10 rounded-full border-border/60" onClick={() => fetchAds()} disabled={isLoading || isBusy} aria-label="Refresh advertisements" title="Refresh">
-                  <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
-                </Button>
-                <Link href={`/ads/new?placement=${placement}`} className="inline-flex h-11 rounded-full bg-[#0052FF] px-5 text-[14px] font-medium text-white shadow-md hover:bg-[#0052FF]/90 items-center gap-2 transition-transform active:scale-95">
-                  <Plus size={18} />
-                  Add Advertisement
-                </Link>
-              </div>
-            </div>
-          }
-        />
+      {views.switcher}
+      <div className="w-full flex flex-col space-y-6 pt-4 md:space-y-0 md:pt-0 md:h-full">
+        <PageActions>
+          <button type="button" onClick={() => setCreating(true)} className={headerPrimaryClass}>
+            <Plus className="size-4" />
+            Add Advertisement
+          </button>
+        </PageActions>
 
         <Device mobile={mobileFilters} desktop={desktopFilters} />
-        <Device desktop={null} mobile={<div className="w-full px-4 md:px-0">{tableSection}</div>} />
+        <Device desktop={null} mobile={<div className="w-full">{tableSection}</div>} />
 
       </div>
+
+      {creating && (
+        <AdForm
+          mode="create"
+          defaultPlacement={placement}
+          onClose={() => setCreating(false)}
+          onSuccess={(saved) => {
+            setCreating(false);
+            // Show the list the new ad landed in.
+            setSearchQuery("");
+            setActiveTab(saved.isActive ? "Active" : "Inactive");
+            if (saved.placement !== placement) setPlacement(saved.placement);
+            else void fetchAds();
+          }}
+        />
+      )}
 
       <Dialog open={bulkDeleteIds !== null} onOpenChange={(open) => { if (!open && !isDeleting) setBulkDeleteIds(null); }}>
         <DialogContent className="sm:max-w-[425px]">

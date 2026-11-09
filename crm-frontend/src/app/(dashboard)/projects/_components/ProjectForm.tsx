@@ -1,24 +1,24 @@
 "use client";
 
+import { DecisionDialog, DIALOG_BUTTON, DIALOG_DANGER, DIALOG_PRIMARY } from "@/components/record/decision-dialog";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { PROJECT_DRAFT_VERSION_REBASABLE, canRestoreProjectDraft, draftIsPristine, editRequestBody, projectDraftKey, pruneRecoveryCopies, readProjectDraft, type ProjectDraft, type RebasableDraft } from "./project-form-draft";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useLeaveGuard } from "@/hooks/use-leave-guard";
 import { guardNavigation } from "@/lib/leave-guard";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FormSelect } from "@/components/shared/form-select";
+import { FormSelect, SearchableFormSelect } from "@/components/shared/form-select";
 import { IconPicker } from "@/components/shared/icon-picker";
 import { DatePicker } from "@/components/shared/date-picker";
 import { PriceInput } from "@/components/shared/price-input";
-import { MobileHeader } from "@/components/layout/mobile-header";
+import { FOCUS_BUTTON, FOCUS_FIELD, FocusModal, stepStatus } from "@/components/shared/focus-modal";
 import {
-  ArrowLeft,
   ChevronDown,
   ImagePlus,
   Loader2,
@@ -28,6 +28,7 @@ import {
   X,
 } from "lucide-react";
 import { projectsApi } from "@/lib/projects-api";
+import { cn } from "@/lib/utils";
 import { propertiesApi } from "@/lib/properties-api";
 import { apiFetch } from "@/lib/api-fetch";
 import {
@@ -36,6 +37,9 @@ import {
   fetchNearbyCategories,
 } from "@/lib/nearby-places";
 import { FurnishingIcon } from "@/components/shared/furnishing-icons";
+import { MasterMultiPicker } from "@/components/master/master-multi-picker";
+import { useMasterCreate } from "@/components/master/use-master-create";
+import { sameName } from "@/lib/master-kinds";
 import { FloorNosInput } from "@/components/shared/floor-nos-input";
 import {
   PROJECT_FAQ_SECTIONS,
@@ -53,13 +57,14 @@ import {
   type ProjectFloorPlanDraft,
 } from "@/lib/project-floor-plans";
 
-const labelClass =
-  "text-xs font-bold uppercase tracking-wider text-muted-foreground";
-const inputClass = "h-12 rounded-xl bg-muted/30";
+// Field styles shared with every create form (see FocusModal).
+const labelClass = "text-[14px] font-medium text-foreground";
+const inputClass = cn(FOCUS_FIELD, "h-9");
 /* Matches the Room select beside it: same height, fill, border and text size. */
-const roomInputClass = "h-12 rounded-xl bg-muted/30 border-border/60 text-[15px]";
+const roomInputClass = cn(FOCUS_FIELD, "h-9");
+const selectClass = cn(FOCUS_FIELD, "h-9! rounded-md! border-border! text-[14px]!");
 const unitSectionTitle =
-  "text-[11px] font-bold uppercase tracking-wider text-muted-foreground border-b border-border/40 pb-2";
+  "border-b border-border/40 pb-2 text-[13px] font-medium text-muted-foreground";
 
 const PROJECT_TYPE_OPTIONS = [
   { value: "apartment", label: "Apartment" },
@@ -139,6 +144,10 @@ const UNIT_TYPE_OPTIONS = [
 ];
 
 const PLOT_UNIT_TYPE_OPTIONS = [{ value: "plot_unit", label: "Plot" }];
+
+/** How a saved unit type reads; units saved without one are stored as "other". */
+export const unitTypeLabel = (value?: string | null) =>
+  [...UNIT_TYPE_OPTIONS, ...PLOT_UNIT_TYPE_OPTIONS].find((o) => o.value === value)?.label ?? (value ? value.replace(/_/g, " ") : "Other");
 
 // Project Area is collected in any unit but always stored as sqft.
 const PROJECT_AREA_UNITS = [
@@ -413,25 +422,71 @@ function moveListItem<T>(list: T[], from: number, to: number): T[] {
 // to localStorage (debounced) so a refresh never loses entered data. The
 // snapshot only ever holds plain JSON (keys, not object URLs or Files).
 const DRAFT_VERSION = PROJECT_DRAFT_VERSION_REBASABLE;
+
+// The form's steps in the full-screen form; each shows some of the sections below.
+const PROJECT_STEPS = [
+  { key: "basics", label: "Basics" },
+  { key: "location", label: "Location" },
+  { key: "about", label: "About" },
+  { key: "structure", label: "Structure" },
+  { key: "units", label: "Units" },
+  { key: "media", label: "Media" },
+  { key: "faqs", label: "FAQs" },
+] as const;
+type ProjectStep = (typeof PROJECT_STEPS)[number]["key"];
+/** Which step each form section (in page order) belongs to. */
+const SECTION_STEPS: ProjectStep[] = ["basics", "location", "basics", "basics", "about", "structure", "structure", "about", "media", "media", "location", "units", "faqs"];
 const draftKeyFor = (mode: "create" | "edit", id: unknown) =>
   mode === "edit" && id != null
     ? `project-form-draft:edit:${id}`
     : "project-form-draft:new";
 
 
+type ProjectFormData = {
+  cities: any[];
+  sublocations: any[];
+  amenities: any[];
+  roomNames: { value: string; label: string }[];
+  roomDimensions: { value: string; label: string; lengthFt: number | null; widthFt: number | null }[];
+  specifications: { value: string; label: string }[];
+  furnishings: { id: number; name: string; icon?: string | null }[];
+};
+function shapeFormData(res: any): ProjectFormData {
+  const data = res?.data ?? res ?? {};
+  return {
+    cities: data.cities ?? [],
+    sublocations: data.sublocations ?? [],
+    amenities: data.amenities ?? [],
+    roomNames: data.roomNames ?? [],
+    roomDimensions: data.roomDimensions ?? [],
+    specifications: data.specifications ?? [],
+    furnishings: data.furnishings ?? [],
+  };
+}
+/** A room-dimension master row as a plot-dimension option. */
+const plotDimensionOption = (rd: ProjectFormData["roomDimensions"][number]) => {
+  const dims = formatRoomDimension(rd.lengthFt, rd.widthFt) ?? rd.value;
+  return { value: dims, label: rd.label !== dims ? `${rd.label} (${dims})` : dims };
+};
+
 interface ProjectFormProps {
   mode: "create" | "edit";
   initialData?: any;
   onSuccess?: () => void;
+  /** Closing without saving; defaults to the projects list (or the project). */
+  onClose?: () => void;
 }
 
 export function ProjectForm({
   mode,
   initialData,
   onSuccess,
+  onClose,
 }: ProjectFormProps) {
   const router = useRouter();
   const d = initialData as any;
+  const [step, setStep] = useState<ProjectStep>("basics");
+  const [visited, setVisited] = useState<Set<ProjectStep>>(() => new Set(["basics"]));
   // Draft key is stable for this mount (edit page only renders once data
   // loads; create mode has no id). The snapshot is read exactly once.
   const legacyDraftKey = draftKeyFor(mode, d?.id);
@@ -465,46 +520,25 @@ export function ProjectForm({
     projectTypeValue === "villa";
 
   const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState<{
-    cities: any[];
-    sublocations: any[];
-    amenities: any[];
-    roomNames: { value: string; label: string }[];
-    roomDimensions: {
-      value: string;
-      label: string;
-      lengthFt: number | null;
-      widthFt: number | null;
-    }[];
-    specifications: { value: string; label: string }[];
-    furnishings: { id: number; name: string; icon?: string | null }[];
-  }>({
-    cities: [],
-    sublocations: [],
-    amenities: [],
-    roomNames: [],
-    roomDimensions: [],
-    specifications: [],
-    furnishings: [],
-  });
+  const [formData, setFormData] = useState<ProjectFormData>(() => shapeFormData({}));
 
   useEffect(() => {
     propertiesApi
       .formData()
-      .then((res: any) => {
-        const data = res?.data ?? res ?? {};
-        setFormData({
-          cities: data.cities ?? [],
-          sublocations: data.sublocations ?? [],
-          amenities: data.amenities ?? [],
-          roomNames: data.roomNames ?? [],
-          roomDimensions: data.roomDimensions ?? [],
-          specifications: data.specifications ?? [],
-          furnishings: data.furnishings ?? [],
-        });
-      })
-      .catch(() => {});
+      .then((res: any) => setFormData(shapeFormData(res)))
+      .catch(() => toast.error("Failed to load form data."));
   }, []);
+  /** Fresh lists (skipping the server cache) after a master item is added from this form. */
+  const reloadFormData = async () => {
+    const next = shapeFormData(await propertiesApi.formData(true));
+    setFormData(next);
+    return next;
+  };
+  // Missing amenities, localities, room names… are added from here (master add dialog).
+  const master = useMasterCreate<ProjectFormData>({
+    reload: reloadFormData,
+    cities: formData.cities.map((c) => ({ id: c.id, name: c.cityName ?? c.city_name ?? "" })),
+  });
 
   const cityIdOf = (cityName: string) => {
     const found = formData.cities.find(
@@ -1621,7 +1655,8 @@ export function ProjectForm({
         return {
           unitCode: u.unitCode.trim(),
           title: u.title.trim() || undefined,
-          unitType: u.unitType || undefined,
+          // Left blank, the site stores "other"; plot units can only be plots.
+          unitType: u.unitType || (isPlotUnit ? "plot_unit" : undefined),
           bedrooms:
             !isPlotUnit && u.bedrooms ? Number(u.bedrooms) : undefined,
           bathrooms:
@@ -1710,11 +1745,6 @@ export function ProjectForm({
       if (payload[k] === undefined) delete payload[k];
     });
     return payload;
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    void submit();
   };
 
   /** Validate and save; `after` replaces the default redirect ("Save & leave"). True when saved. */
@@ -1830,42 +1860,98 @@ export function ProjectForm({
     }
   };
 
+  // ── Steps ──
+  const stepIndex = PROJECT_STEPS.findIndex((x) => x.key === step);
+  const lastStep = stepIndex === PROJECT_STEPS.length - 1;
+  const stepValid = (key: ProjectStep) =>
+    key === "basics" ? !!name.trim() && !!projectType : key === "location" ? !!city.trim() && !!sublocation.trim() : true;
+  const steps = PROJECT_STEPS.map((x, i) => ({ ...x, status: stepStatus(i, stepIndex, visited.has(x.key) && stepValid(x.key)) }));
+  const goStep = (key: ProjectStep) => {
+    setStep(key);
+    setVisited((v) => new Set(v).add(key));
+  };
+  // A new project can't skip past a step that's missing its required fields.
+  const jumpStep = (key: ProjectStep) => {
+    const target = PROJECT_STEPS.findIndex((x) => x.key === key);
+    const blocked = mode === "create" ? PROJECT_STEPS.slice(0, target).find((x) => !stepValid(x.key)) : undefined;
+    if (blocked && target > stepIndex) {
+      toast.error(blocked.key === "basics" ? "Give the project a name first." : "Pick the city and locality first.");
+      return goStep(blocked.key);
+    }
+    goStep(key);
+  };
+  const nextStep = () => {
+    if (!stepValid(step)) {
+      toast.error(step === "basics" ? "Project name is required." : "City and locality are required.");
+      return;
+    }
+    if (!lastStep) goStep(PROJECT_STEPS[stepIndex + 1].key);
+  };
+  const save = () => {
+    const missing = PROJECT_STEPS.find((x) => !stepValid(x.key));
+    if (missing) goStep(missing.key);
+    void submit();
+  };
+  const close = () =>
+    guardNavigation(() => (onClose ? onClose() : router.push(mode === "edit" && d?.id ? `/projects/${d.id}` : "/projects")));
+  const firstOfStep = (index: number, key: ProjectStep) => SECTION_STEPS.indexOf(key) === index;
+  /** A form section: shown on its own step, ruled off from the one above. */
+  const sectionClass = (index: number, key: ProjectStep) =>
+    cn(!firstOfStep(index, key) && "mt-10 border-t pt-10", key !== step && "hidden");
+  const busy = isLoading || uploadingFloorPlanId !== null;
+
   return (
     <>
-      <MobileHeader
-        title={mode === "create" ? "New Project" : "Edit Project"}
-        showBack
-      />
-      <form
-        onSubmit={handleSubmit}
-        className="max-w-5xl mx-auto w-full flex flex-col gap-6 pb-10 px-2.5 md:px-0 mt-2 md:mt-0 mb-20 md:mb-0"
+      <FocusModal
+        open
+        onOpenChange={(o) => { if (!o && !isLoading) close(); }}
+        title={mode === "create" ? "New project" : "Edit project"}
+        steps={steps}
+        active={step}
+        onStepChange={(k) => jumpStep(k as ProjectStep)}
+        footer={
+          <>
+            <button type="button" className={FOCUS_BUTTON.secondary} onClick={close} disabled={isLoading}>Cancel</button>
+            {stepIndex > 0 && (
+              <button type="button" className={FOCUS_BUTTON.secondary} onClick={() => goStep(PROJECT_STEPS[stepIndex - 1].key)} disabled={isLoading}>Back</button>
+            )}
+            {!lastStep && (
+              <button type="button" onClick={nextStep} disabled={isLoading}
+                className={cn(mode === "create" ? FOCUS_BUTTON.primary : FOCUS_BUTTON.secondary, !stepValid(step) && "cursor-not-allowed opacity-50")}>
+                Continue
+              </button>
+            )}
+            {(mode === "edit" || lastStep) && (
+              <button type="button" onClick={save} disabled={busy} className={FOCUS_BUTTON.primary}>
+                {isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                {mode === "create" ? (isLoading ? "Creating…" : "Create project") : (isLoading ? "Saving…" : "Save changes")}
+              </button>
+            )}
+          </>
+        }
       >
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => guardNavigation(() => router.push("/projects"))}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border/60 text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
-            aria-label="Back to projects"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <h1 className="text-[28px] font-bold tracking-tight">
-            {mode === "create" ? "Add New Project" : "Edit Project"}
-          </h1>
-        </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          // Enter moves on while creating; editing saves straight away.
+          if (mode === "create" && !lastStep) nextStep();
+          else save();
+        }}
+        className="flex w-full flex-col"
+      >
         {preview.unitsCount > 0 && (
-          <p className="text-muted-foreground text-sm">
+          <p className="mb-8 text-[14px] text-muted-foreground">
             {`${formatPriceRange(preview.minPrice, preview.maxPrice)} · ${preview.bhk.length ? preview.bhk.map((b) => `${b}BHK`).join(", ") : "No BHK"} · ${preview.unitsCount} unit${preview.unitsCount > 1 ? "s" : ""}`}
           </p>
         )}
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+        <div className={sectionClass(0, "basics")}>
+          <h3 className="mb-6 text-[20px] font-medium tracking-[-0.01em] text-foreground">
             Basic Info
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className={labelClass}>Project Name *</label>
+              <label className={labelClass}>Project Name <span className="text-red-500">*</span></label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -1874,8 +1960,8 @@ export function ProjectForm({
               />
             </div>
             <div className="space-y-2">
-              <label className={labelClass}>Project Type *</label>
-              <FormSelect
+              <label className={labelClass}>Project Type <span className="text-red-500">*</span></label>
+              <FormSelect className={selectClass}
                 name="projectType"
                 options={PROJECT_TYPE_OPTIONS}
                 value={projectType}
@@ -1885,7 +1971,7 @@ export function ProjectForm({
             </div>
             <div className="space-y-2">
               <label className={labelClass}>Status</label>
-              <FormSelect
+              <FormSelect className={selectClass}
                 name="status"
                 options={STATUS_OPTIONS}
                 value={status}
@@ -1896,14 +1982,23 @@ export function ProjectForm({
           </div>
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+        <div className={sectionClass(1, "location")}>
+          <h3 className="mb-6 text-[20px] font-medium tracking-[-0.01em] text-foreground">
             Location
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className={labelClass}>City *</label>
-              <FormSelect
+              <label className={labelClass}>City <span className="text-red-500">*</span></label>
+              <SearchableFormSelect className={selectClass}
+                createNoun="city"
+                onCreate={(q) => master.create("cities", q, (created, fresh) => {
+                  const match = fresh.cities.find((c) => sameName(c.cityName ?? c.city_name ?? "", created));
+                  if (!match) return;
+                  setCity(match.cityName ?? match.city_name);
+                  setSublocation("");
+                  const st = match.stateName ?? match.state_name ?? "";
+                  if (st) setState(String(st).trim());
+                })}
                 name="city"
                 options={formData.cities.map((c: any) => {
                   const n = c.cityName ?? c.city_name ?? "";
@@ -1924,7 +2019,7 @@ export function ProjectForm({
             </div>
             <div className="space-y-2">
               <label className={labelClass}>State</label>
-              <FormSelect
+              <SearchableFormSelect className={selectClass}
                 name="state"
                 options={stateOptions}
                 value={state}
@@ -1937,8 +2032,18 @@ export function ProjectForm({
               />
             </div>
             <div className="space-y-2">
-              <label className={labelClass}>Sublocation / Locality *</label>
-              <FormSelect
+              <label className={labelClass}>Sublocation / Locality <span className="text-red-500">*</span></label>
+              <SearchableFormSelect className={selectClass}
+                createNoun="locality"
+                onCreate={(q) => master.create("sublocations", q, (created, fresh) => {
+                  // The dialog may map it to another city; follow it there.
+                  const subs = fresh.sublocations.filter((x) => sameName(x.localityName ?? x.locality_name ?? x.name ?? "", created));
+                  const sub = subs.find((x) => String(x.cityId ?? x.city_id ?? "") === cityIdOf(city)) ?? subs[subs.length - 1];
+                  if (!sub) return;
+                  const owner = fresh.cities.find((c) => String(c.id) === String(sub.cityId ?? sub.city_id ?? ""));
+                  if (owner) setCity(owner.cityName ?? owner.city_name);
+                  setSublocation(sub.localityName ?? sub.locality_name ?? sub.name ?? created);
+                }, { cityId: cityIdOf(city) })}
                 name="sublocation"
                 options={formData.sublocations
                   .filter((s: any) => {
@@ -1994,12 +2099,21 @@ export function ProjectForm({
               />
             </div>
             <div className="space-y-2 md:col-span-2">
+              <label className={labelClass}>Address</label>
+              <Textarea
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Site address"
+                className={cn(FOCUS_FIELD, "min-h-[90px] py-2")}
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
               <Button
                 type="button"
                 variant="outline"
                 disabled={locating}
                 onClick={handleLocateCoordinates}
-                className="h-11 rounded-xl px-5"
+                className={FOCUS_BUTTON.secondary}
               >
                 {locating ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -2009,30 +2123,21 @@ export function ProjectForm({
                 {locating ? "Locating..." : "Auto Populate"}
               </Button>
               <p className="text-xs text-muted-foreground">
-                Uses the address above (falls back to locality, city and state).
+                Uses the address (falls back to locality, city and state).
                 Fills pincode, latitude and longitude.
               </p>
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <label className={labelClass}>Address</label>
-              <Textarea
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="Site address"
-                className="rounded-xl bg-muted/30 min-h-[90px]"
-              />
             </div>
           </div>
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+        <div className={sectionClass(2, "basics")}>
+          <h3 className="mb-6 text-[20px] font-medium tracking-[-0.01em] text-foreground">
             Possession
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
               <label className={labelClass}>Possession Status</label>
-              <FormSelect
+              <FormSelect className={selectClass}
                 name="possessionStatus"
                 options={POSSESSION_OPTIONS}
                 value={possessionStatus}
@@ -2052,20 +2157,20 @@ export function ProjectForm({
                   setPossessionDate(d ? format(d, "yyyy-MM-dd") : "")
                 }
                 placeholder="Pick possession date"
-                className="h-12 rounded-xl bg-muted/30"
+                className={cn(inputClass, "h-9! w-full border font-normal")}
               />
             </div>
           </div>
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+        <div className={sectionClass(3, "basics")}>
+          <h3 className="mb-6 text-[20px] font-medium tracking-[-0.01em] text-foreground">
             Builder
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
               <label className={labelClass}>Select Builder</label>
-              <FormSelect
+              <FormSelect className={selectClass}
                 name="builderId"
                 placeholder="Select a registered builder"
                 options={[
@@ -2123,8 +2228,8 @@ export function ProjectForm({
           </div>
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+        <div className={sectionClass(4, "about")}>
+          <h3 className="mb-6 text-[20px] font-medium tracking-[-0.01em] text-foreground">
             About
           </h3>
           <div className="grid grid-cols-1 gap-5">
@@ -2134,7 +2239,7 @@ export function ProjectForm({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="About this project..."
-                className="rounded-xl bg-muted/30 min-h-[120px]"
+                className={cn(FOCUS_FIELD, "min-h-[120px] py-2")}
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -2150,7 +2255,7 @@ export function ProjectForm({
               {coverPreview &&
               (coverPreview.startsWith("http") ||
                 coverPreview.startsWith("blob:")) ? (
-                <div className="relative w-full h-44 rounded-xl overflow-hidden border border-border/60 bg-muted/20">
+                <div className="relative w-full h-44 rounded-lg overflow-hidden border border-border/60 bg-muted/20">
                   <img
                     src={coverPreview}
                     alt="Cover preview"
@@ -2169,14 +2274,14 @@ export function ProjectForm({
                   </button>
                 </div>
               ) : coverImageUrl ? (
-                <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 p-2">
+                <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/20 p-2">
                   <span className="flex-1 truncate text-xs text-muted-foreground">
                     {coverImageUrl}
                   </span>
                   <button
                     type="button"
                     onClick={() => coverInputRef.current?.click()}
-                    className="!px-3 !py-1.5 !text-[12px] !font-medium !text-[#0052FF] hover:!bg-[#0052FF]/10 !rounded-lg"
+                    className="!px-3 !py-1.5 !text-[12px] !font-medium !text-foreground hover:!bg-foreground/[0.06] !rounded-lg"
                   >
                     Replace
                   </button>
@@ -2197,7 +2302,7 @@ export function ProjectForm({
                   type="button"
                   disabled={uploadingCover}
                   onClick={() => coverInputRef.current?.click()}
-                  className="w-full h-24 rounded-xl border-2 border-dashed border-border/60 flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:border-[#0052FF]/50 hover:text-[#0052FF] transition-colors disabled:opacity-60"
+                  className="w-full h-24 rounded-lg border-2 border-dashed border-border/60 flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors disabled:opacity-60"
                 >
                   {uploadingCover ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -2220,7 +2325,7 @@ export function ProjectForm({
               {mobileCoverPreview &&
               (mobileCoverPreview.startsWith("http") ||
                 mobileCoverPreview.startsWith("blob:")) ? (
-                <div className="relative w-full h-44 rounded-xl overflow-hidden border border-border/60 bg-muted/20">
+                <div className="relative w-full h-44 rounded-lg overflow-hidden border border-border/60 bg-muted/20">
                   <img
                     src={mobileCoverPreview}
                     alt="Mobile cover preview"
@@ -2239,7 +2344,7 @@ export function ProjectForm({
                   </button>
                 </div>
               ) : mobileCoverImageUrl ? (
-                <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 p-2">
+                <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/20 p-2">
                   <span className="flex-1 truncate text-xs text-muted-foreground">
                     {mobileCoverImageUrl}
                   </span>
@@ -2247,7 +2352,7 @@ export function ProjectForm({
                     type="button"
                     disabled={uploadingMobileCover}
                     onClick={() => mobileCoverInputRef.current?.click()}
-                    className="!px-3 !py-1.5 !text-[12px] !font-medium !text-[#0052FF] hover:!bg-[#0052FF]/10 !rounded-lg disabled:opacity-60"
+                    className="!px-3 !py-1.5 !text-[12px] !font-medium !text-foreground hover:!bg-foreground/[0.06] !rounded-lg disabled:opacity-60"
                   >
                     Replace
                   </button>
@@ -2269,7 +2374,7 @@ export function ProjectForm({
                   type="button"
                   disabled={uploadingMobileCover}
                   onClick={() => mobileCoverInputRef.current?.click()}
-                  className="w-full h-24 rounded-xl border-2 border-dashed border-border/60 flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:border-[#0052FF]/50 hover:text-[#0052FF] transition-colors disabled:opacity-60"
+                  className="w-full h-24 rounded-lg border-2 border-dashed border-border/60 flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors disabled:opacity-60"
                 >
                   {uploadingMobileCover ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -2292,7 +2397,7 @@ export function ProjectForm({
                 onChange={handleBrochureFile}
               />
               {brochureKey ? (
-                <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 p-2">
+                <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/20 p-2">
                   <span className="flex-1 truncate text-xs text-muted-foreground">
                     {brochureName || brochureKey}
                   </span>
@@ -2300,7 +2405,7 @@ export function ProjectForm({
                     type="button"
                     disabled={uploadingBrochure}
                     onClick={() => brochureInputRef.current?.click()}
-                    className="!px-3 !py-1.5 !text-[12px] !font-medium !text-[#0052FF] hover:!bg-[#0052FF]/10 !rounded-lg disabled:opacity-60 inline-flex items-center gap-1.5"
+                    className="!px-3 !py-1.5 !text-[12px] !font-medium !text-foreground hover:!bg-foreground/[0.06] !rounded-lg disabled:opacity-60 inline-flex items-center gap-1.5"
                   >
                     {uploadingBrochure && (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -2325,7 +2430,7 @@ export function ProjectForm({
                   type="button"
                   disabled={uploadingBrochure}
                   onClick={() => brochureInputRef.current?.click()}
-                  className="w-full h-24 rounded-xl border-2 border-dashed border-border/60 flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:border-[#0052FF]/50 hover:text-[#0052FF] transition-colors disabled:opacity-60"
+                  className="w-full h-24 rounded-lg border-2 border-dashed border-border/60 flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground hover:border-foreground/30 hover:text-foreground transition-colors disabled:opacity-60"
                 >
                   {uploadingBrochure ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -2342,12 +2447,12 @@ export function ProjectForm({
           </div>
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+        <div className={sectionClass(5, "structure")}>
+          <h3 className="mb-6 text-[20px] font-medium tracking-[-0.01em] text-foreground">
             Structure &amp; Layout
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <div className="space-y-2">
+            <div className="space-y-2 md:col-span-3">
               <label className={labelClass}>Project Area</label>
               <div className="flex gap-2">
                 <Input
@@ -2361,7 +2466,7 @@ export function ProjectForm({
                 />
                 <FormSelect
                   name="projectAreaUnit"
-                  className="w-32 shrink-0"
+                  className={cn(selectClass, "w-28! shrink-0")}
                   placeholder="Unit"
                   options={PROJECT_AREA_UNITS.map((u) => ({
                     label: u.label,
@@ -2434,7 +2539,7 @@ export function ProjectForm({
           {projectType === "apartment" && (
             <div className="mt-6 space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-foreground">
+                <span className="text-[14px] font-medium text-foreground">
                   Tower Details
                 </span>
                 <Button
@@ -2443,7 +2548,7 @@ export function ProjectForm({
                   onClick={() =>
                     setTowerDetails((prev) => [...prev, emptyTowerDetail()])
                   }
-                  className="h-9 rounded-full px-4"
+                  className={FOCUS_BUTTON.secondary}
                 >
                   <Plus className="h-4 w-4 mr-1" /> Add Tower
                 </Button>
@@ -2517,7 +2622,7 @@ export function ProjectForm({
                           prev.filter((_, j) => j !== i),
                         )
                       }
-                      className="h-12 w-12 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                      className="h-9 w-9 text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
                       aria-label="Remove tower"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -2529,56 +2634,26 @@ export function ProjectForm({
           )}
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-            <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+        <div className={sectionClass(6, "structure")}>
+            <h3 className="mb-6 text-[20px] font-medium tracking-[-0.01em] text-foreground">
               Amenities
             </h3>
-            {formData.amenities.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic">
-                No amenities available in the master list.
-              </p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {formData.amenities.map((amenity: any) => (
-                  <label
-                    key={amenity.id}
-                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
-                      amenityIds.includes(amenity.id)
-                        ? "bg-[#0052FF]/5 border-[#0052FF]/30"
-                        : "bg-muted/10 border-border/40 hover:bg-muted/30"
-                    }`}
-                  >
-                    <Checkbox
-                      checked={amenityIds.includes(amenity.id)}
-                      onCheckedChange={(checked) => {
-                        if (checked)
-                          setAmenityIds((prev) => [...prev, amenity.id]);
-                        else
-                          setAmenityIds((prev) =>
-                            prev.filter((id) => id !== amenity.id),
-                          );
-                      }}
-                    />
-                    <div className="flex flex-col min-w-0">
-                      <span
-                        className="text-sm font-semibold text-foreground truncate capitalize"
-                        title={amenity.name}
-                      >
-                        {amenity.name}
-                      </span>
-                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground truncate">
-                        {amenity.category || "General"}
-                      </span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            )}
+            <MasterMultiPicker
+              noun="amenity"
+              plural="amenities"
+              items={formData.amenities.map((a) => ({ id: a.id, name: a.name, hint: a.category || "General" }))}
+              selected={amenityIds}
+              onChange={setAmenityIds}
+              onCreate={(q) => master.create("amenities", q, (name, fresh) => {
+                const created = fresh.amenities.find((a) => sameName(a.name, name));
+                if (created) setAmenityIds((ids) => (ids.includes(created.id) ? ids : [...ids, created.id]));
+              })}
+            />
           </div>
 
         {projectType !== "plot" && (
-          <div className="bg-card border rounded-2xl p-8 shadow-sm">
-            <h3 className="text-lg font-bold text-foreground border-b pb-3 mb-6">
+          <div className={sectionClass(7, "about")}>
+            <h3 className="mb-6 text-[20px] font-medium tracking-[-0.01em] text-foreground">
               Highlights &amp; Specifications
             </h3>
             <div className="grid grid-cols-1 gap-5">
@@ -2588,12 +2663,12 @@ export function ProjectForm({
                   value={highlights}
                   onChange={(e) => setHighlights(e.target.value)}
                   placeholder="Key selling points of this project..."
-                  className="rounded-xl bg-muted/30 min-h-[90px]"
+                  className={cn(FOCUS_FIELD, "min-h-[90px] py-2")}
                 />
               </div>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-foreground">
+                  <span className="text-[14px] font-medium text-foreground">
                     Specifications
                   </span>
                   <Button
@@ -2605,7 +2680,7 @@ export function ProjectForm({
                         emptySpecification(),
                       ])
                     }
-                    className="h-9 rounded-full px-4"
+                    className={FOCUS_BUTTON.secondary}
                   >
                     <Plus className="h-4 w-4 mr-1" /> Add Row
                   </Button>
@@ -2617,7 +2692,10 @@ export function ProjectForm({
                   >
                     <div className="space-y-2">
                       <label className={labelClass}>Label</label>
-                      <FormSelect
+                      <SearchableFormSelect className={selectClass}
+                        createNoun="specification"
+                        onCreate={(q) => master.create("specifications", q, (name) =>
+                          setSpecifications((prev) => prev.map((row, j) => (j === i ? { ...row, label: name } : row))))}
                         name={`specLabel-${i}`}
                         options={withLegacyOption(
                           formData.specifications.map((sp) => ({
@@ -2706,7 +2784,7 @@ export function ProjectForm({
                                 ),
                               )
                             }
-                            className="h-8 rounded-full px-3 text-xs"
+                            className={cn(FOCUS_BUTTON.secondary, "h-7 text-[12px]")}
                           >
                             <Plus className="h-3.5 w-3.5 mr-1" /> Add point
                           </Button>
@@ -2728,7 +2806,7 @@ export function ProjectForm({
                             prev.filter((_, j) => j !== i),
                           )
                         }
-                        className="h-12 w-12 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                        className="h-9 w-9 text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
                         aria-label="Remove specification"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -2741,9 +2819,9 @@ export function ProjectForm({
           </div>
         )}
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <div className="flex items-center justify-between border-b pb-3 mb-6">
-            <h3 className="text-lg font-bold text-foreground">
+        <div className={sectionClass(8, "media")}>
+          <div className="mb-6 flex items-center justify-between gap-3">
+            <h3 className="text-[20px] font-medium tracking-[-0.01em] text-foreground">
               Gallery ({gallery.length})
             </h3>
             <Button
@@ -2751,7 +2829,7 @@ export function ProjectForm({
               variant="outline"
               disabled={uploadingGallery}
               onClick={() => galleryInputRef.current?.click()}
-              className="h-9 rounded-full px-4"
+              className={FOCUS_BUTTON.secondary}
             >
               {uploadingGallery ? (
                 <Loader2 className="h-4 w-4 mr-1 animate-spin" />
@@ -2784,7 +2862,7 @@ export function ProjectForm({
                   onDrop={onGalleryDrop(i)}
                   onDragEnd={onGalleryDragEnd}
                   title="Drag to reorder — first photo is primary"
-                  className={`relative h-28 rounded-xl overflow-hidden border border-border/60 bg-muted/20 cursor-grab active:cursor-grabbing transition-opacity ${
+                  className={`relative h-28 rounded-lg overflow-hidden border border-border/60 bg-muted/20 cursor-grab active:cursor-grabbing transition-opacity ${
                     draggingGallery === i ? "opacity-40" : ""
                   }`}
                 >
@@ -2800,7 +2878,7 @@ export function ProjectForm({
                     </span>
                   )}
                   {i === 0 && (
-                    <span className="absolute top-1.5 left-1.5 bg-[#0052FF] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                    <span className="absolute top-1.5 left-1.5 bg-foreground text-background text-[10px] font-medium px-1.5 py-0.5 rounded-md">
                       Primary
                     </span>
                   )}
@@ -2820,10 +2898,10 @@ export function ProjectForm({
           )}
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <div className="flex items-center justify-between border-b pb-3 mb-6">
+        <div className={sectionClass(9, "media")}>
+          <div className="mb-6 flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-lg font-bold text-foreground">Videos</h3>
+              <h3 className="text-[20px] font-medium tracking-[-0.01em] text-foreground">Videos</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 YouTube links with a title. Shown on the overview and the
                 photos page.
@@ -2835,7 +2913,7 @@ export function ProjectForm({
               onClick={() =>
                 setVideos((prev) => [...prev, { title: "", url: "" }])
               }
-              className="h-9 rounded-full px-4"
+              className={FOCUS_BUTTON.secondary}
             >
               <Plus className="h-4 w-4 mr-1" /> Add Video
             </Button>
@@ -2870,7 +2948,7 @@ export function ProjectForm({
                       )
                     }
                     placeholder="e.g. Site walkthrough"
-                    className="h-10 rounded-xl bg-muted/30 border-border/60 text-[13.5px]"
+                    className={inputClass}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -2894,7 +2972,7 @@ export function ProjectForm({
                     aria-invalid={
                       v.url.trim() !== "" && !YOUTUBE_URL_RE.test(v.url.trim())
                     }
-                    className="h-10 rounded-xl bg-muted/30 border-border/60 text-[13.5px] aria-[invalid=true]:border-red-400"
+                    className={cn(inputClass, "aria-[invalid=true]:border-red-400")}
                   />
                 </div>
                 <button
@@ -2912,9 +2990,9 @@ export function ProjectForm({
           </div>
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <div className="flex items-center justify-between border-b pb-3 mb-6">
-            <h3 className="text-lg font-bold text-foreground">
+        <div className={sectionClass(10, "location")}>
+          <div className="mb-6 flex items-center justify-between gap-3">
+            <h3 className="text-[20px] font-medium tracking-[-0.01em] text-foreground">
               Connectivity & Nearby
             </h3>
             <Button
@@ -2922,7 +3000,7 @@ export function ProjectForm({
               variant="outline"
               disabled={fetchingNearby}
               onClick={handleAutoPopulateNearby}
-              className="h-9 rounded-full px-4"
+              className={FOCUS_BUTTON.secondary}
             >
               {fetchingNearby ? (
                 <Loader2 className="h-4 w-4 mr-1 animate-spin" />
@@ -2937,9 +3015,9 @@ export function ProjectForm({
               {nearbyCategories.map((cat: any, i: number) => (
                 <div
                   key={i}
-                  className="rounded-xl border border-border/60 bg-muted/10 p-4"
+                  className="rounded-lg border border-border/60 bg-muted/10 p-4"
                 >
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                  <p className="mb-2 text-[13px] font-medium text-muted-foreground">
                     {cat.title}
                   </p>
                   <ul className="space-y-1">
@@ -2963,7 +3041,7 @@ export function ProjectForm({
           )}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-foreground">
+              <span className="text-[14px] font-medium text-foreground">
                 Connectivity Highlights
               </span>
               <Button
@@ -2972,7 +3050,7 @@ export function ProjectForm({
                 onClick={() =>
                   setConnectivity((prev) => [...prev, emptyConnectivity()])
                 }
-                className="h-9 rounded-full px-4"
+                className={FOCUS_BUTTON.secondary}
               >
                 <Plus className="h-4 w-4 mr-1" /> Add Highlight
               </Button>
@@ -3044,7 +3122,7 @@ export function ProjectForm({
                     onClick={() =>
                       setConnectivity((prev) => prev.filter((_, j) => j !== i))
                     }
-                    className="h-12 w-12 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                    className="h-9 w-9 text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
                     aria-label="Remove highlight"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -3055,14 +3133,14 @@ export function ProjectForm({
           </div>
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <div className="flex items-center justify-between border-b pb-3 mb-6">
-            <h3 className="text-lg font-bold text-foreground">
+        <div className={sectionClass(11, "units")}>
+          <div className="mb-6 flex items-center justify-between gap-3">
+            <h3 className="text-[20px] font-medium tracking-[-0.01em] text-foreground">
               Units ({units.filter((u) => u.unitCode.trim()).length})
             </h3>
             <div className="flex items-center gap-3">
               {preview.unitsCount > 0 && (
-                <span className="text-sm font-semibold text-[#0052FF]">
+                <span className="text-[13px] font-medium text-muted-foreground">
                   {formatPriceRange(preview.minPrice, preview.maxPrice)}
                 </span>
               )}
@@ -3096,7 +3174,7 @@ export function ProjectForm({
             {units.map((unit, idx) => (
               <div
                 key={idx}
-                className="border border-border/60 rounded-2xl bg-muted/10 overflow-hidden"
+                className="border border-border/60 rounded-lg bg-muted/10 overflow-hidden"
               >
                 <div
                   className="flex items-center gap-3 p-5 cursor-pointer select-none"
@@ -3111,7 +3189,7 @@ export function ProjectForm({
                   }}
                   aria-expanded={isUnitOpen(idx)}
                 >
-                  <span className="text-sm font-bold text-foreground shrink-0">
+                  <span className="shrink-0 text-[14px] font-medium text-foreground">
                     Unit {idx + 1}
                   </span>
                   <span className="flex-1 truncate text-[13px] text-muted-foreground">
@@ -3136,7 +3214,7 @@ export function ProjectForm({
                 {isUnitOpen(idx) && (
                   <div className="px-5 pb-5 space-y-4 border-t border-border/40 pt-4">
                     <div
-                      className="flex gap-1 rounded-xl bg-muted/40 p-1 overflow-x-auto"
+                      className="flex gap-1 rounded-lg bg-muted/40 p-1 overflow-x-auto"
                       role="tablist"
                       aria-label={`Unit ${idx + 1} sections`}
                     >
@@ -3152,7 +3230,7 @@ export function ProjectForm({
                           onClick={() => setUnitTab(idx, t.id)}
                           className={`flex-1 whitespace-nowrap px-3 py-2 rounded-lg text-[13px] font-semibold transition-colors cursor-pointer ${
                             unitTab(idx) === t.id
-                              ? "bg-white text-[#0052FF] shadow-sm dark:bg-card dark:text-white"
+                              ? "bg-background text-foreground shadow-sm dark:bg-white/[0.08]"
                               : "text-muted-foreground hover:text-foreground"
                           }`}
                         >
@@ -3165,7 +3243,7 @@ export function ProjectForm({
                         <p className={unitSectionTitle}>Identity</p>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           <div className="space-y-2">
-                            <label className={labelClass}>Unit Code *</label>
+                            <label className={labelClass}>Unit Code <span className="text-red-500">*</span></label>
                             <Input
                               value={unit.unitCode}
                               onChange={(e) =>
@@ -3196,7 +3274,7 @@ export function ProjectForm({
                           </div>
                           <div className="space-y-2">
                             <label className={labelClass}>Unit Type</label>
-                            <FormSelect
+                            <FormSelect className={selectClass}
                               name={`unitType-${idx}`}
                               options={
                                 isPlotProject(projectType)
@@ -3207,12 +3285,12 @@ export function ProjectForm({
                               onValueChange={(v) =>
                                 updateUnit(idx, { unitType: v || "" })
                               }
-                              placeholder="Any"
+                              placeholder={isPlotProject(projectType) ? "Plot" : "Other"}
                             />
                           </div>
                           <div className="space-y-2">
                             <label className={labelClass}>Unit Status</label>
-                            <FormSelect
+                            <FormSelect className={selectClass}
                               name={`unitStatus-${idx}`}
                               options={UNIT_STATUS_OPTIONS}
                               value={unit.status}
@@ -3278,7 +3356,7 @@ export function ProjectForm({
                             <label className={labelClass}>
                               {isPlotProject(projectType) ? "Plot Facing" : "Facing"}
                             </label>
-                            <FormSelect
+                            <FormSelect className={selectClass}
                               name={`facing-${idx}`}
                               options={FACING_OPTIONS}
                               value={unit.facing}
@@ -3292,7 +3370,7 @@ export function ProjectForm({
                             <>
                               <div className="space-y-2">
                                 <label className={labelClass}>Furnishing</label>
-                                <FormSelect
+                                <FormSelect className={selectClass}
                                   name={`furnished-${idx}`}
                                   options={FURNISHED_OPTIONS}
                                   value={unit.furnishedStatus}
@@ -3308,6 +3386,7 @@ export function ProjectForm({
                                 <div className="space-y-2">
                                   <label className={labelClass}>Floor Nos</label>
                                   <FloorNosInput
+                                    className="min-h-9! rounded-md! bg-muted/40! py-1! dark:bg-white/[0.04]!"
                                     value={unit.floorNo}
                                     onChange={(val) =>
                                       updateUnit(idx, { floorNo: val })
@@ -3468,23 +3547,15 @@ export function ProjectForm({
                                   <label className={labelClass}>
                                     Plot Dimensions
                                   </label>
-                                  <FormSelect
+                                  <SearchableFormSelect className={selectClass}
+                                    createNoun="dimension"
+                                    onCreate={(q) => master.create("room-dimensions", q, (name, fresh) => {
+                                      const rd = fresh.roomDimensions.find((x) => sameName(x.value, name));
+                                      updateUnit(idx, { plotDimensions: rd ? plotDimensionOption(rd).value : name });
+                                    })}
                                     name={`plotDims-${idx}`}
                                     options={withLegacyOption(
-                                      formData.roomDimensions.map((rd) => {
-                                        const dims =
-                                          formatRoomDimension(
-                                            rd.lengthFt,
-                                            rd.widthFt,
-                                          ) ?? rd.value;
-                                        return {
-                                          value: dims,
-                                          label:
-                                            rd.label !== dims
-                                              ? `${rd.label} (${dims})`
-                                              : dims,
-                                        };
-                                      }),
+                                      formData.roomDimensions.map(plotDimensionOption),
                                       unit.plotDimensions,
                                     )}
                                     value={unit.plotDimensions || null}
@@ -3551,9 +3622,9 @@ export function ProjectForm({
                                 return (
                                   <label
                                     key={key}
-                                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                                       checked
-                                        ? "bg-[#0052FF]/5 border-[#0052FF]/30"
+                                        ? "bg-foreground/[0.04] border-foreground/40"
                                         : "bg-muted/10 border-border/40 hover:bg-muted/30"
                                     }`}
                                   >
@@ -3573,59 +3644,18 @@ export function ProjectForm({
                               })}
                             </div>
                             <p className={unitSectionTitle}>Furnishing Items</p>
-                            {formData.furnishings.length === 0 ? (
-                              <p className="text-sm text-muted-foreground italic">
-                                No furnishing items available in the master
-                                list.
-                              </p>
-                            ) : (
-                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                {formData.furnishings.map((item: any) => {
-                                  const checked =
-                                    unit.furnishingItemIds.includes(item.id);
-                                  return (
-                                    <label
-                                      key={item.id}
-                                      className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
-                                        checked
-                                          ? "bg-[#0052FF]/5 border-[#0052FF]/30"
-                                          : "bg-muted/10 border-border/40 hover:bg-muted/30"
-                                      }`}
-                                    >
-                                      <Checkbox
-                                        checked={checked}
-                                        onCheckedChange={(c) => {
-                                          if (c)
-                                            updateUnit(idx, {
-                                              furnishingItemIds: [
-                                                ...unit.furnishingItemIds,
-                                                item.id,
-                                              ],
-                                            });
-                                          else
-                                            updateUnit(idx, {
-                                              furnishingItemIds:
-                                                unit.furnishingItemIds.filter(
-                                                  (id) => id !== item.id,
-                                                ),
-                                            });
-                                        }}
-                                      />
-                                      <FurnishingIcon
-                                        name={item.icon ?? item.name}
-                                        className="h-4 w-4 shrink-0 text-muted-foreground"
-                                      />
-                                      <span
-                                        className="text-sm font-semibold text-foreground truncate"
-                                        title={item.name}
-                                      >
-                                        {item.name}
-                                      </span>
-                                    </label>
-                                  );
-                                })}
-                              </div>
-                            )}
+                            <MasterMultiPicker
+                              noun="furnishing item"
+                              limit={6}
+                              items={formData.furnishings.map((item) => ({ id: item.id, name: item.name, icon: <FurnishingIcon name={item.icon ?? item.name} className="h-4 w-4 shrink-0 text-muted-foreground" /> }))}
+                              selected={unit.furnishingItemIds}
+                              onChange={(ids) => updateUnit(idx, { furnishingItemIds: ids })}
+                              onCreate={(q) => master.create("furnishing-items", q, (name, fresh) => {
+                                const created = fresh.furnishings.find((f) => sameName(f.name, name));
+                                if (!created) return;
+                                setUnits((prev) => prev.map((u, i) => (i === idx && !u.furnishingItemIds.includes(created.id) ? { ...u, furnishingItemIds: [...u.furnishingItemIds, created.id] } : u)));
+                              })}
+                            />
                           </>
                         )}
                         {!isPlotProject(projectType) && (
@@ -3649,7 +3679,7 @@ export function ProjectForm({
                                 <label className={labelClass}>
                                   Parking Type
                                 </label>
-                                <FormSelect
+                                <FormSelect className={selectClass}
                                   name={`parkingType-${idx}`}
                                   options={PARKING_TYPE_OPTIONS}
                                   value={unit.parkingType}
@@ -3664,9 +3694,9 @@ export function ProjectForm({
                                   Guest Parking
                                 </span>
                                 <label
-                                  className={`flex h-12 items-center gap-3 px-4 rounded-xl border cursor-pointer transition-colors ${
+                                  className={`flex h-10 items-center gap-3 px-3 rounded-md border cursor-pointer transition-colors ${
                                     unit.unitGuestParking
-                                      ? "bg-[#0052FF]/5 border-[#0052FF]/30"
+                                      ? "bg-foreground/[0.04] border-foreground/40"
                                       : "bg-muted/10 border-border/40 hover:bg-muted/30"
                                   }`}
                                 >
@@ -3695,6 +3725,7 @@ export function ProjectForm({
                           <div className="space-y-2">
                             <label className={labelClass}>Price (₹)</label>
                             <PriceInput
+                              className={inputClass}
                               value={unit.price}
                               onChange={(v) => updateUnit(idx, { price: v })}
                               placeholder="e.g. 80L or 1.2Cr"
@@ -3722,14 +3753,14 @@ export function ProjectForm({
                             <label className={labelClass}>Plot Layout Image</label>
                             <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => handleFloorPlanFiles(e, unit.clientId, `plot-layout:${unit.clientId}`)} />
                             {unit.floorPlanImageUrl ? (
-                              <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 p-2">
+                              <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/20 p-2">
                                 {(floorPlanPreviews[`plot-layout:${unit.clientId}`] || /^https?:/i.test(unit.floorPlanImageUrl)) && <img src={floorPlanPreviews[`plot-layout:${unit.clientId}`] || unit.floorPlanImageUrl} alt="Plot layout" className="h-16 w-16 rounded-lg object-cover bg-white" />}
                                 <span className="flex-1 truncate text-xs text-muted-foreground">{unit.floorPlanImageUrl}</span>
                                 <Button type="button" variant="outline" size="sm" disabled={uploadingFloorPlanId !== null} onClick={(e) => (e.currentTarget.parentElement?.parentElement?.querySelector("input[type=file]") as HTMLInputElement | null)?.click()}>Replace image</Button>
                                 <Button type="button" variant="ghost" size="sm" aria-label="Remove plot layout" onClick={() => updateUnit(idx, { floorPlanImageUrl: "", floorPlanImageKey: "" })}><X className="h-4 w-4" /></Button>
                               </div>
                             ) : (
-                              <Button type="button" variant="outline" disabled={uploadingFloorPlanId !== null} onClick={(e) => (e.currentTarget.parentElement?.querySelector("input[type=file]") as HTMLInputElement | null)?.click()} className="h-11 w-full border-dashed">
+                              <Button type="button" variant="outline" disabled={uploadingFloorPlanId !== null} onClick={(e) => (e.currentTarget.parentElement?.querySelector("input[type=file]") as HTMLInputElement | null)?.click()} className={cn(FOCUS_BUTTON.secondary, "h-10 w-full border-dashed")}>
                                 {uploadingFloorPlanId === `plot-layout:${unit.clientId}` ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />}
                                 {uploadingFloorPlanId === `plot-layout:${unit.clientId}` ? "Uploading..." : "Upload plot layout"}
                               </Button>
@@ -3742,7 +3773,7 @@ export function ProjectForm({
                             {unit.floorPlans.map((plan) => {
                               const preview = floorPlanPreviews[plan.id] || plan.imageUrl || plan.imageKey;
                               return (
-                                <div key={plan.id} className="rounded-xl border border-border/60 bg-muted/20 p-3 space-y-3">
+                                <div key={plan.id} className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-3">
                                   <div className="flex items-end gap-3">
                                     <div className="flex-1 space-y-2">
                                       <label className={labelClass}>Floor name</label>
@@ -3751,7 +3782,7 @@ export function ProjectForm({
                                     <Button type="button" variant="ghost" onClick={() => {
                                       updateUnit(idx, { floorPlans: unit.floorPlans.filter((row) => row.id !== plan.id) });
                                       setFloorPlanPreviews((prev) => { const next = { ...prev }; delete next[plan.id]; return next; });
-                                    }} className="h-12 w-12 shrink-0 text-muted-foreground hover:text-red-600" aria-label={`Remove ${plan.floorName || "unnamed"} floor plan`}>
+                                    }} className="h-9 w-9 shrink-0 text-muted-foreground hover:text-red-600" aria-label={`Remove ${plan.floorName || "unnamed"} floor plan`}>
                                       <X className="h-4 w-4" />
                                     </Button>
                                   </div>
@@ -3763,7 +3794,7 @@ export function ProjectForm({
                                         <Button type="button" variant="outline" size="sm" disabled={uploadingFloorPlanId !== null} onClick={(e) => (e.currentTarget.parentElement?.querySelector("input[type=file]") as HTMLInputElement | null)?.click()}>Replace image</Button>
                                       </>
                                     ) : (
-                                      <Button type="button" variant="outline" disabled={uploadingFloorPlanId !== null} onClick={(e) => (e.currentTarget.parentElement?.querySelector("input[type=file]") as HTMLInputElement | null)?.click()} className="h-11 w-full border-dashed">
+                                      <Button type="button" variant="outline" disabled={uploadingFloorPlanId !== null} onClick={(e) => (e.currentTarget.parentElement?.querySelector("input[type=file]") as HTMLInputElement | null)?.click()} className={cn(FOCUS_BUTTON.secondary, "h-10 w-full border-dashed")}>
                                         {uploadingFloorPlanId === plan.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />}
                                         {uploadingFloorPlanId === plan.id ? "Uploading..." : "Upload floor image"}
                                       </Button>
@@ -3781,7 +3812,7 @@ export function ProjectForm({
                       !isPlotProject(projectType) && (
                         <div className="space-y-3 pt-1">
                           <div className="flex items-center justify-between border-b border-border/40 pb-2">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                            <span className="text-[13px] font-medium text-muted-foreground">
                               Room Dimensions
                             </span>
                             <Button
@@ -3795,7 +3826,7 @@ export function ProjectForm({
                                   ],
                                 })
                               }
-                              className="h-8 rounded-full px-3 text-xs"
+                              className={cn(FOCUS_BUTTON.secondary, "h-7 text-[12px]")}
                             >
                               <Plus className="h-3.5 w-3.5 mr-1" /> Add Room
                             </Button>
@@ -3807,7 +3838,9 @@ export function ProjectForm({
                             >
                               <div className="space-y-2">
                                 <label className={labelClass}>Room</label>
-                                <FormSelect
+                                <SearchableFormSelect className={selectClass}
+                                  createNoun="room name"
+                                  onCreate={(q) => master.create("room-names", q, (name) => updateUnitRoom(idx, rIdx, { name }))}
                                   name={`roomName-${idx}-${rIdx}`}
                                   options={withLegacyOption(
                                     formData.roomNames.map((rn) => ({
@@ -3879,7 +3912,7 @@ export function ProjectForm({
                                         ),
                                     })
                                   }
-                                  className="h-12 w-12 text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                                  className="h-9 w-9 text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
                                   aria-label="Remove room"
                                 >
                                   <Trash2 className="h-4 w-4" />
@@ -3900,23 +3933,23 @@ export function ProjectForm({
                 setUnits((prev) => [...prev, emptyUnit()]);
                 setOpenUnits((prev) => ({ ...prev, [units.length]: true }));
               }}
-              className="w-full border-dashed border-2 h-12"
+              className={cn(FOCUS_BUTTON.secondary, "h-10 w-full border-dashed")}
             >
               <Plus className="h-4 w-4 mr-2" /> Add Unit
             </Button>
           </div>
         </div>
 
-        <div className="bg-card border rounded-2xl p-8 shadow-sm">
-          <div className="flex items-center justify-between border-b pb-3 mb-6">
-            <h3 className="text-lg font-bold text-foreground">FAQs</h3>
+        <div className={sectionClass(12, "faqs")}>
+          <div className="mb-6 flex items-center justify-between gap-3">
+            <h3 className="text-[20px] font-medium tracking-[-0.01em] text-foreground">FAQs</h3>
             <Button
               type="button"
               variant="outline"
               onClick={() =>
                 setFaqs((prev) => [...prev, { ...emptyFaq(), section: faqTab }])
               }
-              className="h-9 rounded-full px-4"
+              className={FOCUS_BUTTON.secondary}
             >
               <Plus className="h-4 w-4 mr-1" /> Add FAQ
             </Button>
@@ -3955,10 +3988,10 @@ export function ProjectForm({
               {visibleFaqs.map(({ faq: f, idx: i }) => (
                 <div
                   key={i}
-                  className="border border-border/60 rounded-2xl p-5 space-y-4 bg-muted/10"
+                  className="border border-border/60 rounded-lg p-5 space-y-4 bg-muted/10"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-foreground">
+                    <span className="text-[14px] font-medium text-foreground">
                       FAQ {i + 1}
                     </span>
                     <Button
@@ -4002,7 +4035,7 @@ export function ProjectForm({
                         )
                       }
                       placeholder="Type the answer here..."
-                      className="rounded-xl bg-muted/30 min-h-[90px]"
+                      className={cn(FOCUS_FIELD, "min-h-[90px] py-2")}
                     />
                   </div>
                 </div>
@@ -4011,97 +4044,50 @@ export function ProjectForm({
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-11 rounded-full px-5"
-            onClick={() => guardNavigation(() => router.push("/projects"))}
-          >
-            <X className="h-4 w-4 mr-2" /> Cancel
-          </Button>
-          <Button
-            type="submit"
-            disabled={isLoading || uploadingFloorPlanId !== null}
-            className="h-11 rounded-full bg-[#0052FF] px-6 text-white hover:bg-[#0052FF]/90"
-          >
-            {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {mode === "create" ? "Create Project" : "Save Changes"}
-          </Button>
-        </div>
       </form>
+      {master.dialog}
+      </FocusModal>
 
       {/* Unsaved draft of the CURRENT version found when opening (outdated
           drafts are discarded before this). The saved version is the default. */}
-      <Dialog open={draftOffer !== null} onOpenChange={(open) => { if (!open) keepSavedVersion(); }}>
-        <DialogContent className="sm:max-w-[480px]" showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>Restore your unsaved changes?</DialogTitle>
-            <DialogDescription>
-              You left this {mode === "edit" ? "project" : "new project"} with unsaved changes. Nobody has saved it
-              since, so they can be restored.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="mt-2 gap-2">
-            <Button variant="outline" onClick={restoreDraft}>
-              Restore my changes
-            </Button>
-            <Button onClick={keepSavedVersion} className="bg-[#0052FF] hover:bg-[#0052FF]/90">
-              Keep saved version
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DecisionDialog
+        open={draftOffer !== null}
+        onDismiss={keepSavedVersion}
+        dismissible={false}
+        title="Restore your unsaved changes?"
+        description={<>You left this {mode === "edit" ? "project" : "new project"} with unsaved changes. Nobody has saved it since, so they can be restored.</>}
+        actions={<>
+          <button type="button" className={DIALOG_BUTTON} onClick={restoreDraft}>Restore my changes</button>
+          <button type="button" className={DIALOG_PRIMARY} onClick={keepSavedVersion}>Keep saved version</button>
+        </>}
+      />
 
       {/* Leaving with unsaved changes. */}
-      <Dialog open={pendingLeave !== null && !isLoading} onOpenChange={(open) => { if (!open) cancelLeave(); }}>
-        <DialogContent className="sm:max-w-[480px]">
-          <DialogHeader>
-            <DialogTitle>Save changes before leaving?</DialogTitle>
-            <DialogDescription>
-              This {mode === "edit" ? "project" : "new project"} has unsaved changes. Save them now, keep them as a
-              draft on this device to finish later, or discard them.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="mt-2 gap-2 sm:justify-between">
-            <Button variant="ghost" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={leaveDiscarding}>
-              Discard
-            </Button>
-            <div className="flex flex-col-reverse gap-2 sm:flex-row">
-              <Button variant="outline" onClick={leaveKeepingDraft}>
-                Keep as draft
-              </Button>
-              <Button onClick={saveAndLeave} className="bg-[#0052FF] hover:bg-[#0052FF]/90">
-                Save &amp; leave
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DecisionDialog
+        open={pendingLeave !== null && !isLoading}
+        onDismiss={cancelLeave}
+        title="Save changes before leaving?"
+        description={<>This {mode === "edit" ? "project" : "new project"} has unsaved changes. Save them now, keep them as a draft on this device to finish later, or discard them.</>}
+        aside={<button type="button" className={DIALOG_DANGER} onClick={leaveDiscarding}>Discard</button>}
+        actions={<>
+          <button type="button" className={DIALOG_BUTTON} onClick={leaveKeepingDraft}>Keep as draft</button>
+          <button type="button" className={DIALOG_PRIMARY} onClick={saveAndLeave}>Save &amp; leave</button>
+        </>}
+      />
 
       {/* The server refused the save: someone else saved first. */}
-      <Dialog open={saveConflict !== null} onOpenChange={(open) => { if (!open) setSaveConflict(null); }}>
-        <DialogContent className="sm:max-w-[480px]">
-          <DialogHeader>
-            <DialogTitle>This project was changed by someone else</DialogTitle>
-            <DialogDescription>
-              {saveConflict || "Another staff member saved it after you opened it, so your changes were not saved over their version."}
-            </DialogDescription>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Loading the latest version discards your unsaved changes on this page. Note anything you still need before
-            continuing.
-          </p>
-          <DialogFooter className="mt-2 gap-2">
-            <Button variant="outline" onClick={() => setSaveConflict(null)}>
-              Cancel
-            </Button>
-            <Button onClick={loadLatestVersion} className="bg-[#0052FF] hover:bg-[#0052FF]/90">
-              Load latest version
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DecisionDialog
+        open={saveConflict !== null}
+        onDismiss={() => setSaveConflict(null)}
+        title="This project was changed by someone else"
+        description={saveConflict || "Another staff member saved it after you opened it, so your changes were not saved over their version."}
+        actions={<>
+          <button type="button" className={DIALOG_BUTTON} onClick={() => setSaveConflict(null)}>Cancel</button>
+          <button type="button" className={DIALOG_PRIMARY} onClick={loadLatestVersion}>Load latest version</button>
+        </>}
+      >
+        <p className="text-muted-foreground">Loading the latest version discards your unsaved changes on this page. Note anything you still need before continuing.</p>
+      </DecisionDialog>
     </>
   );
 }
