@@ -88,7 +88,7 @@ export function DataTable<TData, TValue>({
   renderToolbarActions,
   flush = false,
   hidePagination = false,
-  pageSize = 10,
+  pageSize: initialPageSize = 20,
   manualPagination,
   pageCount,
   totalCount,
@@ -113,6 +113,10 @@ export function DataTable<TData, TValue>({
   const [savedPageIndex, setSavedPageIndex] = usePersistedState<number>(`${stateKey}:page`, 0);
   const [localPageIndex, setLocalPageIndex] = useState(0);
   const [pageIndex, setPageIndex] = persistKey === false ? [localPageIndex, setLocalPageIndex] : [savedPageIndex, setSavedPageIndex];
+  // The rows-per-page choice is remembered like the page, starting at the page's default.
+  const [savedPageSize, setSavedPageSize] = usePersistedState<number>(`${stateKey}:size`, initialPageSize);
+  const [localPageSize, setLocalPageSize] = useState(initialPageSize);
+  const [pageSize, setPageSize] = persistKey === false ? [localPageSize, setLocalPageSize] : [savedPageSize, setSavedPageSize];
   const clientPagination: PaginationState = { pageIndex, pageSize };
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -157,6 +161,7 @@ export function DataTable<TData, TValue>({
           autoResetPageIndex: false,
           onPaginationChange: (updater: PaginationState | ((old: PaginationState) => PaginationState)) => {
             const next = typeof updater === "function" ? updater(clientPagination) : updater;
+            if (next.pageSize !== pageSize) setPageSize(next.pageSize);
             setPageIndex(next.pageIndex);
           },
         })

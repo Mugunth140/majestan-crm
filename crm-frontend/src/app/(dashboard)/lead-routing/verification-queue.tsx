@@ -16,7 +16,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
-const LIMIT = 10;
 
 interface VerificationInbound {
   id: number;
@@ -52,12 +51,13 @@ export function VerificationQueue() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = usePersistedState("routing:verificationPage", 1);
+  const [pageSize, setPageSize] = usePersistedState("routing:verificationPageSize", 20);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiFetch(`${API_URL}/inbounds/verification-queue?page=${page}&limit=${LIMIT}`);
+      const res = await apiFetch(`${API_URL}/inbounds/verification-queue?page=${page}&limit=${pageSize}`);
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message);
       setRows(data.data.items);
@@ -67,7 +67,7 @@ export function VerificationQueue() {
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, pageSize]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount and page change
   useEffect(() => { void load(); }, [load]);
@@ -154,11 +154,13 @@ export function VerificationQueue() {
       variant="list"
       flush
       manualPagination
-      pageCount={Math.max(1, Math.ceil(total / LIMIT))}
+      pageCount={Math.max(1, Math.ceil(total / pageSize))}
       totalCount={total}
-      pagination={{ pageIndex: page - 1, pageSize: LIMIT }}
-      onPaginationChange={(u: Updater<PaginationState>) => setPage((p) => (typeof u === "function" ? u({ pageIndex: p - 1, pageSize: LIMIT }) : u).pageIndex + 1)}
-      pageSizeOptions={[LIMIT]}
+      pagination={{ pageIndex: page - 1, pageSize: pageSize }}
+      onPaginationChange={(u: Updater<PaginationState>) => {
+        const next = typeof u === "function" ? u({ pageIndex: page - 1, pageSize }) : u;
+        if (next.pageSize !== pageSize) { setPageSize(next.pageSize); setPage(1); } else setPage(next.pageIndex + 1);
+      }}
       persistKey="verification"
       columns={columns}
       data={rows}

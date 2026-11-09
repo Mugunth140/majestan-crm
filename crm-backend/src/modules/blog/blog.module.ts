@@ -84,11 +84,11 @@ export class BlogController {
         .map((key) => [key, dto[key]]),
     );
   }
-  @Get() async list(@Query('page') page = '1') {
+  @Get() async list(@Query('page') page = '1', @Query('limit') limit = '30') {
     return {
       success: true,
       data: await this.site.get(
-        `/admin/editorial?page=${encodeURIComponent(page)}`,
+        `/admin/editorial?page=${encodeURIComponent(page)}&limit=${encodeURIComponent(limit)}`,
       ),
     };
   }

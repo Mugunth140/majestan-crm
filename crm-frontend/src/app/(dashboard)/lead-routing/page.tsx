@@ -303,7 +303,8 @@ export default function LeadRoutingPage() {
   const [queueLoading, setQueueLoading] = useState(false);
   const [queuePage, setQueuePage] = usePersistedState("routing:queuePage", 1);
   const [queueTotal, setQueueTotal] = useState(0);
-  const LIMIT = 10;
+  // Rows per page, shared by the queue, enquiry and history tables.
+  const [pageSize, setPageSize] = usePersistedState("routing:pageSize", 20);
 
   // Enquiry queue state
   const [enquiry, setEnquiry] = useState<EnquiryLead[]>([]);
@@ -376,7 +377,7 @@ export default function LeadRoutingPage() {
       const params = new URLSearchParams({
         department: deptTab,
         page: String(queueView.isBoard ? 1 : queuePage),
-        limit: String(queueView.isBoard ? BOARD_PAGE.pageSize : LIMIT),
+        limit: String(queueView.isBoard ? BOARD_PAGE.pageSize : pageSize),
       });
       const res = await apiFetch(`${API_URL}/lead-routing/queue?${params}`);
       const data = await res.json();
@@ -391,14 +392,14 @@ export default function LeadRoutingPage() {
     } finally {
       setQueueLoading(false);
     }
-  }, [deptTab, queuePage, queueView.isBoard]);
+  }, [deptTab, queuePage, queueView.isBoard, pageSize]);
 
   const fetchEnquiry = useCallback(async () => {
     setEnquiryLoading(true);
     try {
       const params = new URLSearchParams({
         page: String(enquiryView.isBoard ? 1 : enquiryPage),
-        limit: String(enquiryView.isBoard ? BOARD_PAGE.pageSize : LIMIT),
+        limit: String(enquiryView.isBoard ? BOARD_PAGE.pageSize : pageSize),
       });
       if (enquiryTypeFilter) params.set("propertyType", enquiryTypeFilter);
       if (enquiryIntentFilter) params.set("intent", enquiryIntentFilter);
@@ -418,14 +419,14 @@ export default function LeadRoutingPage() {
     } finally {
       setEnquiryLoading(false);
     }
-  }, [enquiryPage, enquiryTypeFilter, enquiryIntentFilter, enquirySourceFilter, enquiryDateFrom, enquiryDateTo, enquiryView.isBoard]);
+  }, [pageSize, enquiryPage, enquiryTypeFilter, enquiryIntentFilter, enquirySourceFilter, enquiryDateFrom, enquiryDateTo, enquiryView.isBoard]);
 
   const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
       const params = new URLSearchParams({
         page: String(historyView.isBoard ? 1 : historyPage),
-        limit: String(historyView.isBoard ? BOARD_PAGE.pageSize : LIMIT),
+        limit: String(historyView.isBoard ? BOARD_PAGE.pageSize : pageSize),
       });
       if (historyEventFilter) params.set("event_type", historyEventFilter);
       if (historyDateFrom) params.set("from_date", format(historyDateFrom, "yyyy-MM-dd"));
@@ -443,7 +444,7 @@ export default function LeadRoutingPage() {
     } finally {
       setHistoryLoading(false);
     }
-  }, [historyPage, historyEventFilter, historyDateFrom, historyDateTo, historyView.isBoard]);
+  }, [pageSize, historyPage, historyEventFilter, historyDateFrom, historyDateTo, historyView.isBoard]);
 
   useEffect(() => {
     if (mainTab === "queue" && deptTab !== "verification") fetchQueue();
@@ -1035,9 +1036,16 @@ export default function LeadRoutingPage() {
     if (role && !visibleDeptTabs.some((d) => d.value === deptTab)) setDeptTab(visibleDeptTabs[0].value);
   }, [role, deptTab, visibleDeptTabs, setDeptTab]);
 
-  const totalQueuePages = Math.max(1, Math.ceil(queueTotal / LIMIT));
-  const totalEnquiryPages = Math.max(1, Math.ceil(enquiryTotal / LIMIT));
-  const totalHistoryPages = Math.max(1, Math.ceil(historyTotal / LIMIT));
+  // A new page size starts every table back on page 1.
+  const changePage = (u: PaginationUpdate, page: number, setPage: (p: number) => void) => {
+    const next = typeof u === "function" ? u({ pageIndex: page - 1, pageSize }) : u;
+    if (next.pageSize === pageSize) return setPage(next.pageIndex + 1);
+    setPageSize(next.pageSize);
+    setQueuePage(1); setEnquiryPage(1); setHistoryPage(1);
+  };
+  const totalQueuePages = Math.max(1, Math.ceil(queueTotal / pageSize));
+  const totalEnquiryPages = Math.max(1, Math.ceil(enquiryTotal / pageSize));
+  const totalHistoryPages = Math.max(1, Math.ceil(historyTotal / pageSize));
 
   return (
     <>
@@ -1112,9 +1120,8 @@ export default function LeadRoutingPage() {
   manualPagination
                     pageCount={totalQueuePages}
                     totalCount={queueTotal}
-                    pagination={{ pageIndex: queuePage - 1, pageSize: LIMIT }}
-                    onPaginationChange={(u: PaginationUpdate) => setQueuePage((p) => (typeof u === "function" ? u({ pageIndex: p - 1, pageSize: LIMIT }) : u).pageIndex + 1)}
-                    pageSizeOptions={[LIMIT]}
+                    pagination={{ pageIndex: queuePage - 1, pageSize: pageSize }}
+                    onPaginationChange={(u: PaginationUpdate) => changePage(u, queuePage, setQueuePage)}
                     persistKey="queue"
                     columns={queueColumns} 
                     data={queue} 
@@ -1202,9 +1209,8 @@ export default function LeadRoutingPage() {
   manualPagination
                     pageCount={totalEnquiryPages}
                     totalCount={enquiryTotal}
-                    pagination={{ pageIndex: enquiryPage - 1, pageSize: LIMIT }}
-                    onPaginationChange={(u: PaginationUpdate) => setEnquiryPage((p) => (typeof u === "function" ? u({ pageIndex: p - 1, pageSize: LIMIT }) : u).pageIndex + 1)}
-                    pageSizeOptions={[LIMIT]}
+                    pagination={{ pageIndex: enquiryPage - 1, pageSize: pageSize }}
+                    onPaginationChange={(u: PaginationUpdate) => changePage(u, enquiryPage, setEnquiryPage)}
                     persistKey="enquiry"
                     columns={enquiryColumns}
                     data={groupedEnquiry}
@@ -1287,9 +1293,8 @@ export default function LeadRoutingPage() {
                       manualPagination
                       pageCount={totalHistoryPages}
                       totalCount={historyTotal}
-                      pagination={{ pageIndex: historyPage - 1, pageSize: LIMIT }}
-                      onPaginationChange={(u: PaginationUpdate) => setHistoryPage((p) => (typeof u === "function" ? u({ pageIndex: p - 1, pageSize: LIMIT }) : u).pageIndex + 1)}
-                      pageSizeOptions={[LIMIT]}
+                      pagination={{ pageIndex: historyPage - 1, pageSize: pageSize }}
+                      onPaginationChange={(u: PaginationUpdate) => changePage(u, historyPage, setHistoryPage)}
                       persistKey="history"
                       columns={historyColumns}
                       data={history}

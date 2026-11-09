@@ -22,7 +22,7 @@ const columns: ColumnDef<LoggerDevice>[] = [
     id: "staff",
     header: "Staff",
     accessorFn: (d) => d.staff?.name,
-    cell: ({ row }) => <NameCell name={row.original.staff?.name || "Unknown staff"} sub={[row.original.staff?.role, row.original.staff?.email].filter(Boolean).join(" · ")} avatar />,
+    cell: ({ row }) => <NameCell name={row.original.staff?.name || "Unknown staff"} staffId={row.original.staff?.id ?? null} sub={[row.original.staff?.role, row.original.staff?.email].filter(Boolean).join(" · ")} avatar />,
   },
   {
     id: "device",
@@ -143,7 +143,7 @@ export default function LoggerPage() {
                 )) : empty}
               </div>
               <div className="hidden min-h-0 flex-1 flex-col md:flex">
-                <DataTable variant="list" columns={columns} data={shown} onRowClick={open} hidePagination={shown.length <= 50} pageSize={50} persistKey={false} emptyState={empty} />
+                <DataTable variant="list" columns={columns} data={shown} onRowClick={open} persistKey={false} emptyState={empty} />
               </div>
             </>
           )}

@@ -65,7 +65,7 @@ export default function ProjectsPage() {
   const [searchQuery, setSearchQuery] = usePersistedState("projects:search", "");
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
   const [filters, setFilters] = usePersistedState("projects:filters", { projectType: "", minPrice: "", maxPrice: "", bhk: [] as number[], locality: "", minUnits: "" });
-  const [pagination, setPagination] = usePersistedState("projects:page", { pageIndex: 0, pageSize: 10 });
+  const [pagination, setPagination] = usePersistedState("projects:page:v2", { pageIndex: 0, pageSize: 20 });
   const [role, setRole] = useState("");
   const [localityOptions, setLocalityOptions] = useState<{ value: string; label: string }[]>([]);
 

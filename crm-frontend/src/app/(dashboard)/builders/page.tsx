@@ -41,7 +41,7 @@ export default function BuildersPage() {
   const [activeTab, setActiveTab] = usePersistedState<"Active" | "Inactive">("builders:tab", "Active", { allowed: ["Active", "Inactive"] });
   const [searchQuery, setSearchQuery] = usePersistedState("builders:search", "");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
-  const [pagination, setPagination] = usePersistedState("builders:page", { pageIndex: 0, pageSize: 10 });
+  const [pagination, setPagination] = usePersistedState("builders:page:v2", { pageIndex: 0, pageSize: 20 });
 
   // Filters state
   const [hasContactFilter, setHasContactFilter] = usePersistedState<string>("builders:contactFilter", "");

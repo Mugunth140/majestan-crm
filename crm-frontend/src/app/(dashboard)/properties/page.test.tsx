@@ -23,7 +23,7 @@ it('shows the uploader column and combines staff/date filters before fetching th
  fireEvent.click(screen.getByRole('button',{name:'Uploaded',exact:true}));
  fireEvent.change(await screen.findByLabelText('From'),{target:{value:'2026-11-01'}});
  fireEvent.change(screen.getByLabelText('To'),{target:{value:'2026-11-02'}});
- await waitFor(()=>expect(mock.fetch).toHaveBeenLastCalledWith(expect.objectContaining({pagination:{pageIndex:0,pageSize:10},filters:expect.objectContaining({uploadedById:'7',uploadedFrom:'2026-11-01',uploadedTo:'2026-11-02'})})));
+ await waitFor(()=>expect(mock.fetch).toHaveBeenLastCalledWith(expect.objectContaining({pagination:{pageIndex:0,pageSize:20},filters:expect.objectContaining({uploadedById:'7',uploadedFrom:'2026-11-01',uploadedTo:'2026-11-02'})})));
  expect(screen.getByRole('button',{name:/Uploaded by: Kavya/})).toBeTruthy();
  fireEvent.click(screen.getByRole('button',{name:'Clear all'}));
  await waitFor(()=>expect(mock.fetch).toHaveBeenLastCalledWith(expect.objectContaining({filters:expect.objectContaining({uploadedById:'',uploadedFrom:'',uploadedTo:''})})));

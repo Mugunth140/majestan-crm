@@ -55,8 +55,8 @@ export const blogApi = {
     form.append("image", file);
     return call<{ url: string }>("/image", { method: "POST", body: form });
   },
-  list: (page = 1) =>
-    call<{ items: BlogPost[]; total: number }>(`?page=${page}`),
+  list: (page = 1, limit = 20) =>
+    call<{ items: BlogPost[]; total: number }>(`?page=${page}&limit=${limit}`),
   get: (id: number) => call<BlogPost>(`/${id}`),
   save: (post: BlogPost) => {
     const {

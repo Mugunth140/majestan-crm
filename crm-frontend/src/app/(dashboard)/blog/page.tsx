@@ -1,4 +1,5 @@
 "use client";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -20,6 +21,7 @@ export default function BlogPage() {
   const [posts, setPosts] = useState<BlogPost[]>([]),
     [total, setTotal] = useState(0),
     [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = usePersistedState("blog:pageSize", 20);
   const [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -31,7 +33,7 @@ export default function BlogPage() {
     setLoading(true);
     setError("");
     try {
-      const data = await blogApi.list(p);
+      const data = await blogApi.list(p, pageSize);
       setPosts(data.items);
       setTotal(data.total);
     } catch (e) {
@@ -44,7 +46,7 @@ export default function BlogPage() {
     let active = true;
     if (!allowed) return;
     blogApi
-      .list(page)
+      .list(page, pageSize)
       .then((data) => {
         if (active) {
           setPosts(data.items);
@@ -61,7 +63,7 @@ export default function BlogPage() {
     return () => {
       active = false;
     };
-  }, [page, allowed]);
+  }, [page, pageSize, allowed]);
   const edit = async (id?: number) => {
     if (!id) return setEditing("new");
     setBusy(true);
@@ -83,7 +85,7 @@ export default function BlogPage() {
       if (removed) toast.success(`${removed === 1 ? "Article" : `${removed} articles`} deleted.`);
       if (failed.length)
         toast.error(failed[0].reason?.message || "Some articles could not be deleted. Refresh the table and try again.");
-      const nextPage = Math.min(page, Math.max(1, Math.ceil((total - removed) / 30)));
+      const nextPage = Math.min(page, Math.max(1, Math.ceil((total - removed) / pageSize)));
       if (nextPage !== page) setPage(nextPage);
       else await load(page);
     } finally {
@@ -122,6 +124,8 @@ export default function BlogPage() {
         page={page}
         now={now}
         onPage={setPage}
+        pageSize={pageSize}
+        onPageSize={(size) => { setPageSize(size); setPage(1); }}
         onEdit={edit}
         onOpen={(p) => router.push(`/blog/${p.id}`)}
         onDelete={setDeleteTargets}

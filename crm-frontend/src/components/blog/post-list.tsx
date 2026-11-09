@@ -18,6 +18,8 @@ export function BlogPostList({
   busy,
   total,
   page,
+  pageSize,
+  onPageSize,
   now,
   onPage,
   onEdit,
@@ -29,6 +31,9 @@ export function BlogPostList({
   busy: boolean;
   total: number;
   page: number;
+  /** Rows per page: 20, 50 or 100. */
+  pageSize: number;
+  onPageSize: (size: number) => void;
   now: number;
   onPage: (page: number) => void;
   onEdit: (id?: number) => void;
@@ -138,7 +143,6 @@ export function BlogPostList({
                 columns={columns}
                 data={posts}
                 variant="list"
-                pageSizeOptions={[30]}
                 showToolbar
                 showDeleteAction={isAdmin()}
                 onDeleteSelected={onDelete}
@@ -159,15 +163,16 @@ export function BlogPostList({
                   ) : null
                 }
                 manualPagination
-                pageCount={Math.max(1, Math.ceil(total / 30))}
+                pageCount={Math.max(1, Math.ceil(total / pageSize))}
                 totalCount={total}
-                pagination={{ pageIndex: page - 1, pageSize: 30 }}
+                pagination={{ pageIndex: page - 1, pageSize }}
                 onPaginationChange={(updater) => {
                   const next =
                     typeof updater === "function"
-                      ? updater({ pageIndex: page - 1, pageSize: 30 })
+                      ? updater({ pageIndex: page - 1, pageSize })
                       : updater;
-                  onPage(next.pageIndex + 1);
+                  if (next.pageSize !== pageSize) onPageSize(next.pageSize);
+                  else onPage(next.pageIndex + 1);
                 }}
                 persistKey={false}
               />

@@ -81,7 +81,7 @@ export default function PropertiesPage() {
   const [searchQuery, setSearchQuery] = usePersistedState("properties:search", "");
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [filters, setFilters] = usePersistedState("properties:filters", EMPTY_PROPERTY_FILTERS);
-  const [pagination, setPagination] = usePersistedState("properties:page", { pageIndex: 0, pageSize: 10 });
+  const [pagination, setPagination] = usePersistedState("properties:page:v2", { pageIndex: 0, pageSize: 20 });
   const [role, setRole] = useState("");
 
   const { properties, totalCount, isLoading, staff, cities, sublocations, roadNames, propertyTypes, fetchProperties, toggleVisibility, deleteBulk } = usePropertiesList();

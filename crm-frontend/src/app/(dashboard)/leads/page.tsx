@@ -275,7 +275,7 @@ export default function LeadsPage() {
   const [filterOptions, setFilterOptions] = useState<LeadsFilterOptions>(EMPTY_FILTER_OPTIONS);
 
   const [totalCount, setTotalCount] = useState(0);
-  const [pagination, setPagination] = usePersistedState("leads:page", { pageIndex: 0, pageSize: 10 });
+  const [pagination, setPagination] = usePersistedState("leads:page:v2", { pageIndex: 0, pageSize: 20 });
   const [view, setView] = usePersistedState<ViewType>("leads:view", "list", { allowed: ["list", "kanban", "group"] });
   const [groupField, setGroupField] = usePersistedState<LeadGroupField>("leads:groupBy", "status", {
     allowed: LEAD_GROUP_FIELDS.map((f) => f.id),
@@ -1189,7 +1189,7 @@ export default function LeadsPage() {
           />
         ) : (
           <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden">
-            <DataTable key={isReviewingImports ? `review-${reviewEpoch}` : "leads"} {...tableProps} variant="list" pageSizeOptions={[10, 20, 50, 100]} />
+            <DataTable key={isReviewingImports ? `review-${reviewEpoch}` : "leads"} {...tableProps} variant="list" />
           </div>
         )}
         {boardView && !isLoading && totalCount > displayedLeads.length && (
