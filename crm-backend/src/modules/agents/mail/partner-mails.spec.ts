@@ -19,9 +19,9 @@ const partner = (over: Partial<PartnerMailData> = {}): PartnerMailData => ({
 });
 
 describe('partners@ mail events', () => {
-  it('registers two draft emails from partners@', () => {
+  it('registers two automatic emails from partners@', () => {
     expect(PARTNER_MAIL_EVENTS.map((e) => e.key)).toEqual(['partners.introduction', 'partners.welcome']);
-    expect(PARTNER_MAIL_EVENTS.every((e) => e.identity === 'partners' && e.entityType === 'agent' && e.module === 'partners' && e.mode === 'confirm')).toBe(true);
+    expect(PARTNER_MAIL_EVENTS.every((e) => e.identity === 'partners' && e.entityType === 'agent' && e.module === 'partners' && e.mode === 'auto')).toBe(true);
   });
 
   it('only uses fields the partner provides, with and without optional details', () => {

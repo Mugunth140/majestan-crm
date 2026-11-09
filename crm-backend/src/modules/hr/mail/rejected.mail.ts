@@ -7,7 +7,7 @@ export const rejectedMail = defineMailEvent({
   entity: candidateMailEntity,
   label: 'Application update (not selected)',
   description: 'Politely lets the candidate know they were not selected this time.',
-  mode: 'confirm',
+  mode: 'auto',
   version: 3,
   triggers: [{ on: 'hr.candidate.status_changed', when: (p) => p.to === HrCandidateStatus.REJECTED }],
   check: (d) => (d.status === HrCandidateStatus.REJECTED ? [] : ['Candidate status is not "Rejected"']),

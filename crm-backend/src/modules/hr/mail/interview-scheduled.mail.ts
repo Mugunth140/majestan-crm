@@ -9,7 +9,7 @@ export const interviewScheduledMail = defineMailEvent({
   entity: candidateMailEntity,
   label: 'Interview invitation',
   description: 'Invites the candidate with the date, time, mode and venue or meeting link. Created again when the interview changes.',
-  mode: 'confirm',
+  mode: 'auto',
   version: 3,
   triggers: [
     { on: 'hr.candidate.status_changed', when: (p) => p.to === HrCandidateStatus.INTERVIEW_SCHEDULED },

@@ -25,12 +25,13 @@ const lead = (over: Partial<LeadMailData> = {}): LeadMailData => ({
 });
 
 describe('sales@ mail events', () => {
-  it('registers five emails from sales@, one automatic with a schedule', () => {
+  it('registers five automatic emails from sales@, one on a schedule', () => {
     expect(SALES_MAIL_EVENTS.map((e) => e.key)).toEqual([
       'sales.enquiry_received', 'sales.site_visit_confirmed', 'sales.site_visit_reminder', 'sales.visit_thank_you', 'sales.booking_confirmed',
     ]);
     expect(SALES_MAIL_EVENTS.every((e) => e.identity === 'sales' && e.entityType === 'lead')).toBe(true);
-    expect(SALES_MAIL_EVENTS.filter((e) => e.mode === 'auto').map((e) => e.key)).toEqual(['sales.site_visit_reminder']);
+    expect(SALES_MAIL_EVENTS.every((e) => e.mode === 'auto')).toBe(true);
+    expect(SALES_MAIL_EVENTS.filter((e) => e.schedule).map((e) => e.key)).toEqual(['sales.site_visit_reminder']);
     expect(siteVisitReminderMail.schedule?.expiresAfterHours).toBe(12);
   });
 

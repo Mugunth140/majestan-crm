@@ -8,7 +8,7 @@ export const offerSentMail = defineMailEvent({
   entity: candidateMailEntity,
   label: 'Offer notification',
   description: 'Tells the candidate they have been selected and that the formal offer letter will follow.',
-  mode: 'confirm',
+  mode: 'auto',
   version: 3,
   triggers: [{ on: 'hr.candidate.status_changed', when: (p) => p.to === HrCandidateStatus.OFFER_SENT }],
   check: (d) => (d.status === HrCandidateStatus.OFFER_SENT ? [] : ['Candidate status is not "Offer Sent"']),

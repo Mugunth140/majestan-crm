@@ -145,8 +145,16 @@ export class MailDispatcher implements OnApplicationBootstrap, OnModuleDestroy {
     } catch {
       definition = null; // an email type that was removed from the code: still deliver what was queued
     }
-    if (definition && !(await definition.load(row.entity_id, { dataSource: this.dataSource, actorId: null }))) {
+    const data: unknown = definition ? await definition.load(row.entity_id, { dataSource: this.dataSource, actorId: null }) : undefined;
+    if (definition && !data) {
       await this.outbox.update(row.id, { status: 'cancelled', last_error: 'The record was deleted before sending' });
+      return;
+    }
+    // Automatic emails are checked again at send time: if the record changed since it
+    // was queued (status set back, visit cancelled), the email no longer applies.
+    const stale = definition && !row.confirmed_by ? (definition.check?.(data) ?? []) : [];
+    if (stale.length) {
+      await this.outbox.update(row.id, { status: 'cancelled', last_error: `No longer applies: ${stale.join('; ')}`.slice(0, 1000) });
       return;
     }
 

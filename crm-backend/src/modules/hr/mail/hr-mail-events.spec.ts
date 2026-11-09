@@ -25,7 +25,7 @@ const candidate = (over: Partial<CandidateMailData> = {}): CandidateMailData => 
 describe('HR mail events', () => {
   it('registers four HR emails sent from hr@', () => {
     expect(HR_MAIL_EVENTS.map((e) => e.key)).toEqual(['hr.application_received', 'hr.interview_scheduled', 'hr.offer_sent', 'hr.rejected']);
-    expect(HR_MAIL_EVENTS.every((e) => e.identity === 'hr' && e.mode === 'confirm' && e.entityType === 'hr_candidate')).toBe(true);
+    expect(HR_MAIL_EVENTS.every((e) => e.identity === 'hr' && e.mode === 'auto' && e.entityType === 'hr_candidate')).toBe(true);
   });
 
   it('only uses variables the candidate entity provides', () => {

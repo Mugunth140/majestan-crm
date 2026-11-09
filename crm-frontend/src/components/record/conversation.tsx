@@ -213,6 +213,21 @@ export function LeadConversation({
     }
   };
 
+  /** Automatic emails wait a few minutes before sending; this stops one in that window. */
+  const stopSending = async (id: number) => {
+    setRetrying(id);
+    try {
+      await mailApi.cancel(id);
+      toast.success("Email won't be sent.");
+      await loadMail();
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : "Could not stop the email");
+      await loadMail();
+    } finally {
+      setRetrying(null);
+    }
+  };
+
   const deleteFollowUp = async (id: number) => {
     if (!confirm("Delete this follow-up?")) return;
     try {
@@ -423,6 +438,12 @@ export function LeadConversation({
               <Button variant="outline" size="sm" disabled={retrying === mail.id} onClick={() => retry(mail.id)} className="mt-2 h-7 gap-1.5 text-[12px]">
                 {retrying === mail.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
                 Retry
+              </Button>
+            )}
+            {mail.status === "pending" && mail.attempts === 0 && canSendMail && (
+              <Button variant="outline" size="sm" disabled={retrying === mail.id} onClick={() => stopSending(mail.id)} className="mt-2 h-7 gap-1.5 text-[12px]">
+                {retrying === mail.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
+                Don&apos;t send
               </Button>
             )}
           </div>

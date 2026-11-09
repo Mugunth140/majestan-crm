@@ -26,6 +26,12 @@ const welcome = defineMailEvent<Person>({
   template: { subject: 'Hi {{person.name}}', body: '<p>Hello {{person.name}}</p>' },
 });
 
+const autoWelcome = defineMailEvent<Person>({
+  ...welcome, key: 'test.auto_welcome', mode: 'auto',
+  triggers: [{ on: 'person.auto' }],
+  idempotencyKey: (d, id) => `test.auto_welcome:${id}:${d.name}`,
+});
+
 // A record type finance@ may also write to (COMPOSER_SENDERS lists 'lead').
 const leadEntity = defineMailEntity<Person>({ ...personEntity, entityType: 'lead', module: 'sales', identity: 'sales', label: 'Lead' });
 const leadHello = defineMailEvent<Person>({ ...welcome, key: 'test.lead_hello', entity: leadEntity, triggers: [] });
@@ -33,7 +39,9 @@ const leadHello = defineMailEvent<Person>({ ...welcome, key: 'test.lead_hello', 
 function setup(opts: { allowed?: boolean; permit?: (permission: string) => boolean } = {}) {
   const rows: any[] = [];
   let nextId = 1;
-  const matches = (row: any, where: any) => Object.entries(where).every(([k, v]) => row[k] === v);
+  const matches = (row: any, where: any) =>
+    Object.entries(where).every(([k, v]: [string, any]) =>
+      v?._type === 'in' ? v._value.includes(row[k]) : v?._type === 'isNull' ? row[k] == null : row[k] === v);
   const qbUpdate = (set: any) => ({
     where: (_sql: string, params: any) => ({
       execute: async () => {
@@ -63,7 +71,7 @@ function setup(opts: { allowed?: boolean; permit?: (permission: string) => boole
   outbox.manager = { transaction: (fn: any) => fn({ getRepository: () => outbox }) };
   const suppressions: any = { find: async () => [] };
   const registry = new MailRegistry();
-  registry.register([welcome, leadHello]);
+  registry.register([welcome, leadHello, autoWelcome]);
   const staff: any = { getRepository: () => ({ findOne: async () => ({ id: 9, name: 'Staff Nine', email: null, phone: null }) }) };
   const templates: any = { findOne: async () => null };
   const composer = new MailComposer(staff, suppressions, templates);
@@ -104,6 +112,46 @@ describe('MailService', () => {
 
     await events.emitAsync('person.changed', { entityId: 1, to: 'ready' }); // same content: no duplicate
     expect(rows).toHaveLength(2);
+  });
+
+  it('queues automatic emails after a short hold, and a newer version replaces one not yet sent', async () => {
+    const { service, rows, registry } = setup();
+    const events = new EventEmitter2();
+    new MailTriggers(registry, events, service).onApplicationBootstrap();
+    const before = Date.now();
+
+    people.set(2, { email: 'mala@example.com', name: 'Mala', ready: true });
+    await events.emitAsync('person.auto', { entityId: 2 });
+    expect(rows[0]).toMatchObject({ status: 'pending' });
+    const hold = rows[0].next_attempt_at.getTime() - before;
+    expect(hold).toBeGreaterThanOrEqual(5 * 60_000 - 1000);
+    expect(hold).toBeLessThanOrEqual(5 * 60_000 + 1000);
+
+    people.set(2, { email: 'mala@example.com', name: 'Mala R', ready: true });
+    await events.emitAsync('person.auto', { entityId: 2 });
+    expect(rows.map((r) => r.status)).toEqual(['cancelled', 'pending']);
+    expect(rows[0].last_error).toBe('Replaced by a newer version');
+  });
+
+  it('never replaces an email staff already confirmed', async () => {
+    const { service, rows, registry } = setup();
+    const events = new EventEmitter2();
+    new MailTriggers(registry, events, service).onApplicationBootstrap();
+    people.set(3, { email: 'anu@example.com', name: 'Anu', ready: true });
+    await events.emitAsync('person.auto', { entityId: 3 });
+    rows[0].confirmed_by = 9;
+    people.set(3, { email: 'anu@example.com', name: 'Anu K', ready: true });
+    await events.emitAsync('person.auto', { entityId: 3 });
+    expect(rows.map((r) => r.status)).toEqual(['pending', 'pending']);
+  });
+
+  it('marks an automatic email failed, not queued, when it has blocking problems', async () => {
+    const { service, rows, registry } = setup();
+    const events = new EventEmitter2();
+    new MailTriggers(registry, events, service).onApplicationBootstrap();
+    people.set(4, { email: 'raj@example.com', name: 'Raj', ready: false });
+    await events.emitAsync('person.auto', { entityId: 4 });
+    expect(rows[0]).toMatchObject({ status: 'failed', last_error: 'Not ready', next_attempt_at: null });
   });
 
   it('suggests nothing when there is no email address', async () => {

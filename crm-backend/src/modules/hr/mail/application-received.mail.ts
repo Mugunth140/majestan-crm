@@ -6,7 +6,7 @@ export const applicationReceivedMail = defineMailEvent({
   entity: candidateMailEntity,
   label: 'Application received',
   description: 'Thanks the candidate and confirms the application is being reviewed.',
-  mode: 'confirm',
+  mode: 'auto',
   version: 3,
   triggers: [{ on: 'hr.candidate.created' }],
   idempotencyKey: (_d, id) => `hr.application_received:${id}`,

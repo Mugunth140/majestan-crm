@@ -24,12 +24,13 @@ const inbound = (over: Partial<InboundMailData> = {}): InboundMailData => ({
 });
 
 describe('listings@ mail events', () => {
-  it('registers three emails from listings@, one automatic with a schedule', () => {
+  it('registers three automatic emails from listings@, one on a schedule', () => {
     expect(LISTING_MAIL_EVENTS.map((e) => e.key)).toEqual([
       'listings.listing_received', 'listings.listing_approved', 'listings.availability_check',
     ]);
     expect(LISTING_MAIL_EVENTS.every((e) => e.identity === 'listings' && e.entityType === 'inbound' && e.module === 'listings')).toBe(true);
-    expect(LISTING_MAIL_EVENTS.filter((e) => e.mode === 'auto').map((e) => e.key)).toEqual(['listings.availability_check']);
+    expect(LISTING_MAIL_EVENTS.every((e) => e.mode === 'auto')).toBe(true);
+    expect(LISTING_MAIL_EVENTS.filter((e) => e.schedule).map((e) => e.key)).toEqual(['listings.availability_check']);
   });
 
   it('only uses fields the inbound provides, with and without optional details', () => {

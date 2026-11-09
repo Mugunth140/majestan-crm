@@ -1,7 +1,7 @@
 import { MailDispatcher } from './mail-dispatcher.service';
 import { readMailConfig } from './mail-config';
 
-function setup(opts: { send?: jest.Mock; suppressed?: string[]; sentToday?: number; creds?: boolean; redirect?: string; deleted?: boolean; query?: jest.Mock } = {}) {
+function setup(opts: { send?: jest.Mock; suppressed?: string[]; sentToday?: number; creds?: boolean; redirect?: string; deleted?: boolean; query?: jest.Mock; check?: (d: any) => string[] } = {}) {
   const update = jest.fn().mockResolvedValue({ affected: 1 });
   const outbox: any = {
     update,
@@ -12,7 +12,7 @@ function setup(opts: { send?: jest.Mock; suppressed?: string[]; sentToday?: numb
   const send = opts.send ?? jest.fn().mockResolvedValue('<id@majestanrealty.com>');
   const transports: any = { hasCredentials: () => opts.creds ?? true, send };
   const registry: any = {
-    resolve: () => ({ key: 'hr.rejected', label: 'Application unsuccessful', load: async () => (opts.deleted ? null : { id: 1 }) }),
+    resolve: () => ({ key: 'hr.rejected', label: 'Application unsuccessful', load: async () => (opts.deleted ? null : { id: 1 }), check: opts.check }),
     entity: () => ({ contactLog: { table: 'hr_contact_logs', column: 'hr_candidate_id' } }),
   };
   const query = opts.query ?? jest.fn().mockResolvedValue({});
@@ -62,6 +62,21 @@ describe('MailDispatcher.deliver', () => {
     const { dispatcher, query, row } = setup({ send: jest.fn().mockRejectedValue({ message: 'timeout', code: 'ETIMEDOUT' }) });
     await dispatcher.deliver(row, now);
     expect(query).not.toHaveBeenCalled();
+  });
+
+  it('cancels an automatic email whose record no longer qualifies at send time', async () => {
+    const { dispatcher, update, send, row } = setup({ check: () => ['Candidate status is not "Rejected"'] });
+    await dispatcher.deliver({ ...row, confirmed_by: null }, now);
+    expect(send).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalledWith(7, { status: 'cancelled', last_error: 'No longer applies: Candidate status is not "Rejected"' });
+  });
+
+  it('sends an email staff confirmed without re-checking it', async () => {
+    const check = jest.fn(() => ['Changed']);
+    const { dispatcher, send, row } = setup({ check });
+    await dispatcher.deliver(row, now);
+    expect(check).not.toHaveBeenCalled();
+    expect(send).toHaveBeenCalled();
   });
 
   it('applies redirect mode at send time', async () => {

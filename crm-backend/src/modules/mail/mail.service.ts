@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import { MailOutbox } from '../../database/entities/mail-outbox.entity';
 import type { MailOutboxStatus } from '../../database/entities/mail-outbox.entity';
 import { MailSuppression } from '../../database/entities/mail-suppression.entity';
@@ -260,9 +260,16 @@ export class MailService {
       if (!composed.to.length) return; // nobody to write to: nothing to suggest
       if (await this.outbox.exists({ where: { idempotency_key: composed.idempotencyKey } })) return;
 
-      // An older draft of the same email (e.g. the previous interview time) is now stale.
+      // An older version of the same email (e.g. the previous interview time) that
+      // hasn't gone out yet is now stale. Staff-confirmed emails are left alone.
       await this.outbox.update(
-        { event_key: definition.key, entity_type: definition.entityType, entity_id: payload.entityId, status: 'draft' },
+        {
+          event_key: definition.key,
+          entity_type: definition.entityType,
+          entity_id: payload.entityId,
+          status: In(['draft', 'pending']),
+          confirmed_by: IsNull(),
+        },
         { status: 'cancelled', last_error: 'Replaced by a newer version' },
       );
       const auto = definition.mode === 'auto';
@@ -274,6 +281,8 @@ export class MailService {
         last_error: blocked ? composed.issues.join('; ').slice(0, 1000) : null,
         trigger_source: source,
         created_by: payload.actorId ?? null,
+        // A short hold before automatic emails go out, so a mistaken save can be undone.
+        next_attempt_at: auto && !blocked ? new Date(Date.now() + this.config.autoDelayMs) : null,
         expires_at: auto ? (opts.expiresAt ?? null) : new Date(Date.now() + this.config.draftTtlDays * DAY_MS),
       });
     } catch (error) {

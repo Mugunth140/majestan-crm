@@ -8,7 +8,7 @@ export const partnerIntroductionMail = defineMailEvent({
   entity: partnerMailEntity,
   label: 'Thanks for connecting',
   description: 'Thanks a new partner for connecting and introduces Majestan Realty and their contact person.',
-  mode: 'confirm',
+  mode: 'auto',
   version: 2,
   triggers: [{ on: 'partners.agent.created' }],
   idempotencyKey: (_d, id) => `partners.introduction:${id}`,
@@ -27,7 +27,7 @@ export const partnerWelcomeMail = defineMailEvent({
   entity: partnerMailEntity,
   label: 'Welcome partner',
   description: 'Welcomes an approved partner and confirms the agreed commission terms.',
-  mode: 'confirm',
+  mode: 'auto',
   version: 2,
   triggers: [{ on: 'partners.agent.status_changed', when: (p) => p.to === PARTNER_APPROVED_STATUS }],
   check: (d) => {

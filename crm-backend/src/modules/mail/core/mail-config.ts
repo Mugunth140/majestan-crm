@@ -10,6 +10,8 @@ export interface MailConfig {
   minSendIntervalMs: number;
   pollIntervalMs: number;
   draftTtlDays: number;
+  /** Automatic emails wait this long before sending, so a mistaken save can be undone. */
+  autoDelayMs: number;
   retentionDays: number;
   credentials: Partial<Record<MailIdentityKey, { user: string; pass: string }>>;
 }
@@ -39,6 +41,7 @@ export function readMailConfig(env: NodeJS.ProcessEnv = process.env): MailConfig
     minSendIntervalMs: Math.round(1000 / num(env.MAIL_RATE_PER_SECOND, 1)),
     pollIntervalMs: num(env.MAIL_POLL_INTERVAL_MS, 15_000),
     draftTtlDays: num(env.MAIL_DRAFT_TTL_DAYS, 7),
+    autoDelayMs: num(env.MAIL_AUTO_DELAY_MINUTES, 5) * 60_000,
     retentionDays: num(env.MAIL_RETENTION_DAYS, 180),
     credentials,
   };
