@@ -49,6 +49,8 @@ export function syncStoredUser(patch: Partial<Me>) {
     if (!raw) return;
     localStorage.setItem("crm_user", JSON.stringify({ ...JSON.parse(raw), ...patch }));
     window.dispatchEvent(new StorageEvent("storage", { key: "crm_user" }));
+    // The sidebar and every staff photo listen for this one.
+    window.dispatchEvent(new Event("crm-user-updated"));
   } catch {
     // Storage blocked: the next sign-in refreshes it.
   }

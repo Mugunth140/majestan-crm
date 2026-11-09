@@ -145,6 +145,7 @@ export function canOpen(pathname: string, viewer: NavViewer | null) {
 }
 
 export interface StoredUser extends NavViewer {
+  id: number | null;
   name: string;
   /** Profile photo URL, when they've set one. */
   avatar: string | null;
@@ -157,6 +158,7 @@ export function readUser(): StoredUser | null {
     if (!raw) return null;
     const user = JSON.parse(raw);
     return {
+      id: Number(user?.id) || null,
       name: user?.name ?? user?.email ?? "",
       role: user?.role?.name ?? user?.role ?? "",
       department: user?.department?.name ?? user?.department ?? "",

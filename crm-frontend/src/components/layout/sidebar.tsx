@@ -124,6 +124,7 @@ export function Sidebar() {
           userName={user?.name ?? ""}
           role={user?.role ?? ""}
           avatar={user?.avatar ?? null}
+          userId={user?.id ?? null}
           collapsed={isCollapsed}
           onToggleCollapsed={() => setIsCollapsed(!isCollapsed)}
         />

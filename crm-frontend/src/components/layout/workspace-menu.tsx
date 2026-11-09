@@ -29,12 +29,14 @@ export function WorkspaceMenu({
   userName,
   role,
   avatar,
+  userId,
   collapsed,
   onToggleCollapsed,
 }: {
   userName: string;
   role: string;
   avatar?: string | null;
+  userId?: number | null;
   collapsed: boolean;
   onToggleCollapsed: () => void;
 }) {
@@ -81,7 +83,7 @@ export function WorkspaceMenu({
           <Menu.Popup className={popupClass}>
             {(userName || role) && (
               <div className="flex items-center gap-2.5 px-3.5 py-2.5">
-                {userName && <Avatar name={userName} src={avatar} className="h-8 w-8 text-[11px]" />}
+                {userName && <Avatar name={userName} src={avatar} userId={userId} staff className="h-8 w-8 text-[11px]" />}
                 <div className="min-w-0">
                   <p className="truncate text-[14px] font-medium leading-tight text-foreground">{userName}</p>
                   {role && <p className="mt-0.5 truncate text-xs text-muted-foreground">{role}</p>}

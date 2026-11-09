@@ -10,8 +10,8 @@ import { FOCUS_BUTTON } from "@/components/shared/focus-modal";
 import { canOpen } from "./nav-items";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
-// What an admin can change on someone after they signed in.
-const LIVE_FIELDS = ["name", "role", "department", "department_id", "permissions", "nav_access"] as const;
+// What can change on someone after they signed in (an admin's edit, a photo picked elsewhere).
+const LIVE_FIELDS = ["name", "role", "department", "department_id", "avatar_url", "permissions", "nav_access"] as const;
 
 /** Re-reads the signed-in user, so access an admin changed applies without signing in again. */
 async function refreshUser() {

@@ -133,7 +133,7 @@ function UsersList() {
       enableHiding: false,
     },
     { accessorKey: "id", header: "ID", cell: ({ row }) => <IdCell href={`/users/${row.original.id}`}>{row.original.id}</IdCell> },
-    { accessorKey: "name", header: "Name", cell: ({ row }) => <NameCell name={row.original.name} image={row.original.avatar_url} avatar /> },
+    { accessorKey: "name", header: "Name", cell: ({ row }) => <NameCell name={row.original.name} image={row.original.avatar_url} staffId={row.original.id} avatar /> },
     { accessorKey: "email", header: "Email", cell: ({ row }) => <span className="text-muted-foreground">{row.original.email}</span> },
     { accessorKey: "phone", header: "Phone", cell: ({ row }) => <span className="tabular-nums text-muted-foreground">{row.original.phone || "—"}</span> },
     { 
@@ -194,7 +194,7 @@ function UsersList() {
               }
               getKey={(u) => u.id}
               onOpen={(u) => router.push(`/users/${u.id}`)}
-              card={(u) => ({ title: u.name, id: u.id, href: `/users/${u.id}`, subtitle: u.email, footer: u.department?.name, tag: u.role?.name })}
+              card={(u) => ({ title: u.name, image: u.avatar_url, id: u.id, href: `/users/${u.id}`, subtitle: u.email, footer: u.department?.name, tag: u.role?.name })}
               noun="users"
             />
           )}

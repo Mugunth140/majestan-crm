@@ -29,12 +29,15 @@ export function IdCell({ href, onClick, children }: { href?: string; onClick?: (
   return <span className={cls}>{children}</span>;
 }
 
-/** Primary column: the record's name, optionally with a letter avatar. */
-export function NameCell({ name, avatar = false, image, sub, className }: { name?: ReactNode; avatar?: boolean; image?: string | null; sub?: ReactNode; className?: string }) {
+/**
+ * Primary column: the record's name, optionally with a letter avatar. With
+ * `staffId`, the name is a staff member and shows their profile photo.
+ */
+export function NameCell({ name, avatar = false, image, staffId, sub, className }: { name?: ReactNode; avatar?: boolean; image?: string | null; staffId?: number | null; sub?: ReactNode; className?: string }) {
   const label = name ?? <span className="text-muted-foreground">—</span>;
   return (
     <span className={cn("inline-flex min-w-0 items-center gap-2", className)}>
-      {avatar && <NameAvatar name={typeof name === "string" ? name : undefined} src={image} />}
+      {avatar && <NameAvatar name={typeof name === "string" ? name : undefined} src={image} userId={staffId} staff={staffId !== undefined} />}
       <span className="min-w-0">
         <span className="block truncate font-medium text-foreground">{label}</span>
         {sub && <span className="block truncate text-[12px] text-muted-foreground">{sub}</span>}

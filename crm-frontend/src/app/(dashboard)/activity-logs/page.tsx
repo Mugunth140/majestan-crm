@@ -182,7 +182,7 @@ function ActivityLogs() {
     <AssigneePicker people={people} value={selected} allowClear={false} align="start" loading={!staff} placeholder="Find staff…"
       onPick={async (id) => { if (id) pick(id); }}
       trigger={<button type="button" className={cn(toolbarButtonClass, "lg:hidden")} />}>
-      {person ? <Avatar name={person.name} src={person.avatar_url} className="h-5 w-5 text-[9px]" /> : null}
+      {person ? <Avatar name={person.name} src={person.avatar_url} userId={person.id} staff className="h-5 w-5 text-[9px]" /> : null}
       <span className="max-w-[160px] truncate font-medium">{person?.name ?? "Pick staff"}</span>
       <ChevronDown className="size-3.5 text-muted-foreground" />
     </AssigneePicker>
@@ -210,7 +210,7 @@ function ActivityLogs() {
             ) : (
               <>
                 <div className="flex items-center gap-3 px-4 pb-4 pt-3 md:px-5">
-                  <Avatar name={person.name} src={person.avatar_url} className="h-11 w-11 text-[15px]" />
+                  <Avatar name={person.name} src={person.avatar_url} userId={person.id} staff className="h-11 w-11 text-[15px]" />
                   <div className="min-w-0">
                     <h2 className="truncate text-[17px] font-semibold leading-6 text-foreground">{person.name}</h2>
                     <p className="truncate text-[13px] text-muted-foreground">{person.active ? hint(person) || "—" : "Inactive"}</p>

@@ -21,6 +21,8 @@ export interface KanbanCardData {
   tag?: ReactNode;
   /** Letter avatar beside the title. Defaults on. */
   avatar?: boolean;
+  /** A photo for that avatar, e.g. a staff member's profile picture. */
+  image?: string | null;
 }
 
 const DRAG_TYPE = "application/x-crm-card";
@@ -158,7 +160,7 @@ export function KanbanBoard<T>({
                 const body = (
                   <>
                     <div className="flex items-center gap-2">
-                      {c.avatar !== false && <NameAvatar name={c.title} />}
+                      {c.avatar !== false && <NameAvatar name={c.title} src={c.image} />}
                       <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-foreground">{c.title || "—"}</span>
                       {c.id != null && <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{c.id}</span>}
                     </div>
