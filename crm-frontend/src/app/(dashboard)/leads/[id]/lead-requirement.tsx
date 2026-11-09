@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import {
-  AREA_CATEGORIES, BHK_OPTIONS as BHK, DECISION_MAKERS, FACING_OPTIONS as FACING, FUNDERS, FURNISHING_OPTIONS as FURNISHING, PROPERTY_CATEGORIES, PROPERTY_TYPES_MAP, PURCHASE_TIMELINES, PURCHASE_TYPES, QUALIFICATION_PURPOSES,
+  AREA_CATEGORIES, BHK_OPTIONS as BHK, DECISION_MAKERS, FACING_OPTIONS as FACING, FUNDERS, FURNISHING_OPTIONS as FURNISHING, PROPERTY_CATEGORIES, PROPERTY_TYPES_MAP, PURCHASE_TIMELINES, PURCHASE_TYPES, QUALIFICATION_PURPOSES, facingList, prefList,
 } from "@/lib/lead-constants";
 import { formatIndianCurrencyShort, parseIndianCurrency } from "@/lib/indian-currency";
 import { joinProjects, searchProjects, splitProjects } from "@/lib/project-search";
@@ -39,6 +39,10 @@ type Inquiry = {
   preferences?: Record<string, unknown> | null;
 };
 
+// Keeps an old value that's no longer offered (e.g. "north_east") pickable, so it can be unticked.
+const withCurrentList = (options: Option[], values: string[]) =>
+  [...options, ...values.filter((v) => !options.some((o) => o.value === v)).map((v) => ({ label: v, value: v }))];
+
 const money = (v: unknown) => (typeof v === "number" ? formatIndianCurrencyShort(v) : v == null ? "" : String(v));
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
@@ -61,6 +65,8 @@ export function RequirementFields({ inquiry, canEdit, save }: {
   const cityId = inquiry.city_id ?? null;
   const category = inquiry.property_category ?? null;
   const prefs = inquiry.preferences ?? {};
+  const bhk = prefList(prefs.bhk, BHK);
+  const facing = prefList(prefs.facing, FACING);
   const off = !canEdit;
 
   useEffect(() => {
@@ -118,10 +124,12 @@ export function RequirementFields({ inquiry, canEdit, save }: {
         {budget("maxBudget", "Max budget", "e.g. 1.2Cr")}
         {category === "residential" && (
           <>
-            <InlineSelect label="BHK" value={prefs.bhk == null ? null : String(prefs.bhk)} options={BHK} disabled={off} onSave={(v) => setPref("bhk", v)} />
+            <InlineMulti label="BHK" values={bhk} options={withCurrentList(BHK, bhk)} disabled={off}
+              onSave={(v) => setPref("bhk", v.length ? prefList(v, BHK) : null)} />
             <InlineSelect label="Furnishing" value={prefs.furnished == null ? null : String(prefs.furnished)} options={FURNISHING} disabled={off} onSave={(v) => setPref("furnished", v)} />
             <InlineText label="Floor" value={prefs.floorNumber as string | undefined} placeholder="e.g. Ground, 1st, High" disabled={off} onSave={(v) => setPref("floorNumber", v)} />
-            <InlineSelect label="Facing" value={prefs.facing == null ? null : String(prefs.facing)} options={FACING} disabled={off} onSave={(v) => setPref("facing", v)} />
+            <InlineMulti label="Facing" values={facing} options={withCurrentList(FACING, facing)} disabled={off}
+              onSave={(v) => { const list = facingList(v); return setPref("facing", list.length ? prefList(list, FACING) : null); }} />
           </>
         )}
         {category && AREA_CATEGORIES.includes(category) && (

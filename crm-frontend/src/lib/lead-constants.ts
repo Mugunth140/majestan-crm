@@ -136,9 +136,7 @@ const LEGACY_STATUS: Record<string, string> = { "Follow Up": "Future Follow-up" 
 
 /** Pill classes for a status, the same on the leads table and the lead page. */
 // Requirement preferences, shared by the new-lead form and the lead page.
-export const BHK_OPTIONS = [
-  { label: "1", value: "1" }, { label: "2", value: "2" }, { label: "3", value: "3" }, { label: "4+", value: "4" },
-];
+export const BHK_OPTIONS = ["1", "2", "3", "4", "5"].map((v) => ({ label: v, value: v }));
 export const FURNISHING_OPTIONS = [
   { label: "Furnished", value: "1" }, { label: "Semi furnished", value: "2" }, { label: "Unfurnished", value: "0" },
 ];
@@ -151,6 +149,23 @@ export const DECISION_MAKERS = [
   "Self", "Spouse", "Father", "Mother", "Son", "Daughter", "Brother", "Sister", "Father-in-law", "Mother-in-law",
   "Business Partner", "Joint Family", "Other Relative",
 ].map((v) => ({ label: v, value: v }));
+/**
+ * A multi-pick preference (BHK, facing) as a list in option order. Older
+ * requirements stored one value, so a single value reads as a list of one;
+ * values no longer offered are kept at the end.
+ */
+export function prefList(value: unknown, options: { value: string }[]): string[] {
+  const raw = (Array.isArray(value) ? value : [value]).filter((v) => v != null && v !== "").map(String);
+  const order = (v: string) => { const i = options.findIndex((o) => o.value === v); return i < 0 ? options.length : i; };
+  return [...new Set(raw)].sort((a, b) => order(a) - order(b));
+}
+
+/** Facing "Any" stands alone: picked last it clears the rest, otherwise it drops out. */
+export function facingList(picked: string[]): string[] {
+  if (picked[picked.length - 1] === "Any") return ["Any"];
+  return picked.filter((v) => v !== "Any");
+}
+
 /** Categories whose preferences are an area range rather than BHK / facing. */
 export const AREA_CATEGORIES = ["commercial", "industrial", "agricultural", "institutional"];
 

@@ -26,8 +26,26 @@ describe('auto-match', () => {
       localities: ['Irugur'],
       minBudget: 5000,
       maxBudget: null,
-      bhk: 2,
+      bhk: [2],
     });
+  });
+
+  it('ranks units by the nearest of several wanted BHKs, without unsigned overflow', () => {
+    const c = matchCriteria(
+      { property_type: 'apartment', preferences: { bhk: ['2', '3', '', 'x', '3'] } },
+      'Coimbatore',
+    );
+    expect(c.bhk).toEqual([2, 3]);
+    const project = projectMatchQuery(c)!;
+    expect(project.sql).toContain(
+      'MIN(LEAST(ABS(CAST(u.bedrooms AS SIGNED) - ?), ABS(CAST(u.bedrooms AS SIGNED) - ?)))',
+    );
+    expect(project.params.slice(-2)).toEqual([2, 3]);
+    expect(project.params).toHaveLength(placeholders(project.sql));
+    const property = propertyMatchQuery(c);
+    expect(property.sql).toContain('LEAST(ABS(CAST(pd.bedrooms AS SIGNED) - ?)');
+    expect(property.params).toHaveLength(placeholders(property.sql));
+    expect(matchCriteria({ preferences: { bhk: [] } }, null).bhk).toEqual([]);
   });
 
   it('searches everything when the requirement says nothing', () => {

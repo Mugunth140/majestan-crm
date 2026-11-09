@@ -58,7 +58,8 @@ export interface MatchCriteria {
   localities: string[];
   minBudget: number | null;
   maxBudget: number | null;
-  bhk: number | null;
+  /** Every BHK the requirement accepts (old requirements hold a single value). */
+  bhk: number[];
   minArea: number | null;
   maxArea: number | null;
 }
@@ -73,6 +74,9 @@ const num = (v: unknown) => {
     ? n
     : null;
 };
+
+const nums = (v: unknown) =>
+  [...new Set((Array.isArray(v) ? v : [v]).map(num).filter((n): n is number => n !== null))];
 
 const key = (v?: string | null) =>
   v
@@ -124,13 +128,19 @@ export function matchCriteria(
     localities,
     minBudget: num(prefs.minBudget),
     maxBudget: num(prefs.maxBudget),
-    bhk: num(prefs.bhk),
+    bhk: nums(prefs.bhk),
     minArea: num(prefs.minArea),
     maxArea: num(prefs.maxArea),
   };
 }
 
 const placeholders = (list: unknown[]) => list.map(() => '?').join(', ');
+
+/** Distance from a bedrooms column to the nearest wanted BHK (0 when it is one of them). */
+const bhkDistance = (column: string, bhk: number[]) => {
+  const each = bhk.map(() => `ABS(CAST(${column} AS SIGNED) - ?)`);
+  return each.length > 1 ? `LEAST(${each.join(', ')})` : each[0];
+};
 
 /** Options for the wider search: what to rank against and what is already shown. */
 export interface SimilarSearch {
@@ -214,12 +224,12 @@ export function propertyMatchQuery(c: MatchCriteria, similar?: SimilarSearch) {
   const localityRank = c.localities.length
     ? `CASE WHEN s.locality_name IN (${placeholders(c.localities)}) THEN 0 ELSE 1 END`
     : '0';
-  const bhkRank = c.bhk ? 'COALESCE(ABS(pd.bedrooms - ?), 99)' : '0';
+  const bhkRank = c.bhk.length ? `COALESCE(${bhkDistance('pd.bedrooms', c.bhk)}, 99)` : '0';
   const priceRank = similar?.target ? 'COALESCE(ABS(p.price - ?), 1e15)' : '0';
   const rankParams = [
     ...c.localities,
     ...(similar?.target ? [similar.target] : []),
-    ...(c.bhk ? [c.bhk] : []),
+    ...c.bhk,
   ];
 
   return {
@@ -279,14 +289,14 @@ export function projectMatchQuery(c: MatchCriteria, similar?: SimilarSearch) {
   const localityRank = c.localities.length
     ? `CASE WHEN pr.sublocation IN (${placeholders(c.localities)}) THEN 0 ELSE 1 END`
     : '0';
-  const bhkRank = c.bhk ? 'COALESCE(MIN(ABS(u.bedrooms - ?)), 99)' : '0';
+  const bhkRank = c.bhk.length ? `COALESCE(MIN(${bhkDistance('u.bedrooms', c.bhk)}), 99)` : '0';
   const priceRank = similar?.target
     ? `COALESCE(MIN(ABS(${unitPrice} - ?)), 1e15)`
     : '0';
   const rankParams = [
     ...c.localities,
     ...(similar?.target ? [similar.target] : []),
-    ...(c.bhk ? [c.bhk] : []),
+    ...c.bhk,
   ];
 
   return {

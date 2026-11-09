@@ -14,6 +14,7 @@ import { PriceInput } from "@/components/shared/price-input";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
 import { SearchCombobox } from "@/components/shared/search-combobox";
 import { MultiSearchSelect } from "@/components/shared/multi-search-select";
+import { ChipMultiSelect } from "@/components/shared/chip-multi-select";
 import {
   FieldRow, FOCUS_BUTTON, FOCUS_FIELD, FocusField, FocusModal, FocusSection, ToggleCard, fieldName, stepStatus,
 } from "@/components/shared/focus-modal";
@@ -46,7 +47,10 @@ const STEPS = [
 ] as const;
 type StepKey = (typeof STEPS)[number]["key"];
 
-type Prefs = Partial<Record<"minBudget" | "maxBudget" | "bhk" | "furnished" | "floorNumber" | "facing" | "minArea" | "maxArea", string>>;
+type Prefs = Partial<Record<"minBudget" | "maxBudget" | "furnished" | "floorNumber" | "minArea" | "maxArea", string>> & {
+  bhk?: string[];
+  facing?: string[];
+};
 
 const EMPTY = {
   name: "", mobile: "", whatsapp: "", email: "", city: "", address: "",
@@ -196,7 +200,7 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
   const checkingMobile = digits(form.mobile).length >= 10 && dupe?.mobile !== digits(form.mobile);
 
   const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((f) => ({ ...f, [key]: value }));
-  const setPref = (key: keyof Prefs, value: string) => setForm((f) => ({ ...f, prefs: { ...f.prefs, [key]: value } }));
+  const setPref = <K extends keyof Prefs>(key: K, value: Prefs[K]) => setForm((f) => ({ ...f, prefs: { ...f.prefs, [key]: value } }));
 
   const errorsFor = (step: StepKey) => check(step, form, isStaff);
   const valid = (step: StepKey) => Object.keys(errorsFor(step)).length === 0;
@@ -256,7 +260,7 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
         if (created.success) source = created.data.value;
       }
       const assignee = isStaff ? (form.assignee === "queue" ? null : user?.id ?? null) : form.assignee === "queue" ? null : Number(form.assignee);
-      const prefs: Record<string, unknown> = Object.fromEntries(Object.entries(form.prefs).filter(([, v]) => v !== "" && v != null));
+      const prefs: Record<string, unknown> = Object.fromEntries(Object.entries(form.prefs).filter(([, v]) => v !== "" && v != null && !(Array.isArray(v) && !v.length)));
       if (prefs.minBudget) prefs.minBudget = parseIndianCurrency(String(prefs.minBudget));
       if (prefs.maxBudget) prefs.maxBudget = parseIndianCurrency(String(prefs.maxBudget));
       const city = cities?.find((c) => String(c.id) === form.city)?.city_name ?? "";
@@ -513,22 +517,20 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
         </FieldRow>
         {form.category === "residential" && (
           <>
+            <FocusField label="BHK" optional hint="Pick every size the customer would consider.">
+              <ChipMultiSelect label="BHK" options={BHK_OPTIONS} value={p.bhk ?? []} onChange={(v) => setPref("bhk", v)} />
+            </FocusField>
             <FieldRow>
-              <FocusField label="BHK" optional>
-                <FormSelect name="bhk" placeholder="Select" className={SELECT} value={p.bhk || null} options={BHK_OPTIONS} onValueChange={(v) => setPref("bhk", v)} />
-              </FocusField>
               <FocusField label="Furnishing" optional>
                 <FormSelect name="furnished" placeholder="Select" className={SELECT} value={p.furnished || null} options={FURNISHING_OPTIONS} onValueChange={(v) => setPref("furnished", v)} />
               </FocusField>
-            </FieldRow>
-            <FieldRow>
               <FocusField label="Floor" htmlFor="nl-floor" optional>
                 <Input id="nl-floor" value={p.floorNumber ?? ""} onChange={(e) => setPref("floorNumber", e.target.value)} placeholder="Ground, 1st, High" className={INPUT} />
               </FocusField>
-              <FocusField label="Facing" optional>
-                <FormSelect name="facing" placeholder="Select" className={SELECT} value={p.facing || null} options={FACING_OPTIONS} onValueChange={(v) => setPref("facing", v)} />
-              </FocusField>
             </FieldRow>
+            <FocusField label="Facing" optional>
+              <ChipMultiSelect label="Facing" options={FACING_OPTIONS} value={p.facing ?? []} exclusive="Any" onChange={(v) => setPref("facing", v)} />
+            </FocusField>
           </>
         )}
         {AREA_CATEGORIES.includes(form.category) && (
