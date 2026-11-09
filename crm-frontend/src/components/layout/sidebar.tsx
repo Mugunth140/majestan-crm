@@ -127,6 +127,7 @@ export function Sidebar() {
           userId={user?.id ?? null}
           collapsed={isCollapsed}
           onToggleCollapsed={() => setIsCollapsed(!isCollapsed)}
+          onOpenSettings={() => setPick({ at: "/settings", name: SETTINGS.name })}
         />
       </div>
 

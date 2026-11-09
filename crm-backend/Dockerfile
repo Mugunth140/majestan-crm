@@ -14,4 +14,5 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src ./src
 EXPOSE 8000
-CMD ["bun", "run", "start:prod"]
+# Run the app as PID 1 so it receives SIGTERM on deploy; `bun run` does not forward it.
+CMD ["bun", "dist/main.js"]

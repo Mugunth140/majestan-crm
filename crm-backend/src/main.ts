@@ -11,7 +11,8 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 async function bootstrap() {
   assertRequiredEnv();
 
-  const app = await NestFactory.create(AppModule);
+  // forceCloseConnections ends open SSE streams on shutdown so a deploy stops in seconds.
+  const app = await NestFactory.create(AppModule, { forceCloseConnections: true });
   app.enableShutdownHooks();
   // Allow the validated 500-row HR import without changing other JSON limits.
   app.use('/api/v1/hr/bulk', hrImportJsonParser);

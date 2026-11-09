@@ -11,7 +11,7 @@ import { Avatar } from "@/components/record/feed";
 
 // Frappe-style menu surface: elevated card, groups split by hairlines, compact rows.
 const popupClass =
-  "min-w-56 origin-[var(--transform-origin)] divide-y divide-black/[0.06] rounded-xl bg-popover text-popover-foreground shadow-[0_12px_32px_-8px_rgba(0,0,0,0.18),0_4px_8px_-4px_rgba(0,0,0,0.08)] ring-1 ring-black/[0.06] outline-none transition-[opacity,transform] duration-150 data-[ending-style]:scale-[0.97] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.97] data-[starting-style]:opacity-0 dark:divide-white/[0.08] dark:ring-white/10";
+  "origin-[var(--transform-origin)] divide-y divide-black/[0.06] rounded-xl bg-popover text-popover-foreground shadow-[0_12px_32px_-8px_rgba(0,0,0,0.18),0_4px_8px_-4px_rgba(0,0,0,0.08)] ring-1 ring-black/[0.06] outline-none transition-[opacity,transform] duration-150 data-[ending-style]:scale-[0.97] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.97] data-[starting-style]:opacity-0 dark:divide-white/[0.08] dark:ring-white/10";
 const itemClass =
   "flex h-7 cursor-pointer select-none items-center gap-2 rounded-md px-2 text-[14px] text-foreground/85 outline-none data-[highlighted]:bg-black/[0.05] dark:data-[highlighted]:bg-white/[0.08]";
 
@@ -32,6 +32,7 @@ export function WorkspaceMenu({
   userId,
   collapsed,
   onToggleCollapsed,
+  onOpenSettings,
 }: {
   userName: string;
   role: string;
@@ -39,6 +40,8 @@ export function WorkspaceMenu({
   userId?: number | null;
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  /** Opens the sidebar's Settings panel; without it the item only navigates. */
+  onOpenSettings?: () => void;
 }) {
   const router = useRouter();
   const { resolvedTheme, setTheme } = useTheme();
@@ -80,7 +83,8 @@ export function WorkspaceMenu({
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner side="bottom" align="start" sideOffset={6} className="z-50 outline-none">
-          <Menu.Popup className={popupClass}>
+          {/* Expanded, the menu lines up edge to edge with its trigger; collapsed, the trigger is only the mark. */}
+          <Menu.Popup className={cn(popupClass, collapsed ? "w-56" : "w-[var(--anchor-width)]")}>
             {(userName || role) && (
               <div className="flex items-center gap-2.5 px-3.5 py-2.5">
                 {userName && <Avatar name={userName} src={avatar} userId={userId} staff className="h-8 w-8 text-[11px]" />}
@@ -93,7 +97,10 @@ export function WorkspaceMenu({
             <Menu.Group className="p-1.5">
               <Item icon={isDark ? Sun : Moon} label={isDark ? "Light mode" : "Dark mode"} onClick={() => setTheme(isDark ? "light" : "dark")} />
               <Item icon={collapsed ? PanelLeftOpen : PanelLeftClose} label={collapsed ? "Expand" : "Collapse"} onClick={onToggleCollapsed} />
-              <Item icon={Settings} label="Settings" onClick={() => router.push("/settings")} />
+              <Item icon={Settings} label="Settings" onClick={() => {
+                  onOpenSettings?.();
+                  router.push("/settings");
+                }} />
             </Menu.Group>
             <Menu.Group className="p-1.5">
               <Item icon={LogOut} label="Log out" onClick={logout} danger />
