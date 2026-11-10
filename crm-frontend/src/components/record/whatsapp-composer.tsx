@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Clock, Loader2, RefreshCw, Send } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
@@ -24,7 +24,57 @@ export interface WaTemplate {
   fields: WaField[];
   supported: boolean;
 }
-interface WaWindow { configured: boolean; number: string | null; open: boolean; closes_at: string | null; hoursLeft?: number }
+interface WaWindow { configured: boolean; number: string | null; open: boolean; closes_at: string | null; latest?: string | null; hoursLeft?: number }
+
+const LIVE_MS = 5000;
+
+/**
+ * Watches a lead's WhatsApp messages while the page is on screen and calls
+ * `onChange` when one arrives or a delivery status moves, so the conversation
+ * shows new messages without a reload. Returns the latest marker.
+ */
+export function useWhatsappActivity(leadId: number, enabled: boolean, onChange: () => void): string | null {
+  const [latest, setLatest] = useState<string | null>(null);
+  const last = useRef<string | null | undefined>(undefined);
+  const changed = useRef(onChange);
+  useEffect(() => { changed.current = onChange; }, [onChange]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let live = true;
+    let busy = false;
+    last.current = undefined;
+    const check = async () => {
+      if (busy || document.hidden) return;
+      busy = true;
+      try {
+        const res = await apiFetch(`${API_URL}/whatsapp/leads/${leadId}/window`);
+        const body = res.ok ? await res.json() : null;
+        if (!live || !body?.data?.configured) return;
+        const next: string | null = body.data.latest ?? null;
+        // The first answer is what the page already shows; only later changes reload it.
+        if (last.current !== undefined && next !== last.current) changed.current();
+        last.current = next;
+        setLatest(next);
+      } catch {
+        // Offline or the server is restarting: try again on the next tick.
+      } finally {
+        busy = false;
+      }
+    };
+    void check();
+    const timer = setInterval(() => void check(), LIVE_MS);
+    const onVisible = () => { if (!document.hidden) void check(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      live = false;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [leadId, enabled]);
+
+  return latest;
+}
 
 /** Whole hours until free replies close, worked out when the window is loaded. */
 const withHours = (w: WaWindow): WaWindow => ({
@@ -80,11 +130,13 @@ function loadTemplates(refresh = false) {
  * any time, or free text within 24 hours of the customer's last message. When the
  * server isn't set up for the API, `fallback` (open WhatsApp and log) is shown instead.
  */
-export function WhatsappComposer({ leadId, leadName, fallback, onSent }: {
+export function WhatsappComposer({ leadId, leadName, fallback, onSent, latest }: {
   leadId: number;
   leadName?: string | null;
   fallback: ReactNode;
   onSent: () => void;
+  /** Changes when a message arrives, so the reply window is checked again. */
+  latest?: string | null;
 }) {
   const [win, setWin] = useState<WaWindow | null>(null);
   const [templates, setTemplates] = useState<WaTemplate[] | null>(null);
@@ -103,7 +155,7 @@ export function WhatsappComposer({ leadId, leadName, fallback, onSent }: {
       .then((body) => live && setWin(withHours(body?.data ?? { configured: false, number: null, open: false, closes_at: null })))
       .catch(() => live && setWin({ configured: false, number: null, open: false, closes_at: null }));
     return () => { live = false; };
-  }, [leadId]);
+  }, [leadId, latest]);
 
   useEffect(() => {
     if (!win?.configured) return;

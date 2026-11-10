@@ -16,6 +16,8 @@ export interface Template {
   language: string;
   category: string;
   header: string | null;
+  /** TEXT, IMAGE, VIDEO, DOCUMENT or LOCATION; null when there is no header. */
+  headerFormat: string | null;
   body: string;
   footer: string | null;
   buttons: string[];
@@ -63,6 +65,7 @@ export function simplifyTemplate(raw: unknown): Template | null {
   const t = record(raw);
   if (typeof t.name !== 'string' || typeof t.language !== 'string') return null;
   let header: string | null = null;
+  let headerFormat: string | null = null;
   let body = '';
   let footer: string | null = null;
   let supported = true;
@@ -72,8 +75,8 @@ export function simplifyTemplate(raw: unknown): Template | null {
     const c = record(raw);
     const type = String(c.type ?? '').toUpperCase();
     if (type === 'HEADER') {
-      if (String(c.format ?? 'TEXT').toUpperCase() !== 'TEXT')
-        supported = false;
+      headerFormat = String(c.format ?? 'TEXT').toUpperCase();
+      if (headerFormat !== 'TEXT') supported = false;
       else header = typeof c.text === 'string' ? c.text : null;
     } else if (type === 'BODY') body = typeof c.text === 'string' ? c.text : '';
     else if (type === 'FOOTER')
@@ -111,6 +114,7 @@ export function simplifyTemplate(raw: unknown): Template | null {
     language: t.language,
     category: String(t.category ?? ''),
     header,
+    headerFormat,
     body,
     footer,
     buttons,
@@ -168,4 +172,22 @@ export function missingField(
   return (
     template.fields.find((f) => !String(values[f.id] ?? '').trim()) ?? null
   );
+}
+
+/**
+ * Values for every field of `template`, from values known by name: named fields
+ * ({{first_name}}) by their name, numbered fields ({{1}}, {{2}}…) by `order`.
+ */
+export function valuesFor(
+  template: Template,
+  byName: Record<string, string>,
+  order: string[],
+): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const f of template.fields) {
+    const name = /^\d+$/.test(f.key) ? order[Number(f.key) - 1] : f.key;
+    const value = name ? byName[name] : undefined;
+    if (value) values[f.id] = value;
+  }
+  return values;
 }

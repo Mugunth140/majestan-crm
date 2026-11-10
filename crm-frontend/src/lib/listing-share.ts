@@ -46,6 +46,14 @@ export const shareApi = {
       body: JSON.stringify({ items: items(listings) }),
     }).then((res) => res.data),
 
+  /** Sends the brochures from the business WhatsApp number; 503 when the API isn't set up. */
+  whatsapp: (leadId: number, listings: SharedListing[]) =>
+    apiJson<{ data: { sent: number; to: string } }>(`${API_URL}/leads/${leadId}/share/whatsapp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: items(listings) }),
+    }).then((res) => res.data),
+
   log: (leadId: number, channel: ShareChannel, listings: SharedListing[]) =>
     apiJson(`${API_URL}/leads/${leadId}/share/log`, {
       method: "POST",

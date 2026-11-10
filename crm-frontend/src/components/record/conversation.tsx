@@ -21,7 +21,7 @@ import { MailComposer, type ComposerStart } from "@/components/mail/mail-compose
 import { MailPreviewDialog } from "@/components/mail/mail-preview-dialog";
 import { cn } from "@/lib/utils";
 import { withCurrent } from "./inline-field";
-import { WhatsappComposer } from "./whatsapp-composer";
+import { WhatsappComposer, useWhatsappActivity } from "./whatsapp-composer";
 import { Avatar, CARD, Chip, Feed, FeedTime, TabHeader, Who, sortOldestFirst, type FeedItem } from "./feed";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -173,6 +173,8 @@ export function LeadConversation({
   const [editing, setEditing] = useState<FollowUp | null>(null);
   const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
   const seen = useRef<Set<number> | null>(null);
+  // New WhatsApp messages and delivery ticks show up without reloading the page.
+  const waLatest = useWhatsappActivity(leadId, entity.api === "leads", onRefresh);
 
   const fetchMail = useCallback(
     () => Promise.all([mailApi.catalog(entity.mail), mailApi.history(entity.mail, leadId)]),
@@ -571,7 +573,7 @@ export function LeadConversation({
             </div>
           )}
           {mode === "whatsapp" && (
-            <QuickMessage leadId={leadId} leadName={leadName} entity={entity} number={whatsapp || mobile} onSent={() => { setMode(null); onRefresh(); }} />
+            <QuickMessage leadId={leadId} leadName={leadName} entity={entity} number={whatsapp || mobile} latest={waLatest} onSent={() => { setMode(null); onRefresh(); }} />
           )}
 
           <div role="tablist" aria-label="Compose" className={cn("flex h-12 items-center gap-1 overflow-x-auto px-3 scrollbar-hide md:gap-2 md:px-5", mode && "border-t")}>
@@ -622,10 +624,11 @@ function QuickMessage(props: {
   leadId: number;
   leadName?: string | null;
   number?: string | null;
+  latest?: string | null;
   onSent: () => void;
 }) {
   if (props.entity.api !== "leads") return <OpenWhatsapp {...props} />;
-  return <WhatsappComposer leadId={props.leadId} leadName={props.leadName} onSent={props.onSent} fallback={<OpenWhatsapp {...props} />} />;
+  return <WhatsappComposer leadId={props.leadId} leadName={props.leadName} latest={props.latest} onSent={props.onSent} fallback={<OpenWhatsapp {...props} />} />;
 }
 
 function OpenWhatsapp({ leadId, entity, number, onSent }: {

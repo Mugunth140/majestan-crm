@@ -8,6 +8,7 @@ import { WhatsappWebhookController } from './whatsapp/whatsapp-webhook.controlle
 import { WhatsappWebhookService } from './whatsapp/whatsapp-webhook.service';
 import { WhatsappController } from './whatsapp/whatsapp.controller';
 import { WhatsappSendService } from './whatsapp/whatsapp-send.service';
+import { WhatsappAutomationService } from './whatsapp/whatsapp-automation.service';
 
 @Global()
 @Module({
@@ -18,7 +19,8 @@ import { WhatsappSendService } from './whatsapp/whatsapp-send.service';
     SmsService,
     WhatsappWebhookService,
     WhatsappSendService,
+    WhatsappAutomationService,
   ],
-  exports: [WhatsappService, SmsService],
+  exports: [WhatsappService, SmsService, WhatsappSendService],
 })
 export class CommunicationsModule {}

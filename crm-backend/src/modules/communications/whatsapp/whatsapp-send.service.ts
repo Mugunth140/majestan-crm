@@ -76,22 +76,81 @@ export class WhatsappSendService {
         number: null,
         open: false,
         closes_at: null,
+        latest: null,
       };
-    const rows: { last: string | Date | null; left: number | null }[] =
-      await this.dataSource.query(
-        `SELECT MAX(created_at) AS last,
-              TIMESTAMPDIFF(SECOND, NOW(), MAX(created_at) + INTERVAL ${WINDOW_HOURS} HOUR) AS \`left\`
-       FROM whatsapp_messages WHERE direction = 'in' AND (lead_id = ? OR RIGHT(phone, 10) = ?)`,
-        [lead.id, to.slice(-10)],
-      );
-    const left = Number(rows[0]?.left ?? 0);
+    const [left, latest] = await Promise.all([
+      this.secondsLeft(lead.id, to),
+      this.latest(lead.id, to),
+    ]);
     return {
       configured: this.whatsapp.isConfigured(),
       number: to,
       open: left > 0,
       closes_at:
         left > 0 ? new Date(Date.now() + left * 1000).toISOString() : null,
+      latest,
     };
+  }
+
+  /**
+   * Changes whenever a message to or from this lead arrives or its delivery
+   * status moves, so an open lead page knows to reload its conversation.
+   */
+  private async latest(leadId: number, to: string): Promise<string | null> {
+    const rows: { n: number | string; at: Date | string | null }[] =
+      await this.dataSource.query(
+        `SELECT COUNT(*) AS n, MAX(updated_at) AS at FROM whatsapp_messages WHERE lead_id = ? OR RIGHT(phone, 10) = ?`,
+        [leadId, to.slice(-10)],
+      );
+    const row = rows[0];
+    if (!row || !Number(row.n)) return null;
+    const at = row.at instanceof Date ? row.at.toISOString() : String(row.at);
+    return `${Number(row.n)}:${at}`;
+  }
+
+  /** Seconds left in the 24-hour reply window (0 when closed). */
+  async secondsLeft(leadId: number, to: string): Promise<number> {
+    const rows: { left: number | null }[] = await this.dataSource.query(
+      `SELECT TIMESTAMPDIFF(SECOND, NOW(), MAX(created_at) + INTERVAL ${WINDOW_HOURS} HOUR) AS \`left\`
+       FROM whatsapp_messages WHERE direction = 'in' AND (lead_id = ? OR RIGHT(phone, 10) = ?)`,
+      [leadId, to.slice(-10)],
+    );
+    return Math.max(0, Number(rows[0]?.left ?? 0));
+  }
+
+  /**
+   * Stores a message we sent and shows it in the lead's Conversation. A status
+   * webhook can arrive before this insert; it leaves a placeholder row to fill in.
+   * `sentBy` null means the CRM sent it on its own (log id "wa-auto:").
+   */
+  async record(m: {
+    wamid: string;
+    to: string;
+    leadId: number;
+    type: string;
+    text: string;
+    subject: string | null;
+    sentBy: number | null;
+    contactType?: 'whatsapp' | 'share';
+  }) {
+    await this.dataSource.query(
+      `INSERT INTO whatsapp_messages (wa_message_id, direction, phone, lead_id, message_type, body, status, sent_at)
+       VALUES (?, 'out', ?, ?, ?, ?, 'sent', NOW())
+       ON DUPLICATE KEY UPDATE lead_id = VALUES(lead_id), message_type = VALUES(message_type), body = VALUES(body), sent_at = VALUES(sent_at)`,
+      [m.wamid, m.to, m.leadId, m.type, m.text],
+    );
+    if (m.contactType === 'share') return;
+    await this.dataSource.query(
+      `INSERT IGNORE INTO contact_logs (lead_id, contact_type, subject, message, sent_by_id, call_direction, source_call_id)
+       VALUES (?, 'whatsapp', ?, ?, ?, 'outgoing', ?)`,
+      [
+        m.leadId,
+        m.subject,
+        m.text,
+        m.sentBy,
+        `${m.sentBy === null ? 'wa-auto' : 'wa'}:${m.wamid}`,
+      ],
+    );
   }
 
   async send(user: WhatsappUser, leadId: number, body: SendWhatsapp) {
@@ -153,18 +212,15 @@ export class WhatsappSendService {
     }
 
     const wamid = await this.whatsapp.deliver(to, message);
-    // A status webhook can arrive before this insert; it leaves a placeholder row to fill in.
-    await this.dataSource.query(
-      `INSERT INTO whatsapp_messages (wa_message_id, direction, phone, lead_id, message_type, body, status, sent_at)
-       VALUES (?, 'out', ?, ?, ?, ?, 'sent', NOW())
-       ON DUPLICATE KEY UPDATE lead_id = VALUES(lead_id), message_type = VALUES(message_type), body = VALUES(body), sent_at = VALUES(sent_at)`,
-      [wamid, to, lead.id, type, text],
-    );
-    await this.dataSource.query(
-      `INSERT IGNORE INTO contact_logs (lead_id, contact_type, subject, message, sent_by_id, call_direction, source_call_id)
-       VALUES (?, 'whatsapp', ?, ?, ?, 'outgoing', ?)`,
-      [lead.id, subject, text, user.id, `wa:${wamid}`],
-    );
+    await this.record({
+      wamid,
+      to,
+      leadId: lead.id,
+      type,
+      text,
+      subject,
+      sentBy: user.id,
+    });
     return { id: wamid, to, text };
   }
 }

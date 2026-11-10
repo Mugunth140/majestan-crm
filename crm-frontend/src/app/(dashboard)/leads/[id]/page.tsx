@@ -2,7 +2,7 @@
 
 import { CompletenessRing } from "@/components/record/score-ring";
 import { leadScoreFields } from "@/lib/record-score";
-import { apiFetch } from "@/lib/api-fetch";
+import { ApiError, apiFetch } from "@/lib/api-fetch";
 import { normalizeDepartment, pipelineOf } from "@/lib/department";
 import { recordNotInterested } from "@/lib/not-interested";
 import { NotInterestedDialog } from "./not-interested-dialog";
@@ -293,9 +293,9 @@ function LeadDetail() {
     }
   };
 
-  // WhatsApp isn't connected yet: the chat opens with the message written, the
+  // Without the WhatsApp API, the chat opens with the message written, the
   // PDFs download for staff to attach, and the share is logged on the lead.
-  const shareOnWhatsapp = async (listings: SharedListing[]) => {
+  const openWhatsappShare = async (listings: SharedListing[]) => {
     const digits = String(lead?.whatsapp_number || lead?.mobile_number || "").replace(/\D/g, "");
     const to = digits.length === 10 ? `91${digits}` : digits;
     window.open(`https://wa.me/${to}?text=${encodeURIComponent(whatsappMessage(lead?.name, listings))}`, "_blank", "noopener");
@@ -307,6 +307,28 @@ function LeadDetail() {
       void fetchLead(true);
     } catch {
       // downloadPdfs already explained what went wrong.
+    }
+  };
+
+  // The brochures go straight to the lead's WhatsApp from the business number.
+  const shareOnWhatsapp = async (listings: SharedListing[]) => {
+    const sending = toast.loading(listings.length === 1 ? "Sending the brochure on WhatsApp…" : `Sending ${listings.length} brochures on WhatsApp…`);
+    try {
+      const { sent, to } = await shareApi.whatsapp(Number(id), listings);
+      toast.success(sent === 1 ? `Brochure sent on WhatsApp to +${to}` : `${sent} brochures sent on WhatsApp to +${to}`, { id: sending });
+      setIsAutoMatchOpen(false);
+      void fetchLead(true);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 503) {
+        toast.dismiss(sending);
+        return openWhatsappShare(listings);
+      }
+      toast.error("Not sent on WhatsApp", {
+        id: sending,
+        description: error instanceof Error ? error.message : undefined,
+        action: { label: "Open WhatsApp instead", onClick: () => void openWhatsappShare(listings) },
+        duration: 12_000,
+      });
     }
   };
 

@@ -37,7 +37,10 @@ export function contactLogIcon(log: { contact_type: string; call_direction?: str
 // no staff member; the mail service keys its entries "mail:<id>".
 export function contactLogAuthor(log: { sent_by?: { name?: string } | null; source_call_id?: string | null }): string {
   if (log.sent_by?.name) return log.sent_by.name;
-  return String(log.source_call_id ?? "").startsWith("mail:") ? "Automatic email" : "Staff";
+  const source = String(log.source_call_id ?? "");
+  if (source.startsWith("mail:")) return "Automatic email";
+  if (source.startsWith("wa-auto:")) return "Automatic WhatsApp";
+  return "Staff";
 }
 
 export function formatTimestamp(ts: string) {

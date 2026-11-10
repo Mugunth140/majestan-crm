@@ -136,6 +136,12 @@ export class LeadsController {
     return { success: true, data: await this.share.emailDraft(id, body.items, req.user) };
   }
 
+  /** Sends the brochures from the business WhatsApp number (Cloud API). */
+  @Post(':id/share/whatsapp')
+  async shareWhatsapp(@Param('id', ParseIntPipe) id: number, @Body() body: ShareListingsDto, @Request() req: any) {
+    return { success: true, data: await this.share.whatsappShare(id, body.items, req.user) };
+  }
+
   @Post(':id/share/log')
   async logShare(@Param('id', ParseIntPipe) id: number, @Body() body: LogShareDto, @Request() req: any) {
     return { success: true, data: await this.share.log(id, body.channel, body.items, req.user) };
