@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, MotionConfig, motion, type PanInfo } from "motion/react";
-import { ArrowRightLeft, Bell, CalendarClock, CalendarPlus, CheckCheck, Hand, Trash2, UserPlus, type LucideIcon } from "lucide-react";
+import { ArrowRightLeft, Bell, CalendarClock, CalendarPlus, CheckCheck, Hand, MessageCircle, Trash2, UserPlus, type LucideIcon } from "lucide-react";
 import { useNotifications, type Notification } from "@/context/notification-context";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { PageActions } from "@/components/layout/page-actions";
@@ -20,6 +20,7 @@ const KINDS: Record<string, Kind> = {
   lead_assigned: { icon: UserPlus, tint: "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400" },
   lead_claimed: { icon: Hand, tint: "bg-violet-500/12 text-violet-600 dark:text-violet-400" },
   lead_transferred: { icon: ArrowRightLeft, tint: "bg-blue-500/12 text-blue-600 dark:text-blue-400" },
+  whatsapp_message: { icon: MessageCircle, tint: "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400" },
 };
 const FALLBACK: Kind = { icon: Bell, tint: "bg-muted text-muted-foreground" };
 

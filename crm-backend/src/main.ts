@@ -1,6 +1,7 @@
 import { ninetyNineAcresJsonParser } from './common/middleware/ninety-nine-acres-json';
 import { hrImportJsonParser } from './common/middleware/hr-import-json';
 import { mailJsonParser } from './common/middleware/mail-json';
+import { whatsappJsonParser } from './common/middleware/whatsapp-json';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
@@ -19,6 +20,8 @@ async function bootstrap() {
   app.use('/api/v1/leads/99acres', ninetyNineAcresJsonParser);
   // Email bodies and templates from the composer (attachments use multipart, not JSON).
   app.use('/api/v1/mail', mailJsonParser);
+  // WhatsApp webhooks keep their raw body for Meta's signature check.
+  app.use('/api/v1/whatsapp/webhook', whatsappJsonParser);
 
   // Browser calls are same-origin via the Next.js rewrite; FRONTEND_URL covers
   // any direct cross-origin use (e.g. local dev on a different port).

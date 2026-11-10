@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadGatewayException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
+import { simplifyTemplate, type Template } from './whatsapp-templates';
 
 export interface WhatsappTemplateOptions {
   name: string;
@@ -15,6 +16,9 @@ export class WhatsappService {
   private readonly apiUrl: string;
   private readonly token: string;
   private readonly phoneNumberId: string;
+  private readonly accountId: string;
+  private readonly graphUrl: string;
+  private templateCache: { at: number; data: Template[] } | null = null;
 
   constructor(
     private readonly configService: ConfigService,
@@ -22,8 +26,67 @@ export class WhatsappService {
   ) {
     this.token = this.configService.get<string>('WHATSAPP_API_TOKEN', '');
     this.phoneNumberId = this.configService.get<string>('WHATSAPP_PHONE_NUMBER_ID', '');
-    const version = this.configService.get<string>('WHATSAPP_API_VERSION', 'v19.0');
-    this.apiUrl = `https://graph.facebook.com/${version}/${this.phoneNumberId}/messages`;
+    const version = this.configService.get<string>('WHATSAPP_API_VERSION', 'v23.0');
+    this.accountId = this.configService.get<string>('WHATSAPP_BUSINESS_ACCOUNT_ID', '');
+    this.graphUrl = `https://graph.facebook.com/${version}`;
+    this.apiUrl = `${this.graphUrl}/${this.phoneNumberId}/messages`;
+  }
+
+  /** Whether the CRM can send through the Cloud API and list templates. */
+  isConfigured(): boolean {
+    return Boolean(this.token && this.phoneNumberId && this.accountId);
+  }
+
+  private headers() {
+    return { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' };
+  }
+
+  /** Meta's own error text, so staff see why a send was refused. */
+  private reason(error: unknown): string {
+    const e = error as { response?: { data?: { error?: { error_user_msg?: string; message?: string } } }; message?: string };
+    return e?.response?.data?.error?.error_user_msg || e?.response?.data?.error?.message || e?.message || 'WhatsApp request failed';
+  }
+
+  /** Approved templates, cached for five minutes. */
+  async templates(force = false): Promise<Template[]> {
+    if (!this.isConfigured()) throw new ServiceUnavailableException('WhatsApp is not set up on the CRM server');
+    if (!force && this.templateCache && Date.now() - this.templateCache.at < 300_000) return this.templateCache.data;
+    const data: Template[] = [];
+    let url: string | null =
+      `${this.graphUrl}/${this.accountId}/message_templates?status=APPROVED&limit=100&fields=name,language,status,category,components,parameter_format`;
+    try {
+      for (let page = 0; url && page < 10; page++) {
+        const response = await lastValueFrom(this.httpService.get(url, { headers: this.headers() }));
+        const body = (response?.data ?? {}) as { data?: unknown[]; paging?: { next?: string } };
+        for (const raw of body.data ?? []) {
+          const template = simplifyTemplate(raw);
+          if (template) data.push(template);
+        }
+        url = body.paging?.next ?? null;
+      }
+    } catch (error) {
+      this.logger.error(`Could not load WhatsApp templates: ${this.reason(error)}`);
+      throw new BadGatewayException(`Could not load WhatsApp templates: ${this.reason(error)}`);
+    }
+    data.sort((a, b) => a.name.localeCompare(b.name) || a.language.localeCompare(b.language));
+    this.templateCache = { at: Date.now(), data };
+    return data;
+  }
+
+  /** Send a message body (text or template) and return Meta's message id; throws with Meta's reason. */
+  async deliver(to: string, message: Record<string, unknown>): Promise<string> {
+    if (!this.isConfigured()) throw new ServiceUnavailableException('WhatsApp is not set up on the CRM server');
+    try {
+      const response = await lastValueFrom(
+        this.httpService.post(this.apiUrl, { messaging_product: 'whatsapp', recipient_type: 'individual', to, ...message }, { headers: this.headers() }),
+      );
+      const id = (response?.data as { messages?: { id?: string }[] })?.messages?.[0]?.id;
+      if (!id) throw new Error('WhatsApp did not return a message id');
+      return id;
+    } catch (error) {
+      this.logger.warn(`WhatsApp send to …${to.slice(-4)} failed: ${this.reason(error)}`);
+      throw new BadGatewayException(this.reason(error));
+    }
   }
 
   /**

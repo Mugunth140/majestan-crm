@@ -21,6 +21,7 @@ import { MailComposer, type ComposerStart } from "@/components/mail/mail-compose
 import { MailPreviewDialog } from "@/components/mail/mail-preview-dialog";
 import { cn } from "@/lib/utils";
 import { withCurrent } from "./inline-field";
+import { WhatsappComposer } from "./whatsapp-composer";
 import { Avatar, CARD, Chip, Feed, FeedTime, TabHeader, Who, sortOldestFirst, type FeedItem } from "./feed";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -351,12 +352,14 @@ export function LeadConversation({
         continue;
       }
       const kind = log.contact_type === "sms" ? "an SMS" : log.contact_type === "email" ? "an email" : "a WhatsApp message";
+      // Messages the customer sent us (WhatsApp webhook) are theirs, not a staff member's.
+      const sender = log.call_direction === "incoming" ? leadName || "Customer" : who;
       list.push({
         key: `log-${log.id}`,
         at,
         icon: log.contact_type === "sms" ? <Smartphone /> : log.contact_type === "email" ? <Mail /> : <MessageCircle />,
-        who,
-        title: <><Who>{who}</Who> sent {kind}</>,
+        who: sender,
+        title: <><Who>{sender}</Who> sent {kind}</>,
         extra: (log.message || log.subject) ? (
           <div
             className={cn(
@@ -568,7 +571,7 @@ export function LeadConversation({
             </div>
           )}
           {mode === "whatsapp" && (
-            <QuickMessage leadId={leadId} entity={entity} number={whatsapp || mobile} onSent={() => { setMode(null); onRefresh(); }} />
+            <QuickMessage leadId={leadId} leadName={leadName} entity={entity} number={whatsapp || mobile} onSent={() => { setMode(null); onRefresh(); }} />
           )}
 
           <div role="tablist" aria-label="Compose" className={cn("flex h-12 items-center gap-1 overflow-x-auto px-3 scrollbar-hide md:gap-2 md:px-5", mode && "border-t")}>
@@ -612,7 +615,20 @@ export function LeadConversation({
  * WhatsApp from the dock. There is no messaging API yet, so the message opens
  * in WhatsApp and is logged on the lead.
  */
-function QuickMessage({ leadId, entity, number, onSent }: {
+// Leads send through the WhatsApp Cloud API (templates, replies) once the server is set up;
+// everything else, or an unconfigured server, opens WhatsApp and logs the message.
+function QuickMessage(props: {
+  entity: ConversationEntity;
+  leadId: number;
+  leadName?: string | null;
+  number?: string | null;
+  onSent: () => void;
+}) {
+  if (props.entity.api !== "leads") return <OpenWhatsapp {...props} />;
+  return <WhatsappComposer leadId={props.leadId} leadName={props.leadName} onSent={props.onSent} fallback={<OpenWhatsapp {...props} />} />;
+}
+
+function OpenWhatsapp({ leadId, entity, number, onSent }: {
   entity: ConversationEntity;
   leadId: number;
   number?: string | null;
