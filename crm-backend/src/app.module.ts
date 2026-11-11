@@ -37,6 +37,7 @@ import { PreferencesModule } from './modules/preferences/preferences.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { SiteAnalyticsModule } from './modules/site-analytics/site-analytics.module';
+import { WebsiteUsersModule } from './modules/website-users/website-users.module';
 import { PropertiesModule } from './modules/properties/properties.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { BuildersModule } from './modules/builders/builders.module';
@@ -179,6 +180,7 @@ import { CommunicationsModule } from './modules/communications/communications.mo
     TasksModule,
     AnalyticsModule,
     SiteAnalyticsModule,
+    WebsiteUsersModule,
     DashboardModule,
     PreferencesModule,
     ReportsModule,

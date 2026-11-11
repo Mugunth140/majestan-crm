@@ -23,8 +23,8 @@ describe("sidebar access", () => {
 
   it("gives staff their department's modules", () => {
     const inventory = ["agent-network", "builders", "projects", "properties", "asset-inventory"];
-    expect(sorted(defaultNavAccess("Staff", "Telecalling Department"))).toEqual(sorted(["scheduler", "leads", "routing", ...inventory]));
-    expect(sorted(defaultNavAccess("Staff", "Sales Department"))).toEqual(sorted(["scheduler", "leads", "routing", "inbound", ...inventory]));
+    expect(sorted(defaultNavAccess("Staff", "Telecalling Department"))).toEqual(sorted(["scheduler", "leads", "routing", "website-users", ...inventory]));
+    expect(sorted(defaultNavAccess("Staff", "Sales Department"))).toEqual(sorted(["scheduler", "leads", "routing", "website-users", "inbound", ...inventory]));
     expect(sorted(defaultNavAccess("Staff", "Sourcing Department"))).toEqual(sorted(["scheduler", "inbound", "routing", "agent-network", "projects", "properties", "asset-inventory"]));
     expect(sorted(defaultNavAccess("Staff", "Collection Department"))).toEqual(sorted(["scheduler", "leads", "projects", "properties", "agent-network", "asset-inventory"]));
     expect(sorted(defaultNavAccess("Staff", "Designing Department"))).toEqual(sorted(["scheduler", "ads", "showcases", "blog"]));

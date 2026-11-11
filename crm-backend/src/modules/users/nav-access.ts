@@ -2,7 +2,7 @@
 // for each role and department. Keep in step with
 // crm-frontend/src/lib/nav-access.ts, which draws the same sidebar.
 export const NAV_KEYS = [
-  'analytics', 'scheduler', 'leads', 'routing', 'inbound', 'agent-network', 'projects', 'properties', 'builders',
+  'analytics', 'scheduler', 'leads', 'routing', 'website-users', 'inbound', 'agent-network', 'projects', 'properties', 'builders',
   'ads', 'blog', 'showcases', 'asset-inventory', 'hr', 'tasks', 'logger', 'activity-logs', 'users', 'master',
 ] as const;
 export type NavKey = (typeof NAV_KEYS)[number];
@@ -14,8 +14,8 @@ const MANAGEMENT_ONLY: Record<string, NavKey[]> = {
 const BASE: NavKey[] = ['scheduler'];
 const INVENTORY: NavKey[] = ['agent-network', 'builders', 'projects', 'properties', 'asset-inventory'];
 const DEPARTMENT_MODULES: [RegExp, NavKey[]][] = [
-  [/telecall/i, ['leads', 'routing', ...INVENTORY]],
-  [/sales/i, ['leads', 'routing', 'inbound', ...INVENTORY]],
+  [/telecall/i, ['leads', 'routing', 'website-users', ...INVENTORY]],
+  [/sales/i, ['leads', 'routing', 'website-users', 'inbound', ...INVENTORY]],
   [/sourcing/i, ['inbound', 'routing', 'agent-network', 'projects', 'properties', 'asset-inventory']],
   [/collection/i, ['leads', 'projects', 'properties', 'agent-network', 'asset-inventory']],
   [/design/i, ['ads', 'showcases', 'blog']],

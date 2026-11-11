@@ -30,6 +30,7 @@ const LIST_TITLES: [string, string][] = [
   ["/properties", "Properties"],
   ["/builders", "Builders"],
   ["/lead-routing", "Routing"],
+  ["/website-users", "Website Users"],
   ["/activity-logs", "Activity Logs"],
   ["/analytics", "Analytics"],
   ["/master", "Master Registry"],

@@ -15,6 +15,7 @@ const TILES: Record<string, string> = {
   "/scheduler": "bg-sky-600",
   "/leads": "bg-emerald-600",
   "/lead-routing": "bg-violet-500",
+  "/website-users": "bg-sky-700",
   "/inbound": "bg-cyan-600",
   "/agent-network": "bg-indigo-500",
   "/projects": "bg-amber-500",
@@ -33,7 +34,7 @@ const TILES: Record<string, string> = {
 };
 
 const GROUPS: { title: string; hrefs: string[] }[] = [
-  { title: "Sales", hrefs: ["/scheduler", "/leads", "/lead-routing", "/inbound", "/agent-network", "/logger"] },
+  { title: "Sales", hrefs: ["/scheduler", "/leads", "/lead-routing", "/website-users", "/inbound", "/agent-network", "/logger"] },
   { title: "Inventory", hrefs: ["/projects", "/properties", "/builders", "/asset-inventory"] },
   { title: "Marketing", hrefs: ["/ads", "/blog", "/showcases"] },
   { title: "Team", hrefs: ["/analytics", "/tasks", "/hr", "/users", "/activity-logs", "/master"] },
