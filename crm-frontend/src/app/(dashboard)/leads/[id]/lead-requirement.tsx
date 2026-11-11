@@ -13,6 +13,9 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 // Every property type once, for requirements without a category yet.
 const ALL_TYPES: Option[] = [...new Map(Object.values(PROPERTY_TYPES_MAP).flat().map((o) => [o.value, o])).values()];
+export const propertyTypeOptions = (category?: string | null): Option[] => (category && PROPERTY_TYPES_MAP[category]) || ALL_TYPES;
+/** The category a type belongs to, for a requirement that has none yet. */
+export const categoryOfType = (type: string) => Object.entries(PROPERTY_TYPES_MAP).find(([, list]) => list.some((o) => o.value === type))?.[0] ?? null;
 
 // Cities change rarely: one request per page load, shared by every requirement
 // and the lead's contact city.
@@ -70,6 +73,8 @@ export function RequirementFields({ inquiry, canEdit, save }: {
   const prefs = inquiry.preferences ?? {};
   const bhk = prefList(prefs.bhk, BHK);
   const facing = prefList(prefs.facing, FACING);
+  // Older requirements hold one furnishing value; newer ones a list.
+  const furnished = prefList(prefs.furnished, FURNISHING);
   const off = !canEdit;
 
   useEffect(() => {
@@ -102,10 +107,8 @@ export function RequirementFields({ inquiry, canEdit, save }: {
     <div>
       <Group title="Property">
         <InlineSelect clearable label="Purchase type" value={inquiry.purchase_type} options={PURCHASE_TYPES} disabled={off} onSave={(v) => save({ purchaseType: v || null })} />
-        <InlineSearchMulti label="Projects" values={splitProjects(inquiry.project_list)} search={searchProjects} placeholder="Search projects…" disabled={off}
-          onSave={(v) => save({ project: joinProjects(v) })} />
         <InlineSelect clearable label="Category" value={category} options={PROPERTY_CATEGORIES} disabled={off} onSave={(v) => save({ propertyCategory: v || null, propertyType: null })} />
-        <InlineSelect clearable label="Property type" value={inquiry.property_type} options={(category && PROPERTY_TYPES_MAP[category]) || ALL_TYPES} disabled={off}
+        <InlineSelect clearable label="Property type" value={inquiry.property_type} options={propertyTypeOptions(category)} disabled={off}
           onSave={(v) => save({ propertyType: v || null })} />
         <InlineSelect clearable label="Funding" value={inquiry.funder} options={FUNDERS} disabled={off} onSave={(v) => save({ funder: v || null })} />
       </Group>
@@ -129,7 +132,8 @@ export function RequirementFields({ inquiry, canEdit, save }: {
           <>
             <InlineMulti label="BHK" values={bhk} options={withCurrentList(BHK, bhk)} disabled={off}
               onSave={(v) => setPref("bhk", v.length ? prefList(v, BHK) : null)} />
-            <InlineSelect clearable label="Furnishing" value={prefs.furnished == null ? null : String(prefs.furnished)} options={FURNISHING} disabled={off} onSave={(v) => setPref("furnished", v)} />
+            <InlineMulti label="Furnishing" values={furnished} options={withCurrentList(FURNISHING, furnished)} disabled={off}
+              onSave={(v) => setPref("furnished", v.length ? prefList(v, FURNISHING) : null)} />
             <InlineText label="Floor" value={prefs.floorNumber as string | undefined} placeholder="e.g. Ground, 1st, High" disabled={off} onSave={(v) => setPref("floorNumber", v)} />
             <InlineMulti label="Facing" values={facing} options={withCurrentList(FACING, facing)} disabled={off}
               onSave={(v) => { const list = facingList(v); return setPref("facing", list.length ? prefList(list, FACING) : null); }} />
@@ -151,7 +155,16 @@ export function RequirementFields({ inquiry, canEdit, save }: {
               onSave={(v) => setPref("petFriendly", v || null)} />
           </>
         )}
+        {inquiry.property_type === "independent_house" && (
+          <InlineCheck label="Owner occupied" text="Wants an owner-occupied house" checked={prefs.ownerOccupied === true} disabled={off}
+            onSave={(v) => setPref("ownerOccupied", v || null)} />
+        )}
         {!category && <p className="py-2 text-[13px] text-muted-foreground md:col-span-2">Pick a category to add BHK, facing or area.</p>}
+      </Group>
+
+      <Group title="Projects">
+        <InlineSearchMulti label="Projects" values={splitProjects(inquiry.project_list)} search={searchProjects} placeholder="Search projects…" disabled={off}
+          onSave={(v) => save({ project: joinProjects(v) })} />
       </Group>
     </div>
   );

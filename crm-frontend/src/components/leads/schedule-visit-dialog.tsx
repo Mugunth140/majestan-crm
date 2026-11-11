@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { CalendarCheck, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CalendarCheck, Check, ChevronDown, Loader2, Plus, Search, X } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { searchProjects, type SearchOption } from "@/lib/project-search";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -63,10 +66,10 @@ function OpenDialog({ open, busy, onClose, onSave, onSkip }: Props & { open: Non
             <span className="text-[13px] font-medium text-foreground/80">Time (IST)</span>
             <Input type="time" value={visit.time} onChange={set("time")} required className="h-10 rounded-xl" />
           </label>
-          <label className="col-span-2 space-y-1.5">
+          <div className="col-span-2 space-y-1.5">
             <span className="text-[13px] font-medium text-foreground/80">Project</span>
-            <Input value={visit.project} onChange={set("project")} maxLength={255} placeholder="e.g. Emerald Heights" className="h-10 rounded-xl" />
-          </label>
+            <ProjectPicker value={visit.project} onChange={(project) => setVisit((v) => ({ ...v, project }))} />
+          </div>
           <label className="col-span-2 space-y-1.5">
             <span className="text-[13px] font-medium text-foreground/80">Meeting point</span>
             <Input value={visit.location} onChange={set("location")} maxLength={500} placeholder="Leave empty to use the project address" className="h-10 rounded-xl" />
@@ -82,5 +85,82 @@ function OpenDialog({ open, busy, onClose, onSave, onSkip }: Props & { open: Non
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** One project: search the site's projects, or add a name that isn't listed. */
+function ProjectPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SearchOption[] | null>(null);
+  const typed = query.trim().slice(0, 255);
+
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    const timer = setTimeout(() => {
+      searchProjects(typed).then((r) => { if (live) setResults(r); }, () => { if (live) setResults([]); });
+    }, 200);
+    return () => { live = false; clearTimeout(timer); };
+  }, [open, typed]);
+
+  const pick = (name: string) => { onChange(name); setOpen(false); setQuery(""); setResults(null); };
+  const listed = results?.some((r) => r.label.toLowerCase() === typed.toLowerCase());
+
+  return (
+    <div className="relative">
+      <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setQuery(""); setResults(null); } }}>
+        <PopoverTrigger render={<button type="button" aria-label="Project" className="flex h-10 w-full items-center gap-2 rounded-xl border border-input bg-transparent px-3 text-left text-[14px] outline-none focus-visible:ring-2 focus-visible:ring-ring/50" />}>
+          <span className={cn("min-w-0 flex-1 truncate", !value && "text-muted-foreground")}>{value || "Search projects…"}</span>
+          {!value && <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />}
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-(--anchor-width) min-w-[260px] gap-0 p-0">
+          <div className="flex items-center gap-2 border-b px-3">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" || !typed) return;
+                e.preventDefault();
+                pick(results?.find((r) => r.label.toLowerCase() === typed.toLowerCase())?.label ?? results?.[0]?.label ?? typed);
+              }}
+              placeholder="Search projects…"
+              aria-label="Search projects"
+              className="h-10 min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          <div className="max-h-64 overflow-y-auto p-1">
+            {results === null ? (
+              <p className="flex items-center gap-2 px-2 py-2 text-[13px] text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching…</p>
+            ) : (
+              <>
+                {results.map((r) => (
+                  <button key={r.value} type="button" onClick={() => pick(r.label)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[14px] hover:bg-muted">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate">{r.label}</span>
+                      {r.hint && <span className="block truncate text-[12px] text-muted-foreground">{r.hint}</span>}
+                    </span>
+                    {r.label === value && <Check className="h-4 w-4 shrink-0" />}
+                  </button>
+                ))}
+                {!results.length && !typed && <p className="px-2 py-2 text-[13px] text-muted-foreground">No projects found.</p>}
+                {typed && !listed && (
+                  <button type="button" onClick={() => pick(typed)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[14px] text-muted-foreground hover:bg-muted">
+                    <Plus className="h-3.5 w-3.5 shrink-0" /> Add “<span className="truncate text-foreground">{typed}</span>”
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+      {value && (
+        <button type="button" aria-label="Clear project" onClick={() => onChange("")} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
   );
 }

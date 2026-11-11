@@ -30,6 +30,7 @@ export const PROPERTY_FIELD_RULES: Record<string, FieldRule> = {
   tslrFmb: { listing: "Buy" },
   saleType: { listing: "Buy" },
   tenantOccupied: { types: BUILDINGS, listing: "Rent" },
+  ownerOccupied: { types: ["individual_portion"] },
   bookingAmount: { listing: "Buy" },
   pricePerSqft: { types: ["commercial", "industrial"], listing: "Buy" },
   monthlyRent: { types: BUILDINGS, listing: "Buy", occupiedSale: true },
@@ -169,18 +170,20 @@ export function isPropertyFieldVisible(
       homeType === "individual_portion" ||
       (propertyType === "commercial" && listingType === "Buy")
     );
+  // Where parking is recorded as car/bike × covered/open (parkingSpaces), the
+  // single counts and the parking type give way to it.
   if (
     ["parking", "carParking", "bikeParking", "parkingType"].includes(field) &&
-    (["apartment", "villa"].includes(propertyType) ||
-      (propertyType === "commercial" && listingType === "Buy"))
+    (["apartment", "villa", "individual_portion", "investment_property", "farm_house", "commercial", "coworking"].includes(propertyType) ||
+      (propertyType === "industrial" && listingType === "Rent"))
   )
     return false;
   if (field === "expectedMonthlyRentPerSqft")
     return propertyType === "commercial" && listingType === "Buy";
   if (field === "parkingSpaces")
     return (
-      ["apartment", "villa", "investment_property"].includes(propertyType) ||
-      (propertyType === "commercial" && listingType === "Buy")
+      ["apartment", "villa", "individual_portion", "investment_property", "farm_house", "commercial"].includes(propertyType) ||
+      (["coworking", "industrial"].includes(propertyType) && listingType === "Rent")
     );
   if (["totalRentPerMonth", "expectedRentPerMonth"].includes(field))
     return propertyType === "investment_property";

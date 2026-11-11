@@ -1,5 +1,5 @@
 import { IsDateString, Matches, IsInt } from 'class-validator';
-import { IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class PropertyQueryDto {
@@ -80,6 +80,28 @@ export class PropertyQueryDto {
   @IsOptional()
   @IsString()
   roadName?: string;
+
+  // "More filters": checked again by the site API.
+  @IsOptional() @Matches(/^\d{1,2}\+?$/)
+  bedrooms?: string;
+
+  @IsOptional() @Matches(/^\d{1,2}\+?$/)
+  bathrooms?: string;
+
+  @IsOptional() @IsString()
+  facing?: string;
+
+  @IsOptional() @IsString()
+  possessionStatus?: string;
+
+  @IsOptional() @IsIn(['tenant', 'vacant', 'owner'])
+  occupancy?: string;
+
+  @IsOptional() @IsIn(['yes', 'no'])
+  negotiable?: string;
+
+  @IsOptional() @IsIn(['car', 'bike'])
+  parking?: string;
 
 
   @IsOptional() @Type(() => Number) @IsInt() @Min(1)

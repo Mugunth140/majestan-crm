@@ -278,18 +278,27 @@ export function ParkingFields({
   onChange,
   legacyParkingCount,
   legacyParkingType,
+  legacyCarParking,
+  legacyBikeParking,
 }: {
   value: CurationDraft;
   onChange: (value: CurationDraft) => void;
   legacyParkingCount?: string;
   legacyParkingType?: string;
+  /** Single car / bike counts saved before the breakdown was offered here. */
+  legacyCarParking?: string;
+  legacyBikeParking?: string;
 }) {
+  const legacyVehicles = [
+    legacyCarParking && Number(legacyCarParking) > 0 ? `${legacyCarParking} car` : "",
+    legacyBikeParking && Number(legacyBikeParking) > 0 ? `${legacyBikeParking} bike` : "",
+  ].filter(Boolean).join(", ");
   return (
     <fieldset className="space-y-4 md:col-span-2 lg:col-span-3">
       <legend className="mb-3 text-[14px] font-medium text-foreground">Parking spaces</legend>
-      {!value.parkingRecorded && value.parkingSpaces.length === 0 && (legacyParkingCount || legacyParkingType) && (
+      {!value.parkingRecorded && value.parkingSpaces.length === 0 && (legacyParkingCount || legacyParkingType || legacyVehicles) && (
         <p className="text-sm text-muted-foreground">
-          Existing parking: {legacyParkingCount ? `${legacyParkingCount} spaces` : "count not recorded"}{legacyParkingType ? ` (${legacyParkingType})` : ""}. Breakdown not yet recorded. Existing values are kept until you add combinations or select No parking.
+          Existing parking: {legacyVehicles || (legacyParkingCount ? `${legacyParkingCount} spaces` : "count not recorded")}{legacyParkingType ? ` (${legacyParkingType})` : ""}. Breakdown not yet recorded. Existing values are kept until you add combinations or select No parking.
         </p>
       )}
       {value.parkingSpaces.map((row, index) => (

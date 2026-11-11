@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { phoneDigits } from './phone-digits';
 import { DataSource } from 'typeorm';
 import { PermissionsService } from '../permissions/permissions.service';
 import type { NavKey } from '../users/nav-access';
@@ -56,11 +57,12 @@ export interface SearchTerm {
   id: { prefix: string; value: number } | null;
 }
 
+export { phoneDigits };
+
 export function readTerm(q: string): SearchTerm | null {
   const text = q.trim().slice(0, 100);
   if (!text) return null;
-  const digits = text.replace(/\D/g, '');
-  const phone = /^[+\d\s()-]+$/.test(text) && digits.length >= 4 ? digits : null;
+  const phone = /^[+\d\s()-]+$/.test(text) ? phoneDigits(text) : null;
   const idMatch = /^([A-Za-z#]{0,4})-?0*(\d{1,9})$/.exec(text);
   const id = idMatch ? { prefix: idMatch[1].replace('#', '').toUpperCase(), value: Number(idMatch[2]) } : null;
   // A single letter matches too much to be useful, unless it is part of an id.
@@ -140,7 +142,7 @@ export class SearchService {
   private async leads(user: any, t: SearchTerm, limit: number): Promise<SearchHit[]> {
     const m = this.match(t, ['l.name', 'l.email'], ['l.mobile_number', 'l.whatsapp_number'], 'l.id', ['L']);
     const rows: any[] = await this.dataSource.query(
-      `SELECT l.id, l.name, l.mobile_number, l.status, s.id AS staff_id, s.name AS staff
+      `SELECT l.id, l.name, l.mobile_number, l.whatsapp_number, l.status, s.id AS staff_id, s.name AS staff
        FROM leads l LEFT JOIN users s ON s.id = l.assigned_staff_id
        WHERE 1=1 ${seesAllLeads(user) ? '' : leadScopeSql(user)} AND ${m.where}
        ORDER BY (l.id = ?) DESC, (l.name LIKE ?) DESC, l.updated_at DESC LIMIT ?`,
@@ -148,7 +150,13 @@ export class SearchService {
     );
     return rows.map((r) => ({
       id: r.id, code: pad('L', r.id, 5), title: r.name || 'Unnamed lead',
-      subtitle: join(r.mobile_number, r.status, r.staff ? null : 'Unassigned'), href: `/leads/${r.id}`,
+      subtitle: join(
+        r.mobile_number,
+        // Found by a WhatsApp number that differs from the mobile: show which.
+        t.phone && r.whatsapp_number && r.whatsapp_number !== r.mobile_number && String(r.whatsapp_number).replace(/\D/g, '').includes(t.phone)
+          ? `WhatsApp ${r.whatsapp_number}` : null,
+        r.status, r.staff ? null : 'Unassigned'),
+      href: `/leads/${r.id}`,
       person: r.staff ? { id: r.staff_id, name: r.staff } : null,
     }));
   }

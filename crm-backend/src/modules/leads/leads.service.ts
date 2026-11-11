@@ -4,6 +4,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { isQueuedWebsiteSource } from './website-sources';
+import { phoneDigits } from '../search/phone-digits';
 import { matchCriteria, NO_CRITERIA, projectMatchQuery, propertyMatchQuery, SIMILAR_WHEN, similarCriteria } from './auto-match';
 import { photoUrl } from './share/listing-data';
 import { LeadSource } from '../../database/entities/lead-source.entity';
@@ -1043,15 +1044,19 @@ export class LeadsService {
       const parsedIdMatch = rawSearch.match(/^[Ll#]?0*(\d+)$/);
       const parsedId = parsedIdMatch ? Number(parsedIdMatch[1]) : null;
 
+      const conds = ['l.name LIKE ?', 'l.mobile_number LIKE ?', 'l.whatsapp_number LIKE ?', 'l.email LIKE ?', "CONCAT('L', LPAD(l.id, 5, '0')) LIKE ?"];
+      params.push(s, s, s, s, s);
       if (parsedId !== null && Number.isFinite(parsedId) && parsedId > 0) {
-        filterConds +=
-          " AND (l.name LIKE ? OR l.mobile_number LIKE ? OR l.email LIKE ? OR l.id = ? OR CONCAT('L', LPAD(l.id, 5, '0')) LIKE ?)";
-        params.push(s, s, s, parsedId, s);
-      } else {
-        filterConds +=
-          " AND (l.name LIKE ? OR l.mobile_number LIKE ? OR l.email LIKE ? OR CONCAT('L', LPAD(l.id, 5, '0')) LIKE ?)";
-        params.push(s, s, s, s);
+        conds.push('l.id = ?');
+        params.push(parsedId);
       }
+      // A typed number in any format (+91 98765 43210) against either phone.
+      const phone = /^[+\d\s()-]+$/.test(rawSearch) ? phoneDigits(rawSearch) : null;
+      if (phone) {
+        conds.push("REGEXP_REPLACE(COALESCE(l.mobile_number, ''), '[^0-9]', '') LIKE ?", "REGEXP_REPLACE(COALESCE(l.whatsapp_number, ''), '[^0-9]', '') LIKE ?");
+        params.push(`%${phone}%`, `%${phone}%`);
+      }
+      filterConds += ` AND (${conds.join(' OR ')})`;
     }
 
     if (query?.dateFrom) {

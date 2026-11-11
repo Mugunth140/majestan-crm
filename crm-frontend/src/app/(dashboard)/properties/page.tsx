@@ -2,7 +2,8 @@
 
 import { PropertyForm } from "./_components/PropertyForm";
 import { propertyTypeName } from "./_components/property-form-fields";
-import { EMPTY_PROPERTY_FILTERS, LISTING_STATUS_OPTIONS, propertyUploaderLabel } from "@/lib/property-list-filters";
+import { EMPTY_PROPERTY_FILTERS, LISTING_STATUS_OPTIONS, MORE_PROPERTY_FILTERS, propertyUploaderLabel } from "@/lib/property-list-filters";
+import { COMMERCIAL_SPECIAL_PURPOSES } from "./_components/property-type-options";
 import { propertyStatusLabel } from "@/lib/property-status";
 
 import { useState, useEffect } from "react";
@@ -20,7 +21,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { FormSelect } from "@/components/shared/form-select";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { ListBody, ListFrame, ListToolbar, SegmentTabs, ToolbarEnd, ToolbarSearch, headerPrimaryClass, toolbarFilterButton } from "@/components/layout/list-page";
-import { ClearFilters, DateQuickFilter, FilterDivider, FilterStrip, QuickFilter, RangeQuickFilter, TextQuickFilter } from "@/components/shared/quick-filters";
+import { ClearFilters, DateQuickFilter, FilterDivider, FilterStrip, MoreFilters, QuickFilter, RangeQuickFilter, TextQuickFilter } from "@/components/shared/quick-filters";
 import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
@@ -69,6 +70,10 @@ const PROPERTY_FIELDS: ViewField[] = [
   { id: "locality", label: "Locality", get: (p) => p.localityName },
   { id: "approval", label: "Approval", get: (p) => p.approvalStatus || "Pending", dot: (v) => statusDot(v), capitalize: true },
 ];
+
+const SPECIAL_PURPOSE_OPTIONS = COMMERCIAL_SPECIAL_PURPOSES.map((v) => ({ label: v, value: v }));
+const MORE_FIELDS = MORE_PROPERTY_FILTERS.map((f) => ({ ...f, options: [...f.options] }));
+const MORE_EMPTY = Object.fromEntries(MORE_FIELDS.map((f) => [f.key, ""]));
 
 export default function PropertiesPage() {
   const router = useRouter();
@@ -366,9 +371,18 @@ export default function PropertiesPage() {
                 onChange={event => { setFilters(f => ({...f, [key]: event.target.value})); resetPage(); }} />)}
             </div>
           </div>)}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-muted-foreground">Special purpose</label>
+            <FormSelect name="specialPurpose" options={SPECIAL_PURPOSE_OPTIONS} value={filters.specialPurpose}
+              onValueChange={value => { setFilters(f => ({...f, specialPurpose: value || ""})); resetPage(); }} placeholder="Any purpose" />
+          </div>
+          {MORE_FIELDS.map(field => <div key={field.key} className="space-y-1.5">
+            <label className="text-xs font-bold text-muted-foreground">{field.label}</label>
+            <FormSelect name={field.key} options={field.options} value={(filters as Record<string, string>)[field.key] ?? ""}
+              onValueChange={value => { setFilters(f => ({...f, [field.key]: value || ""})); resetPage(); }} placeholder="Any" />
+          </div>)}
           {[
             { key: "floor", label: "Floor", placeholder: "e.g. Ground, 1, 2" },
-            { key: "specialPurpose", label: "Special purpose", placeholder: "e.g. Office, showroom" },
           ].map(field => <div key={field.key} className="space-y-1.5">
             <label htmlFor={`filter-${field.key}`} className="text-xs font-bold text-muted-foreground">{field.label}</label>
             <Input id={`filter-${field.key}`} value={filters[field.key as keyof typeof filters]} placeholder={field.placeholder}
@@ -465,9 +479,12 @@ export default function PropertiesPage() {
           <RangeQuickFilter label="Area" unit="sq.ft" min={filters.minSqft} max={filters.maxSqft} onChange={(minSqft, maxSqft) => { setFilters((f) => ({ ...f, minSqft, maxSqft })); resetPage(); }} />
           <QuickFilter label="Furnishing" value={filters.furnishingStatus} options={[{ label: "Bareshell", value: "BARESHELL" }, { label: "Fully furnished", value: "FULLY FURNISHED" }, { label: "Semi furnished", value: "SEMI FURNISHED" }, { label: "Unfurnished", value: "UNFURNISHED" }]} onChange={(v) => { setFilters((f) => ({ ...f, furnishingStatus: v })); resetPage(); }} />
           <TextQuickFilter label="Floor" value={filters.floor} placeholder="e.g. Ground, 1, 2" onChange={(v) => { setFilters((f) => ({ ...f, floor: v })); resetPage(); }} />
-          <TextQuickFilter label="Special purpose" value={filters.specialPurpose} placeholder="e.g. Office, showroom" onChange={(v) => { setFilters((f) => ({ ...f, specialPurpose: v })); resetPage(); }} />
+          <QuickFilter label="Special purpose" value={filters.specialPurpose} options={SPECIAL_PURPOSE_OPTIONS} onChange={(v) => { setFilters((f) => ({ ...f, specialPurpose: v })); resetPage(); }} />
           <QuickFilter label="Uploaded by" value={filters.uploadedById} options={staff.map((user) => ({ label: `${user.name}${user.isActive ? "" : " (Inactive)"}`, value: String(user.id) }))} onChange={(v) => { setFilters((f) => ({ ...f, uploadedById: v })); resetPage(); }} />
           <DateQuickFilter label="Uploaded" from={filters.uploadedFrom} to={filters.uploadedTo} onChange={(uploadedFrom, uploadedTo) => { setFilters((f) => ({ ...f, uploadedFrom, uploadedTo })); resetPage(); }} />
+          <MoreFilters fields={MORE_FIELDS} values={filters as Record<string, string>}
+            onChange={(key, value) => { setFilters((f) => ({ ...f, [key]: value })); resetPage(); }}
+            onClear={() => { setFilters((f) => ({ ...f, ...MORE_EMPTY })); resetPage(); }} />
           <ClearFilters show={activeFiltersCount > 0 || !!searchQuery} onClick={() => { setSearchQuery(""); clearFilters(); }} />
         </FilterStrip>
         <ToolbarEnd>

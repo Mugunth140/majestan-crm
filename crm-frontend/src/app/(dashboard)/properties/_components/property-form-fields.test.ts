@@ -188,3 +188,25 @@ describe("Commercial rental and coworking save rules", () => {
     expect(visible("floorPlans", "coworking", "Rent")).toBe(true);
   });
 });
+
+describe("Parking breakdown (car / bike × covered / open)", () => {
+  it.each([
+    ["villa", "Buy"], ["individual_portion", "Buy"], ["individual_portion", "Rent"], ["farm_house", "Buy"],
+    ["commercial", "Rent"], ["coworking", "Rent"], ["industrial", "Rent"], ["apartment", "Rent"],
+  ])("offers it for %s %s, without single counts beside it", (type, listing) => {
+    expect(visible("parkingSpaces", type, listing)).toBe(true);
+    for (const field of ["carParking", "bikeParking", "parkingType"]) expect(visible(field, type, listing)).toBe(false);
+  });
+  it("keeps industrial sale counts as they are", () => {
+    expect(visible("parkingSpaces", "industrial", "Buy")).toBe(false);
+    expect(visible("carParking", "industrial", "Buy")).toBe(true);
+  });
+});
+
+describe("Owner occupied", () => {
+  it("is asked for independent portions only", () => {
+    expect(visible("ownerOccupied", "individual_portion", "Buy")).toBe(true);
+    expect(visible("ownerOccupied", "individual_portion", "Rent")).toBe(true);
+    expect(visible("ownerOccupied", "apartment", "Rent")).toBe(false);
+  });
+});

@@ -136,17 +136,21 @@ export function matchCriteria(
   } catch {
     // An unreadable locality list just means no locality preference.
   }
-  const types =
-    TYPE_MAP[type] ?? CATEGORY_MAP[key(inquiry.property_category)] ?? null;
-  const category =
-    CATEGORY_MAP[key(inquiry.property_category)] ??
+  // The category is a hard limit: an industrial warehouse never brings in
+  // commercial listings, and similar listings stay inside the category.
+  const category = CATEGORY_MAP[key(inquiry.property_category)] ?? null;
+  const typed = TYPE_MAP[type] ?? null;
+  const inCategory = typed?.filter((t) => !category || category.includes(t));
+  const types = inCategory?.length ? inCategory : (category ?? typed);
+  const broad =
+    category ??
     Object.values(CATEGORY_MAP).find((list) =>
       types?.some((t) => list.includes(t)),
     );
   return {
     types,
     broadTypes:
-      types && category ? [...new Set([...types, ...category])] : types,
+      category ?? (types && broad ? [...new Set([...types, ...broad])] : types),
     listing:
       purchase === 'rental'
         ? 'Rent'

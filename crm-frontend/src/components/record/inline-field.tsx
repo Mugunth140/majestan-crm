@@ -412,7 +412,7 @@ export function InlineMulti({
 
   const chips = values.length ? (
     <span className="flex min-w-0 flex-1 flex-wrap gap-1 py-1">
-      {values.map((v) => <span key={v} className="rounded bg-foreground/[0.06] px-1.5 py-px text-[13px] text-foreground/85">{v}</span>)}
+      {values.map((v) => <span key={v} className="rounded bg-foreground/[0.06] px-1.5 py-px text-[13px] text-foreground/85">{options.find((o) => o.value === v)?.label ?? v}</span>)}
     </span>
   ) : (
     <span className="min-w-0 flex-1 truncate text-muted-foreground/60">{disabled ? "—" : placeholder}</span>

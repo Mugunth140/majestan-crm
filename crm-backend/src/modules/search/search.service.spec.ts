@@ -12,7 +12,9 @@ describe('readTerm', () => {
     expect(readTerm('L00025')!.id).toEqual({ prefix: 'L', value: 25 });
     expect(readTerm('#25')!.id).toEqual({ prefix: '', value: 25 });
     expect(readTerm('HRC0012')!.id).toEqual({ prefix: 'HRC', value: 12 });
-    expect(readTerm('+91 98765 43210')!.phone).toBe('919876543210');
+    expect(readTerm('+91 98765 43210')!.phone).toBe('9876543210');
+    expect(readTerm('098765 43210')!.phone).toBe('9876543210');
+    expect(readTerm('98765')!.phone).toBe('98765');
     expect(readTerm('Ravi')!.phone).toBeNull();
     expect(readTerm('Ravi')!.id).toBeNull();
   });

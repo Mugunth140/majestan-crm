@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { OptionSearchList, type SearchableOption } from "@/components/shared/option-search-list";
 import { cn } from "@/lib/utils";
@@ -231,6 +231,61 @@ export function DateQuickFilter({ label, from, to, onChange }: {
 /** Plain strings as filter options. */
 export const toOptions = (values: (string | null | undefined)[]): SearchableOption[] =>
   [...new Set(values.filter((v): v is string => !!v && v !== "—"))].map((v) => ({ label: v, value: v }));
+
+export type MoreFilterField = { key: string; label: string; options: SearchableOption[] };
+
+/**
+ * Filters used now and then, in one popover at the end of the strip: each is a
+ * row of options, and picking the chosen one again clears it.
+ */
+export function MoreFilters({ fields, values, onChange, onClear }: {
+  fields: MoreFilterField[];
+  values: Record<string, string>;
+  onChange: (key: string, value: string) => void;
+  onClear: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const count = fields.filter((f) => values[f.key]).length;
+  return (
+    // Its own trigger (not Chip's): it stays open while picking, so the
+    // button it hangs from must not be swapped when the count appears.
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger render={<button type="button" className={count ? cn(base, "bg-[#017D58]/[0.09] px-2.5 text-foreground ring-1 ring-inset ring-[#017D58]/25 dark:bg-[#2FB585]/[0.12] dark:ring-[#2FB585]/25") : emptyClass} />}>
+        <SlidersHorizontal className="size-3.5" />
+        More filters
+        {count > 0 && <span className="rounded bg-[#017D58] px-1.5 text-[11.5px] font-medium leading-[18px] text-white dark:bg-[#2FB585] dark:text-black">{count}</span>}
+        <ChevronDown className="size-3.5 opacity-60" />
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-[min(360px,calc(100vw-2rem))] gap-0 p-0">
+      <div className="max-h-[min(560px,70vh)] space-y-3 overflow-y-auto p-3">
+        {fields.map((f) => (
+          <div key={f.key} role="radiogroup" aria-label={f.label} className="space-y-1.5">
+            <p className="text-[12.5px] font-medium text-muted-foreground">{f.label}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {f.options.map((o) => {
+                const on = values[f.key] === o.value;
+                return (
+                  <button key={o.value} type="button" role="radio" aria-checked={on} onClick={() => onChange(f.key, on ? "" : o.value)}
+                    className={cn("h-7 rounded-md px-2.5 text-[13px] transition-colors",
+                      on ? "bg-[#017D58]/[0.09] font-medium text-foreground ring-1 ring-inset ring-[#017D58]/30 dark:bg-[#2FB585]/[0.12] dark:ring-[#2FB585]/30"
+                        : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground")}>
+                    {o.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      {count > 0 && (
+        <div className="flex justify-end border-t px-3 py-2">
+          <button type="button" onClick={onClear} className="rounded-md px-2 py-1 text-[13px] text-muted-foreground hover:bg-muted hover:text-foreground">Clear these</button>
+        </div>
+      )}
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 /** The thin rule between a page's tabs and its filter strip. */
 export function FilterDivider() {

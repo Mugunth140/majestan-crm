@@ -2552,7 +2552,7 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
     <In group="services"><AdditionalCurationFields {...curationFieldProps} only={["storageTankCapacity", "powerSupplyCapacity", "agricultureEb", "utilities", "hasCanteen", "hasFreeRefreshment"]} /></In>
     <In group="use"><AdditionalCurationFields {...curationFieldProps} only={["propertyUses", "specialPurposes"]} /></In>
   <In group="rooms">{isFieldVisible("numberOfPortions") && <PortionFields count={numberOfPortions} onCountChange={setNumberOfPortions} value={curation} onChange={setCuration} />}</In>
-  <In group="parking">{isFieldVisible("parkingSpaces") && <ParkingFields value={curation} onChange={setCuration} legacyParkingCount={parking} legacyParkingType={parkingType} />}</In>
+  <In group="parking">{isFieldVisible("parkingSpaces") && <ParkingFields value={curation} onChange={setCuration} legacyParkingCount={parking} legacyParkingType={parkingType} legacyCarParking={propertyType === "industrial" ? industrialCarParking : carParking} legacyBikeParking={propertyType === "industrial" ? industrialBikeParking : bikeParking} />}</In>
   <In group="land">
   {isFieldVisible("plotFacing") && <div className="space-y-2"><label className={labelClass}>Plot Facing</label><FormSelect name="plotFacing" placeholder="Select direction" options={FACING_DIRECTION_OPTIONS} value={plotFacing} onValueChange={setPlotFacing} /></div>}
   {isFieldVisible("plotBoundaries") && !["plot", "farmland", "farm_house"].includes(propertyType) && <div className="space-y-4 lg:col-span-3"><h3 className="text-[16px] font-medium text-foreground">Plot boundaries</h3><PropertyPlotBoundaries value={plotBoundaries} onChange={setPlotBoundaries} facing={plotFacing || (propertyType === "commercial" ? propertyFacing : "")} /><FormErr field="plotBoundaries" /></div>}
@@ -3009,6 +3009,22 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
                   />
                   <span className="leading-none">
                     Yes <span className="font-normal text-muted-foreground">currently tenant occupied</span>
+                  </span>
+                </label>
+              </div>
+            )}
+
+            {isFieldVisible("ownerOccupied") && (
+              <div className="space-y-2">
+                <label className={labelClass}>Owner Occupied</label>
+                <label className="flex h-9 cursor-pointer items-center gap-3 rounded-md border border-border bg-muted/40 px-3 text-[14px] text-foreground transition-colors hover:bg-muted/60 has-checked:border-foreground/40 dark:bg-white/[0.04]">
+                  <Checkbox
+                    checked={curation.ownerOccupied}
+                    onCheckedChange={(checked) => setCuration((c) => ({ ...c, ownerOccupied: checked === true }))}
+                    className="shrink-0"
+                  />
+                  <span className="leading-none">
+                    Yes <span className="font-normal text-muted-foreground">owner lives in the house</span>
                   </span>
                 </label>
               </div>
@@ -4489,7 +4505,7 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
                 />
               </div>
 
-              <div className="space-y-2">
+              {isFieldVisible("carParking") && <div className="space-y-2">
                 <label className={labelClass}>Car Parking</label>
                 <Input
                   type="number"
@@ -4499,9 +4515,9 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
                   min={0}
                   className={inputClass}
                 />
-              </div>
+              </div>}
 
-              <div className="space-y-2">
+              {isFieldVisible("bikeParking") && <div className="space-y-2">
                 <label className={labelClass}>Bike Parking</label>
                 <Input
                   type="number"
@@ -4511,7 +4527,7 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
                   min={0}
                   className={inputClass}
                 />
-              </div>
+              </div>}
 
               <div className="space-y-2">
                 <label className={labelClass}>Loading/Unloading Bays</label>

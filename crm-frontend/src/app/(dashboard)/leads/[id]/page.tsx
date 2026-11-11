@@ -48,7 +48,7 @@ import { TabHeader } from "@/components/record/feed";
 import { LeadConversation, type ComposeRequest } from "@/components/record/conversation";
 import { FollowUpComposer } from "@/components/record/follow-up-composer";
 import { AttachmentsArt, EmptyState, RequirementsArt } from "@/components/record/empty-state";
-import { RequirementFields, loadCities } from "./lead-requirement";
+import { RequirementFields, loadCities, propertyTypeOptions, categoryOfType } from "./lead-requirement";
 import { MatchesDialog, type AutoMatches } from "./matches-dialog";
 import { shareApi, whatsappMessage, type SharedListing } from "@/lib/listing-share";
 import {
@@ -716,6 +716,20 @@ function LeadDetail() {
           disabled={!canEdit}
         />
         <FieldRow label="Assigned to">{assigneeButton("field")}</FieldRow>
+        {/* Edits the newest requirement, the one the team works from. */}
+        {(() => {
+          const latest = inquiries.reduce<any>((a, b) => (!a || b.id > a.id ? b : a), null);
+          return (
+            <InlineSelect
+              clearable
+              label="Property type"
+              value={latest?.property_type ?? null}
+              options={withCurrent(propertyTypeOptions(latest?.property_category), latest?.property_type)}
+              onSave={(v) => saveInquiry(latest.id, v && !latest.property_category ? { propertyType: v, propertyCategory: categoryOfType(v) } : { propertyType: v || null })}
+              disabled={!canEdit || !latest}
+            />
+          );
+        })()}
         <FieldRow label="Unqualified">
           <div className="flex h-8 items-center px-2">
             <Switch

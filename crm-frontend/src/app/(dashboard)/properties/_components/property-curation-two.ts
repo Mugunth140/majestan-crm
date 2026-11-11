@@ -114,6 +114,8 @@ export type CurationDraft = Record<
   hasCanteenKnown: boolean;
   hasFreeRefreshmentKnown: boolean;
   parkingRecorded: boolean;
+  /** Independent portion: the owner lives in another portion of the house. */
+  ownerOccupied: boolean;
 };
 export function restoreCurationDetails(
   value: Record<string, unknown> | null | undefined,
@@ -156,6 +158,7 @@ export function restoreCurationDetails(
         ? data.hasFreeRefreshmentKnown
         : typeof data.hasFreeRefreshment === "boolean",
     hasCanteen: data.hasCanteen === true,
+    ownerOccupied: data.ownerOccupied === true,
     hasFreeRefreshment: data.hasFreeRefreshment === true,
     parkingRecorded:
       typeof data.parkingRecorded === "boolean"
@@ -193,6 +196,7 @@ export function curationPayload(
       ...p,
       count: Number(p.count),
     }));
+  if (visible("ownerOccupied")) out.ownerOccupied = draft.ownerOccupied;
   for (const key of ["hasCanteen", "hasFreeRefreshment"] as const)
     if (visible(key) && draft[`${key}Known`]) out[key] = draft[key];
   return out;
@@ -284,6 +288,7 @@ export function curationReadFields(
     roadApproach: "Road Approach",
     storageTankCapacity: "Storage Tank Capacity",
     powerSupplyCapacity: "Power Supply",
+    ownerOccupied: "Owner Occupied",
     hasCanteen: "Has Canteen",
     hasFreeRefreshment: "Has Free Refreshment",
     restroomCount: "No of Rest Rooms",

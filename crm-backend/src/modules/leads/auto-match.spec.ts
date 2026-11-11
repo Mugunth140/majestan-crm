@@ -102,6 +102,33 @@ describe('auto-match', () => {
     ]);
   });
 
+  it('keeps an industrial requirement to industrial listings', () => {
+    const warehouse = matchCriteria(
+      { property_category: 'industrial', property_type: 'warehouse' },
+      null,
+    );
+    expect(warehouse.types).toEqual(['industrial']);
+    expect(similarCriteria(warehouse).criteria.types).toEqual(['industrial']);
+    const bare = matchCriteria({ property_category: 'industrial' }, null);
+    expect(bare.types).toEqual(['industrial']);
+    expect(bare.broadTypes).toEqual(['industrial']);
+    expect(projectMatchQuery(bare)).toBeNull();
+  });
+
+  it('keeps a commercial warehouse to commercial listings', () => {
+    const c = matchCriteria(
+      { property_category: 'commercial', property_type: 'warehouse' },
+      null,
+    );
+    expect(c.types).toEqual(['commercial']);
+    expect(c.broadTypes).toEqual(['commercial', 'coworking']);
+  });
+
+  it('still reads a type without a category', () => {
+    const c = matchCriteria({ property_type: 'warehouse' }, null);
+    expect(c.types).toEqual(['commercial', 'industrial']);
+  });
+
   it('widens to the whole category and drops budget and area for similar listings', () => {
     const c = matchCriteria(
       {
