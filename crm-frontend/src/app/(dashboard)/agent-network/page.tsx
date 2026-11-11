@@ -1,5 +1,6 @@
 "use client";
 
+import { extraColumns } from "@/components/tables/extra-columns";
 import { isAdmin as isAdminUser } from "@/lib/permissions";
 import { apiFetch } from "@/lib/api-fetch";
 
@@ -206,7 +207,19 @@ export default function AgentsPage() {
         const s = row.original.status as string;
         return <StatusCell status={s} tone={STATUS_TONES[s] ?? "gray"} />;
       }
-    }
+    },
+    ...extraColumns([
+      { id: "email", label: "Email", value: (r) => r.email },
+      { id: "whatsapp", label: "WhatsApp", value: (r) => r.whatsapp },
+      { id: "city", label: "City", value: (r) => r.city },
+      { id: "state", label: "State", value: (r) => r.state },
+      { id: "property_category", label: "Category", value: (r) => r.property_category, kind: "label" },
+      { id: "commission", label: "Commission", value: (r) => r.commission, kind: "label" },
+      { id: "staff", label: "Assigned staff", value: (r) => (r.staff === "Unassigned" ? null : r.staff) },
+      { id: "nextFollowUp", label: "Next follow-up", value: (r) => r.nextFollowUpDate, kind: "date" },
+      { id: "lastFollowUp", label: "Last follow-up", value: (r) => r.lastFollowedUpDate, kind: "date" },
+      { id: "created_at", label: "Added on", value: (r) => r.created_at, kind: "date" },
+    ]),
   ];
 
   const uniquePartnerTypes = Array.from(new Set(agents.map(a => a.partner_type).filter(c => c && c !== "—")));

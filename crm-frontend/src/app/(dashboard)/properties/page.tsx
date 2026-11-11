@@ -1,5 +1,6 @@
 "use client";
 
+import { extraColumns } from "@/components/tables/extra-columns";
 import { PropertyForm } from "./_components/PropertyForm";
 import { propertyTypeName } from "./_components/property-form-fields";
 import { EMPTY_PROPERTY_FILTERS, LISTING_STATUS_OPTIONS, MORE_PROPERTY_FILTERS, propertyUploaderLabel } from "@/lib/property-list-filters";
@@ -264,6 +265,23 @@ export default function PropertiesPage() {
       header: "Uploaded on",
       cell: ({ row }) => <DateCell value={row.original.createdAt} />,
     },
+    ...extraColumns([
+      { id: "city", label: "City", value: (r) => r.cityName || r.city },
+      { id: "projectName", label: "Project", value: (r) => r.projectName },
+      { id: "builderName", label: "Builder", value: (r) => r.builderName },
+      { id: "reraNumber", label: "RERA no.", value: (r) => r.reraNumber },
+      { id: "roadName", label: "Road", value: (r) => r.roadName },
+      { id: "negotiable", label: "Negotiable", value: (r) => r.negotiable, kind: "yesno" },
+      { id: "petFriendly", label: "Pet friendly", value: (r) => r.petFriendly, kind: "yesno" },
+      { id: "maintenanceCharges", label: "Maintenance", value: (r) => r.maintenanceCharges, kind: "money" },
+      { id: "securityDeposit", label: "Security deposit", value: (r) => r.securityDeposit, kind: "money" },
+      { id: "marketPrice", label: "Market price", value: (r) => r.marketPrice, kind: "money" },
+      { id: "brokerageType", label: "Brokerage", value: (r) => r.brokerageType, kind: "label" },
+      { id: "availableFrom", label: "Available from", value: (r) => r.availableFrom, kind: "date" },
+      { id: "verificationStatus", label: "Verification", value: (r) => r.verificationStatus, kind: "label" },
+      { id: "source", label: "Source", value: (r) => r.source, kind: "label" },
+      { id: "updatedAt", label: "Last updated", value: (r) => r.updatedAt, kind: "datetime" },
+    ]),
   ];
 
   const tableProps = {

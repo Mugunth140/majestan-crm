@@ -1,5 +1,6 @@
 "use client";
 
+import { extraColumns } from "@/components/tables/extra-columns";
 import { isAdmin } from "@/lib/permissions";
 import { apiFetch } from "@/lib/api-fetch";
 
@@ -154,7 +155,15 @@ function UsersList() {
       cell: ({ row }) => (
         <ActiveCell active={row.original.is_active} />
       )
-    }
+    },
+    ...extraColumns([
+      { id: "whatsapp_no", label: "WhatsApp", value: (r) => r.whatsapp_no },
+      { id: "join_date", label: "Joined on", value: (r) => r.join_date, kind: "date" },
+      { id: "qualification", label: "Qualification", value: (r) => r.qualification },
+      { id: "last_login_at", label: "Last login", value: (r) => r.last_login_at, kind: "datetime" },
+      { id: "device_last_sync_at", label: "Last call-log sync", value: (r) => r.device_last_sync_at, kind: "datetime" },
+      { id: "created_at", label: "Added on", value: (r) => r.created_at, kind: "date" },
+    ]),
   ];
 
   return (

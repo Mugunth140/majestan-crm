@@ -138,6 +138,13 @@ export class AgentsService {
         a.mobile_number as mobile, 
         a.email, 
         a.city, 
+        a.state,
+        a.whatsapp_number as whatsapp,
+        a.property_category as propertyCategory,
+        a.commission_accepted as commissionAccepted,
+        a.commission_type as commissionType,
+        a.commission_value as commissionValue,
+        a.updated_at as updatedAt,
         a.partner_type as partnerType, 
         a.status, 
         a.created_at as createdAt,
@@ -177,6 +184,13 @@ export class AgentsService {
       nextFollowUpTime: row.nextFollowUpTime || null,
       lastFollowedUpDate: row.lastFollowedUpDate || null,
       lastFollowedUpTime: row.lastFollowedUpTime || null,
+      // Optional list columns (hidden until picked in the Columns menu).
+      whatsapp: row.whatsapp || null,
+      city: row.city || null,
+      state: row.state || null,
+      property_category: row.propertyCategory || null,
+      commission: row.commissionAccepted ? [row.commissionType, row.commissionValue].filter(Boolean).join(' ') || 'Accepted' : null,
+      updated_at: row.updatedAt,
     }));
   }
 

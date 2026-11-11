@@ -66,6 +66,18 @@ const INQUIRY_TRACKED_FIELDS = [
   'sub_locations', 'purchase_timeline', 'qualification_purpose', 'decision_maker', 'preferences',
 ];
 
+/** A JSON column that may arrive as text (raw queries) or parsed. */
+function jsonOf(v: unknown): any {
+  if (typeof v !== 'string') return v ?? null;
+  try { return JSON.parse(v); } catch { return null; }
+}
+const listOf = (v: unknown): string[] => { const x = jsonOf(v); return Array.isArray(x) ? x.map(String) : []; };
+function budgetOf(prefs: unknown): { minBudget: number | null; maxBudget: number | null } {
+  const p = jsonOf(prefs) ?? {};
+  const n = (x: unknown) => (x == null || x === '' || !Number.isFinite(Number(x)) ? null : Number(x));
+  return { minBudget: n(p.minBudget), maxBudget: n(p.maxBudget) };
+}
+
 @Injectable()
 export class LeadsService {
   private _s3Client: S3Client | null = null;
@@ -1161,7 +1173,7 @@ export class LeadsService {
     const joinClauses = `
       LEFT JOIN users s ON l.assigned_staff_id = s.id
       LEFT JOIN (
-        SELECT lead_id, property_type, property_category, preferences,
+        SELECT lead_id, property_type, property_category, preferences, purchase_type, purchase_timeline, sub_locations,
                ROW_NUMBER() OVER(PARTITION BY lead_id ORDER BY id DESC) as rn
         FROM lead_inquiries
       ) i ON i.lead_id = l.id AND i.rn = 1
@@ -1218,6 +1230,9 @@ export class LeadsService {
         l.name, 
         l.mobile_number as mobile, 
         l.email, 
+        l.whatsapp_number as whatsapp,
+        l.city,
+        l.updated_at as updatedAt,
         l.status, 
         l.department,
         l.lead_source as source, 
@@ -1226,6 +1241,10 @@ export class LeadsService {
         s.name as staff,
         i.property_type as propertyType, 
         i.property_category as propertyCategory,
+        i.purchase_type as purchaseType,
+        i.purchase_timeline as purchaseTimeline,
+        i.sub_locations as subLocations,
+        i.preferences as preferences,
         latest_f.next_follow_up_date as nextFollowUpDate,
         latest_f.next_follow_up_time as nextFollowUpTime,
         latest_f.priority as priority,
@@ -1269,6 +1288,14 @@ export class LeadsService {
       lastFollowedUpTime: row.lastFollowedUpTime || null,
       lastFollowedUpNotes: row.lastFollowedUpNotes || null,
       isUnqualified: Boolean(row.isUnqualified),
+      // Optional list columns (hidden until picked in the Columns menu).
+      whatsapp: row.whatsapp || null,
+      city: row.city || null,
+      updatedAt: row.updatedAt,
+      purchaseType: row.purchaseType || null,
+      purchaseTimeline: row.purchaseTimeline || null,
+      locations: listOf(row.subLocations),
+      ...budgetOf(row.preferences),
     }));
 
     const optionSets = {

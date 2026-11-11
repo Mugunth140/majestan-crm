@@ -1,5 +1,6 @@
 "use client";
 
+import { extraColumns } from "@/components/tables/extra-columns";
 import { isAdmin } from "@/lib/permissions";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -218,6 +219,13 @@ export default function BuildersPage() {
       header: "Created",
       cell: ({ row }) => <DateCell value={row.original.createdAt} />,
     },
+    ...extraColumns<BuilderRecord>([
+      { id: "website", label: "Website", value: (r) => r.website },
+      { id: "experienceYears", label: "Experience (years)", value: (r) => r.experienceYears, kind: "number" },
+      { id: "completedProjects", label: "Completed projects", value: (r) => r.completedProjects, kind: "number" },
+      { id: "ongoingProjects", label: "Ongoing projects", value: (r) => r.ongoingProjects, kind: "number" },
+      { id: "updatedAt", label: "Last updated", value: (r) => r.updatedAt, kind: "datetime" },
+    ]),
   ];
 
   const tableProps = {

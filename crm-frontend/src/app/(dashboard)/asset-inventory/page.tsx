@@ -1,5 +1,6 @@
 "use client";
 
+import { extraColumns } from "@/components/tables/extra-columns";
 import { isAdmin } from "@/lib/permissions";
 import { apiFetch } from "@/lib/api-fetch";
 
@@ -272,7 +273,26 @@ export default function AssetInventoryPage() {
         const status = row.original.status || "New";
         return <StatusCell status={status} tone={status === "Sold" ? "violet" : undefined} />;
       },
-    }
+    },
+    ...extraColumns([
+      { id: "display_id", label: "Asset code", value: (r) => r.display_id },
+      { id: "owner_name", label: "Owner", value: (r) => r.owner_name },
+      { id: "mobile_number", label: "Mobile", value: (r) => r.mobile_number },
+      { id: "source", label: "Source", value: (r) => r.source, kind: "label" },
+      { id: "mediator_name", label: "Mediator", value: (r) => r.mediator_name },
+      { id: "road_name", label: "Road", value: (r) => r.location?.road_name },
+      { id: "junction_name", label: "Junction", value: (r) => r.location?.junction_name },
+      { id: "distance_from_main", label: "Distance from main road", value: (r) => r.location?.distance_from_main },
+      { id: "soil_type", label: "Soil type", value: (r) => r.feature?.soil_type, kind: "label" },
+      { id: "water_source", label: "Water source", value: (r) => r.feature?.water_source, kind: "label" },
+      { id: "saleable_area", label: "Saleable area", value: (r) => r.feature?.saleable_area },
+      { id: "dtcp_price", label: "DTCP price", value: (r) => r.financials?.dtcp_price },
+      { id: "business_mode", label: "Business mode", value: (r) => r.financials?.business_mode, kind: "label" },
+      { id: "visited_date", label: "Site visit", value: (r) => r.visited_date, kind: "date" },
+      { id: "outcome", label: "Outcome", value: (r) => r.outcome },
+      { id: "quality_score", label: "Quality score", value: (r) => r.quality_score, kind: "number" },
+      { id: "created_at", label: "Added on", value: (r) => r.created_at, kind: "date" },
+    ]),
   ];
 
   const tableProps = {

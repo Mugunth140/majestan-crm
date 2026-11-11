@@ -1,5 +1,6 @@
 "use client";
 
+import { extraColumns } from "@/components/tables/extra-columns";
 import { isAdmin } from "@/lib/permissions";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -201,6 +202,20 @@ export default function ProjectsPage() {
         return <span className="capitalize"><StatusCell status={s} /></span>;
       },
     },
+    ...extraColumns([
+      { id: "builderName", label: "Builder", value: (r) => r.builderName },
+      { id: "city", label: "City", value: (r) => r.city },
+      { id: "sublocation", label: "Locality", value: (r) => r.sublocation },
+      { id: "pincode", label: "Pincode", value: (r) => r.pincode },
+      { id: "reraNumber", label: "RERA no.", value: (r) => r.reraNumber },
+      { id: "possessionStatus", label: "Possession", value: (r) => r.possessionStatus, kind: "label" },
+      { id: "possessionDate", label: "Possession date", value: (r) => r.possessionDate, kind: "date" },
+      { id: "towers", label: "Towers", value: (r) => r.towers, kind: "number" },
+      { id: "totalFloors", label: "Floors", value: (r) => r.totalFloors, kind: "number" },
+      { id: "projectAreaSqft", label: "Project area (sq ft)", value: (r) => r.projectAreaSqft, kind: "number" },
+      { id: "createdAt", label: "Added on", value: (r) => r.createdAt, kind: "date" },
+      { id: "updatedAt", label: "Last updated", value: (r) => r.updatedAt, kind: "datetime" },
+    ]),
   ];
 
   const tableProps = {

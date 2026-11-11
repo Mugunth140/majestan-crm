@@ -1,5 +1,6 @@
 "use client";
 
+import { extraColumns } from "@/components/tables/extra-columns";
 import { isAdmin } from "@/lib/permissions";
 import { apiFetch, apiJson } from "@/lib/api-fetch";
 import { normalizeDepartment } from "@/lib/department";
@@ -643,6 +644,21 @@ export default function LeadsPage() {
         return <span className="text-muted-foreground">{row.original.date}</span>;
       }
     },
+    ...extraColumns([
+      { id: "email", label: "Email", value: (r) => r.email },
+      { id: "whatsapp", label: "WhatsApp", value: (r) => r.whatsapp },
+      { id: "city", label: "City", value: (r) => r.city },
+      { id: "locations", label: "Preferred locations", value: (r) => r.locations },
+      { id: "propertyCategory", label: "Category", value: (r) => r.propertyCategory, kind: "label" },
+      { id: "purchaseType", label: "Purchase type", value: (r) => r.purchaseType, kind: "label" },
+      { id: "purchaseTimeline", label: "Timeline", value: (r) => r.purchaseTimeline, kind: "label" },
+      { id: "minBudget", label: "Min budget", value: (r) => r.minBudget, kind: "money" },
+      { id: "maxBudget", label: "Max budget", value: (r) => r.maxBudget, kind: "money" },
+      { id: "priority", label: "Priority", value: (r) => r.priority, kind: "label" },
+      { id: "nextFollowUp", label: "Next follow-up", value: (r) => r.nextFollowUpDate, kind: "date" },
+      { id: "department", label: "Department", value: (r) => r.department, kind: "label" },
+      { id: "updatedAt", label: "Last updated", value: (r) => r.updatedAt, kind: "datetime" },
+    ]),
   ], [activeTab, pendingAssignments, unresolvedStaffIds]);
 
   // Pending-review extras: duplicate badge + per-row remove (Open Pipeline only)

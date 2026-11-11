@@ -1,5 +1,6 @@
 "use client";
 
+import { extraColumns } from "@/components/tables/extra-columns";
 import { isAdmin } from "@/lib/permissions";
 import { apiFetch } from "@/lib/api-fetch";
 import { normalizeDepartment } from "@/lib/department";
@@ -773,6 +774,13 @@ export default function LeadRoutingPage() {
         );
       },
     },
+    ...extraColumns<QueueLead>([
+      { id: "email", label: "Email", value: (r) => r.email },
+      { id: "whatsapp_number", label: "WhatsApp", value: (r) => r.whatsapp_number },
+      { id: "city", label: "City", value: (r) => r.city },
+      { id: "lead_source", label: "Source", value: (r) => r.lead_source },
+      { id: "created_at", label: "Lead created", value: (r) => r.created_at, kind: "date" },
+    ]),
   ], [role, router]);
 
   // ── Enquiry queue: group-adjacent ordering ─────────────────────────────────
@@ -908,6 +916,14 @@ export default function LeadRoutingPage() {
         </span>
       ),
     },
+    ...extraColumns<EnquiryLead>([
+      { id: "email", label: "Email", value: (r) => r.email },
+      { id: "message", label: "Message", value: (r) => r.message },
+      { id: "repeat_count", label: "Open enquiries", value: (r) => r.repeat_count, kind: "number" },
+      { id: "visit_date", label: "Visit date", value: (r) => r.visit_date, kind: "date" },
+      { id: "visit_slot", label: "Visit slot", value: (r) => r.visit_slot },
+      { id: "lead_status", label: "Lead status", value: (r) => (r.id ? r.status : null) },
+    ]),
     {
       id: "actions",
       header: "Actions",

@@ -1,5 +1,6 @@
 "use client";
 
+import { extraColumns } from "@/components/tables/extra-columns";
 import { inboundStatusLabel, inboundStatusTone } from "@/lib/inbound-status";
 import { InboundAssignmentDialog } from "@/components/inbound/inbound-assignment-dialog";
 import { NewInboundModal, showQueueNext } from "@/components/inbound/new-inbound-modal";
@@ -337,6 +338,28 @@ export default function InboundPage() {
         return activeTab === "Queue" ? <span className="whitespace-nowrap tabular-nums text-muted-foreground">{formatInboundCreated(d)}</span> : <DateCell value={d} />;
       }
     },
+    ...extraColumns([
+      { id: "owner_name", label: "Owner name", value: (r) => r.owner_name },
+      { id: "whatsapp_number", label: "WhatsApp", value: (r) => r.whatsapp_number },
+      { id: "email", label: "Email", value: (r) => r.email },
+      { id: "property_title", label: "Property title", value: (r) => r.property_title },
+      { id: "purpose", label: "Purpose", value: (r) => r.purpose, kind: "label" },
+      { id: "bhk", label: "BHK", value: (r) => r.bhk },
+      { id: "floor_number", label: "Floor", value: (r) => r.floor_number },
+      { id: "city", label: "City", value: (r) => r.city },
+      { id: "locality", label: "Locality", value: (r) => r.locality || r.area },
+      { id: "sale_price", label: "Sale price", value: (r) => r.sale_price, kind: "money" },
+      { id: "total_rent", label: "Rent", value: (r) => r.total_rent, kind: "money" },
+      { id: "advance", label: "Advance", value: (r) => r.advance, kind: "money" },
+      { id: "rent_per_sqft", label: "Rent / sq ft", value: (r) => r.rent_per_sqft, kind: "money" },
+      { id: "brokerage_accepted", label: "Brokerage accepted", value: (r) => r.brokerage_accepted, kind: "yesno" },
+      { id: "is_exclusive", label: "Exclusive", value: (r) => r.is_exclusive, kind: "yesno" },
+      { id: "is_prime_location", label: "Prime location", value: (r) => r.is_prime_location, kind: "yesno" },
+      { id: "quality_score", label: "Quality score", value: (r) => r.quality_score, kind: "number" },
+      { id: "nextFollowUp", label: "Next follow-up", value: (r) => r.nextFollowUpDate, kind: "date" },
+      { id: "lastFollowUp", label: "Last follow-up", value: (r) => r.lastFollowedUpDate, kind: "date" },
+      { id: "updated_at", label: "Last updated", value: (r) => r.updated_at, kind: "datetime" },
+    ]),
   ];
 
   const columnKey = (column: ColumnDef<any>) => column.id || ("accessorKey" in column ? String(column.accessorKey) : "");
