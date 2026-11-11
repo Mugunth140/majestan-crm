@@ -32,6 +32,42 @@ export interface Listing {
 }
 
 export const WEBSITE = 'https://www.majestanrealty.com';
+
+/** What each site property type is called in a customer-facing name. */
+const TYPE_NAMES: Record<string, string> = {
+  apartment: 'Apartment',
+  villa: 'Villa',
+  individual_portion: 'Independent House',
+  investment_property: 'Investment Property',
+  pg_service_apartment: 'PG / Service Apartment',
+  farm_house: 'Farm House',
+  plot: 'Plot',
+  farmland: 'Farmland',
+  commercial: 'Commercial Space',
+  coworking: 'Coworking Space',
+  industrial: 'Industrial Property',
+};
+const BHK_TYPES = ['apartment', 'villa', 'individual_portion', 'investment_property', 'farm_house'];
+
+/**
+ * The name a property goes out under, e.g. "3BHK Apartment in Valavalli,
+ * Coimbatore". Its own title can carry the owner's or building's name, so a
+ * customer sees only the kind of property and where it is.
+ */
+export function propertyShareName(p: {
+  property_type?: string | null;
+  bedrooms?: number | string | null;
+  locality_name?: string | null;
+  locality?: string | null;
+  city?: string | null;
+}): string {
+  const type = p.property_type ?? '';
+  const kind = TYPE_NAMES[type] ?? (type ? titleCase(type) : 'Property');
+  const bhk = Number(p.bedrooms);
+  const name = BHK_TYPES.includes(type) && bhk > 0 ? `${bhk}BHK ${kind}` : kind;
+  const place = [p.locality_name ?? p.locality, p.city].map((v) => (v ?? '').trim()).filter(Boolean).join(', ');
+  return place ? `${name} in ${place}` : name;
+}
 const MAX_PHOTOS = 16;
 
 const has = (v: unknown) =>
@@ -203,7 +239,7 @@ export function propertyListing(
     kind: 'property',
     id: p.id,
     code: p.property_code || `#${p.id}`,
-    title: p.title || 'Property',
+    title: propertyShareName(p),
     subtitle: [
       titleCase(p.property_type || ''),
       [p.locality_name, p.city].filter(Boolean).join(', '),
@@ -352,7 +388,7 @@ export async function loadProject(
 ): Promise<Listing | null> {
   const [p] = await site.query(
     `SELECT id, project_code, name, project_type, builder_name, rera_number, possession_status, possession_date,
-            city, sublocation, address, pincode, latitude, longitude, towers, tower_details, total_units, total_floors,
+            city, sublocation, pincode, latitude, longitude, towers, tower_details, total_units, total_floors,
             project_area_sqft, connectivity, nearby_categories, canonical_slug, cover_image_url, gallery_image_urls
        FROM projects WHERE id = ? LIMIT 1`,
     [id],
@@ -494,7 +530,6 @@ export function projectListing(
       section(
         'Location',
         [
-          ['Address', plain(p.address)],
           ['Locality', p.sublocation],
           ['City', p.city],
           ['Pincode', p.pincode],

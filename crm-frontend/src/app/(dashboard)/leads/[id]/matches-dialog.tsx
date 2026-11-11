@@ -63,6 +63,7 @@ function propertyRow(p: any): Row {
     id: p.id,
     code: p.code || `#${p.id}`,
     title: p.title || "Untitled",
+    shareTitle: p.share_title || undefined,
     price: price === "-" ? "Price on request" : `${price}${rent ? "/mo" : ""}`,
     subtitle: [label(p.property_type), p.locality || p.city]
       .filter(Boolean)

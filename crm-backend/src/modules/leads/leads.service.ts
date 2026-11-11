@@ -6,7 +6,7 @@ import { DataSource, EntityManager, In } from 'typeorm';
 import { isQueuedWebsiteSource } from './website-sources';
 import { phoneDigits } from '../search/phone-digits';
 import { matchCriteria, NO_CRITERIA, projectMatchQuery, propertyMatchQuery, SIMILAR_WHEN, similarCriteria } from './auto-match';
-import { photoUrl } from './share/listing-data';
+import { photoUrl, propertyShareName } from './share/listing-data';
 import { LeadSource } from '../../database/entities/lead-source.entity';
 import { Lead } from '../../database/entities/lead.entity';
 import { LeadFollowUp } from '../../database/entities/lead-follow-up.entity';
@@ -1347,6 +1347,7 @@ export class LeadsService {
       return [...exact.map((row) => ({ ...row, match: 'exact' })), ...similar.map((row) => ({ ...row, match: 'similar' }))].map((row) => ({
         ...row,
         photo: photoUrl(row.photo),
+        ...(build === propertyMatchQuery ? { share_title: propertyShareName(row) } : {}),
       }));
     };
     const [properties, projects] = await Promise.all([run(propertyMatchQuery), run(projectMatchQuery)]);
@@ -1365,7 +1366,10 @@ export class LeadsService {
     const run = async (build: typeof propertyMatchQuery | typeof projectMatchQuery) => {
       const query = build(criteria);
       const rows: any[] = query ? await this.siteDataSource.query(query.sql, query.params) : [];
-      return rows.map((row) => ({ ...row, match: 'search', photo: photoUrl(row.photo) }));
+      return rows.map((row) => ({
+        ...row, match: 'search', photo: photoUrl(row.photo),
+        ...(build === propertyMatchQuery ? { share_title: propertyShareName(row) } : {}),
+      }));
     };
     const [properties, projects] = await Promise.all([run(propertyMatchQuery), run(projectMatchQuery)]);
     return { properties, projects };

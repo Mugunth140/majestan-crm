@@ -3,6 +3,7 @@ import {
   photoUrl,
   projectListing,
   propertyListing,
+  propertyShareName,
   rupees,
 } from './listing-data';
 
@@ -93,10 +94,8 @@ Photos pending backfill from old CRM.
       ['Unit sizes', '1,000 sq ft – 1,400 sq ft'],
     ]);
     expect(get('Towers').table!.rows).toEqual([['Alpha', '10', '8']]);
-    expect(get('Location').facts).toContainEqual([
-      'Address',
-      'Kgisl Campus, call',
-    ]);
+    // Never the full address: locality, city and pincode only.
+    expect(get('Location').facts!.map(([k]) => k)).not.toContain('Address');
     expect(get('Location').groups).toEqual([
       { title: 'Connectivity', items: ['Airport – Just 15 km'] },
       { title: 'Education', items: ['KCT · 1.1 km'] },
@@ -116,6 +115,19 @@ Photos pending backfill from old CRM.
       'a.jpg',
       'plan.jpg',
     ]);
+  });
+
+  it('names a property by kind and place, never by its own title', () => {
+    const listing = propertyListing(
+      { id: 2, title: 'Mr Kumar\'s Sree Nivas, 12 Gandhi St', property_type: 'apartment', bedrooms: 3, locality_name: 'Valavalli', city: 'Coimbatore', listing_type: 'Sell', price: 9000000 },
+      [],
+      [],
+    );
+    expect(listing.title).toBe('3BHK Apartment in Valavalli, Coimbatore');
+    expect(JSON.stringify(listing)).not.toContain('Gandhi');
+    expect(propertyShareName({ property_type: 'commercial', locality: 'RS Puram', city: 'Coimbatore' })).toBe('Commercial Space in RS Puram, Coimbatore');
+    expect(propertyShareName({ property_type: 'plot', bedrooms: 0, city: 'Coimbatore' })).toBe('Plot in Coimbatore');
+    expect(propertyShareName({ property_type: 'individual_portion', bedrooms: '2' })).toBe('2BHK Independent House');
   });
 
   it('leaves out empty sections', () => {

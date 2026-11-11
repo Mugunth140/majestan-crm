@@ -17,6 +17,8 @@ export interface SharedListing {
   id: number;
   code: string;
   title: string;
+  /** The name it goes out under to the customer ("3BHK Apartment in …"); falls back to title. */
+  shareTitle?: string;
   price?: string;
   subtitle?: string;
   /** Public page, when the site has one. */
@@ -97,7 +99,7 @@ export function whatsappMessage(
   const first = name?.trim().split(/\s+/)[0];
   const lines = listings.map((l, i) => {
     const detail = [l.subtitle, l.price].filter(Boolean).join(" · ");
-    return `${i + 1}. *${l.title}*${detail ? ` – ${detail}` : ""}${l.url ? `\n${l.url}` : ""}`;
+    return `${i + 1}. *${l.shareTitle || l.title}*${detail ? ` – ${detail}` : ""}${l.url ? `\n${l.url}` : ""}`;
   });
   return [
     `Hi${first ? ` ${first}` : ""},`,
