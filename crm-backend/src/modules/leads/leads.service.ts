@@ -185,7 +185,7 @@ export class LeadsService {
         ? { date: visitInquiry.visit_date, slot: visitInquiry.visit_slot ?? null, intent: visitInquiry.intent ?? 'enquiry' }
         : null;
 
-    return { ...lead, follow_ups: followUps, contact_logs: contactLogs, interestedProperty, visit };
+    return { ...lead, is_converted: !!lead.converted_to, follow_ups: followUps, contact_logs: contactLogs, interestedProperty, visit };
   }
 
   // Acknowledge a lead's open website enquiries. Only the assigned staff

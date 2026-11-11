@@ -206,12 +206,12 @@ export class LeadRoutingController {
     @Req() req: any,
   ) {
     const requestingUserId: number = req.user.sub;
-    await this.leadRoutingService.convertLead(
+    const data = await this.leadRoutingService.convertLead(
       Number(leadId),
       body.convert_to,
       body.feedback,
       requestingUserId,
     );
-    return { success: true };
+    return { success: true, data };
   }
 }

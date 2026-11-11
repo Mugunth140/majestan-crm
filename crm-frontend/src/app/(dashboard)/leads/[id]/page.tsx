@@ -344,9 +344,12 @@ function LeadDetail() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success("Lead converted successfully.");
+        const made = data.data as { kind: "agent" | "inbound"; id: number; existing: boolean } | undefined;
+        toast.success(made?.kind === "agent"
+          ? (made.existing ? "Lead linked to the existing agent with this number." : "Lead converted to an agent.")
+          : "Lead converted to an inbound.");
         setIsConvertOpen(false);
-        router.push("/leads");
+        router.push(made ? (made.kind === "agent" ? `/agent-network/${made.id}` : `/inbound/${made.id}`) : "/leads");
       } else {
         toast.error(data.message || "Failed to convert lead");
       }

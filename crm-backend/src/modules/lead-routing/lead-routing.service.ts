@@ -15,6 +15,15 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { NON_QUEUEABLE_LEAD_STATUSES } from '../leads/lead-statuses';
 import { PROPERTY_PAGE_SOURCE } from '../leads/website-sources';
 import { transferLeadToSales } from './transfer-to-sales';
+import { Agent } from '../../database/entities/agent.entity';
+import { AgentFollowUp } from '../../database/entities/agent-follow-up.entity';
+import { Inbound } from '../../database/entities/inbound.entity';
+import { InboundFollowUp } from '../../database/entities/inbound-follow-up.entity';
+
+const todayIst = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+/** The first note on the new record: where it came from and what the converter said. */
+const conversionNote = (lead: { id: number }, note?: string) =>
+  [`Converted from lead L${String(lead.id).padStart(5, '0')}`, note?.trim()].filter(Boolean).join(': ');
 
 @Injectable()
 export class LeadRoutingService {
@@ -33,6 +42,7 @@ export class LeadRoutingService {
       .getRepository(Lead)
       .createQueryBuilder('lead')
       .where('lead.assigned_staff_id IS NULL')
+      .andWhere('lead.converted_to IS NULL')
       .andWhere('lead.department = :department', { department })
       .andWhere('lead.status NOT IN (:...excluded)', { excluded: NON_QUEUEABLE_LEAD_STATUSES })
       // A lead stays out of Routing only while it has pending decisions;
@@ -262,7 +272,7 @@ export class LeadRoutingService {
     }
     await this.dataSource.transaction(async (manager) => {
       const result = await manager.query(
-        'UPDATE leads SET assigned_staff_id = ? WHERE id = ? AND assigned_staff_id IS NULL',
+        'UPDATE leads SET assigned_staff_id = ? WHERE id = ? AND assigned_staff_id IS NULL AND converted_to IS NULL',
         [requestingUserId, leadId]
       );
       if (result.affectedRows === 0) {
@@ -327,6 +337,7 @@ export class LeadRoutingService {
     const leadRepo = this.dataSource.getRepository(Lead);
     const lead = await leadRepo.findOne({ where: { id: leadId } });
     if (!lead) throw new NotFoundException('Lead not found');
+    if (lead.converted_to) throw new BadRequestException(`Lead was converted to ${lead.converted_to} and can't be assigned`);
 
     const prevAssignedId = lead.assigned_staff_id;
 
@@ -449,28 +460,41 @@ export class LeadRoutingService {
 
   // ── Convert ────────────────────────────────────────────────────────────────
   async convertLead(leadId: number, convertTo: 'inbound' | 'agent', feedback: string | undefined, requestingUserId: number) {
-    const leadRepo = this.dataSource.getRepository(Lead);
-    const lead = await leadRepo.findOne({ where: { id: leadId } });
-    if (!lead) throw new NotFoundException('Lead not found');
+    // The lead leaves Routing and becomes an Agent or Inbound record in one
+    // step: a lead marked Converted with no record behind it was lost to both.
+    const done = await this.dataSource.transaction(async (manager) => {
+      const leadRepo = manager.getRepository(Lead);
+      const lead = await leadRepo.findOne({ where: { id: leadId }, lock: { mode: 'pessimistic_write' } });
+      if (!lead) throw new NotFoundException('Lead not found');
+      if (lead.converted_to) throw new BadRequestException(`Lead is already converted to ${lead.converted_to}`);
 
-    const prevAssignedId = lead.assigned_staff_id;
+      const prevAssignedId = lead.assigned_staff_id;
+      const target = convertTo === 'agent'
+        ? await this.agentFromLead(manager, lead, feedback, requestingUserId, prevAssignedId ?? null)
+        : await this.inboundFromLead(manager, lead, feedback, requestingUserId);
 
-    lead.converted_to = convertTo;
-    lead.converted_at = new Date();
-    lead.assigned_staff_id = null as unknown as number;
-    lead.status = 'Converted';
-    await leadRepo.save(lead);
+      lead.converted_to = convertTo;
+      lead.converted_at = new Date();
+      lead.assigned_staff_id = null as unknown as number;
+      lead.status = 'Converted';
+      await leadRepo.save(lead);
 
-    const rh = this.dataSource.getRepository(RoutingHistory).create({
-      lead_id: leadId,
-      event_type: 'Converted',
-      from_user_id: prevAssignedId ?? null,
-      to_user_id: null,
-      actioned_by_id: requestingUserId,
-      feedback,
-      department: lead.department,
+      await manager.save(manager.getRepository(RoutingHistory).create({
+        lead_id: leadId,
+        event_type: 'Converted',
+        from_user_id: prevAssignedId ?? null,
+        to_user_id: null,
+        actioned_by_id: requestingUserId,
+        feedback,
+        department: lead.department,
+      }));
+      return target;
     });
-    await this.dataSource.getRepository(RoutingHistory).save(rh);
+
+    // Welcome drafts for brand-new records, after commit (same as adding them by hand).
+    if (done.created) {
+      await this.events?.emitAsync(convertTo === 'agent' ? 'partners.agent.created' : 'listings.inbound.created', { entityId: done.id, actorId: requestingUserId });
+    }
 
     // Notify converting staff
     await this.notificationsService.createNotification(
@@ -503,6 +527,7 @@ export class LeadRoutingService {
         );
       }
     }
+    return { kind: convertTo, id: done.id, existing: !done.created };
   }
 
   // ── Website Enquiry Events (decide-first intake) ────────────────────────────
@@ -527,6 +552,52 @@ export class LeadRoutingService {
   // Row-lock the event, 404 when missing, 409 (with handledBy) when another
   // staff member already resolved it. The decider-name lookup is best effort:
   // a missing user row falls back to 'another staff member', never a 500.
+  /** The agent this lead becomes: the existing one with this mobile, or a new one owned by the converter. */
+  private async agentFromLead(manager: EntityManager, lead: Lead, note: string | undefined, actorId: number, heldById: number | null) {
+    const repo = manager.getRepository(Agent);
+    const mobile = String(lead.mobile_number ?? '').trim();
+    if (!mobile) throw new BadRequestException('This lead has no mobile number to create an agent with');
+    const existing = await repo.findOne({ where: { mobile_number: mobile } });
+    if (existing) {
+      await manager.save(manager.getRepository(AgentFollowUp).create({ agent_id: existing.id, follow_up_date: todayIst(), notes: conversionNote(lead, note), created_by_id: actorId }));
+      return { id: existing.id, created: false };
+    }
+    // Agents are worked by staff: an admin's conversion goes to whoever held the lead.
+    const actor = await manager.getRepository(User).findOne({ where: { id: actorId }, relations: { role: true } });
+    const owner = ['Admin', 'Super Admin'].includes(actor?.role?.name ?? '') ? heldById : actorId;
+    const agent = await manager.save(repo.create({
+      name: lead.name || mobile,
+      mobile_number: mobile,
+      whatsapp_number: lead.whatsapp_number || (null as any),
+      email: lead.email || (null as any),
+      city: lead.city || (null as any),
+      status: 'New',
+      assigned_staff_id: owner as number,
+    }));
+    await manager.save(manager.getRepository(AgentFollowUp).create({ agent_id: agent.id, follow_up_date: todayIst(), notes: conversionNote(lead, note), created_by_id: actorId }));
+    return { id: agent.id, created: true };
+  }
+
+  /** The owner record this lead becomes, waiting in the Inbound queue for the listings team. */
+  private async inboundFromLead(manager: EntityManager, lead: Lead, note: string | undefined, actorId: number) {
+    const repo = manager.getRepository(Inbound);
+    const mobile = String(lead.mobile_number ?? '').trim();
+    const inbound = await manager.save(repo.create({
+      owner_name: lead.name || (null as any),
+      mobile_number: mobile || (null as any),
+      whatsapp_number: lead.whatsapp_number || (null as any),
+      email: lead.email || (null as any),
+      city: lead.city || (null as any),
+      uploaded_by_id: actorId,
+      assigned_staff_id: null as any,
+      is_queued: true,
+    }));
+    inbound.property_id = `I${String(inbound.id).padStart(5, '0')}`;
+    await manager.save(inbound);
+    await manager.save(manager.getRepository(InboundFollowUp).create({ inbound_id: inbound.id, follow_up_date: todayIst(), notes: conversionNote(lead, note), created_by_id: actorId }));
+    return { id: inbound.id, created: true };
+  }
+
   private async lockOpenEvent(manager: EntityManager, eventId: number) {
     const rows: any[] = await manager.query(
       'SELECT * FROM website_enquiry_events WHERE id = ? FOR UPDATE',
@@ -856,6 +927,7 @@ export class LeadRoutingService {
     const leadRepo = this.dataSource.getRepository(Lead);
     const lead = await leadRepo.findOne({ where: { id: leadId } });
     if (!lead) throw new NotFoundException('Lead not found');
+    if (lead.converted_to) throw new BadRequestException(`Lead was converted to ${lead.converted_to}`);
 
     const prevAssignedId = lead.assigned_staff_id;
 
