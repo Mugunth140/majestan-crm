@@ -48,8 +48,8 @@ export function computePace(target: TargetInput, days: Map<string, number> | und
     byWeek[taskWeek(d)] += v;
     if (d === asOf) todayAchieved += v;
   }
-  const weekTargets = [0, ...[1, 2, 3, 4].map(w => Number(target.weeks[w - 1]) || 0)];
   const monthly = Number(target.monthly) || 0;
+  const weekTargets = [0, ...fittedWeeks(monthly, target.weeks)];
 
   const week = taskWeek(asOf);
   const bounds = taskWeekBounds(asOf);
@@ -92,6 +92,18 @@ export function computePace(target: TargetInput, days: Map<string, number> | und
     today: { goal, achieved: thisMonth ? todayAchieved : 0, remaining: Math.max(0, goal - (thisMonth ? todayAchieved : 0)) },
     byWeek, weekTargets, daily,
   };
+}
+
+/**
+ * Weekly targets that add up to the month. A stored split that doesn't (left
+ * from an earlier monthly figure, e.g. 1/1/1/2 under 4,160) is replaced by the
+ * even split, so today's goal and the week's target stay meaningful.
+ */
+export function fittedWeeks(monthly: number, weeks: number[]): number[] {
+  const stored = [0, 1, 2, 3].map(i => Number(weeks[i]) || 0);
+  if (Math.abs(stored.reduce((a, b) => a + b, 0) - monthly) <= Math.max(0.005, monthly * 0.01)) return stored;
+  const base = Math.floor(monthly / 4);
+  return [base, base, base, monthly - base * 3];
 }
 
 /** The weekly targets stored on a TaskMetricTarget row, weeks 1–4. */

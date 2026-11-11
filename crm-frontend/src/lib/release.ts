@@ -13,6 +13,32 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2.3.0",
+    date: "2026-11-11",
+    title: "Introducing WhatsApp Integration",
+    changes: [
+      { kind: "new", text: "WhatsApp in the CRM: message a lead from the business number, and their replies show up in the lead's Conversation as they arrive.", slide: "whatsapp" },
+      { kind: "new", text: "Share properties and projects on WhatsApp with their brochure, and visit confirmations, reminders and booking messages go out on their own.", slide: "whatsapp" },
+      { kind: "new", text: "WhatsApp is still being switched on with Meta, so some messages may not get through yet. Calls, email and everything else work as usual.", slide: "whatsapp" },
+      { kind: "new", text: "Choose which columns each table shows. Your choice is saved for you only, and Reset to default brings the original back." },
+      { kind: "new", text: "Leads by source on the dashboards, e.g. how many leads came from 99acres this month." },
+      { kind: "new", text: "Properties: Special purpose is now a list to pick from, and More filters adds BHK, bathrooms, facing, possession, occupancy, negotiable and parking." },
+      { kind: "new", text: "Owner occupied on independent houses, both on the property and on a lead's requirement." },
+      { kind: "new", text: "Covered and open parking for cars and bikes on independent houses, villas and every rental property." },
+      { kind: "new", text: "Everyone now has a profile picture: pick one of the avatars or upload your own photo." },
+      { kind: "improved", text: "Team leads and managers can assign a lead to themselves." },
+      { kind: "improved", text: "Lead page: property type in Details, talk time and answered calls, and an Interested in panel for projects too." },
+      { kind: "improved", text: "Requirements: furnishing takes more than one choice, Projects moved to the end, and budgets read out in words." },
+      { kind: "improved", text: "Find matches keeps to the requirement's category (an industrial requirement shows only industrial listings) and can search every listing." },
+      { kind: "improved", text: "Search leads by WhatsApp number in All Leads and ⌘K / Ctrl+K, typed with or without +91." },
+      { kind: "improved", text: "Schedule site visit: search for the project instead of typing it." },
+      { kind: "improved", text: "Wide tables and charts on the dashboards scroll sideways with a visible scrollbar." },
+      { kind: "improved", text: "Drafts of follow-ups, emails and WhatsApp messages are kept when you switch tabs or pages." },
+      { kind: "fixed", text: "Today's target and the week's target now follow the monthly target when the weekly split didn't add up to it." },
+      { kind: "fixed", text: "Avg time to first contact counts working hours only." },
+    ],
+  },
+  {
     version: "2.2.0",
     date: "2026-11-09",
     title: "Search everything",

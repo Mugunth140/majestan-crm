@@ -51,3 +51,13 @@ describe("what's new", () => {
     expect(steps.map((s) => s.id)).toEqual(["whats-new", "views", "search"]);
   });
 });
+
+describe("2.3.0", () => {
+  it("opens What's new with the WhatsApp integration slide", async () => {
+    const { RELEASES, releasesSince } = await import("@/lib/release");
+    expect(RELEASES[0].version).toBe("2.3.0");
+    const steps = whatsNewSteps(releasesSince("2.2.0", RELEASES), "Staff");
+    expect(steps.map((s) => s.id).slice(0, 2)).toEqual(["whats-new", "whatsapp"]);
+    expect(SLIDES.find((s) => s.id === "whatsapp")?.title).toBe("Introducing WhatsApp Integration");
+  });
+});

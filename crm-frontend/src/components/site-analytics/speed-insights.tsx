@@ -128,7 +128,7 @@ export function SpeedInsights({ report }: { report: SiteReport }) {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="table-scroll overflow-x-auto pb-1">
             <table className="w-full text-left text-sm">
               <caption className="sr-only">
                 Route p75 performance, worst relative to the poor threshold

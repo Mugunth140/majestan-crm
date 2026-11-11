@@ -53,13 +53,25 @@ export function TargetForm() {
   const filled = dept.metrics.filter((d) => Number(entries[d.key]?.value) > 0);
 
   const toggle = (id: number) => { const n = new Set(chosen); if (n.has(id)) n.delete(id); else n.add(id); setPicked(n); };
-  const setValue = (key: string, value: string) => setEntries((e) => ({ ...e, [key]: { value, weeks: e[key]?.weeks ?? null } }));
+  // Changing the month's number re-splits weeks that were still the even split,
+  // so a split opened at "5" can't stay at 1/1/1/2 once the month says 4,160.
+  const setValue = (key: string, value: string) => setEntries((e) => {
+    const weeks = e[key]?.weeks ?? null;
+    const was = evenSplit(Number(e[key]?.value) || 0).map(String);
+    const followed = weeks && weeks.every((w, i) => String(Number(w) || 0) === was[i]);
+    return { ...e, [key]: { value, weeks: followed ? evenSplit(Number(value) || 0).map(String) : weeks } };
+  });
   const setWeeks = (key: string, weeks: string[] | null) => setEntries((e) => ({ ...e, [key]: { value: e[key]?.value ?? "", weeks } }));
   const changeDept = (id: string) => { setDeptId(Number(id)); setPicked(new Set()); setEntries({}); };
 
   const submit = async () => {
     if (!chosen.size) { toast.error("Choose at least one person"); return; }
     if (!filled.length) { toast.error("Give at least one target"); return; }
+    const uneven = filled.find((d) => {
+      const e = entries[d.key];
+      return e.weeks && e.weeks.reduce((sum, w) => sum + (Number(w) || 0), 0) !== Number(e.value);
+    });
+    if (uneven) { toast.error(`${uneven.label}: the four weeks must add up to the month's target`); return; }
     setSaving(true);
     try {
       const r = await send<{ created: number[]; skipped: { name: string; reason: string }[] }>("", "POST", {
@@ -155,11 +167,14 @@ export function TargetForm() {
   );
 }
 
+/** Four weeks of a monthly target; the last week takes the remainder. */
+const evenSplit = (monthly: number) => { const base = Math.floor(monthly / 4); return [base, base, base, monthly - base * 3]; };
+
 function MetricInput({ d, entry, workingDays, onValue, onWeeks }: { d: MetricDef; entry?: Entry; workingDays: number; onValue: (v: string) => void; onWeeks: (w: string[] | null) => void }) {
   const monthly = Number(entry?.value) || 0;
   const unit = d.value_type;
   const base = Math.floor(monthly / 4);
-  const split = [base, base, base, monthly - base * 3];
+  const split = evenSplit(monthly);
   const weeks = entry?.weeks;
   const weeksTotal = weeks?.reduce((s, w) => s + (Number(w) || 0), 0) ?? 0;
   return (

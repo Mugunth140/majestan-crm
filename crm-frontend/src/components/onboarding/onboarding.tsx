@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { meApi } from "@/lib/me-api";
 import { APP_VERSION, RELEASES, compareVersions, releasesSince } from "@/lib/release";
 import { readUser } from "@/components/layout/nav-items";
+import { PhotoGate } from "@/components/users/photo-gate";
 import { TourPlayer, type Step } from "./player";
 import { useWelcomeSteps, whatsNewSteps } from "./steps";
 
@@ -21,6 +22,18 @@ type Mode = { kind: "welcome" } | { kind: "whats-new"; steps: Step[] } | null;
  */
 export function Onboarding() {
   const [mode, setMode] = useState<Mode>(null);
+  // Signed-in user without a picture: asked for one once any tour is closed.
+  const [needsPhoto, setNeedsPhoto] = useState<number | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    const check = () => meApi.get().then((me) => { if (live) setNeedsPhoto(me.avatar_url ? null : me.id); }).catch(() => {});
+    void check();
+    // A picture saved in the tour clears it; removing one in Settings brings it back.
+    const changed = () => void check();
+    window.addEventListener("crm-user-updated", changed);
+    return () => { live = false; window.removeEventListener("crm-user-updated", changed); };
+  }, []);
 
   useEffect(() => {
     let live = true;
@@ -58,6 +71,7 @@ export function Onboarding() {
     <AnimatePresence>
       {mode?.kind === "welcome" && <WelcomeTour key="welcome" onClose={close} />}
       {mode?.kind === "whats-new" && <TourPlayer key="new" label="What's new" steps={mode.steps} onClose={close} />}
+      {!mode && needsPhoto !== null && <PhotoGate key="photo" userId={needsPhoto} onDone={() => setNeedsPhoto(null)} />}
     </AnimatePresence>
   );
 }

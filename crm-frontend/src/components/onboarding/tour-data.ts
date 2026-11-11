@@ -74,6 +74,17 @@ export const SLIDES: Slide[] = [
     ],
   },
   {
+    id: "whatsapp",
+    eyebrow: "WhatsApp",
+    title: "Introducing WhatsApp Integration",
+    beats: [
+      { shot: "lead-conversation", focus: [270, 740, 790, 100], text: "WhatsApp messages to and from the lead sit in its Conversation, next to calls and emails. Replies appear as they arrive." },
+      { shot: "lead-conversation", focus: [250, 850, 400, 50], text: "Press WhatsApp at the bottom to write to the lead from the business number. Properties and projects you share can go over WhatsApp too." },
+      { shot: "lead-conversation", focus: [1085, 480, 355, 45], text: "Messages go to the lead's WhatsApp number. Visit confirmations, reminders and booking messages are sent on their own." },
+      { shot: "lead-conversation", text: "We're still switching WhatsApp on with Meta, so some messages may not get through for now. Calls, email and the rest of the CRM work as usual." },
+    ],
+  },
+  {
     id: "scheduler",
     eyebrow: "Scheduler",
     title: "Your day of follow-ups",

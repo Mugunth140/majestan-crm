@@ -143,7 +143,7 @@ export function Leaderboard({ block }: { block: BlockOf<"leaderboard"> }) {
   );
 
   return (
-    <div className="-mx-4 overflow-x-auto sm:-mx-5">
+    <div className="table-scroll -mx-4 overflow-x-auto pb-1 sm:-mx-5">
       <table className="w-full min-w-[640px] border-collapse text-[13px]">
         <thead className="text-xs text-muted-foreground">
           <tr className="border-b">
@@ -292,7 +292,7 @@ export function Queue({ block }: { block: BlockOf<"queue"> }) {
         <ReasonChip active={reason === null} onClick={() => setReason(null)} label="All" count={block.items.length} />
         {Object.keys(REASONS).filter((r) => counts[r]).map((r) => <ReasonChip key={r} active={reason === r} onClick={() => setReason(reason === r ? null : r)} label={REASONS[r].label} count={counts[r]} tone={REASONS[r].tone} />)}
       </div>
-      <div className="-mx-4 overflow-x-auto sm:-mx-5">
+      <div className="table-scroll -mx-4 overflow-x-auto pb-1 sm:-mx-5">
         <table className="w-full min-w-[560px] text-[13px]">
           <thead className="text-xs text-muted-foreground">
             <tr className="border-b">
@@ -426,7 +426,7 @@ function MiniGoal({ label, achieved, goal, fmt }: { label: string; achieved: num
 
 export function MetricTable({ block }: { block: BlockOf<"table"> }) {
   return (
-    <div className="-mx-4 overflow-x-auto sm:-mx-5">
+    <div className="table-scroll -mx-4 overflow-x-auto pb-1 sm:-mx-5">
       <table className="w-full min-w-[560px] text-[13px]">
         <thead className="text-xs text-muted-foreground">
           <tr className="border-b">

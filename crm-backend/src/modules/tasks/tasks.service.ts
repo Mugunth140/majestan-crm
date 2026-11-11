@@ -45,7 +45,12 @@ export type TaskRow = {
  * the last week takes the remainder. Overrides are used only when all four are given.
  */
 function weeklySplit(monthly: number, overrides?: Record<number, number>): number[] {
-  if (overrides && [1, 2, 3, 4].every(w => overrides[w] !== undefined)) return [1, 2, 3, 4].map(w => Number(overrides[w]) || 0);
+  if (overrides && [1, 2, 3, 4].every(w => overrides[w] !== undefined)) {
+    const weeks = [1, 2, 3, 4].map(w => Number(overrides[w]) || 0);
+    // A split left over from an earlier monthly figure would set the wrong pace.
+    if (Math.abs(weeks.reduce((a, b) => a + b, 0) - monthly) > 0.005) throw new BadRequestException('The four weekly targets must add up to the monthly target');
+    return weeks;
+  }
   const base = Math.floor(monthly / 4);
   return [base, base, base, monthly - base * 3];
 }

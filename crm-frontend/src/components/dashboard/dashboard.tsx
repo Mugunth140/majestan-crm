@@ -1,6 +1,6 @@
 "use client";
 import { GettingStarted } from "@/components/onboarding/getting-started";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { toast } from "sonner";
@@ -241,15 +241,27 @@ function BlockView({ block }: { block: Block }) {
   );
 }
 
+/**
+ * Charts that stop reading well when squeezed keep a minimum width and scroll
+ * sideways inside their card, with a visible scrollbar, on narrow screens.
+ */
+function Wide({ min, children }: { min: number; children: ReactNode }) {
+  return (
+    <div className="table-scroll -mx-4 overflow-x-auto px-4 pb-1 sm:-mx-5 sm:px-5">
+      <div style={{ minWidth: min }}>{children}</div>
+    </div>
+  );
+}
+
 function BlockBody({ block }: { block: Block }) {
   switch (block.kind) {
-    case "trend": return <TrendChart block={block} />;
+    case "trend": return <Wide min={560}><TrendChart block={block} /></Wide>;
     case "bars": return <BarList block={block} />;
-    case "stacked": return <StackedBars block={block} />;
+    case "stacked": return <Wide min={480}><StackedBars block={block} /></Wide>;
     case "donut": return <Donut block={block} />;
     case "funnel": return <Funnel block={block} />;
-    case "heatmap": return <Heatmap block={block} />;
-    case "scatter": return <Scatter block={block} />;
+    case "heatmap": return <Wide min={block.cols.length > 16 ? 680 : 480}><Heatmap block={block} /></Wide>;
+    case "scatter": return <Wide min={440}><Scatter block={block} /></Wide>;
     case "radar": return <Radar block={block} />;
     case "leaderboard": return <Leaderboard block={block} />;
     case "insights": return <Insights block={block} />;

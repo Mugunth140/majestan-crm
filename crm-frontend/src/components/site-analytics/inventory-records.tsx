@@ -32,7 +32,7 @@ export function InventoryRecordTable({
   selected?: string[];
 }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="table-scroll overflow-x-auto pb-1">
       <table className="w-full text-left text-sm">
         <thead>
           <tr className="text-xs text-muted-foreground">
@@ -219,7 +219,7 @@ export function InventoryRecordsDialog({
         ) : (
           <>
             {result.configurations ? (
-              <div className="overflow-x-auto">
+              <div className="table-scroll overflow-x-auto pb-1">
                 <table className="w-full text-left text-sm">
                   <thead>
                     <tr>

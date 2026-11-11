@@ -1,4 +1,4 @@
-import { computePace } from './task-pace';
+import { computePace, fittedWeeks } from './task-pace';
 
 const days = (entries: Record<string, number>) => new Map(Object.entries(entries));
 const target = { monthly: 400, weeks: [100, 100, 100, 100] };
@@ -38,5 +38,18 @@ describe('computePace', () => {
 
   it('ignores days outside the month', () => {
     expect(computePace(target, days({ '2026-10-31': 50, '2026-11-02': 10 }), '2026-11', '2026-11-03').achieved).toBe(10);
+  });
+});
+
+describe('weekly split that no longer matches the month', () => {
+  it('uses the even split, so today has a goal', () => {
+    expect(fittedWeeks(4160, [1, 1, 1, 2])).toEqual([1040, 1040, 1040, 1040]);
+    expect(fittedWeeks(1950, [487, 487, 487, 489])).toEqual([487, 487, 487, 489]);
+    expect(fittedWeeks(10, [0, 0, 0, 10])).toEqual([0, 0, 0, 10]);
+    // 66 calls before today, in week 2 of November 2026, with the bad split stored
+    const days = new Map([['2026-11-09', 66], ['2026-11-11', 89]]);
+    const pace = computePace({ monthly: 4160, weeks: [1, 1, 1, 2] }, days, '2026-11', '2026-11-11');
+    expect(pace.week.target).toBeGreaterThan(1000);
+    expect(pace.today.goal).toBeGreaterThan(0);
   });
 });
