@@ -201,7 +201,6 @@ export const EVENT_LABELS: Record<string, string> = {
   enquiry_submitted: "Enquiries",
   site_visit_requested: "Site visits",
   owner_submission: "Owner submissions",
-  registration_completed: "Registrations",
   javascript_error: "JavaScript errors",
   unhandled_rejection: "Unhandled rejections",
   api_error: "API errors",
