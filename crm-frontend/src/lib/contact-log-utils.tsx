@@ -57,6 +57,17 @@ export function formatDuration(totalSeconds: any): string {
   return rest === 0 ? `${m}m` : `${m}m ${rest}s`;
 }
 
+/** Total time on calls: "45s", "12 min", "1 hr 5 min". */
+export function formatTalkTime(totalSeconds: number): string {
+  const s = Math.max(0, Math.round(totalSeconds));
+  if (s < 60) return `${s}s`;
+  const minutes = Math.round(s / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m ? `${h} hr ${m} min` : `${h} hr`;
+}
+
 // Newest-first sort (created_at, id tiebreak) — backend orders the same way,
 // but bulk device syncs share second precision.
 export function sortContactLogs<T extends { created_at: any; id?: any }>(logs: T[]): T[] {

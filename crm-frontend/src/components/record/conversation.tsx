@@ -7,6 +7,7 @@ import { CalendarClock, CalendarDays, ChevronDown, Plus, Flag, Loader2, Mail, Me
 import { toHrFollowUpPayload } from "@/lib/hr-follow-up";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api-fetch";
+import { useDraft } from "@/lib/use-draft";
 import { listingHref, parseShare, shareApi } from "@/lib/listing-share";
 import { mailApi, MAIL_STATUS, newDraftIds, type MailCatalog, type MailSummary, type MailTarget } from "@/lib/mail-api";
 import { contactLogAuthor, formatDuration } from "@/lib/contact-log-utils";
@@ -159,8 +160,9 @@ export function LeadConversation({
   const [catalog, setCatalog] = useState<MailCatalog | null>(null);
   const [mails, setMails] = useState<MailSummary[]>([]);
   const [target, setTarget] = useState<MailTarget | null>(null);
-  const [mailComposer, setMailComposer] = useState<ComposerStart | null>(null);
-  const [mode, setMode] = useState<Mode | null>(null);
+  // The open composer is remembered too, so coming back to the tab shows the draft.
+  const [mode, setMode] = useDraft<Mode | null>(`compose:${entity.api}:${leadId}`, null);
+  const [mailComposer, setMailComposer] = useState<ComposerStart | null>(() => (mode === "email" ? { kind: "blank" } : null));
   const [handled, setHandled] = useState<number | null>(null);
   if (request && request.n !== handled) {
     setHandled(request.n);
@@ -637,7 +639,7 @@ function OpenWhatsapp({ leadId, entity, number, onSent }: {
   number?: string | null;
   onSent: () => void;
 }) {
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useDraft(`wa-open:${entity.api}:${leadId}`, "");
   const [sending, setSending] = useState(false);
   const to = dialable(number);
   const label = "WhatsApp";

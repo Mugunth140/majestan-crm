@@ -2,7 +2,7 @@
 
 import { PropertyForm } from "./_components/PropertyForm";
 import { propertyTypeName } from "./_components/property-form-fields";
-import { EMPTY_PROPERTY_FILTERS, propertyUploaderLabel } from "@/lib/property-list-filters";
+import { EMPTY_PROPERTY_FILTERS, LISTING_STATUS_OPTIONS, propertyUploaderLabel } from "@/lib/property-list-filters";
 import { propertyStatusLabel } from "@/lib/property-status";
 
 import { useState, useEffect } from "react";
@@ -306,7 +306,7 @@ export default function PropertiesPage() {
     onPaginationChange: setPagination,
   };
 
-  const activeFiltersCount = Object.values(filters).filter((v) => v !== "").length;
+  const activeFiltersCount = Object.values(filters).filter((v) => v != null && v !== "").length;
   const clearFilters = () => {
     setFilters(EMPTY_PROPERTY_FILTERS);
     resetPage();
@@ -453,6 +453,9 @@ export default function PropertiesPage() {
         <SegmentTabs tabs={tabs} value={activeTab} onChange={(tab) => { setActiveTab(tab); resetPage(); }} label="Properties views" />
         <FilterDivider />
         <FilterStrip>
+          {activeTab === "Available" && (
+            <QuickFilter label="Status" value={filters.listingStatus ?? ""} options={LISTING_STATUS_OPTIONS} onChange={(v) => { setFilters((f) => ({ ...f, listingStatus: v })); resetPage(); }} />
+          )}
           <QuickFilter label="Listing" value={filters.listingType} options={[{ label: "Buy", value: "Sell" }, { label: "Rent", value: "Rent" }]} onChange={(v) => { setFilters((f) => ({ ...f, listingType: v })); resetPage(); }} />
           <QuickFilter label="Property type" value={filters.propertyType} options={propertyTypes.length ? propertyTypes.map((t) => ({ ...t, label: propertyTypeName(t.value, t.label) })) : PROPERTY_TYPE_OPTIONS} onChange={(v) => { setFilters((f) => ({ ...f, propertyType: v })); resetPage(); }} />
           <QuickFilter label="City" value={filters.cityId} options={cities.map((c) => ({ label: c.cityName, value: String(c.id) }))} onChange={(v) => { setFilters((f) => ({ ...f, cityId: v, sublocationId: "" })); resetPage(); }} />

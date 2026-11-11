@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { clearDraft, peekDraft, saveDraft } from "@/lib/use-draft";
 import { AlertTriangle, ArrowLeft, FileText, ImageIcon, Info, Loader2, Paperclip, Send, X } from "lucide-react";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api-fetch";
@@ -56,6 +57,8 @@ export function MailComposer(props: Props) {
 const startValue = (start: ComposerStart) =>
   start.kind === "saved" ? `saved:${start.id}` : start.kind === "system" ? `system:${start.key}` : start.kind === "draft" ? `draft:${start.id}` : "blank";
 
+type MailDraft = { source: string; subject: string; body: string; cc: string; sender: string | null };
+
 function OpenComposer({ entityType, entityId, start, recipients = [], senders, inline, onClose, onSent }: Props & { start: ComposerStart }) {
   const [catalog, setCatalog] = useState<MailTemplateCatalog | null>(null);
   const [source, setSource] = useState(startValue(start));
@@ -76,6 +79,13 @@ function OpenComposer({ entityType, entityId, start, recipients = [], senders, i
   useEffect(() => { filesRef.current = files; }, [files]);
 
   const draft = start.kind === "draft" ? start : null;
+  // What's written is kept for this tab until it's sent, so leaving the composer
+  // (another composer, another lead tab) doesn't lose it. A share's attached
+  // brochures can't be kept, so a share starts fresh each time.
+  const draftKey = `mail:${entityType}:${entityId}`;
+  const plainBlank = start.kind === "blank" && !start.subject && !start.body && !start.attachments?.length && !start.share?.length;
+  const keepsDraft = !(start.kind === "blank" && (start.attachments?.length || start.share?.length));
+  const [restored, setRestored] = useState(false);
 
   // Load variables and templates once, then fill in the starting text.
   useEffect(() => {
@@ -85,21 +95,35 @@ function OpenComposer({ entityType, entityId, start, recipients = [], senders, i
       .then((next) => {
         if (!live) return;
         setCatalog(next);
-        const text = textFor(next, startValue(start), draft?.eventKey);
-        if (text) { setSubject(text.subject); setBody(text.body); }
+        const kept = plainBlank ? peekDraft<MailDraft>(draftKey) : undefined;
+        const text = kept ? null : textFor(next, startValue(start), draft?.eventKey);
+        if (kept) {
+          setSource(kept.source);
+          setSubject(kept.subject);
+          setBody(kept.body);
+          setCcText(kept.cc);
+          setTouched(true);
+        } else if (text) { setSubject(text.subject); setBody(text.body); }
         else if (start.kind === "blank") {
           if (start.subject) setSubject(start.subject);
           if (start.cc?.length) setCcText(start.cc.join(", "));
           if (start.body) setBody(start.body);
           if (start.attachments?.length) setFiles(start.attachments);
         }
-        setSender(startSender(next, start, senders));
+        setSender(kept?.sender ?? startSender(next, start, senders));
+        setRestored(true);
       })
       .catch(() => toast.error("Could not load email templates"));
     return () => { live = false; };
     // senders only seeds the first choice; later changes don't reset what the user picked.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entityType, start, draft?.eventKey]);
+
+  useEffect(() => {
+    if (!restored || !keepsDraft || sentRef.current) return;
+    const empty = !subject.trim() && !ccText.trim() && !body.replace(/<[^>]*>|&nbsp;/g, "").trim();
+    saveDraft(draftKey, empty ? null : ({ source, subject, body, cc: ccText, sender } satisfies MailDraft));
+  }, [restored, keepsDraft, draftKey, source, subject, body, ccText, sender]);
 
   // Files uploaded but never sent are removed when the composer closes.
   useEffect(() => () => {
@@ -172,6 +196,7 @@ function OpenComposer({ entityType, entityId, start, recipients = [], senders, i
     try {
       await mailApi.composeSend(input(), preview.hash);
       sentRef.current = true;
+      clearDraft(draftKey);
       toast.success(preview.enabled ? "Email queued for sending." : "Email queued. It will go out once sending is switched on.");
       onSent();
     } catch (reason) {

@@ -112,6 +112,13 @@ export class LeadsController {
     return { success: true, data };
   }
 
+  /** Available listings by name, code or area, to share ones the matches didn't find. */
+  @Get(':id/listings/search')
+  async searchListings(@Query('q') q?: string) {
+    const data = await this.leadsService.searchListings(String(q ?? ''));
+    return { success: true, data };
+  }
+
   /** A listing's customer brochure, to download or send on WhatsApp. */
   @Header('Cache-Control', 'private, no-store')
   @Get(':id/share/pdf/:kind/:listingId')

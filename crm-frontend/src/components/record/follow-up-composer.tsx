@@ -4,6 +4,7 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Flag, Loader2, Mail, MessageCircle, Phone, PhoneMissed } from "lucide-react";
+import { useDraft } from "@/lib/use-draft";
 import { apiFetch } from "@/lib/api-fetch";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -73,7 +74,8 @@ export function FollowUpComposer({ api, entityId, noun, followUps, onSaved, toBo
   /** Reshapes the body for APIs that don't take the camelCase one (HR). */
   toBody?: (body: Record<string, string>) => Record<string, unknown>;
 }) {
-  const [form, setForm] = useState(EMPTY);
+  // Kept while switching composer or tab; cleared once the follow-up is logged.
+  const [form, setForm] = useDraft(`followup:${api}:${entityId}`, EMPTY);
   const [saving, setSaving] = useState(false);
 
   const highest = latestRnr(followUps);

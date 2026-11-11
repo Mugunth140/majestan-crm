@@ -1,7 +1,8 @@
 export function parseIndianCurrency(input: string | number | null | undefined): number {
   if (input === null || input === undefined) return 0;
   if (typeof input === "number") return Number.isFinite(input) ? input : 0;
-  const cleanInput = input.toString().toLowerCase().replace(/,/g, "").trim();
+  // Accepts what formatIndianCurrencyShort shows ("₹1.2 Cr") as well as typed "1.2cr" or "Rs 50L".
+  const cleanInput = input.toString().toLowerCase().replace(/^\s*(₹|rs\.?|inr)/, "").replace(/[,\s]/g, "").trim();
   if (!cleanInput) return 0;
   let multiplier = 1;
   let numericStr = cleanInput;

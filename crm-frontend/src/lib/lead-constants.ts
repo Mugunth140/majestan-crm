@@ -140,6 +140,13 @@ export const BHK_OPTIONS = ["1", "2", "3", "4", "5"].map((v) => ({ label: v, val
 export const FURNISHING_OPTIONS = [
   { label: "Furnished", value: "1" }, { label: "Semi furnished", value: "2" }, { label: "Unfurnished", value: "0" },
 ];
+/** Car parking slots a requirement needs; "0" means none. */
+export const CAR_PARKING_OPTIONS = [
+  { label: "Not needed", value: "0" }, { label: "1 car", value: "1" }, { label: "2 cars", value: "2" }, { label: "3 or more", value: "3" },
+];
+export const LIFT_OPTIONS = [
+  { label: "Required", value: "required" }, { label: "Not needed", value: "not_needed" },
+];
 export const FACING_OPTIONS = [
   { label: "North", value: "North" }, { label: "East", value: "East" }, { label: "South", value: "South" }, { label: "West", value: "West" },
   { label: "North-East", value: "North-East" }, { label: "North-West", value: "North-West" },

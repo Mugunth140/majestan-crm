@@ -62,7 +62,31 @@ export interface MatchCriteria {
   bhk: number[];
   minArea: number | null;
   maxArea: number | null;
+  /** Words typed by staff to find a listing by name, code, area or builder. */
+  search?: string | null;
 }
+
+/** Nothing to narrow by: every available listing, newest first. */
+export const NO_CRITERIA: MatchCriteria = {
+  types: null,
+  broadTypes: null,
+  listing: null,
+  city: null,
+  localities: [],
+  minBudget: null,
+  maxBudget: null,
+  bhk: [],
+  minArea: null,
+  maxArea: null,
+};
+
+const likeAny = (columns: string[], search: string) => {
+  const term = `%${search.replace(/[%_\\]/g, '\\$&')}%`;
+  return {
+    sql: `(${columns.map((c) => `${c} LIKE ?`).join(' OR ')})`,
+    params: columns.map(() => term),
+  };
+};
 
 const num = (v: unknown) => {
   const n = Number(v);
@@ -75,8 +99,13 @@ const num = (v: unknown) => {
     : null;
 };
 
-const nums = (v: unknown) =>
-  [...new Set((Array.isArray(v) ? v : [v]).map(num).filter((n): n is number => n !== null))];
+const nums = (v: unknown) => [
+  ...new Set(
+    (Array.isArray(v) ? v : [v])
+      .map(num)
+      .filter((n): n is number => n !== null),
+  ),
+];
 
 const key = (v?: string | null) =>
   v
@@ -192,6 +221,14 @@ export function propertyMatchQuery(c: MatchCriteria, similar?: SimilarSearch) {
   const area =
     'COALESCE(NULLIF(pd.area_sqft, 0), NULLIF(pd.built_up_area, 0), NULLIF(pd.carpet_area, 0), NULLIF(pd.plot_area, 0))';
 
+  if (c.search) {
+    const like = likeAny(
+      ['p.title', 'p.property_code', 's.locality_name', 'p.city'],
+      c.search,
+    );
+    where.push(like.sql);
+    params.push(...like.params);
+  }
   if (c.types) {
     where.push(`p.property_type IN (${placeholders(c.types)})`);
     params.push(...c.types);
@@ -224,7 +261,9 @@ export function propertyMatchQuery(c: MatchCriteria, similar?: SimilarSearch) {
   const localityRank = c.localities.length
     ? `CASE WHEN s.locality_name IN (${placeholders(c.localities)}) THEN 0 ELSE 1 END`
     : '0';
-  const bhkRank = c.bhk.length ? `COALESCE(${bhkDistance('pd.bedrooms', c.bhk)}, 99)` : '0';
+  const bhkRank = c.bhk.length
+    ? `COALESCE(${bhkDistance('pd.bedrooms', c.bhk)}, 99)`
+    : '0';
   const priceRank = similar?.target ? 'COALESCE(ABS(p.price - ?), 1e15)' : '0';
   const rankParams = [
     ...c.localities,
@@ -268,6 +307,20 @@ export function projectMatchQuery(c: MatchCriteria, similar?: SimilarSearch) {
     where.push('pr.city = ?');
     projectParams.push(c.city);
   }
+  if (c.search) {
+    const like = likeAny(
+      [
+        'pr.name',
+        'pr.project_code',
+        'pr.sublocation',
+        'pr.city',
+        'pr.builder_name',
+      ],
+      c.search,
+    );
+    where.push(like.sql);
+    projectParams.push(...like.params);
+  }
 
   const rent = c.listing === 'Rent';
   const unitPrice = rent ? 'u.monthly_rent' : 'u.price';
@@ -289,7 +342,9 @@ export function projectMatchQuery(c: MatchCriteria, similar?: SimilarSearch) {
   const localityRank = c.localities.length
     ? `CASE WHEN pr.sublocation IN (${placeholders(c.localities)}) THEN 0 ELSE 1 END`
     : '0';
-  const bhkRank = c.bhk.length ? `COALESCE(MIN(${bhkDistance('u.bedrooms', c.bhk)}), 99)` : '0';
+  const bhkRank = c.bhk.length
+    ? `COALESCE(MIN(${bhkDistance('u.bedrooms', c.bhk)}), 99)`
+    : '0';
   const priceRank = similar?.target
     ? `COALESCE(MIN(ABS(${unitPrice} - ?)), 1e15)`
     : '0';

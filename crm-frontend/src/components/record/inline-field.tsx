@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Check, ChevronDown, Loader2, Search, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { OptionSearchList } from "@/components/shared/option-search-list";
 import { formatIndianCurrencyWords, parseIndianCurrency } from "@/lib/indian-currency";
 import { cn } from "@/lib/utils";
@@ -149,6 +150,8 @@ export function InlineText({
 
 export type Option = { label: string; value: string; dot?: string; hint?: string };
 
+const NONE: Option = { label: "None", value: "__none" };
+
 export function InlineSelect({
   label,
   value,
@@ -157,6 +160,7 @@ export function InlineSelect({
   disabled,
   placeholder = "Select…",
   searchable,
+  clearable,
 }: {
   label: string;
   value: string | null | undefined;
@@ -166,10 +170,18 @@ export function InlineSelect({
   placeholder?: string;
   /** Adds a search box: for long lists like localities. */
   searchable?: boolean;
+  /** Offers "None" to empty the field; it saves "". */
+  clearable?: boolean;
 }) {
   const { saving, run } = useSaving(onSave);
   const [open, setOpen] = useState(false);
   const byValue = useMemo(() => new Map(options.map((o) => [o.value, o])), [options]);
+  // "None" shows only once something is picked: an empty field has nothing to clear.
+  const choices = clearable && value ? [NONE, ...options] : options;
+  const pick = (next: string) => {
+    const saved = next === NONE.value ? "" : next;
+    if (saved !== (value ?? "")) run(saved).catch(() => {});
+  };
   const current = value ? byValue.get(value) : undefined;
 
   if (disabled) {
@@ -194,11 +206,11 @@ export function InlineSelect({
           </PopoverTrigger>
           <PopoverContent align="start" className="w-[min(300px,calc(100vw-2rem))] gap-0 p-0">
             <OptionSearchList
-              options={options}
+              options={choices}
               value={value}
               label={label}
               placeholder={`Search ${label.toLowerCase()}…`}
-              onPick={(next) => { setOpen(false); if (next !== value) run(next).catch(() => {}); }}
+              onPick={(next) => { setOpen(false); pick(next); }}
             />
           </PopoverContent>
         </Popover>
@@ -212,7 +224,7 @@ export function InlineSelect({
       <Select
         value={value ?? ""}
         onValueChange={(next) => {
-          if (next && next !== value) run(String(next)).catch(() => {});
+          if (next) pick(String(next));
         }}
         disabled={saving}
       >
@@ -234,8 +246,8 @@ export function InlineSelect({
           </SelectValue>
         </SelectTrigger>
         <SelectContent className="max-h-[320px]" alignItemWithTrigger={false} side="bottom" align="start">
-          {options.map((opt) => (
-            <SelectItem key={opt.value} value={opt.value} className="py-1.5 text-[14px]">
+          {choices.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value} className={cn("py-1.5 text-[14px]", opt.value === NONE.value && "text-muted-foreground")}>
               <span className="flex items-center gap-2">
                 {opt.dot && <span className={cn("h-2 w-2 rounded-full", opt.dot)} />}
                 {opt.label}
@@ -595,6 +607,41 @@ export const withCurrent = (options: Option[], value?: string | null) =>
   !value || options.some((o) => o.value === value) ? options : [{ label: value, value }, ...options];
 
 // A value that opens something else to change it (e.g. the reassign dialog).
+/** A yes/no field as a checkbox; it saves as soon as it's ticked or unticked. */
+export function InlineCheck({
+  label,
+  checked,
+  onSave,
+  disabled,
+  text,
+}: {
+  label: string;
+  checked: boolean;
+  onSave: (checked: boolean) => Promise<unknown> | void;
+  disabled?: boolean;
+  /** Words beside the box, e.g. "Needed". */
+  text?: string;
+}) {
+  const [saving, setSaving] = useState(false);
+  return (
+    <FieldRow label={label}>
+      <label className={cn("flex h-8 items-center gap-2 px-2 text-[14px] text-foreground", !disabled && "cursor-pointer")}>
+        <Checkbox
+          checked={checked}
+          disabled={disabled || saving}
+          aria-label={label}
+          onCheckedChange={async (next) => {
+            setSaving(true);
+            try { await onSave(!!next); } catch { /* the caller shows the error */ } finally { setSaving(false); }
+          }}
+        />
+        {text && <span className={cn(!checked && "text-muted-foreground")}>{text}</span>}
+      </label>
+      {saving && <Spinner />}
+    </FieldRow>
+  );
+}
+
 export function InlineAction({
   label,
   children,

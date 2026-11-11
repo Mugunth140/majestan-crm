@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Clock, Loader2, RefreshCw, Send } from "lucide-react";
+import { useDraft } from "@/lib/use-draft";
 import { apiFetch } from "@/lib/api-fetch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -142,9 +143,10 @@ export function WhatsappComposer({ leadId, leadName, fallback, onSent, latest }:
   const [templates, setTemplates] = useState<WaTemplate[] | null>(null);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
   const [mode, setMode] = useState<"template" | "text" | null>(null);
-  const [picked, setPicked] = useState<string>("");
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [text, setText] = useState("");
+  // Kept while switching composer or tab; cleared once sent.
+  const [picked, setPicked] = useDraft<string>(`wa:${leadId}:template`, "");
+  const [values, setValues] = useDraft<Record<string, string>>(`wa:${leadId}:values`, {});
+  const [text, setText] = useDraft(`wa:${leadId}:text`, "");
   const [sending, setSending] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 

@@ -33,7 +33,7 @@ const LeadAttachments = dynamic(() => import("@/components/shared/lead-attachmen
 import { AssigneeButton, HEADER_BUTTON, HEADER_PRIMARY, StatusMenu } from "@/components/record/header-actions";
 import type { Person } from "@/components/record/assignee-picker";
 import { MobileHeader } from "@/components/layout/mobile-header";
-import { sortContactLogs } from "@/lib/contact-log-utils";
+import { formatTalkTime, sortContactLogs } from "@/lib/contact-log-utils";
 import {
   leadStatusDot,
   leadStatusPill,
@@ -628,6 +628,12 @@ function LeadDetail() {
   // Defensive newest-first sort (created_at, id tiebreak) — backend orders
   // the same way, but bulk device syncs share second precision.
   const contactLogs: any[] = useMemo(() => sortContactLogs(lead?.contact_logs || []), [lead]);
+  // Every call logged on the lead, from the dialer or the staff's phone.
+  const talk = useMemo(() => {
+    const calls = contactLogs.filter((log) => log.contact_type === "call");
+    const seconds = calls.reduce((sum, log) => sum + (Number(log.call_duration) || 0), 0);
+    return { calls: calls.length, connected: calls.filter((log) => Number(log.call_duration) > 0).length, seconds };
+  }, [contactLogs]);
   const sharedTotal = useMemo(() => sharedCount(timeline), [timeline]);
   const timelineFeed = useMemo(
     () => timelineItems(activityView === "shared" ? timeline.filter(isShareEntry) : timeline),
@@ -718,6 +724,18 @@ function LeadDetail() {
               aria-label="Mark as unqualified"
             />
           </div>
+        </FieldRow>
+        <FieldRow label="Talk time">
+          <span className="px-2 text-[14px] text-foreground tabular-nums">
+            {talk.calls ? (
+              <>
+                {formatTalkTime(talk.seconds)}
+                <span className="text-muted-foreground"> · {talk.connected} of {talk.calls} {talk.calls === 1 ? "call" : "calls"} answered</span>
+              </>
+            ) : (
+              <span className="text-muted-foreground">No calls yet</span>
+            )}
+          </span>
         </FieldRow>
         <FieldRow label="Created">
           <span className="px-2 text-[14px] text-foreground">
@@ -1083,6 +1101,7 @@ function LeadDetail() {
 
       <MatchesDialog
         key={autoMatches.n}
+        leadId={Number(id)}
         open={isAutoMatchOpen}
         onOpenChange={setIsAutoMatchOpen}
         matches={autoMatches}

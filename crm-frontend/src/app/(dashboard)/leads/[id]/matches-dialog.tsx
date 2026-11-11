@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Building2, Loader2 } from "lucide-react";
+import { Building2, Loader2, Search, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,10 @@ import {
   type SharedListing,
 } from "@/lib/listing-share";
 import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api-fetch";
+import { useDebounce } from "@/hooks/use-debounce";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- site rows arrive as loose API JSON */
 
@@ -176,6 +180,7 @@ function MatchRow({
  * and share them by email or WhatsApp; each goes as a branded PDF.
  */
 export function MatchesDialog({
+  leadId,
   open,
   onOpenChange,
   matches,
@@ -186,6 +191,7 @@ export function MatchesDialog({
   onWhatsapp,
   onDownload,
 }: {
+  leadId: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   matches: AutoMatches;
@@ -197,10 +203,34 @@ export function MatchesDialog({
   onWhatsapp: (listings: SharedListing[]) => Promise<void>;
   onDownload: (listings: SharedListing[]) => Promise<void>;
 }) {
-  const properties = matches.properties.map(propertyRow);
-  const projects = matches.projects.map(projectRow);
+  // Typing looks through every available listing, for ones the matches missed.
+  const [query, setQuery] = useState("");
+  const term = useDebounce(query.trim(), 300);
+  const searching = term.length >= 2;
+  const [found, setFound] = useState<(AutoMatches & { term: string }) | null>(null);
+  const [searchError, setSearchError] = useState(false);
+  useEffect(() => {
+    if (!searching) return;
+    let live = true;
+    apiFetch(`${API_URL}/leads/${leadId}/listings/search?q=${encodeURIComponent(term)}`)
+      .then((res) => res.json())
+      .then((body) => {
+        if (!live) return;
+        if (!body?.success) throw new Error();
+        setSearchError(false);
+        setFound({ term, properties: body.data.properties ?? [], projects: body.data.projects ?? [] });
+      })
+      .catch(() => { if (live) setSearchError(true); });
+    return () => { live = false; };
+  }, [leadId, term, searching]);
+  const results = searching && found?.term === term ? found : null;
+  const loadingSearch = searching && !results && !searchError;
+
+  const source = searching ? (results ?? { properties: [], projects: [] }) : matches;
+  const properties = source.properties.map(propertyRow);
+  const projects = source.projects.map(projectRow);
   const [tab, setTab] = useState<ListingKind>(
-    properties.length || !projects.length ? "property" : "project",
+    matches.properties.length || !matches.projects.length ? "property" : "project",
   );
   const [picked, setPicked] = useState<Row[]>([]);
   const [busy, setBusy] = useState<Busy>(null);
@@ -214,7 +244,7 @@ export function MatchesDialog({
         : [...list, row],
     );
   const full = picked.length >= MAX_SHARE;
-  const empty = !properties.length && !projects.length;
+  const empty = !searching && !properties.length && !projects.length;
 
   const run = async (
     kind: Exclude<Busy, null>,
@@ -250,12 +280,37 @@ export function MatchesDialog({
         <DialogHeader className="shrink-0 gap-1 px-5 pt-5 pb-0">
           <DialogTitle className="text-[16px]">Matches</DialogTitle>
           <DialogDescription>
-            Available listings that fit{" "}
-            {requirement === "Requirement"
-              ? "this requirement"
-              : requirement.toLowerCase()}
-            . Pick up to {MAX_SHARE} to send as PDFs.
+            {searching ? (
+              <>Every available listing matching your search; booked, sold and rented ones are left out.</>
+            ) : (
+              <>
+                Available listings that fit{" "}
+                {requirement === "Requirement"
+                  ? "this requirement"
+                  : requirement.toLowerCase()}
+                .
+              </>
+            )}{" "}
+            Pick up to {MAX_SHARE} to send as PDFs.
           </DialogDescription>
+          <div className="relative mt-3">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search any available property or project by name, code or area…"
+              aria-label="Search listings"
+              className="h-9 w-full rounded-lg border bg-background pl-9 pr-9 text-[14px] outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-foreground/30 [&::-webkit-search-cancel-button]:hidden"
+            />
+            {loadingSearch ? (
+              <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+            ) : query ? (
+              <button type="button" aria-label="Clear search" onClick={() => setQuery("")} className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
+                <X className="size-3.5" />
+              </button>
+            ) : null}
+          </div>
           {!empty && (
             <div
               role="tablist"
@@ -329,8 +384,13 @@ export function MatchesDialog({
             )
           ) : (
             <p className="px-5 py-16 text-center text-[14px] text-muted-foreground">
-              No {tab === "property" ? "properties" : "projects"} fit this
-              requirement.
+              {searching
+                ? loadingSearch
+                  ? "Searching…"
+                  : searchError
+                    ? "Couldn't search listings. Try again."
+                    : `No available ${tab === "property" ? "properties" : "projects"} match “${term}”.`
+                : `No ${tab === "property" ? "properties" : "projects"} fit this requirement.`}
             </p>
           )}
         </div>

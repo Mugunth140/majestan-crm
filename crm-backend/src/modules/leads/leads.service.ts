@@ -4,7 +4,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { isQueuedWebsiteSource } from './website-sources';
-import { matchCriteria, projectMatchQuery, propertyMatchQuery, SIMILAR_WHEN, similarCriteria } from './auto-match';
+import { matchCriteria, NO_CRITERIA, projectMatchQuery, propertyMatchQuery, SIMILAR_WHEN, similarCriteria } from './auto-match';
 import { photoUrl } from './share/listing-data';
 import { LeadSource } from '../../database/entities/lead-source.entity';
 import { Lead } from '../../database/entities/lead.entity';
@@ -1310,6 +1310,24 @@ export class LeadsService {
     };
     const [properties, projects] = await Promise.all([run(propertyMatchQuery), run(projectMatchQuery)]);
     return { inquiryId: inquiry.id, properties, projects };
+  }
+
+  /**
+   * Any available property or published project with an available unit whose
+   * name, code, area or builder matches what staff typed. Booked and sold
+   * listings never show, as in the matches.
+   */
+  async searchListings(search: string) {
+    const term = search.trim().slice(0, 100);
+    if (term.length < 2) return { properties: [], projects: [] };
+    const criteria = { ...NO_CRITERIA, search: term };
+    const run = async (build: typeof propertyMatchQuery | typeof projectMatchQuery) => {
+      const query = build(criteria);
+      const rows: any[] = query ? await this.siteDataSource.query(query.sql, query.params) : [];
+      return rows.map((row) => ({ ...row, match: 'search', photo: photoUrl(row.photo) }));
+    };
+    const [properties, projects] = await Promise.all([run(propertyMatchQuery), run(projectMatchQuery)]);
+    return { properties, projects };
   }
 
   async uploadDocument(leadId: number, file: Express.Multer.File, actorId: number | null = null) {

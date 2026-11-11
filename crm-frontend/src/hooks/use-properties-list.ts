@@ -64,8 +64,10 @@ export function usePropertiesList() {
       if (filters.listingType) params.listingType = filters.listingType;
       if (filters.cityId) params.cityId = filters.cityId;
       for (const key of Object.keys(EMPTY_PROPERTY_FILTERS) as (keyof PropertyFilters)[]) {
-        if (filters[key] !== '') params[key] = filters[key];
+        if (key !== 'listingStatus' && filters[key] && filters[key] !== '') params[key] = filters[key];
       }
+      // The Status filter narrows the Available tab (which holds sold and rented too).
+      if (params.status === 'available' && filters.listingStatus) params.status = filters.listingStatus;
 
       const data = await propertiesApi.list(params);
       
