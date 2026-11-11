@@ -84,6 +84,7 @@ export class LeadRoutingController {
       department,
       requestingUser?.role,
       requestingUser?.department_id,
+      Number(requestingUser?.sub) || undefined,
     );
     return { success: true, data };
   }

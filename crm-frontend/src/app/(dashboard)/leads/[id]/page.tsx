@@ -365,7 +365,8 @@ function LeadDetail() {
       .then((d) => {
         if (!d.success) throw new Error();
         setStaff((d.data as { id: number; name: string; department?: { name: string }; current_lead_count?: number }[]).map((p) => ({
-          id: p.id, name: p.name, hint: [p.department?.name, `${p.current_lead_count ?? 0} leads`].filter(Boolean).join(" · "),
+          id: p.id, name: p.id === currentUserId ? `${p.name} (you)` : p.name,
+          hint: [p.department?.name, `${p.current_lead_count ?? 0} leads`].filter(Boolean).join(" · "),
         })));
       })
       .catch(() => { setStaff([]); toast.error("Failed to load staff list"); });
@@ -987,29 +988,35 @@ function LeadDetail() {
                       </span>
                     )}
                   >
-                    {lead.interestedProperty ? (
-                      <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-[14px]">
-                        {/* TODO: move site URL to NEXT_PUBLIC_SITE_URL once added to .env */}
-                        <a
-                          href={`${process.env.NEXT_PUBLIC_SITE_URL || "https://majestan.in"}/properties/${lead.interestedProperty.slug}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 font-semibold text-[#017D58] hover:underline dark:text-[#2FB585]"
-                        >
-                          {lead.interestedProperty.title}
-                          <ArrowUpRight className="h-3.5 w-3.5 shrink-0" />
-                        </a>
-                        {lead.interestedProperty.code && <span className="text-muted-foreground">ID: {lead.interestedProperty.code}</span>}
-                        {lead.interestedProperty.propertyType && <span className="text-muted-foreground">{lead.interestedProperty.propertyType}</span>}
-                        {lead.interestedProperty.city && <span className="text-muted-foreground">{lead.interestedProperty.city}</span>}
-                        {lead.interestedProperty.price != null && (
-                          <span className="font-medium">
-                            {new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(Number(lead.interestedProperty.price))}
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-[14px] text-muted-foreground">Property details not available.</p>
+                    {lead.interestedProperty ? (() => {
+                      const p = lead.interestedProperty;
+                      const inr = (v: unknown) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(Number(v));
+                      const title = (
+                        <>
+                          {p.kind === "project" && <span className="mr-1.5 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Project</span>}
+                          {p.title}
+                        </>
+                      );
+                      return (
+                        <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-[14px]">
+                          {p.url ? (
+                            <a href={p.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 font-semibold text-[#017D58] hover:underline dark:text-[#2FB585]">
+                              {title}
+                              <ArrowUpRight className="h-3.5 w-3.5 shrink-0" />
+                            </a>
+                          ) : <span className="font-semibold">{title}</span>}
+                          {p.code && <span className="text-muted-foreground">ID: {p.code}</span>}
+                          {p.propertyType && <span className="text-muted-foreground">{p.propertyType}</span>}
+                          {p.city && <span className="text-muted-foreground">{p.city}</span>}
+                          {p.price != null && (
+                            <span className="font-medium">
+                              {p.kind === "project" && p.maxPrice != null && Number(p.maxPrice) > Number(p.price) ? `${inr(p.price)} – ${inr(p.maxPrice)}` : inr(p.price)}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })() : (
+                      <p className="text-[14px] text-muted-foreground">Listing details not available.</p>
                     )}
                   </Panel>
                 )}

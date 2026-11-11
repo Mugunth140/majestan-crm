@@ -94,23 +94,23 @@ export const inBothPeriods = (col: string, range: Range) =>
   `${col} >= ${utcStart(range.prevFrom)} AND ${col} < ${utcStart(addDays(range.to, 1))}`;
 
 /**
- * When the working clock starts for something that happened at a UTC
- * timestamp: itself during working hours, otherwise 9:00 IST on the next
- * working day. Returns a UTC timestamp expression.
+ * Working minutes from a fixed Monday up to a UTC timestamp: 9:00–18:30 IST
+ * on every day but Sunday. The difference of two of these is the working time
+ * between them, so nights and Sundays never count.
  */
-export function workClockStart(col: string) {
+export function workMinutes(col: string) {
   const ist = `(${col} + INTERVAL ${IST_OFFSET_MIN} MINUTE)`;
   const day = `CAST(${ist} AS DATE)`;
   const minute = `(hour(${ist}) * 60 + minute(${ist}))`;
-  const nextWorking = (d: string) => `(CASE WHEN dayofweek(${d}) = 0 THEN ${d} + INTERVAL 1 DAY ELSE ${d} END)`;
-  const at9 = (d: string) => `(CAST(${d} AS TIMESTAMP) + INTERVAL ${WORK_START_MIN} MINUTE)`;
-  const local = `CASE
-      WHEN dayofweek(${day}) = 0 THEN ${at9(`(${day} + INTERVAL 1 DAY)`)}
-      WHEN ${minute} < ${WORK_START_MIN} THEN ${at9(day)}
-      WHEN ${minute} >= ${WORK_END_MIN} THEN ${at9(nextWorking(`(${day} + INTERVAL 1 DAY)`))}
-      ELSE ${ist} END`;
-  return `((${local}) - INTERVAL ${IST_OFFSET_MIN} MINUTE)`;
+  const days = `date_diff('day', DATE '2024-01-01', ${day})`; // 1 Jan 2024 is a Monday
+  const perDay = WORK_END_MIN - WORK_START_MIN;
+  return `((${days} - floor(${days} / 7)) * ${perDay} + CASE WHEN dayofweek(${day}) = 0 THEN 0
+      ELSE LEAST(GREATEST(${minute} - ${WORK_START_MIN}, 0), ${perDay}) END)`;
 }
+
+/** Working minutes between two UTC timestamps (never negative). */
+export const workMinutesBetween = (from: string, to: string) =>
+  `GREATEST(${workMinutes(to)} - ${workMinutes(from)}, 0)`;
 
 /** Task weeks: days 1–7, 8–14, 15–21, 22–end of month. */
 export function taskWeek(date: string) {

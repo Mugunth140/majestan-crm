@@ -3,7 +3,10 @@
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table";
 import { ChevronRight } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useTableColumns } from "@/components/tables/use-table-columns";
+import { ColumnPicker } from "@/components/tables/column-picker";
 import { EmptyState } from "@/components/shared/empty-state";
 
 // Frappe-style "Group By" list: one header, then a collapsible section per group value.
@@ -15,6 +18,7 @@ export function GroupedList<TData>({
   renderGroupLabel,
   onRowClick,
   emptyState,
+  persistKey = "main",
 }: {
   columns: ColumnDef<TData, unknown>[];
   data: TData[];
@@ -24,8 +28,12 @@ export function GroupedList<TData>({
   renderGroupLabel?: (key: string) => ReactNode;
   onRowClick?: (row: TData) => void;
   emptyState?: ReactNode;
+  /** Shares the user's column choice with the DataTable of the same name on this page. */
+  persistKey?: string;
 }) {
-  const table = useReactTable({ data, columns, getCoreRowModel: getCoreRowModel() });
+  const pathname = usePathname();
+  const { prefKey, columnVisibility, picker } = useTableColumns(columns, pathname, persistKey);
+  const table = useReactTable({ data, columns, getCoreRowModel: getCoreRowModel(), state: { columnVisibility } });
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const groups = useMemo(() => {
@@ -43,7 +51,7 @@ export function GroupedList<TData>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, groupBy, groupOrder]);
 
-  const colCount = table.getVisibleLeafColumns().length;
+  const colCount = table.getVisibleLeafColumns().length + (prefKey ? 1 : 0);
 
   return (
     <div className="table-scroll relative w-full min-w-0 overflow-auto px-5 pt-3 md:h-full md:min-h-0 md:flex-1">
@@ -59,6 +67,11 @@ export function GroupedList<TData>({
                   {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                 </th>
               ))}
+              {prefKey && (
+                <th className="sticky right-0 z-30 h-8 w-10 rounded-r-md bg-[color-mix(in_oklab,var(--muted)_70%,var(--background))] px-1.5 text-right">
+                  <ColumnPicker {...picker} />
+                </th>
+              )}
             </tr>
           ))}
         </thead>
@@ -103,6 +116,7 @@ export function GroupedList<TData>({
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </td>
                         ))}
+                        {prefKey && <td aria-hidden="true" className="h-11 border-b border-border/60 transition-colors group-hover/row:bg-muted/40" />}
                       </tr>
                     </Fragment>
                   ))}

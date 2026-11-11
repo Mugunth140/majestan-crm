@@ -617,6 +617,20 @@ export class DashboardService {
     };
   }
 
+  /** New leads in the period per source (99acres, website…), with how many were booked. */
+  private sourceBars(id: string, rows: Record<string, number | string>[], span: Block['span']): Block {
+    const sorted = rows.map(r => ({ label: String(r.source), value: Number(r.leads ?? 0), secondary: Number(r.booked ?? 0) }))
+      .filter(r => r.value > 0).sort((a, b) => b.value - a.value);
+    const shown = sorted.length > 12 ? sorted.slice(0, 11) : sorted;
+    const rest = sorted.slice(shown.length);
+    const bars: Bar[] = shown.map(r => ({ ...r, href: leadsHref({ source: r.label }) }));
+    if (rest.length) bars.push({ label: `Other (${rest.length} sources)`, value: rest.reduce((n, r) => n + r.value, 0), secondary: rest.reduce((n, r) => n + r.secondary, 0) });
+    return {
+      kind: 'bars', id, title: 'Leads by source', subtitle: `${sorted.reduce((n, r) => n + r.value, 0)} new leads in the period, and how many were booked`,
+      fmt: 'n', span, valueLabel: 'Leads', secondaryLabel: 'Booked', bars,
+    };
+  }
+
   private async sourceQuality(range: Range, span: Block['span']): Promise<Block[]> {
     const rows = await this.store.query<{ source: string; leads: number; contacted: number; qualified: number; sv_sched: number; sv_done: number; nego: number; booked: number }>(
       Q.leadCohort({ ids: 'NULL', range, now: Q.nowLiteral() }),
@@ -699,6 +713,9 @@ export class DashboardService {
           ...(respBars.kind === 'bars' && respBars.bars.length ? [respBars] : []),
           this.trend(`${dept}-team-trend`, 'Team productivity trend', DEPT_SERIES[dept], data, ids, 'half'),
           this.activityCalendar(`${dept}-calendar`, people, data, PRIMARY[dept]),
+          ...(dept === 'telecalling' || dept === 'sales'
+            ? [this.sourceBars(`${dept}-sources`, await this.store.query<Record<string, number | string>>(Q.leadCohort({ ids: 'NULL', range: data.range, now: Q.nowLiteral() }, Q.idList(ids))), 'half')]
+            : []),
         ],
       },
       { id: 'queue', title: 'Unattended and overdue records', blocks: [await this.queue(`${dept}-queue`, 'Leads needing action', people, data.range)] },
@@ -1057,6 +1074,7 @@ export class DashboardService {
         blocks: [
           { kind: 'funnel', id: 'org-funnel', title: 'Lead-to-booking funnel', span: 'half', stages: funnel },
           { kind: 'bars', id: 'org-leakage', title: 'Stage-wise leakage', subtitle: 'Share of leads lost between steps', fmt: 'pct', span: 'half', bars: leakage },
+          this.sourceBars('org-sources', cohort, 'full'),
         ],
       },
       {

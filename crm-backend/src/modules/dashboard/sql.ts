@@ -1,5 +1,5 @@
 import {
-  addDays, inBothPeriods, istDate, periodOf, RESPONSE_SLA_MIN, utcStart, workClockStart, type Range,
+  addDays, inBothPeriods, istDate, periodOf, RESPONSE_SLA_MIN, utcStart, workMinutesBetween, type Range,
 } from './range';
 
 /**
@@ -160,7 +160,7 @@ export function statusCounters({ ids, range }: Ctx) {
 
 /**
  * Assignments to the person and how quickly they first touched the lead.
- * The clock runs in working hours only. Leads never routed count from creation.
+ * Only working time counts (9:00–18:30 IST, not Sundays). Leads never routed count from creation.
  */
 export function responseCounters({ ids, range, now }: Ctx) {
   return `
@@ -173,17 +173,19 @@ export function responseCounters({ ids, range, now }: Ctx) {
        AND NOT EXISTS (SELECT 1 FROM routing_histories r WHERE r.lead_id = l.id)
   ), touch AS (${LEAD_TOUCHES}),
   r AS (
-    SELECT a.lead_id, a.uid, a.t_at, ${workClockStart('a.t_at')} AS clock, MIN(t.ts) AS first_ts
+    SELECT a.lead_id, a.uid, a.t_at, MIN(t.ts) AS first_ts
       FROM a LEFT JOIN touch t ON t.lead_id = a.lead_id AND t.uid = a.uid AND t.ts >= a.t_at
      GROUP BY ALL
+  ), w AS (
+    SELECT *, ${workMinutesBetween('t_at', 'first_ts')} AS resp_min, ${workMinutesBetween('t_at', now)} AS waiting_min FROM r
   )
   SELECT uid, ${periodOf('t_at', range)} AS p,
     COUNT(*) AS assigned_n,
     COUNT(first_ts) AS responded_n,
-    COALESCE(SUM(GREATEST(date_diff('minute', clock, first_ts), 0)), 0) AS resp_min_sum,
-    COUNT(*) FILTER (WHERE first_ts IS NOT NULL AND date_diff('minute', clock, first_ts) <= ${RESPONSE_SLA_MIN}) AS resp_sla_n,
-    COUNT(*) FILTER (WHERE first_ts IS NULL AND clock < ${now} - INTERVAL ${RESPONSE_SLA_MIN} MINUTE) AS resp_missed_n
-  FROM r GROUP BY ALL`;
+    COALESCE(SUM(resp_min) FILTER (WHERE first_ts IS NOT NULL), 0) AS resp_min_sum,
+    COUNT(*) FILTER (WHERE first_ts IS NOT NULL AND resp_min <= ${RESPONSE_SLA_MIN}) AS resp_sla_n,
+    COUNT(*) FILTER (WHERE first_ts IS NULL AND waiting_min > ${RESPONSE_SLA_MIN}) AS resp_missed_n
+  FROM w GROUP BY ALL`;
 }
 
 /** Current portfolio of open leads owned by each person (a snapshot, no period). */

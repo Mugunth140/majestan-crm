@@ -21,6 +21,7 @@ import { LeadEventsService } from './lead-events.service';
 import { S3Client } from 'bun';
 import { extname } from 'path';
 import { fetchWatermarkedImage, isImageMimetype } from '../../common/imgproxy-watermark';
+import { WEBSITE } from './share/listing-data';
 
 export interface CreateLeadResult {
   lead: Lead | null;
@@ -37,8 +38,19 @@ export interface DuplicateLeadInfo {
   staff: string;
 }
 
+/** The website project a requirement came from (project enquiry forms keep it in preferences). */
+export function inquiryProjectId(inquiry: { preferences?: unknown; [key: string]: any } | null | undefined): number | null {
+  let prefs = inquiry?.preferences as unknown;
+  if (typeof prefs === 'string') {
+    try { prefs = JSON.parse(prefs); } catch { return null; }
+  }
+  const id = Number((prefs as { projectId?: unknown } | null)?.projectId);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+/** The newest requirement linked to a website property or project. */
 export function pickPropertyLink(inquiries?: Array<{ id: number; property_id?: number | null; [key: string]: any }> | null) {
-  const linked = (inquiries ?? []).filter((i) => i.property_id);
+  const linked = (inquiries ?? []).filter((i) => i.property_id || inquiryProjectId(i));
   if (linked.length === 0) return null;
   return linked.sort((a, b) => b.id - a.id)[0];
 }
@@ -115,9 +127,29 @@ export class LeadsService {
     let interestedProperty: {
       id: number; title: string; code: string | null; slug: string | null;
       price: string | number | null; propertyType: string | null; status: string | null; city: string | null;
+      url: string | null; kind: 'property' | 'project'; maxPrice?: string | number | null;
     } | null = null;
+    const projectId = link && !link.property_id ? inquiryProjectId(link) : null;
     try {
-      if (link) {
+      if (projectId) {
+        // A project enquiry: the project, with the price range of its units.
+        const rows: any[] = await this.siteDataSource.query(
+          `SELECT p.id, p.name AS title, p.project_code AS code, p.canonical_slug AS slug, p.project_type AS propertyType,
+                  p.status, p.city, MIN(NULLIF(u.price, 0)) AS price, MAX(NULLIF(u.price, 0)) AS maxPrice
+             FROM projects p LEFT JOIN project_units u ON u.project_id = p.id
+            WHERE p.id = ? GROUP BY p.id LIMIT 1`,
+          [projectId],
+        );
+        const p = rows[0];
+        if (p) {
+          interestedProperty = {
+            id: p.id, title: p.title, code: p.code ?? null, slug: p.slug ?? null,
+            price: p.price ?? null, maxPrice: p.maxPrice ?? null, propertyType: p.propertyType ?? null,
+            status: p.status ?? null, city: p.city ?? null,
+            url: p.slug ? `${WEBSITE}/${p.slug}` : null, kind: 'project',
+          };
+        }
+      } else if (link) {
         const rows: any[] = await this.siteDataSource.query(
           'SELECT id, title, property_code AS code, slug, price, property_type AS propertyType, status, city FROM properties WHERE id = ? LIMIT 1',
           [link.property_id],
@@ -135,6 +167,7 @@ export class LeadsService {
             id: p.id, title: p.title, code: p.code ?? null, slug: p.slug ?? null,
             price: p.price ?? null, propertyType: p.propertyType ?? null,
             status: p.status ?? null, city: p.city ?? null,
+            url: p.slug ? `${WEBSITE}/property/${p.slug}` : null, kind: 'property',
           };
         }
       }
@@ -142,10 +175,13 @@ export class LeadsService {
       console.warn('[LeadsService] site-DB unavailable for lead detail; interestedProperty will be null:', (err as Error)?.message);
     }
 
+    // The visit shown is the linked requirement's, or else the newest one with a visit date.
+    const visitInquiry = link?.visit_date != null ? link
+      : [...((lead.inquiries as any[]) ?? [])].filter((i) => i.visit_date != null).sort((a, b) => b.id - a.id)[0];
     const visit =
-      link?.visit_date != null
+      visitInquiry?.visit_date != null
         // visit_slot is SQL TIME: mysql2 returns 'HH:MM:SS'; Task 12 (crm-fe) slices to 'HH:MM'
-        ? { date: link.visit_date, slot: link.visit_slot ?? null, intent: link.intent ?? 'enquiry' }
+        ? { date: visitInquiry.visit_date, slot: visitInquiry.visit_slot ?? null, intent: visitInquiry.intent ?? 'enquiry' }
         : null;
 
     return { ...lead, follow_ups: followUps, contact_logs: contactLogs, interestedProperty, visit };

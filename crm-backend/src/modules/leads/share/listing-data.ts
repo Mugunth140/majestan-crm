@@ -31,7 +31,7 @@ export interface Listing {
   photos: string[];
 }
 
-const WEBSITE = 'https://www.majestanrealty.com';
+export const WEBSITE = 'https://www.majestanrealty.com';
 const MAX_PHOTOS = 16;
 
 const has = (v: unknown) =>

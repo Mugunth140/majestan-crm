@@ -877,7 +877,7 @@ export class LeadRoutingService {
   }
 
   // ── Staff List ─────────────────────────────────────────────────────────────
-  async getStaffList(department: string, requestingUserRole?: string, requestingUserDeptId?: number) {
+  async getStaffList(department: string, requestingUserRole?: string, requestingUserDeptId?: number, requestingUserId?: number) {
     const qb = this.dataSource
       .getRepository(User)
       .createQueryBuilder('u')
@@ -904,6 +904,20 @@ export class LeadRoutingService {
     }
 
     const users = await qb.getMany();
+
+    // Team Leads and Managers can take a lead themselves: list them first,
+    // even when the filters above (Staff only, a department) leave them out.
+    if (requestingUserId && (requestingUserRole === 'Team Lead' || requestingUserRole === 'Manager')) {
+      const index = users.findIndex((u) => u.id === requestingUserId);
+      if (index > 0) users.unshift(...users.splice(index, 1));
+      if (index === -1) {
+        const me = await this.dataSource.getRepository(User).findOne({
+          where: { id: requestingUserId, is_active: true },
+          relations: { role: true, department: true },
+        });
+        if (me) users.unshift(me);
+      }
+    }
 
     if (users.length === 0) return [];
 

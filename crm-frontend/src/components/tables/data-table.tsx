@@ -17,12 +17,20 @@ import {
 import { memo, useEffect, useRef, useState, type CSSProperties, type ReactElement, type ReactNode, type RefObject } from "react";
 import { usePathname } from "next/navigation";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useTableColumns } from "@/components/tables/use-table-columns";
+import { ColumnPicker } from "@/components/tables/column-picker";
 
 declare module "@tanstack/react-table" {
   interface ColumnMeta<TData, TValue> {
     hideOnMobile?: boolean;
     /** Fixed pixel width for narrow columns (e.g. Actions). Opt-in only. */
     fixedWidth?: number;
+    /** Name in the Columns menu when the header isn't plain text. */
+    label?: string;
+    /** Starts hidden; the user can turn it on from the Columns menu. */
+    defaultHidden?: boolean;
+    /** False keeps the column out of the Columns menu (always shown). */
+    hideable?: boolean;
   }
 }
 
@@ -119,6 +127,8 @@ export function DataTable<TData, TValue>({
   const [pageSize, setPageSize] = persistKey === false ? [localPageSize, setLocalPageSize] : [savedPageSize, setSavedPageSize];
   const clientPagination: PaginationState = { pageIndex, pageSize };
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  // Columns each user chooses to show, saved for them only (see ColumnPicker).
+  const { prefKey, columnVisibility, visibleKey, picker } = useTableColumns(columns, pathname, persistKey === false ? null : persistKey || "main");
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   // Rows are memoised, so they read the latest click handler through a ref.
   const onRowClickRef = useRef(onRowClick);
@@ -148,6 +158,7 @@ export function DataTable<TData, TValue>({
       sorting,
       columnFilters,
       rowSelection,
+      columnVisibility,
       pagination: manualPagination && pagination ? pagination : clientPagination,
     },
     ...(manualPagination
@@ -285,6 +296,16 @@ export function DataTable<TData, TValue>({
                       : flexRender(header.column.columnDef.header, header.getContext())}
                   </TableHead>
                 ))}
+                {prefKey && (
+                  <TableHead
+                    className={cn(
+                      "sticky right-0 z-30 w-10 px-1.5 text-right",
+                      isList ? cn("h-8 rounded-r-md", STICKY_HEAD_RIGHT) : "h-11 bg-muted",
+                    )}
+                  >
+                    <ColumnPicker {...picker} />
+                  </TableHead>
+                )}
               </TableRow>
             ))}
           </TableHeader>
@@ -299,20 +320,23 @@ export function DataTable<TData, TValue>({
                     isList={isList}
                     onRowClick={onRowClickRef}
                     enterIndex={entering ? i : undefined}
+                    trailing={!!prefKey}
+                    visibleKey={visibleKey}
                   />
                 ))}
                 {Array.from({ length: hidePagination || isList ? 0 : Math.max(0, table.getState().pagination.pageSize - table.getRowModel().rows.length) }).map((_, i) => (
                   <TableRow key={`empty-${i}`} className="hover:bg-transparent border-b border-border/40">
-                    {columns.map((col, colIdx) => (
+                    {table.getVisibleLeafColumns().map((col, colIdx) => (
                       <TableCell 
                         key={`empty-cell-${i}-${colIdx}`} 
                         className={cn(
                           "py-2.5 px-4 h-[45px] border-r border-border/40 last:border-r-0",
                           colIdx === 0 ? "sticky left-0 z-10 bg-card" : "",
-                          (col.meta as any)?.hideOnMobile ? "hidden md:table-cell" : ""
+                          (col.columnDef.meta as any)?.hideOnMobile ? "hidden md:table-cell" : ""
                         )} 
                       />
                     ))}
+                    {prefKey && <TableCell className="h-[45px]" />}
                   </TableRow>
                 ))}
               </>
@@ -436,6 +460,8 @@ const ENTER_MAX_ROWS = 16;
 // opaque colours, so rows scrolling sideways never show through or beside them.
 const GUTTER = "before:pointer-events-none before:absolute before:inset-y-0 before:-left-5 before:w-5 before:bg-background";
 const STICKY_HEAD = cn("bg-[color-mix(in_oklab,var(--muted)_70%,var(--background))]", GUTTER);
+// The Columns button's cell, pinned to the right edge of the header.
+const STICKY_HEAD_RIGHT = "bg-[color-mix(in_oklab,var(--muted)_70%,var(--background))]";
 const STICKY_CELL = cn(
   GUTTER,
   "bg-background group-hover/row:bg-[color-mix(in_oklab,var(--muted)_40%,var(--background))] group-data-[state=selected]/row:bg-[color-mix(in_oklab,var(--muted)_60%,var(--background))]",
@@ -450,12 +476,17 @@ const DataRow = memo(function DataRow<TData>({
   isList,
   onRowClick,
   enterIndex,
+  trailing,
 }: {
   row: Row<TData>;
   selected: boolean;
   isList: boolean;
   onRowClick: RefObject<((row: TData) => void) | undefined>;
   enterIndex?: number;
+  /** An empty cell under the Columns button. */
+  trailing?: boolean;
+  /** Changes when the user shows or hides a column, so the row redraws. */
+  visibleKey?: string;
 }) {
   const entering = enterIndex !== undefined && enterIndex < ENTER_MAX_ROWS;
   return (
@@ -490,6 +521,16 @@ const DataRow = memo(function DataRow<TData>({
           {flexRender(cell.column.columnDef.cell, cell.getContext())}
         </TableCell>
       ))}
+      {trailing && (
+        <TableCell
+          aria-hidden="true"
+          className={cn(
+            isList
+              ? "h-11 border-b border-border/60 px-0 transition-colors group-hover/row:bg-muted/40 group-data-[state=selected]/row:bg-muted/60 last:rounded-r-md"
+              : "px-0",
+          )}
+        />
+      )}
     </TableRow>
   );
 }) as <TData>(props: {
@@ -498,4 +539,6 @@ const DataRow = memo(function DataRow<TData>({
   isList: boolean;
   onRowClick: RefObject<((row: TData) => void) | undefined>;
   enterIndex?: number;
+  trailing?: boolean;
+  visibleKey?: string;
 }) => ReactElement;
