@@ -86,6 +86,15 @@ interface DataTableProps<TData, TValue> {
   pageSizeOptions?: number[];
 }
 
+/** Which rows a list holds, in order: by id where rows have one, else by count. */
+export function rowSignature(rows: readonly unknown[]): string {
+  const ids = rows.map((r) => {
+    const o = r as { id?: unknown; code?: unknown } | null;
+    return o && (o.id ?? o.code) != null ? String(o.id ?? o.code) : "";
+  });
+  return ids.every((id) => id === "") ? `#${rows.length}` : ids.join(",");
+}
+
 export function DataTable<TData, TValue>({
   columns,
   data,
@@ -181,12 +190,18 @@ export function DataTable<TData, TValue>({
   // The first non-empty data is the restore point: keep the saved page, but
   // pull it back if the list shrank. Any later data change (tab/search/filter
   // on the parent) returns to page 1, like TanStack's default auto-reset.
+  // A refetch that brings back the same rows (a re-render, a background
+  // refresh) keeps the page; only a different set of rows starts over.
   const seenDataRef = useRef<TData[] | null>(null);
+  const seenRowsRef = useRef<string | null>(null);
   const restoredRef = useRef(false);
   useEffect(() => {
     if (manualPagination || seenDataRef.current === data) return;
     seenDataRef.current = data;
     if (data.length === 0) return;
+    const rowsKey = rowSignature(data);
+    if (rowsKey === seenRowsRef.current) return;
+    seenRowsRef.current = rowsKey;
     if (!restoredRef.current) {
       restoredRef.current = true;
       const lastPage = Math.max(0, Math.ceil(table.getPrePaginationRowModel().rows.length / pageSize) - 1);

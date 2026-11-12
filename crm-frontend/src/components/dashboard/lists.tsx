@@ -31,8 +31,11 @@ export function DeltaPill({ d, className }: { d: Delta | null; className?: strin
 export function Kpis({ block }: { block: BlockOf<"kpis"> }) {
   const { focus, setFocus, trendKeys } = useDash();
   const many = block.metrics.length;
+  // Columns follow the width the tiles actually get (a half-width "Your own
+  // work" row is much narrower than the screen), so labels never crush.
   return (
-    <div className={cn("grid grid-cols-2 gap-3 sm:gap-4", many % 4 === 0 ? "lg:grid-cols-4" : many >= 4 && "md:grid-cols-3 xl:grid-cols-4", many === 3 && "md:grid-cols-3", many >= 10 && "2xl:grid-cols-5")}>
+    <div className="@container">
+    <div className={cn("grid grid-cols-1 gap-3 @[20rem]:grid-cols-2 sm:gap-4", many % 4 === 0 ? "@2xl:grid-cols-4" : many >= 4 && "@xl:grid-cols-3 @4xl:grid-cols-4", many === 3 && "@xl:grid-cols-3", many >= 10 && "@6xl:grid-cols-5")}>
       {block.metrics.map((m, i) => {
         const linked = !!m.series && trendKeys.has(m.series);
         const active = linked && focus === m.series;
@@ -49,6 +52,7 @@ export function Kpis({ block }: { block: BlockOf<"kpis"> }) {
           />
         );
       })}
+    </div>
     </div>
   );
 }
@@ -369,7 +373,8 @@ export function Targets({ block }: { block: BlockOf<"targets"> }) {
   const { openPerson, canOpen } = useDash();
   if (!block.rows.length) return <EmptyChart>No targets set for this month</EmptyChart>;
   return (
-    <div className={cn("grid gap-3", block.personal && block.rows.length > 1 && "md:grid-cols-2")}>
+    <div className="@container">
+    <div className={cn("grid gap-3", block.personal && block.rows.length > 1 && "@lg:grid-cols-2", block.personal && block.rows.length >= 4 && "@5xl:grid-cols-4", block.personal && block.rows.length === 3 && "@4xl:grid-cols-3")}>
       {block.rows.map((r) => {
         const pct = r.monthly ? (r.achieved / r.monthly) * 100 : 0;
         const pace = r.monthly ? (r.expected / r.monthly) * 100 : 0;
@@ -405,6 +410,7 @@ export function Targets({ block }: { block: BlockOf<"targets"> }) {
           </div>
         );
       })}
+    </div>
     </div>
   );
 }

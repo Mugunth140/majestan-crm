@@ -60,7 +60,7 @@ const PRIMARY: Record<DeptKey, string> = {
   telecalling: 'calls', sales: 'calls', collection: 'calls', sourcing: 'sourced', hr: 'hr_moves', digital: 'tasks', design: 'tasks', other: 'calls',
 };
 const SALES_STAGES = ['New Lead', 'Contacted', 'Qualified', 'Property Shared', 'Interested', 'Site Visit Scheduled', 'Site Visit Completed', 'Re Visit Scheduled', 'Re Visit Completed', 'Negotiation', 'Booking Advance', 'Agreement', 'Closed Won'];
-const HR_STAGES = ['New Application', 'Resume Shortlisted', 'Interview Scheduled', 'Interview Completed', 'Selected', 'Offer Sent', 'Joined'];
+const HR_STAGES = ['New Application', 'Contacted', 'Resume Shortlisted', 'Interview Scheduled', 'Interview Completed', 'Selected', 'Offer Sent', 'Joined'];
 const leadsHref = (params: Record<string, string | number>) => `/leads?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)]))}`;
 
 @Injectable()
@@ -724,8 +724,9 @@ export class DashboardService {
       const own = data.targets.filter(t => t.personId === viewer.id);
       sections.push({
         id: 'own', title: 'Your own work', blocks: [
-          this.kpis('own-kpis', 'Your activity', HEADLINE[dept].slice(0, 4), data, [viewer.id], people, own.length ? 'half' : 'full'),
-          ...(own.length ? [{ kind: 'targets', id: 'own-targets', title: 'Your targets', span: 'half', rows: own, personal: true } as Block] : []),
+          // Full width each: side by side, four tiles and four targets were too cramped to read on a laptop.
+          this.kpis('own-kpis', 'Your activity', HEADLINE[dept].slice(0, 4), data, [viewer.id], people, 'full'),
+          ...(own.length ? [{ kind: 'targets', id: 'own-targets', title: 'Your targets', span: 'full', rows: own, personal: true } as Block] : []),
         ],
       });
     }

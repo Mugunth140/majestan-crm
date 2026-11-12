@@ -3,10 +3,11 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 
 // Remembers list-page UI state (tabs, toggles, filters, search, page) so staff
-// who open a record and come back land where they were. sessionStorage: it
-// survives reloads and in-app navigation but stays scoped to the browser tab,
-// so a fresh tab starts clean. Keys are per user so a different login in the
-// same tab never inherits someone else's filters.
+// who open a record and come back land where they were. localStorage: it stays
+// on the device across reloads, new tabs, closing the browser and the
+// installed app, so a record opened in another tab or the next morning still
+// finds the list as it was left. Keys are per user so a different login on
+// the same device never inherits someone else's filters.
 //
 // Reads happen in the useState initializer, which is only safe because the
 // dashboard layout mounts pages client-side (see useIsClient there) — on the
@@ -58,7 +59,7 @@ export function reviveValue<T>(raw: unknown, initial: T, options: PersistedState
 
 function read(storageKey: string): unknown {
   try {
-    const raw = sessionStorage.getItem(storageKey);
+    const raw = localStorage.getItem(storageKey);
     return raw === null ? undefined : JSON.parse(raw);
   } catch {
     return undefined; // storage blocked or corrupt entry
@@ -67,11 +68,16 @@ function read(storageKey: string): unknown {
 
 function write(storageKey: string, value: unknown) {
   try {
-    if (value === undefined) sessionStorage.removeItem(storageKey);
-    else sessionStorage.setItem(storageKey, JSON.stringify(value));
+    if (value === undefined) localStorage.removeItem(storageKey);
+    else localStorage.setItem(storageKey, JSON.stringify(value));
   } catch {
     // Non-fatal: the page just won't remember its place.
   }
+}
+
+/** Set a list's remembered state from elsewhere (e.g. open the Queue tab after creating an inbound). */
+export function setPersistedState(key: string, value: unknown) {
+  write(persistedStateKey(key), value);
 }
 
 export function usePersistedState<T>(

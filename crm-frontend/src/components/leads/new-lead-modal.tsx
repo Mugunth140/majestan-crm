@@ -23,6 +23,7 @@ import {
   PROPERTY_CATEGORIES, PROPERTY_TYPES_MAP, PURCHASE_TIMELINES, PURCHASE_TYPES, QUALIFICATION_PURPOSES,
 } from "@/lib/lead-constants";
 import { parseIndianCurrency } from "@/lib/indian-currency";
+import { siteFieldValue, siteFieldsFor, siteFieldsTitle } from "@/lib/requirement-site-fields";
 import { joinProjects, searchProjects } from "@/lib/project-search";
 import type { DuplicateLeadInfo } from "@/lib/lead-import";
 import { cn } from "@/lib/utils";
@@ -50,6 +51,8 @@ type StepKey = (typeof STEPS)[number]["key"];
 type Prefs = Partial<Record<"minBudget" | "maxBudget" | "furnished" | "floorNumber" | "minArea" | "maxArea", string>> & {
   bhk?: string[];
   facing?: string[];
+  /** Commercial / industrial site needs (see requirement-site-fields). */
+  site?: Record<string, string | boolean>;
 };
 
 const EMPTY = {
@@ -260,7 +263,13 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
         if (created.success) source = created.data.value;
       }
       const assignee = isStaff ? (form.assignee === "queue" ? null : user?.id ?? null) : form.assignee === "queue" ? null : Number(form.assignee);
-      const prefs: Record<string, unknown> = Object.fromEntries(Object.entries(form.prefs).filter(([, v]) => v !== "" && v != null && !(Array.isArray(v) && !v.length)));
+      const { site = {}, ...plainPrefs } = form.prefs;
+      const prefs: Record<string, unknown> = Object.fromEntries(Object.entries(plainPrefs).filter(([, v]) => v !== "" && v != null && !(Array.isArray(v) && !v.length)));
+      // Only the questions the chosen category asks; answers left from another category are dropped.
+      for (const f of siteFieldsFor(form.category)) {
+        const v = siteFieldValue(f, site[f.key]);
+        if (v != null) prefs[f.key] = v;
+      }
       if (prefs.minBudget) prefs.minBudget = parseIndianCurrency(String(prefs.minBudget));
       if (prefs.maxBudget) prefs.maxBudget = parseIndianCurrency(String(prefs.maxBudget));
       const city = cities?.find((c) => String(c.id) === form.city)?.city_name ?? "";
@@ -542,6 +551,36 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
               <Input id="nl-maxa" type="number" min="0" value={p.maxArea ?? ""} onChange={(e) => setPref("maxArea", e.target.value)} placeholder="sq ft" className={INPUT} />
             </FocusField>
           </FieldRow>
+        )}
+        {siteFieldsFor(form.category).length > 0 && (
+          <div className="space-y-3 pt-1">
+            <p className="text-[13px] font-medium text-muted-foreground">{siteFieldsTitle(form.category)}</p>
+            <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
+              {siteFieldsFor(form.category).map((f) => {
+                const v = p.site?.[f.key];
+                const put = (val: string | boolean) => setPref("site", { ...p.site, [f.key]: val });
+                const id = `nl-site-${f.key}`;
+                if (f.kind === "check") {
+                  return (
+                    <label key={f.key} htmlFor={id} className="flex items-center gap-2 self-end text-[14px]">
+                      <input id={id} type="checkbox" checked={v === true} onChange={(e) => put(e.target.checked)} className="size-4 accent-[#017D58]" />
+                      {f.checkText ?? f.label}
+                    </label>
+                  );
+                }
+                return (
+                  <FocusField key={f.key} label={f.unit ? `${f.label} (${f.unit})` : f.label} htmlFor={f.kind === "select" ? undefined : id} optional>
+                    {f.kind === "select" ? (
+                      <FormSelect name={id} placeholder="Select" className={SELECT} value={typeof v === "string" && v ? v : null} options={f.options ?? []} onValueChange={(val) => put(val ?? "")} />
+                    ) : (
+                      <Input id={id} type={f.kind === "number" ? "number" : "text"} min={f.kind === "number" ? "0" : undefined}
+                        value={typeof v === "string" ? v : ""} onChange={(e) => put(e.target.value)} placeholder={f.placeholder} className={INPUT} />
+                    )}
+                  </FocusField>
+                );
+              })}
+            </div>
+          </div>
         )}
         {!form.category && (
           <p className="rounded-lg border border-dashed px-4 py-3 text-[14px] text-muted-foreground">

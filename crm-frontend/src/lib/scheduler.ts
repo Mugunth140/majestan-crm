@@ -150,3 +150,18 @@ export function formatWhen(date: string | null, time: string | null, now = new D
   const [h, min] = time.split(":").map(Number);
   return `${label} · ${h % 12 || 12}:${String(min).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 }
+
+/**
+ * Whether an item matches what was typed in the scheduler's search: its
+ * name, ID (HRC0012, with or without the prefix and zeros) or phone number
+ * (spaces, dashes and +91 ignored).
+ */
+export function matchesScheduleSearch(item: Pick<ScheduleItem, "name" | "code" | "mobile">, query: string) {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  if (item.name?.toLowerCase().includes(q) || item.code?.toLowerCase().includes(q)) return true;
+  const idDigits = q.match(/^[a-z#]*0*(\d+)$/)?.[1];
+  if (idDigits && item.code && item.code.replace(/^\D+0*/, "") === idDigits) return true;
+  const digits = q.replace(/\D/g, "");
+  return digits.length >= 3 && /^[+\d\s()-]+$/.test(q) && (item.mobile ?? "").replace(/\D/g, "").includes(digits.length > 10 ? digits.slice(-10) : digits);
+}

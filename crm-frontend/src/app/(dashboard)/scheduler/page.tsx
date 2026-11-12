@@ -6,6 +6,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { apiFetch } from "@/lib/api-fetch";
 import { cn } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useDebounce } from "@/hooks/use-debounce";
 import { DataTable } from "@/components/tables/data-table";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { IdCell, NameCell, StatusCell } from "@/components/tables/cells";
@@ -14,6 +15,7 @@ import { MobileHeader } from "@/components/layout/mobile-header";
 import {
   ListBody,
   ListFrame,
+  ToolbarSearch,
 } from "@/components/layout/list-page";
 import { ClearFilters, FilterStrip, QuickFilter, toOptions } from "@/components/shared/quick-filters";
 import { ACTION_FILTERS, type ActionFilter } from "@/lib/action-filters";
@@ -27,6 +29,7 @@ import {
   inboundItem,
   isDoneView,
   leadItem,
+  matchesScheduleSearch,
   sortItems,
   viewKey,
   type ScheduleItem,
@@ -68,7 +71,7 @@ async function getJson(path: string) {
 }
 const safe = (path: string) => getJson(path).catch(() => null);
 
-function leadQuery(view: ScheduleView, limit: number, filters: Filters) {
+function leadQuery(view: ScheduleView, limit: number, filters: Filters, search: string) {
   const params = new URLSearchParams({
     page: "1",
     limit: String(limit),
@@ -78,6 +81,7 @@ function leadQuery(view: ScheduleView, limit: number, filters: Filters) {
   });
   if (filters.staff) params.set("staff", filters.staff);
   if (filters.status) params.set("status", filters.status);
+  if (search) params.set("search", search);
   return `/leads?${params}`;
 }
 
@@ -111,6 +115,9 @@ export default function SchedulerPage() {
     "scheduler:filters",
     NO_FILTERS,
   );
+  // Narrows every tab at once, so each tile's count says where the matches are.
+  const [searchQuery, setSearchQuery] = usePersistedState("scheduler:search", "");
+  const search = useDebounce(searchQuery, 300).trim();
   const [viewer, setViewer] = useState({ id: 0, role: "", department: "" });
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is client-only
@@ -135,7 +142,7 @@ export default function SchedulerPage() {
   };
   const key = viewKey(view);
   const leadsShown = !filters.module || filters.module === "lead";
-  const leadFilterKey = `${filters.staff}|${filters.status}`;
+  const leadFilterKey = `${filters.staff}|${filters.status}|${search}`;
 
   useEffect(() => {
     let live = true;
@@ -163,7 +170,7 @@ export default function SchedulerPage() {
     let live = true;
     (async () => {
       const counts = await Promise.all(
-        SCHEDULE_VIEWS.map((v) => safe(leadQuery(v, 1, filters))),
+        SCHEDULE_VIEWS.map((v) => safe(leadQuery(v, 1, filters, search))),
       );
       if (!live) return;
       setLeadCounts(
@@ -196,7 +203,7 @@ export default function SchedulerPage() {
   const loading = leads.request !== request;
   useEffect(() => {
     let live = true;
-    safe(leadQuery(view, LEAD_LIMIT, filters)).then((data) => {
+    safe(leadQuery(view, LEAD_LIMIT, filters, search)).then((data) => {
       if (live) setLeads({ request, rows: (data?.data ?? []).map(leadItem) });
     });
     return () => {
@@ -220,8 +227,9 @@ export default function SchedulerPage() {
     (i: ScheduleItem) =>
       (!filters.module || i.module === filters.module) &&
       (!filters.staff || i.staff === filters.staff) &&
-      (!filters.status || i.status === filters.status),
-    [filters],
+      (!filters.status || i.status === filters.status) &&
+      matchesScheduleSearch(i, search),
+    [filters, search],
   );
 
   const othersFor = useCallback(
@@ -369,7 +377,9 @@ export default function SchedulerPage() {
             : "Nothing scheduled"
       }
       description={
-        activeFilters
+        search
+          ? `Nothing here matches “${search}”. Check the other tabs' counts.`
+          : activeFilters
           ? "Try clearing a filter."
           : done
             ? "Follow-ups made on this day will show up here."
@@ -437,6 +447,10 @@ export default function SchedulerPage() {
             })}
           </div>
 
+          <div className="px-4 pt-3 md:hidden">
+            <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search name, ID, phone" className="[&_input]:h-10 [&_input]:text-[16px]" />
+          </div>
+
           {/* Under the tiles: Today's to-do / done split, and the filters */}
           <div className="flex min-h-11 items-end gap-2 border-b px-4 pt-2 md:px-5">
             {bucket === "Today" ? (
@@ -470,8 +484,9 @@ export default function SchedulerPage() {
                 </span>
               </p>
             )}
-            <div className="mb-1.5 ml-auto flex min-w-0 max-w-full justify-end">
+            <div className="mb-1.5 ml-auto flex min-w-0 max-w-full items-center justify-end gap-2">
               <FilterStrip>{filterBar}</FilterStrip>
+              <ToolbarSearch value={searchQuery} onChange={setSearchQuery} placeholder="Search name, ID, phone" className="hidden shrink-0 md:block md:[&_input]:w-56" />
             </div>
           </div>
 
@@ -488,7 +503,7 @@ export default function SchedulerPage() {
                   data={rows}
                   onRowClick={(i) => router.push(i.href)}
                   emptyState={empty}
-                  persistKey={false}
+                  persistKey="schedule"
                 />
               </div>
             )}

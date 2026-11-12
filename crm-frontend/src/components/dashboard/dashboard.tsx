@@ -199,7 +199,8 @@ function Tabs({ tabs, active, onChange }: { tabs: Report["tabs"]; active: string
 const SPAN: Record<Span, string> = {
   full: "md:col-span-2 lg:col-span-12",
   twoThirds: "md:col-span-2 lg:col-span-8",
-  half: "md:col-span-2 lg:col-span-6",
+  // Side by side only once two cards each get a readable width (a laptop with the sidebar open is not enough).
+  half: "md:col-span-2 lg:col-span-12 xl:col-span-6",
   third: "md:col-span-1 lg:col-span-4",
 };
 

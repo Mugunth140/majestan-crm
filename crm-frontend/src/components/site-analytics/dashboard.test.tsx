@@ -110,11 +110,11 @@ describe("website analytics dashboard", () => {
     fireEvent.click(screen.getByRole("button", { name: /Period:/ }));
     fireEvent.click(screen.getByRole("option", { name: "Last 6 months" }));
     expect(
-      sessionStorage.getItem("crm_view:anon:site-analytics:range"),
+      localStorage.getItem("crm_view:anon:site-analytics:range"),
     ).toContain('"180"');
   });
   it("explains a saved custom range that is too long", () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       "crm_view:anon:site-analytics:range",
       JSON.stringify({ preset: "custom", from: "2024-01-01", to: "2026-11-06" }),
     );

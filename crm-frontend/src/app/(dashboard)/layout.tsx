@@ -23,7 +23,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Pages restore their saved tabs/filters/page from sessionStorage on first
+  // Pages restore their saved tabs/filters/page from localStorage on first
   // render, which the server can't see — so mount them client-side only. In-app
   // navigation is unaffected; a hard reload shows the loading skeleton a frame.
   const isClient = useIsClient();

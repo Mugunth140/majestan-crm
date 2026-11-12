@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Camera, Loader2, MapPin, Plus, UploadCloud, X } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
 import { inboundLocation } from "@/lib/inbound-location";
-import { persistedStateKey } from "@/hooks/use-persisted-state";
+import { setPersistedState } from "@/hooks/use-persisted-state";
 import { INBOUND_STATUS_OPTIONS } from "@/lib/inbound-status";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,8 +36,8 @@ type StepKey = (typeof INBOUND_STEPS)[number]["key"];
 /** After a phone capture, the list opens on the Queue with no stale search or filters. */
 export function showQueueNext() {
   try {
-    sessionStorage.setItem(persistedStateKey("inbound:tab"), JSON.stringify("Queue"));
-    for (const key of ["inbound:search", "inbound:filters", "inbound:queueFilters"]) sessionStorage.removeItem(persistedStateKey(key));
+    setPersistedState("inbound:tab", "Queue");
+    for (const key of ["inbound:search", "inbound:filters", "inbound:queueFilters"]) setPersistedState(key, undefined);
   } catch { /* The capture still succeeded when browser storage is unavailable. */ }
 }
 

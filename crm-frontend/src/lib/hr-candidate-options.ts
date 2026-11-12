@@ -21,6 +21,6 @@ export const HR_DEPARTMENTS = ['Sales', 'Telecalling', 'Sourcing', 'Channel Part
 
 /** Every status a candidate moves through, in order. */
 export const HR_STATUSES = [
-  'New Application', 'Resume Shortlisted', 'Interview Scheduled', 'Interview Completed',
+  'New Application', 'Contacted', 'Resume Shortlisted', 'Interview Scheduled', 'Interview Completed',
   'Selected', 'Offer Sent', 'Joined', 'Rejected', 'Hold',
 ];

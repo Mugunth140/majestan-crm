@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SCHEDULE_VIEWS, agentItem, formatWhen, inView, isDoneView, sortItems, viewKey } from "./scheduler";
+import { SCHEDULE_VIEWS, agentItem, formatWhen, inView, isDoneView, matchesScheduleSearch, sortItems, viewKey } from "./scheduler";
 import { notificationHref, notificationSentence, reminderParts } from "./notification-text";
 
 // 08:45 UTC on 5 Nov is 14:15 in India.
@@ -66,4 +66,21 @@ describe("notification text", () => {
     expect(notificationHref({ entity_id: 3, entity_type: "user" })).toBeNull();
     expect(notificationHref({ lead_id: 8 })).toBe("/leads/8");
   });
+});
+
+describe("matchesScheduleSearch", () => {
+  const item = { name: "Ravi Kumar", code: "L00425", mobile: "+91 98765 43210" };
+  it("matches everything when the search is empty", () => expect(matchesScheduleSearch(item, "  ")).toBe(true));
+  it("matches part of the name, any case", () => expect(matchesScheduleSearch(item, "kum")).toBe(true));
+  it("matches the ID with or without prefix and zeros", () => {
+    expect(matchesScheduleSearch(item, "L00425")).toBe(true);
+    expect(matchesScheduleSearch(item, "425")).toBe(true);
+    expect(matchesScheduleSearch(item, "426")).toBe(false);
+  });
+  it("matches a phone number typed in any format", () => {
+    expect(matchesScheduleSearch(item, "98765-43210")).toBe(true);
+    expect(matchesScheduleSearch(item, "+919876543210")).toBe(true);
+    expect(matchesScheduleSearch(item, "43210")).toBe(true);
+  });
+  it("misses other names", () => expect(matchesScheduleSearch(item, "suresh")).toBe(false));
 });

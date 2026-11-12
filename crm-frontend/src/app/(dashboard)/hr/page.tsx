@@ -25,7 +25,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { ListFrame, ListToolbar, SegmentTabs, ToolbarEnd, ToolbarSearch, headerButtonClass, headerPrimaryClass, toolbarFilterButton } from "@/components/layout/list-page";
-import { ClearFilters, DateQuickFilter, FilterDivider, FilterStrip, QuickFilter, toOptions } from "@/components/shared/quick-filters";
+import { ClearFilters, DateQuickFilter, FilterDivider, FilterStrip, QuickFilter, TextQuickFilter, toOptions } from "@/components/shared/quick-filters";
 import { PageActions } from "@/components/layout/page-actions";
 import { Device } from "@/components/shared/device";
 import { StaffName } from "@/components/shared/name-avatar";
@@ -33,6 +33,10 @@ import { StaffName } from "@/components/shared/name-avatar";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 const STATUS_TONES = HR_STATUS_TONES;
+
+/** Filter value for a candidate's assigned staff; unassigned candidates share one value. */
+const UNASSIGNED = "unassigned";
+const staffKey = (c: { assignedStaff?: { id: number } | null }) => (c.assignedStaff?.id != null ? String(c.assignedStaff.id) : UNASSIGNED);
 
 const HR_FIELDS: ViewField[] = [
   { id: "status", label: "Status", get: (c) => c.status, order: Object.keys(STATUS_TONES), dot: (v) => statusDot(v, STATUS_TONES[v]) },
@@ -85,6 +89,8 @@ export default function HrPage() {
     dateTo: "",
     department: "",
     status: "",
+    staff: "",
+    position: "",
   });
 
   const tabs = ["All Candidates", "Rejected"];
@@ -154,6 +160,11 @@ export default function HrPage() {
     }
     if (filters.department) filtered = filtered.filter(c => c.department === filters.department);
     if (filters.status) filtered = filtered.filter(c => c.status === filters.status);
+    if (filters.staff) filtered = filtered.filter(c => staffKey(c) === filters.staff);
+    if (filters.position.trim()) {
+      const p = filters.position.trim().toLowerCase();
+      filtered = filtered.filter(c => String(c.position || "").toLowerCase().includes(p));
+    }
 
     if (activeTab === "Rejected") return filtered.filter(c => c.status === "Rejected");
     if (activeTab === "All Candidates") return filtered.filter(c => c.status !== "Rejected");
@@ -163,7 +174,13 @@ export default function HrPage() {
   const uniqueDepartments = Array.from(new Set(candidates.map(l => l.department).filter(Boolean)));
   const uniqueStatuses = Array.from(new Set(candidates.map(l => l.status).filter(Boolean)));
   const activeFiltersCount = Object.values(filters).filter(v => v !== "").length;
-  const clearFilters = () => setFilters({ dateFrom: "", dateTo: "", department: "", status: "" });
+  const staffOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const c of candidates) seen.set(staffKey(c), c.assignedStaff?.name || "Unassigned");
+    return [...seen].map(([value, label]) => ({ value, label }))
+      .sort((a, b) => (a.value === UNASSIGNED) === (b.value === UNASSIGNED) ? a.label.localeCompare(b.label) : a.value === UNASSIGNED ? 1 : -1);
+  }, [candidates]);
+  const clearFilters = () => setFilters({ dateFrom: "", dateTo: "", department: "", status: "", staff: "", position: "" });
 
   const columns = [
     {
@@ -261,6 +278,14 @@ export default function HrPage() {
             <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Department</label>
             <FormSelect name="department" options={uniqueDepartments.map(s => ({label: s as string, value: s as string}))} value={filters.department} onValueChange={v => setFilters(f => ({...f, department: v || ""}))} placeholder="All Departments" />
           </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Assigned Staff</label>
+            <FormSelect name="staff" options={staffOptions} value={filters.staff} onValueChange={v => setFilters(f => ({...f, staff: v || ""}))} placeholder="All Staff" />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Position</label>
+            <Input value={filters.position} onChange={e => setFilters(f => ({...f, position: e.target.value}))} placeholder="e.g. Telecaller" className="h-9 rounded-lg text-sm" />
+          </div>
         </div>
       </PopoverContent>
     </Popover>
@@ -319,6 +344,8 @@ export default function HrPage() {
           <DateQuickFilter label="Created" from={filters.dateFrom} to={filters.dateTo} onChange={(dateFrom, dateTo) => setFilters((f) => ({ ...f, dateFrom, dateTo }))} />
           <QuickFilter label="Status" value={filters.status} options={toOptions(uniqueStatuses as string[])} onChange={(v) => setFilters((f) => ({ ...f, status: v }))} />
           <QuickFilter label="Department" value={filters.department} options={toOptions(uniqueDepartments as string[])} onChange={(v) => setFilters((f) => ({ ...f, department: v }))} />
+          <QuickFilter label="Assigned staff" value={filters.staff} options={staffOptions} onChange={(v) => setFilters((f) => ({ ...f, staff: v }))} />
+          <TextQuickFilter label="Position" value={filters.position} placeholder="e.g. Telecaller" onChange={(v) => setFilters((f) => ({ ...f, position: v }))} />
           <ClearFilters show={activeFiltersCount > 0 || !!searchQuery} onClick={() => { clearFilters(); setSearchQuery(""); }} />
         </FilterStrip>
         <ToolbarEnd>

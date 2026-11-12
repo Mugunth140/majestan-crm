@@ -7,6 +7,7 @@ import {
 } from "@/lib/lead-constants";
 import { formatIndianCurrencyShort, parseIndianCurrency } from "@/lib/indian-currency";
 import { joinProjects, searchProjects, splitProjects } from "@/lib/project-search";
+import { siteFieldValue, siteFieldsFor, siteFieldsTitle, type SiteField } from "@/lib/requirement-site-fields";
 import { InlineCheck, InlineMulti, InlineSearchMulti, InlineSelect, InlineText, withCurrent, type Option } from "@/components/record/inline-field";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -103,6 +104,20 @@ export function RequirementFields({ inquiry, canEdit, save }: {
       onSave={(v) => setPref(key, v ? parseIndianCurrency(v) || null : null)} />
   );
 
+  const siteFields = siteFieldsFor(category);
+  const siteInput = (f: SiteField) => {
+    const raw = prefs[f.key];
+    const save = (v: unknown) => setPref(f.key, siteFieldValue(f, v));
+    const label = f.unit ? `${f.label} (${f.unit})` : f.label;
+    if (f.kind === "check") return <InlineCheck key={f.key} label={f.label} text={f.checkText ?? f.label} checked={raw === true} disabled={off} onSave={save} />;
+    if (f.kind === "select") {
+      const value = raw == null ? null : String(raw);
+      return <InlineSelect key={f.key} clearable label={f.label} value={value} options={withCurrent(f.options ?? [], value)} disabled={off} onSave={save} />;
+    }
+    return <InlineText key={f.key} label={label} type={f.kind === "number" ? "number" : undefined} value={raw == null ? undefined : String(raw)}
+      placeholder={f.placeholder} disabled={off} onSave={save} />;
+  };
+
   return (
     <div>
       <Group title="Property">
@@ -149,8 +164,10 @@ export function RequirementFields({ inquiry, canEdit, save }: {
           <>
             <InlineSelect clearable label="Car parking" value={prefs.carParking == null ? null : String(prefs.carParking)} options={CAR_PARKING_OPTIONS} disabled={off}
               onSave={(v) => setPref("carParking", v)} />
-            <InlineSelect clearable label="Lift" value={prefs.lift == null ? null : String(prefs.lift)} options={LIFT_OPTIONS} disabled={off}
-              onSave={(v) => setPref("lift", v)} />
+            {category === "residential" && (
+              <InlineSelect clearable label="Lift" value={prefs.lift == null ? null : String(prefs.lift)} options={LIFT_OPTIONS} disabled={off}
+                onSave={(v) => setPref("lift", v)} />
+            )}
             <InlineCheck label="Pet friendly" text="Needs a pet-friendly home" checked={prefs.petFriendly === true} disabled={off}
               onSave={(v) => setPref("petFriendly", v || null)} />
           </>
@@ -161,6 +178,12 @@ export function RequirementFields({ inquiry, canEdit, save }: {
         )}
         {!category && <p className="py-2 text-[13px] text-muted-foreground md:col-span-2">Pick a category to add BHK, facing or area.</p>}
       </Group>
+
+      {siteFields.length > 0 && (
+        <Group title={siteFieldsTitle(category)}>
+          {siteFields.map((f) => siteInput(f))}
+        </Group>
+      )}
 
       <Group title="Projects">
         <InlineSearchMulti label="Projects" values={splitProjects(inquiry.project_list)} search={searchProjects} placeholder="Search projects…" disabled={off}

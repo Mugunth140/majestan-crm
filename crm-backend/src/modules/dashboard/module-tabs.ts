@@ -13,7 +13,7 @@ type Query = <T>(sql: string) => Promise<T[]>;
 type Row = Record<string, number | string | null>;
 
 const DEFS = new Map<string, MetricDef>(Object.values(DEPT_METRICS).flat().map(d => [d.key, d]));
-const HR_STAGES = ['New Application', 'Resume Shortlisted', 'Interview Scheduled', 'Interview Completed', 'Selected', 'Offer Sent', 'Joined'];
+const HR_STAGES = ['New Application', 'Contacted', 'Resume Shortlisted', 'Interview Scheduled', 'Interview Completed', 'Selected', 'Offer Sent', 'Joined'];
 const HR_CLOSED = `('Joined', 'Rejected')`;
 const n = (v: unknown) => Number(v ?? 0) || 0;
 const end = (r: Range) => utcStart(addDays(r.to, 1));

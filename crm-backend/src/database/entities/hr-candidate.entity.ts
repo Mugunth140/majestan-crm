@@ -4,6 +4,7 @@ import { HrFollowUp } from './hr-follow-up.entity';
 
 export enum HrCandidateStatus {
   NEW_APPLICATION = 'New Application',
+  CONTACTED = 'Contacted',
   RESUME_SHORTLISTED = 'Resume Shortlisted',
   INTERVIEW_SCHEDULED = 'Interview Scheduled',
   INTERVIEW_COMPLETED = 'Interview Completed',
