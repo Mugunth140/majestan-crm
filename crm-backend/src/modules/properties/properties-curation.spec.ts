@@ -185,7 +185,7 @@ describe('Explicit curation removals', () => {
   it('does not default document visibility to public', async () => {
     const { service, siteApi } = setup('apartment', {});
     await service.update(7, { documents: [{ fileKey: 'private.pdf', fileName: 'Private' }] });
-    expect(siteApi.patch.mock.calls[0][1].documents[0]).not.toHaveProperty('isPublic');
+    expect((siteApi.patch.mock.calls[0] as any[])[1].documents[0]).not.toHaveProperty('isPublic');
   });
 });
 

@@ -1,15 +1,14 @@
-import { describe, expect, it, mock } from 'bun:test';
 import { ForbiddenException } from '@nestjs/common';
 import { AgentsService } from './agents.service';
 
 const setup = (agent: Record<string, unknown>) => {
   const saved: Record<string, unknown>[] = [];
   const repo = {
-    findOne: mock(async () => ({ ...agent })),
-    find: mock(async () => []),
-    save: mock(async (a: Record<string, unknown>) => { saved.push({ ...a }); return a; }),
+    findOne: jest.fn(async () => ({ ...agent })),
+    find: jest.fn(async () => []),
+    save: jest.fn(async (a: Record<string, unknown>) => { saved.push({ ...a }); return a; }),
   };
-  const recordEvents = { record: mock(async () => {}), recordChanges: mock(async () => {}) };
+  const recordEvents = { record: jest.fn(async () => {}), recordChanges: jest.fn(async () => {}) };
   const svc = new AgentsService({ getRepository: () => repo } as never, undefined, recordEvents as never);
   return { svc, saved, recordEvents };
 };

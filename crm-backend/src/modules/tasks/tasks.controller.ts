@@ -99,7 +99,9 @@ export class TasksController {
 
   // POST /api/v1/tasks/:id/receipts
   @Post(':id/receipts')
-  @UseInterceptors(FileInterceptor('file'))
+  // Multer stops reading at 10 MB, matching the service's own check, so an
+  // oversized upload is cut off instead of being buffered in memory first.
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024, files: 1 } }))
   async uploadReceipt(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,

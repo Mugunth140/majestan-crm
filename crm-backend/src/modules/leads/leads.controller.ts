@@ -235,7 +235,9 @@ export class LeadsController {
   }
 
   @Post(':id/documents')
-  @UseInterceptors(FileInterceptor('file'))
+  // Multer stops reading at 10 MB, matching the service's own check, so an
+  // oversized upload is cut off instead of being buffered in memory first.
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024, files: 1 } }))
   async uploadDocument(@Param('id') id: string, @UploadedFile() file: Express.Multer.File, @Request() req: any) {
     if (!file) {
       throw new BadRequestException('No file uploaded');

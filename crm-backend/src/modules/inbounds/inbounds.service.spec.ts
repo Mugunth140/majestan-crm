@@ -22,7 +22,7 @@ describe('inbound capture and repeat review', () => {
     storage = { write: jest.fn().mockResolvedValue(undefined), delete: jest.fn().mockResolvedValue(undefined) };
     (service as any)._s3Client = storage;
     gpsMock.mockResolvedValue(undefined);
-    global.fetch = jest.fn().mockResolvedValue({ ok: true, arrayBuffer: async () => new ArrayBuffer(20) });
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, arrayBuffer: async () => new ArrayBuffer(20) }) as unknown as typeof fetch;
   });
   afterEach(() => {
     if (oldPublicUrl === undefined) delete process.env.R2_PUBLIC_URL;
@@ -78,7 +78,7 @@ describe('inbound capture and repeat review', () => {
   it('keeps image uploads working without GPS or imgproxy', async () => {
     repository.findOne.mockResolvedValue({ id: 2, property_id: 'I00002', latitude: 11, longitude: 76 });
     gpsMock.mockRejectedValue(new Error('Unreadable metadata'));
-    (fetch as jest.Mock).mockRejectedValue(new Error('Imgproxy down'));
+    (fetch as unknown as jest.Mock).mockRejectedValue(new Error('Imgproxy down'));
     jest.spyOn(console, 'error').mockImplementation(() => {});
     const saved = await service.uploadImage(2, file());
     expect(saved).toMatchObject({ latitude: 11, longitude: 76 });

@@ -1,8 +1,7 @@
-import { describe, expect, it, mock } from 'bun:test';
 import { RecordEventsService } from './record-events.service';
 
 const service = () => {
-  const query = mock(async (_sql: string, _params: unknown[]) => []);
+  const query = jest.fn(async (_sql: string, _params: unknown[]) => []);
   return { query, svc: new RecordEventsService({ query } as never) };
 };
 

@@ -25,7 +25,7 @@ it('attributes bulk uploads to the signed-in creator',async()=>{
 it('never reassigns a creator on edits',async()=>{
  const {service,patch}=setup();
  await service.update(9,{title:'Updated title',uploadedByCrmUserId:999} as any,{sub:8});
- expect(patch.mock.calls[0][1]).not.toHaveProperty('uploadedByCrmUserId');
+ expect((patch.mock.calls[0] as unknown[])[1]).not.toHaveProperty('uploadedByCrmUserId');
 });
 it('joins staff names in one CRM query while preserving server pagination and forwarding filters',async()=>{
  const {service,get,find,getRepository}=setup([{id:9,uploadedByCrmUserId:7,ownerPhone:'private'},{id:10,uploadedByCrmUserId:8}]);

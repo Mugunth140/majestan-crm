@@ -154,7 +154,7 @@ describe('WhatsappWebhookService', () => {
     lead: { id: number; name: string; assigned_staff_id: number | null } | null,
     inserted = 1,
   ) => {
-    const query = jest.fn((sql: string) => Promise.resolve(answer(sql)));
+    const query = jest.fn((sql: string, _params?: unknown[]) => Promise.resolve(answer(sql)));
     const answer = (sql: string): unknown => {
       if (sql.includes('FROM leads')) return lead ? [lead] : [];
       if (sql.includes('INSERT IGNORE INTO whatsapp_messages'))

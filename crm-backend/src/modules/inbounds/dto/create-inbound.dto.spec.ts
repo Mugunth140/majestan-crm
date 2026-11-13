@@ -204,7 +204,7 @@ describe('inbound edits', () => {
   );
 
   it('allows a partial edit of an incomplete quick capture', () => {
-    expect(() => validateInboundRequiredEdits({ landmark: 'Near the park', email: undefined })).not.toThrow();
+    expect(() => validateInboundRequiredEdits({ landmark: 'Near the park', email: undefined } as Parameters<typeof validateInboundRequiredEdits>[0])).not.toThrow();
   });
 
   it.each([CreateInboundDto, UpdateInboundDto])('validates email and allows an empty email', async (dtoClass) => {

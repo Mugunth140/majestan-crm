@@ -11,7 +11,7 @@ describe('owner property review workflow', () => {
   it('keeps review filtering and total counts on the upstream paginated query', async () => {
     const { service, siteApi } = make();
     const result = await service.findAll({ status: 'review', page: 2, limit: 10, search: 'Garden', cityId: 1, propertyType: 'plot' });
-    const query = new URL(siteApi.get.mock.calls[0][0] as string, 'http://site.test').searchParams;
+    const query = new URL((siteApi.get.mock.calls[0] as unknown[])[0] as string, 'http://site.test').searchParams;
     expect(Object.fromEntries(query)).toMatchObject({ statusFilter: 'review', page: '2', limit: '10', search: 'Garden', cityId: '1', propertyType: 'plot' });
     expect(result.meta).toEqual({ total: 15, page: 2, limit: 10, totalPages: 2 });
   });

@@ -101,7 +101,7 @@ describe('transferLeadToSales', () => {
     );
 
     expect(h.ownerFindOne).not.toHaveBeenCalled();
-    const message = h.notifications.createNotification.mock.calls[0][2];
+    const message = (h.notifications.createNotification.mock.calls[0] as unknown[])[2];
     expect(message).toContain('Added to the Sales queue');
     expect(message).not.toContain('Still assigned');
   });

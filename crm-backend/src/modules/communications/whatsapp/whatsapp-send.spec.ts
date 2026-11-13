@@ -158,7 +158,7 @@ describe('WhatsappSendService', () => {
     whatsapp_number: null,
   };
   const setup = (secondsLeft: number | null) => {
-    const query = jest.fn((sql: string) => {
+    const query = jest.fn((sql: string, _params?: unknown[]) => {
       if (sql.includes('FROM leads')) return Promise.resolve([lead]);
       if (sql.includes('TIMESTAMPDIFF'))
         return Promise.resolve([{ last: null, left: secondsLeft }]);
