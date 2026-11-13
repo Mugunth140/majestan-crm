@@ -7,6 +7,7 @@ import pinoHttp from 'pino-http';
 
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { SITE_DATA_SOURCE, siteDatabaseOptions } from './database/site-database';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -96,12 +97,6 @@ import { MailTemplate } from './database/entities/mail-template.entity';
 import { MailAttachment } from './database/entities/mail-attachment.entity';
 
 // Site entities
-import { Property } from './database/entities/site/property.entity';
-import { PropertyDetails } from './database/entities/site/property-details.entity';
-import { PropertyImage } from './database/entities/site/property-image.entity';
-import { PropertyLocation } from './database/entities/site/property-location.entity';
-import { City } from './database/entities/site/city.entity';
-import { Sublocation } from './database/entities/site/sublocation.entity';
 import { MailModule } from './modules/mail/mail.module';
 import { CommunicationsModule } from './modules/communications/communications.module';
 
@@ -136,25 +131,10 @@ import { CommunicationsModule } from './modules/communications/communications.mo
 
     // Connection 2: Majestan Site Database (Read-Write for Properties)
     TypeOrmModule.forRootAsync({
-      name: 'site',
+      name: SITE_DATA_SOURCE,
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        type: 'mysql',
-        host: configService.get<string>('SITE_DB_HOST', configService.get<string>('DB_HOST', 'mysql')!),
-        port: configService.get<number>('SITE_DB_PORT', configService.get<number>('DB_PORT', 3306)!),
-        username: configService.get<string>('SITE_DB_USER', configService.get<string>('DB_USERNAME', '')!),
-        password: configService.get<string>('SITE_DB_PASS', configService.get<string>('DB_PASSWORD', '')!),
-        database: configService.get<string>('SITE_DB_NAME', 'majestan'),
-        entities: [Property, PropertyDetails, PropertyImage, PropertyLocation, City, Sublocation],
-        synchronize: false,
-        logging: false,
-        extra: {
-          connectionLimit: configService.get<number>('DB_CONNECTION_LIMIT_SITE', 5),
-          connectTimeout: 10000,
-          acquireTimeout: 10000,
-        },
-      }),
+      useFactory: siteDatabaseOptions,
     }),
 
     // Business Modules

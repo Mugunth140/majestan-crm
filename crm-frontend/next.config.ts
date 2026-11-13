@@ -11,6 +11,9 @@ const nextConfig: NextConfig = {
   // Unique per build; the in-app update check compares it with the deployed build's.
   env: { NEXT_PUBLIC_BUILD_ID: process.env.BUILD_ID || Date.now().toString(36) },
   turbopack: {},
+  // .next/standalone with a minimal server.js; the Docker runner runs it on Node
+  // rather than `next start` under Bun (same move as the public site, for memory).
+  output: 'standalone',
   // Keep the dev badge clear of the login page's bottom-left accessibility button
   devIndicators: { position: 'bottom-right' },
   allowedDevOrigins: ['192.168.13.167', 'localhost'],
