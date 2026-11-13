@@ -150,7 +150,8 @@ export default function SchedulerPage() {
       const [inbounds, agents, candidates] = await Promise.all([
         safe("/inbounds"),
         safe("/agents"),
-        safe("/hr"),
+        // Only candidates still in process with follow-ups: the rest never land in a bucket.
+        safe("/hr?scheduled=1"),
       ]);
       if (!live) return;
       const list = (data: any) =>

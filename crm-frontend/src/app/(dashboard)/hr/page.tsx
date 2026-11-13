@@ -1,12 +1,12 @@
 "use client";
 import { isAdmin } from "@/lib/permissions";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { DataTable } from "@/components/tables/data-table";
-import { ModuleMobileRows, ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
+import { BOARD_PAGE, ModuleMobileRows, ModuleViews, useModuleView, type ViewField } from "@/components/views/module-views";
 import { moveRow } from "@/lib/move-row";
 import { IdCell, NameCell, StatusCell, statusDot } from "@/components/tables/cells";
 import { HR_STATUS_TONES } from "@/lib/hr-status";
-import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useClampedPage, usePersistedState } from "@/hooks/use-persisted-state";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Plus, Eye, Search, Filter, X, FileSpreadsheet } from "lucide-react";
@@ -34,9 +34,9 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
 
 const STATUS_TONES = HR_STATUS_TONES;
 
-/** Filter value for a candidate's assigned staff; unassigned candidates share one value. */
-const UNASSIGNED = "unassigned";
-const staffKey = (c: { assignedStaff?: { id: number } | null }) => (c.assignedStaff?.id != null ? String(c.assignedStaff.id) : UNASSIGNED);
+/** Choices for the filters, from every candidate; the server sends them with each page. */
+type HrFilterOptions = { departments: string[]; statuses: string[]; staff: { value: string; label: string }[] };
+const EMPTY_FILTER_OPTIONS: HrFilterOptions = { departments: [], statuses: [], staff: [] };
 
 const HR_FIELDS: ViewField[] = [
   { id: "status", label: "Status", get: (c) => c.status, order: Object.keys(STATUS_TONES), dot: (v) => statusDot(v, STATUS_TONES[v]) },
@@ -53,6 +53,11 @@ export default function HrPage() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [pendingImports, setPendingImports] = useState<HrImportRow[]>([]);
   const [creating, setCreating] = useState(false);
+  // Every candidate's mobile, loaded only while an import is under review (duplicate check).
+  const [knownMobiles, setKnownMobiles] = useState<{ mobile: string }[] | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
+  const [filterOptions, setFilterOptions] = useState<HrFilterOptions>(EMPTY_FILTER_OPTIONS);
+  const [pagination, setPagination] = usePersistedState("hr:page", { pageIndex: 0, pageSize: 20 });
 
   const [activeTab, setActiveTab] = usePersistedState<string>("hr:tab", "All Candidates", { allowed: ["All Candidates", "Rejected"] });
   const [searchQuery, setSearchQuery] = usePersistedState("hr:search", "");
@@ -95,20 +100,26 @@ export default function HrPage() {
 
   const tabs = ["All Candidates", "Rejected"];
 
-  const fetchCandidates = () => {
+  // The server filters and pages; only the newest request may fill the table.
+  const latestRequest = useRef(0);
+  const fetchCandidates = useCallback(() => {
+    const request = ++latestRequest.current;
+    const page = views.isBoard ? BOARD_PAGE : pagination;
+    const params = new URLSearchParams({ page: String(page.pageIndex + 1), limit: String(page.pageSize), tab: activeTab });
+    if (debouncedSearchQuery.trim()) params.set("search", debouncedSearchQuery.trim());
+    for (const [key, value] of Object.entries(filters)) if (value.trim()) params.set(key, value.trim());
     setIsLoading(true);
-    apiFetch(`${API_URL}/hr`)
+    apiFetch(`${API_URL}/hr?${params}`)
       .then(res => { if (!res.ok) throw new Error("Failed to load candidates"); return res.json(); })
       .then(data => {
-        const mapped = data.map((c: any) => ({
-          ...c,
-          formattedId: "HRC" + String(c.id).padStart(4, "0")
-        }));
-        setCandidates(mapped);
+        if (request !== latestRequest.current) return;
+        setCandidates((data.data ?? []).map((c: any) => ({ ...c, formattedId: "HRC" + String(c.id).padStart(4, "0") })));
+        setTotalCount(data.meta?.total ?? 0);
+        setFilterOptions(data.meta?.filterOptions ?? EMPTY_FILTER_OPTIONS);
       })
-      .catch(() => toast.error("Failed to load candidates. Please refresh to try again."))
-      .finally(() => setIsLoading(false));
-  };
+      .catch(() => { if (request === latestRequest.current) toast.error("Failed to load candidates. Please refresh to try again."); })
+      .finally(() => { if (request === latestRequest.current) setIsLoading(false); });
+  }, [views.isBoard, pagination, activeTab, debouncedSearchQuery, filters]);
 
   const handleBulkDelete = async () => {
     if (!bulkDeleteIds || bulkDeleteIds.length === 0) return;
@@ -126,60 +137,40 @@ export default function HrPage() {
     }
   };
 
+  useEffect(() => { fetchCandidates(); }, [fetchCandidates]);
+  useClampedPage(pagination, setPagination, totalCount, isLoading);
+
+  // A new search, filter or tab starts again from the first page (a restored page is kept).
+  const filterKey = JSON.stringify([debouncedSearchQuery.trim(), filters, activeTab]);
+  const lastFilterKey = useRef(filterKey);
   useEffect(() => {
-    fetchCandidates();
+    if (lastFilterKey.current === filterKey) return;
+    lastFilterKey.current = filterKey;
+    setPagination((p) => (p.pageIndex === 0 ? p : { ...p, pageIndex: 0 }));
+  }, [filterKey, setPagination]);
+
+  useEffect(() => {
     // Scroll to top on mount (mobile body scroll + desktop main scroll)
     window.scrollTo(0, 0);
     const main = document.querySelector("main");
     if (main) main.scrollTop = 0;
   }, []);
 
-  const displayedCandidates = useMemo(() => {
-    let filtered = candidates;
+  useEffect(() => {
+    if (!pendingImports.length) return;
+    let live = true;
+    apiJson<{ data: string[] }>(`${API_URL}/hr/mobiles`)
+      .then((res) => { if (live) setKnownMobiles(res.data.map((mobile) => ({ mobile }))); })
+      .catch(() => { if (live) { toast.error("Couldn't check the import for existing candidates."); setKnownMobiles([]); } });
+    return () => { live = false; };
+  }, [pendingImports.length]);
 
-    if (debouncedSearchQuery.trim()) {
-      const q = debouncedSearchQuery.toLowerCase();
-      filtered = filtered.filter(c =>
-        (c.name && c.name.toLowerCase().includes(q)) ||
-        (c.formattedId && c.formattedId.toLowerCase().includes(q)) ||
-        (c.mobile && c.mobile.includes(q)) ||
-        (c.department && c.department.toLowerCase().includes(q)) ||
-        (c.position && c.position.toLowerCase().includes(q))
-      );
-    }
+  const displayedCandidates = candidates;
 
-    if (filters.dateFrom) {
-      const from = new Date(filters.dateFrom);
-      from.setHours(0, 0, 0, 0);
-      filtered = filtered.filter(c => new Date(c.createdAt || c.created_at) >= from);
-    }
-    if (filters.dateTo) {
-      const to = new Date(filters.dateTo);
-      to.setHours(23, 59, 59, 999);
-      filtered = filtered.filter(c => new Date(c.createdAt || c.created_at) <= to);
-    }
-    if (filters.department) filtered = filtered.filter(c => c.department === filters.department);
-    if (filters.status) filtered = filtered.filter(c => c.status === filters.status);
-    if (filters.staff) filtered = filtered.filter(c => staffKey(c) === filters.staff);
-    if (filters.position.trim()) {
-      const p = filters.position.trim().toLowerCase();
-      filtered = filtered.filter(c => String(c.position || "").toLowerCase().includes(p));
-    }
-
-    if (activeTab === "Rejected") return filtered.filter(c => c.status === "Rejected");
-    if (activeTab === "All Candidates") return filtered.filter(c => c.status !== "Rejected");
-    return filtered;
-  }, [candidates, debouncedSearchQuery, filters, activeTab]);
-
-  const uniqueDepartments = Array.from(new Set(candidates.map(l => l.department).filter(Boolean)));
-  const uniqueStatuses = Array.from(new Set(candidates.map(l => l.status).filter(Boolean)));
+  const uniqueDepartments = filterOptions.departments;
+  const uniqueStatuses = filterOptions.statuses;
   const activeFiltersCount = Object.values(filters).filter(v => v !== "").length;
-  const staffOptions = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const c of candidates) seen.set(staffKey(c), c.assignedStaff?.name || "Unassigned");
-    return [...seen].map(([value, label]) => ({ value, label }))
-      .sort((a, b) => (a.value === UNASSIGNED) === (b.value === UNASSIGNED) ? a.label.localeCompare(b.label) : a.value === UNASSIGNED ? 1 : -1);
-  }, [candidates]);
+  const staffOptions = filterOptions.staff;
   const clearFilters = () => setFilters({ dateFrom: "", dateTo: "", department: "", status: "", staff: "", position: "" });
 
   const columns = [
@@ -368,6 +359,11 @@ export default function HrPage() {
               columns={columns}
               data={displayedCandidates}
               showToolbar={true}
+              manualPagination
+              pageCount={Math.ceil(totalCount / pagination.pageSize) || 1}
+              totalCount={totalCount}
+              pagination={pagination}
+              onPaginationChange={setPagination}
               showDeleteAction={isAdmin({ role })}
               onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
               renderToolbarActions={(selectedRows) => {
@@ -389,6 +385,7 @@ export default function HrPage() {
             }
             card={rowCard}
             noun="candidates"
+            totalCount={totalCount}
           />
         )}
       </div>
@@ -418,8 +415,9 @@ export default function HrPage() {
             className="h-12 rounded-full px-5 gap-2"><FileSpreadsheet size={16} />Bulk Import</Button></div>
         } />
         {pendingImports.length > 0 ? (
-          <HrImportReview rows={pendingImports} existing={candidates} onCancel={() => setPendingImports([])}
-            onImported={() => { setPendingImports([]); setActiveTab("All Candidates"); setSearchQuery(""); clearFilters(); fetchCandidates(); }} />
+          knownMobiles === null ? <TableSkeleton /> :
+          <HrImportReview rows={pendingImports} existing={knownMobiles} onCancel={() => { setPendingImports([]); setKnownMobiles(null); }}
+            onImported={() => { setPendingImports([]); setKnownMobiles(null); setActiveTab("All Candidates"); setSearchQuery(""); clearFilters(); fetchCandidates(); }} />
         ) : (<>
         {/* Filters + Table */}
         <Device mobile={mobileFilters} desktop={desktopFilters} />
@@ -436,6 +434,11 @@ export default function HrPage() {
                   columns={columns}
                   data={displayedCandidates}
                   showToolbar={true}
+                  manualPagination
+                  pageCount={Math.ceil(totalCount / pagination.pageSize) || 1}
+                  totalCount={totalCount}
+                  pagination={pagination}
+                  onPaginationChange={setPagination}
                   showDeleteAction={isAdmin({ role })}
                   onDeleteSelected={(rows) => setBulkDeleteIds(rows.map(r => r.id))}
                   renderToolbarActions={(selectedRows) => {

@@ -1,11 +1,12 @@
 import { HrDocumentsService, MAX_HR_DOCUMENT_BYTES } from './hr-documents.service';
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException, Put, UseGuards, ParseEnumPipe, Request, StreamableFile, Header, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException, Put, UseGuards, ParseEnumPipe, Request, StreamableFile, Header, ParseIntPipe, Query } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AssignHrCandidatesDto } from './dto/assign-hr-candidates.dto';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { BulkImportHrDto } from './dto/bulk-import-hr.dto';
 import { HrService } from './hr.service';
+import type { HrListQuery } from './hr-list-query';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateHrCandidateDto } from './dto/create-hr-candidate.dto';
 import { UpdateHrCandidateDto } from './dto/update-hr-candidate.dto';
@@ -44,7 +45,19 @@ export class HrController {
 
   constructor(private readonly hrService: HrService, private readonly documents: HrDocumentsService) {}
 
-  @Get() findAll() { return this.hrService.findAll(); }
+  /**
+   * `?page=` returns one page with `meta.total` and the filter choices (the HR
+   * page); `?scheduled=1` returns the candidates the scheduler can show;
+   * neither returns every candidate, as before.
+   */
+  @Get() findAll(@Query() query: HrListQuery & { scheduled?: unknown }) {
+    if (query.scheduled === '1' || query.scheduled === 'true') return this.hrService.findScheduled();
+    if (query.page !== undefined) return this.hrService.findPage(query);
+    return this.hrService.findAll();
+  }
+
+  @Get('mobiles')
+  async mobiles() { return { success: true, data: await this.hrService.mobiles() }; }
 
   @Get('staff-list')
   async staffList() { return { success: true, data: await this.hrService.getAssignableStaff() }; }

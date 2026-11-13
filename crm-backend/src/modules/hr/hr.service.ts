@@ -8,6 +8,7 @@ import { HrImportRowDto, normalizeCandidateMobile } from './dto/bulk-import-hr.d
 import { HrCandidate, HrCandidateStatus } from '../../database/entities/hr-candidate.entity';
 import { HrFollowUp } from '../../database/entities/hr-follow-up.entity';
 import { summarizeHrFollowUps } from './hr-follow-up-summary';
+import { HR_UNASSIGNED, HrListQuery, hrListConditions, hrPage } from './hr-list-query';
 import { HrContactLog } from '../../database/entities/hr-contact-log.entity';
 import { CreateHrCandidateDto } from './dto/create-hr-candidate.dto';
 import { UpdateHrCandidateDto } from './dto/update-hr-candidate.dto';
@@ -58,10 +59,77 @@ export class HrService {
     return this.recordEvents?.activity('hr', id) ?? [];
   }
 
-  async findAll() { 
-    const candidates = await this.repo.find({ order: { createdAt: 'DESC' } });
-    const allFollowUps = await this.fuRepo.find({ order: { created_at: 'DESC' } });
+  /** Every candidate, newest first. Kept for callers that still want the whole list. */
+  async findAll() {
+    return this.withSummaries(await this.repo.find({ order: { createdAt: 'DESC', id: 'DESC' } }));
+  }
 
+  /** One page of the HR list with its total and the filter choices (`GET /hr?page=…`). */
+  async findPage(query: HrListQuery) {
+    const { page, limit } = hrPage(query);
+    const qb = this.repo.createQueryBuilder('c');
+    for (const condition of hrListConditions(query)) qb.andWhere(condition.sql, condition.params);
+    const [rows, total] = await qb
+      .orderBy('c.createdAt', 'DESC')
+      .addOrderBy('c.id', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+    return {
+      success: true,
+      data: await this.withSummaries(rows),
+      meta: { total, page, limit, filterOptions: await this.listFilterOptions() },
+    };
+  }
+
+  /**
+   * Candidates the scheduler can show: still in process and with follow-up
+   * history (every schedule bucket is worked out from follow-ups).
+   */
+  async findScheduled() {
+    const rows = await this.repo
+      .createQueryBuilder('c')
+      .where("c.status NOT IN ('Joined', 'Rejected')")
+      .andWhere('EXISTS (SELECT 1 FROM hr_follow_ups f WHERE f.hr_candidate_id = c.id)')
+      .orderBy('c.createdAt', 'DESC')
+      .addOrderBy('c.id', 'DESC')
+      .getMany();
+    return this.withSummaries(rows);
+  }
+
+  /** Every candidate's mobile, for the import review's duplicate check. */
+  async mobiles(): Promise<string[]> {
+    const rows = await this.repo.find({ select: { id: true, mobile: true } });
+    return rows.map(row => row.mobile).filter(Boolean);
+  }
+
+  /** Choices for the HR list's filters, from every candidate (not just the page). */
+  private async listFilterOptions() {
+    const [departments, statuses, staffIds] = await Promise.all([
+      this.repo.createQueryBuilder('c').select('DISTINCT c.department', 'value').where("c.department <> ''").getRawMany<{ value: string }>(),
+      this.repo.createQueryBuilder('c').select('DISTINCT c.status', 'value').getRawMany<{ value: string }>(),
+      this.repo.createQueryBuilder('c').select('DISTINCT c.assignedStaffId', 'value').getRawMany<{ value: number | null }>(),
+    ]);
+    const names = await this.assigneeNames(staffIds.map(row => (row.value == null ? null : Number(row.value))));
+    const staff = [...names.values()]
+      .map(user => ({ value: String(user.id), label: user.name }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+    // Unassigned (or a removed staff account) is offered when some candidate has it, after the names.
+    if (staffIds.some(row => row.value == null || !names.has(Number(row.value)))) {
+      staff.push({ value: HR_UNASSIGNED, label: 'Unassigned' });
+    }
+    return {
+      departments: departments.map(row => row.value).filter(Boolean),
+      statuses: statuses.map(row => row.value).filter(Boolean),
+      staff,
+    };
+  }
+
+  /** Adds source name, assigned staff and the follow-up summary the lists show. */
+  private async withSummaries(candidates: HrCandidate[]) {
+    if (!candidates.length) return [];
+    const ids = candidates.map(candidate => candidate.id);
+    const allFollowUps = await this.fuRepo.find({ where: { hr_candidate_id: In(ids) }, order: { created_at: 'DESC' } });
     const names = await this.assigneeNames(candidates.map(candidate => candidate.assignedStaffId));
     const sources = new Map((await this.master.getHrSources()).map(source => [source.id, source.name]));
     const followUpsByCandidate = new Map<number, HrFollowUp[]>();
@@ -70,17 +138,14 @@ export class HrService {
       history.push(followUp);
       followUpsByCandidate.set(followUp.hr_candidate_id, history);
     }
-    return candidates.map(candidate => {
-      const summary = summarizeHrFollowUps(followUpsByCandidate.get(candidate.id) || []);
-
-      return {
-        ...candidate,
-        recruitmentSource: sources.get(candidate.hrSourceId ?? 0) || candidate.recruitmentSource,
-        assignedStaff: names.get(candidate.assignedStaffId ?? 0) || null,
-        ...summary
-      };
-    });
+    return candidates.map(candidate => ({
+      ...candidate,
+      recruitmentSource: sources.get(candidate.hrSourceId ?? 0) || candidate.recruitmentSource,
+      assignedStaff: names.get(candidate.assignedStaffId ?? 0) || null,
+      ...summarizeHrFollowUps(followUpsByCandidate.get(candidate.id) || []),
+    }));
   }
+
   async findOne(id: number) {
     const candidate = await this.repo.findOne({ where: { id } });
     if (candidate) {
