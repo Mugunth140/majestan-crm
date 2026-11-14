@@ -197,7 +197,7 @@ export class LeadsService {
         ? { date: visitInquiry.visit_date, slot: visitInquiry.visit_slot ?? null, intent: visitInquiry.intent ?? 'enquiry' }
         : null;
 
-    return { ...lead, is_converted: !!lead.converted_to, follow_ups: followUps, contact_logs: contactLogs, interestedProperty, visit };
+    return { ...lead, is_converted: !!lead.converted_to, converted_record: await this.convertedRecord(lead), follow_ups: followUps, contact_logs: contactLogs, interestedProperty, visit };
   }
 
   // Acknowledge a lead's open website enquiries. Only the assigned staff
@@ -205,6 +205,19 @@ export class LeadsService {
   // else's Enquiry Queue item. Idempotent: acknowledging twice is a no-op.
   // Unassigned leads (assigned_staff_id NULL) can never satisfy the numeric
   // check below, so their rows stay until claimed/assigned — intended.
+  /** The Agent or Inbound record a converted lead became, matched by mobile number. */
+  private async convertedRecord(lead: Lead): Promise<{ type: 'agent' | 'inbound'; id: number; name: string | null } | null> {
+    if (!lead.converted_to || !lead.mobile_number) return null;
+    const table = lead.converted_to === 'agent' ? 'agents' : 'inbounds';
+    const nameCol = lead.converted_to === 'agent' ? 'name' : 'owner_name';
+    const rows = await this.dataSource.query(
+      `SELECT id, ${nameCol} AS name FROM ${table} WHERE mobile_number = ? ORDER BY id DESC LIMIT 1`,
+      [lead.mobile_number],
+    );
+    const row = rows?.[0];
+    return row ? { type: lead.converted_to as 'agent' | 'inbound', id: Number(row.id), name: row.name ?? null } : null;
+  }
+
   async acknowledgeEnquiry(leadId: number, requestingUserId: number) {
     const lead = await this.dataSource.getRepository(Lead).findOne({
       where: { id: leadId },
@@ -345,6 +358,9 @@ export class LeadsService {
     const existingLead = await leadRepo.findOne({ where: { id } });
     if (!existingLead) throw new NotFoundException('Lead not found');
     const previousStatus = existingLead.status;
+    if (existingLead.converted_to && body.status_name && body.status_name !== previousStatus) {
+      throw new BadRequestException(`Lead was converted to ${existingLead.converted_to}; update it there instead`);
+    }
     const wasUnqualified = !!existingLead.is_unqualified;
 
     if (body.status_name) {
@@ -1083,6 +1099,9 @@ export class LeadsService {
       filterConds += ' AND l.status = ?';
       params.push(query.status);
     }
+    // A converted lead lives on as an Agent or Inbound record and is worked
+    // there; it only lists here when staff ask for Converted leads on purpose.
+    if (query?.status !== 'Converted') filterConds += ' AND l.converted_to IS NULL';
     if (query?.source) {
       filterConds += ' AND l.lead_source = ?';
       params.push(query.source);

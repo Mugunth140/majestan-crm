@@ -71,4 +71,10 @@ describe('LeadsService.updateLeadStatus — sales pipeline handover', () => {
     expect(transferMock).not.toHaveBeenCalled();
     expect(result.transferredToSales).toBe(false);
   });
+
+  it('refuses to change the status of a converted lead', async () => {
+    lead = { ...lead, status: 'Converted', converted_to: 'agent' };
+    await expect(service.updateLeadStatus(42, { status_name: 'Contacted' }, 3)).rejects.toThrow('converted to agent');
+    expect(save).not.toHaveBeenCalled();
+  });
 });

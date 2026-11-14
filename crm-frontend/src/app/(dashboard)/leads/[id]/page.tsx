@@ -28,6 +28,7 @@ import { PageActions } from "@/components/layout/page-actions";
 import { useIsMobile } from "@/hooks/use-device";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 
 const LeadAttachments = dynamic(() => import("@/components/shared/lead-attachments").then(mod => mod.LeadAttachments), { ssr: false });
 import { AssigneeButton, HEADER_BUTTON, HEADER_PRIMARY, StatusMenu } from "@/components/record/header-actions";
@@ -678,7 +679,7 @@ function LeadDetail() {
 
   // The status and assignee buttons, shared with every record page.
   const statusMenu = (size: "h-7" | "h-8", align: "start" | "end" = "end") => (
-    <StatusMenu status={statusName} options={STATUS_OPTIONS} pillClass={leadStatusPill(statusName)} onChange={canEdit ? changeStatus : undefined} size={size} align={align} />
+    <StatusMenu status={statusName} options={STATUS_OPTIONS} pillClass={leadStatusPill(statusName)} onChange={canEdit && !lead.is_converted ? changeStatus : undefined} size={size} align={align} />
   );
   const assigneeButton = (variant: "header" | "field" | "phone") => (
     <AssigneeButton name={lead.assigned_staff?.name} variant={variant} people={staff ?? []} value={lead.assigned_staff_id ?? lead.assigned_staff?.id}
@@ -687,6 +688,11 @@ function LeadDetail() {
   // Anyone who works the lead can convert it: its owner (Telecalling or
   // Sales), their team lead, managers and admins. The server checks the same.
   const showConvert = (canEdit || role === "Super Admin") && !lead.is_converted;
+  // A converted lead is worked as its Agent or Inbound record; link there.
+  const convertedHref = lead.converted_record
+    ? `/${lead.converted_record.type === "agent" ? "agent-network" : "inbound"}/${lead.converted_record.id}`
+    : lead.converted_to === "agent" ? "/agent-network" : lead.converted_to === "inbound" ? "/inbound" : null;
+  const convertedLabel = lead.converted_to === "agent" ? "Converted to agent" : "Converted to inbound";
   const openConvert = () => { setConvertTo(""); setConvertFeedback(""); setIsConvertOpen(true); };
 
   const inquiries: any[] = lead.inquiries || [];
@@ -899,6 +905,12 @@ function LeadDetail() {
               Convert
             </button>
           )}
+          {convertedHref && (
+            <Link href={convertedHref} className={HEADER_BUTTON}>
+              {convertedLabel}
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </Link>
+          )}
         </div>
       </PageActions>
 
@@ -915,6 +927,11 @@ function LeadDetail() {
               <button type="button" onClick={openConvert} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-[#017D58] text-[15px] font-semibold text-white dark:bg-[#2FB585] dark:text-black">
                 <TrendingUp className="h-4 w-4" /> Convert
               </button>
+            )}
+            {convertedHref && (
+              <Link href={convertedHref} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border text-[15px] font-semibold text-foreground">
+                {convertedLabel} <ArrowUpRight className="h-4 w-4" />
+              </Link>
             )}
           </div>
       </div>
