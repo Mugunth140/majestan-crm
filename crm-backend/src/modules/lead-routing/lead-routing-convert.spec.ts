@@ -1,11 +1,11 @@
-import { BadRequestException } from '@nestjs/common';
-import { LeadRoutingService } from './lead-routing.service';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { LeadRoutingService, canConvertLead } from './lead-routing.service';
 
 jest.mock('bun', () => ({ S3Client: class {} }), { virtual: true });
 
 /** An in-memory store keyed by entity name, enough for convertLead. */
 function setup(lead: Record<string, unknown>, agents: any[] = []) {
-  const users = [{ id: 9, role: { name: 'Staff' } }, { id: 1, role: { name: 'Admin' } }];
+  const users = [{ id: 9, role: { name: 'Staff' }, department: { name: 'Sales Department' } }, { id: 1, role: { name: 'Admin' } }, { id: 12, role: { name: 'Staff' }, department: { name: 'Sales Department' } }];
   const rows: Record<string, any[]> = { User: users, Lead: [lead], Agent: agents, AgentFollowUp: [], Inbound: [], InboundFollowUp: [], RoutingHistory: [] };
   let nextId = 100;
   const nameOf = (x: any) => x?.__entity;
@@ -70,5 +70,32 @@ describe('convertLead', () => {
     const { service, rows } = setup({ ...lead(), converted_to: 'agent' });
     await expect(service.convertLead(4206, 'agent', 'again', 9)).rejects.toBeInstanceOf(BadRequestException);
     expect(rows.Agent).toHaveLength(0);
+  });
+});
+
+describe('who can convert a lead', () => {
+  const staff = (id: number, dept: string, role = 'Staff') => ({ id, role: { name: role }, department: { name: dept } });
+  it('lets the assigned staff member convert, whatever their department', () => {
+    expect(canConvertLead(staff(9, 'Sales Department'), { assigned_staff_id: 9, department: 'sales' })).toBe(true);
+    expect(canConvertLead(staff(9, 'Telecalling Department'), { assigned_staff_id: 9, department: 'telecalling' })).toBe(true);
+  });
+  it('lets managers and admins convert any lead', () => {
+    expect(canConvertLead(staff(1, '', 'Admin'), { assigned_staff_id: 9, department: 'sales' })).toBe(true);
+    expect(canConvertLead(staff(2, '', 'Manager'), { assigned_staff_id: 9, department: 'sales' })).toBe(true);
+  });
+  it("lets a team lead convert in their own pipeline only", () => {
+    expect(canConvertLead(staff(5, 'Sales Department', 'Team Lead'), { assigned_staff_id: 9, department: 'sales' })).toBe(true);
+    expect(canConvertLead(staff(5, 'Sales Department', 'Team Lead'), { assigned_staff_id: 9, department: 'telecalling' })).toBe(false);
+    expect(canConvertLead(staff(5, 'HR Department', 'Team Lead'), { assigned_staff_id: null, department: 'sales' })).toBe(true);
+  });
+  it("stops other staff converting someone else's lead", () => {
+    expect(canConvertLead(staff(12, 'Sales Department'), { assigned_staff_id: 9, department: 'sales' })).toBe(false);
+    expect(canConvertLead(null, { assigned_staff_id: 9, department: 'sales' })).toBe(false);
+  });
+  it('refuses the conversion on the server', async () => {
+    const { service, rows } = setup(lead());
+    await expect(service.convertLead(4206, 'agent', 'note', 12)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(rows.Agent).toHaveLength(0);
+    expect(rows.Lead[0].converted_to).toBeNull();
   });
 });

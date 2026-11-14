@@ -25,6 +25,26 @@ const todayIst = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/
 const conversionNote = (lead: { id: number }, note?: string) =>
   [`Converted from lead L${String(lead.id).padStart(5, '0')}`, note?.trim()].filter(Boolean).join(': ');
 
+/**
+ * Who may convert a lead, the same people the lead page lets edit it: Admin,
+ * Super Admin and Manager; the staff member it is assigned to; and a Team
+ * Lead for an unassigned lead or one in their own pipeline (sales/telecalling).
+ */
+export function canConvertLead(
+  actor: { id: number; role?: { name?: string } | null; department?: { name?: string } | null } | null,
+  lead: { assigned_staff_id?: number | null; department?: string | null },
+): boolean {
+  if (!actor) return false;
+  const role = actor.role?.name ?? '';
+  if (['Admin', 'Super Admin', 'Manager'].includes(role)) return true;
+  if (lead.assigned_staff_id != null && lead.assigned_staff_id === actor.id) return true;
+  if (role !== 'Team Lead') return false;
+  if (lead.assigned_staff_id == null) return true;
+  const dept = actor.department?.name ?? '';
+  const pipeline = /sales/i.test(dept) ? 'sales' : /telecalling/i.test(dept) ? 'telecalling' : null;
+  return pipeline != null && pipeline === String(lead.department ?? '').toLowerCase();
+}
+
 @Injectable()
 export class LeadRoutingService {
   constructor(
@@ -467,6 +487,8 @@ export class LeadRoutingService {
       const lead = await leadRepo.findOne({ where: { id: leadId }, lock: { mode: 'pessimistic_write' } });
       if (!lead) throw new NotFoundException('Lead not found');
       if (lead.converted_to) throw new BadRequestException(`Lead is already converted to ${lead.converted_to}`);
+      const actor = await manager.getRepository(User).findOne({ where: { id: requestingUserId }, relations: { role: true, department: true } });
+      if (!canConvertLead(actor, lead)) throw new ForbiddenException('Only the lead owner, their team lead or a manager can convert this lead');
 
       const prevAssignedId = lead.assigned_staff_id;
       const target = convertTo === 'agent'

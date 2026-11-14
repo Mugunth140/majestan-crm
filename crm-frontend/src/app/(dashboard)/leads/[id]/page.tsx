@@ -684,8 +684,9 @@ function LeadDetail() {
     <AssigneeButton name={lead.assigned_staff?.name} variant={variant} people={staff ?? []} value={lead.assigned_staff_id ?? lead.assigned_staff?.id}
       onPick={showReassign ? handleAssignLead : undefined} allowClear={false} loading={staff === null} onOpen={loadStaff} />
   );
-  const showConvert = canEdit && !lead.is_converted &&
-    (role === "Admin" || role === "Manager" || ((role === "Staff" || role === "Team Lead") && userDept === "telecalling"));
+  // Anyone who works the lead can convert it: its owner (Telecalling or
+  // Sales), their team lead, managers and admins. The server checks the same.
+  const showConvert = (canEdit || role === "Super Admin") && !lead.is_converted;
   const openConvert = () => { setConvertTo(""); setConvertFeedback(""); setIsConvertOpen(true); };
 
   const inquiries: any[] = lead.inquiries || [];
