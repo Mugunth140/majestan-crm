@@ -1,6 +1,7 @@
 "use client";
 
 import { extraColumns } from "@/components/tables/extra-columns";
+import { FirstContactCell, WaitChip } from "@/components/leads/wait-chip";
 import { isAdmin } from "@/lib/permissions";
 import { apiFetch, apiJson } from "@/lib/api-fetch";
 import { normalizeDepartment } from "@/lib/department";
@@ -90,6 +91,8 @@ const EMPTY_LEADS_FILTERS = {
   priority: "",
   minBudgetLakh: "",
   maxBudgetLakh: "",
+  /** "1": only leads still waiting for their owner's first contact. */
+  waiting: "",
 };
 
 // Filter-dropdown values for the whole scoped list, delivered by the server
@@ -276,7 +279,16 @@ export default function LeadsPage() {
   const [filterOptions, setFilterOptions] = useState<LeadsFilterOptions>(EMPTY_FILTER_OPTIONS);
 
   const [totalCount, setTotalCount] = useState(0);
+  /** Leads in this view still waiting for their owner's first contact (the toolbar chip). */
+  const [waitingCount, setWaitingCount] = useState(0);
   const [pagination, setPagination] = usePersistedState("leads:page:v2", { pageIndex: 0, pageSize: 20 });
+  // The evening summary and the sidebar badge link to /leads?waiting=1.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("waiting") !== "1") return;
+    setFilters((f) => ({ ...EMPTY_LEADS_FILTERS, ...f, waiting: "1" }));
+    setPagination((prev) => resetPageIndex(prev));
+    router.replace("/leads");
+  }, [router, setFilters, setPagination]);
   const [view, setView] = usePersistedState<ViewType>("leads:view", "list", { allowed: ["list", "kanban", "group"] });
   const [groupField, setGroupField] = usePersistedState<LeadGroupField>("leads:groupBy", "status", {
     allowed: LEAD_GROUP_FIELDS.map((f) => f.id),
@@ -354,6 +366,7 @@ export default function LeadsPage() {
       if (filters.status) params.append('status', filters.status);
       if (filters.source) params.append('source', filters.source);
       if (filters.priority) params.append('priority', filters.priority);
+      if (filters.waiting) params.append('waiting', '1');
       const toRupees = (lakh: string) => {
         if (lakh.trim() === "") return "";
         const n = Number(lakh);
@@ -377,6 +390,7 @@ export default function LeadsPage() {
         setLeads(data.data);
         setTotalCount(total);
         setFilterOptions(data.meta?.filterOptions ?? EMPTY_FILTER_OPTIONS);
+        setWaitingCount(Number(data.meta?.waiting) || 0);
       }
     } catch {
       toast.error("Failed to load leads.");
@@ -566,6 +580,7 @@ export default function LeadsPage() {
         <span className="inline-flex items-center gap-2">
           <NameAvatar name={row.original.name} />
           <span className="font-medium text-foreground">{row.original.name}</span>
+          {row.original.awaitingFirstContact && row.original.assignedAt && <WaitChip assignedAt={row.original.assignedAt} />}
         </span>
       ),
     },
@@ -643,6 +658,15 @@ export default function LeadsPage() {
       cell: ({ row }) => {
         return <span className="text-muted-foreground">{row.original.date}</span>;
       }
+    },
+    {
+      id: "firstContact",
+      header: "First contact",
+      enableSorting: false,
+      meta: { label: "First contact", defaultHidden: true },
+      cell: ({ row }) => (
+        <FirstContactCell assignedAt={row.original.assignedAt} firstContactedAt={row.original.firstContactedAt} waiting={row.original.awaitingFirstContact} />
+      ),
     },
     ...extraColumns([
       { id: "email", label: "Email", value: (r) => r.email },
@@ -1090,6 +1114,27 @@ export default function LeadsPage() {
     return lead.status || "No status";
   };
 
+  // "14 waiting": leads nobody has called yet since they were assigned. Tapping filters to them, longest wait first.
+  const waitingToggle = (variant: "desktop" | "phone") => {
+    const on = filters.waiting === "1";
+    if (!on && waitingCount === 0) return null;
+    const label = on ? `Waiting for first contact · ${waitingCount}` : `${waitingCount} waiting for first contact`;
+    return (
+      <button type="button" aria-pressed={on}
+        onClick={() => updateFilters((f) => ({ ...f, waiting: on ? "" : "1" }))}
+        title="Leads whose owner hasn't called, messaged or followed up since they were assigned"
+        className={cn(
+          "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap font-medium transition-colors",
+          variant === "desktop" ? "h-8 rounded-md px-2.5 text-[13px]" : "h-8 rounded-full px-3 text-[13px]",
+          on ? "bg-foreground text-background" : "bg-[color-mix(in_oklab,var(--status-bad)_12%,transparent)] text-foreground hover:bg-[color-mix(in_oklab,var(--status-bad)_18%,transparent)]",
+        )}>
+        <span aria-hidden className="size-1.5 rounded-full" style={{ background: "var(--status-bad)" }} />
+        {label}
+        {on && <X aria-hidden className="size-3.5 opacity-70" />}
+      </button>
+    );
+  };
+
   const desktopFilters = (
     <div className="md:flex md:min-h-0 md:flex-1 md:flex-col lg:-mx-6 lg:-mb-8 lg:-mt-6">
       {/* Toolbar: which leads, then every filter in one sideways-scrolling strip, search at the end */}
@@ -1107,6 +1152,7 @@ export default function LeadsPage() {
           <>
             <span aria-hidden className="h-5 w-px shrink-0 bg-border" />
             <FilterStrip>
+              {waitingToggle("desktop")}
               {visiblePipelines.length > 1 && (
                 <QuickFilter label="Pipeline" required value={deptFilter} options={visiblePipelines}
                   onChange={(v) => { setDeptFilter(v as "telecalling" | "sales"); resetPage(); }} />
@@ -1278,6 +1324,7 @@ export default function LeadsPage() {
         </div>
       )}
 
+      {!isReviewingImports && waitingToggle("phone")}
     </div>
   );
 

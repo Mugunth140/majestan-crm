@@ -395,6 +395,15 @@
 .email-prose .email-var-unknown { background: rgba(220, 38, 38, 0.12); color: #b91c1c; }
 .dark .email-prose .email-var-unknown { color: #fca5a5; }
 
+/* Status colours used outside the dashboards too (lead wait chips, badges), and
+   the four target-pace steps. Validated as one ordered set (red → green) for
+   colour-blind and full-colour separation in light and dark; orange and yellow
+   sit under 3:1 on white, so every use carries a text label as well. */
+:root {
+  --status-good: #0ca30c; --status-warn: #fab219; --status-bad: #d03b3b;
+  --pace-red: #c42b2b; --pace-orange: #ec7a2a; --pace-yellow: #f2c418; --pace-green: #0ca30c;
+}
+
 /* Dashboard charts: categorical slots in fixed order, status steps, and the
    blue sequential ramp. Dark mode uses its own validated steps, not a flip. */
 .dash-palette {

@@ -11,6 +11,7 @@ import { readUser } from "@/components/layout/nav-items";
 import { moduleGroups } from "@/components/mobile/app-modules";
 import { NameAvatar } from "@/components/shared/name-avatar";
 import { cn } from "@/lib/utils";
+import { badgeText, useWaitingLeads } from "@/hooks/use-waiting-leads";
 
 const THEMES = [
   { value: "light", label: "Light" },
@@ -25,6 +26,7 @@ export default function MorePage() {
   const [user] = useState(readUser);
   const { theme, setTheme } = useTheme();
   const groups = moduleGroups(user, ["/tasks"]);
+  const waiting = useWaitingLeads(groups.some((g) => g.modules.some((m) => m.href === "/leads")));
 
   const logout = () => {
     localStorage.removeItem("crm_token");
@@ -60,6 +62,13 @@ export default function MorePage() {
                     </span>
                     <span className="m-cell-body">
                       <span className="flex-1 truncate text-[16px]">{m.name}</span>
+                      {m.href === "/leads" && waiting && waiting.count > 0 && (
+                        <span aria-label={`${waiting.count} waiting for a first call`}
+                          className="inline-flex h-[20px] min-w-[20px] items-center justify-center rounded-full px-1.5 text-[12px] font-semibold tabular-nums text-white"
+                          style={{ background: waiting.overdue ? "var(--status-bad)" : "var(--status-warn)" }}>
+                          {badgeText(waiting.count)}
+                        </span>
+                      )}
                       <ChevronRight className="size-[18px] text-muted-foreground/50" />
                     </span>
                   </Link>

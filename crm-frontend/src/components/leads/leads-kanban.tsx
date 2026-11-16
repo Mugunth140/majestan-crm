@@ -2,6 +2,7 @@
 
 import { Phone } from "lucide-react";
 import { NameAvatar } from "@/components/shared/name-avatar";
+import { WaitChip } from "@/components/leads/wait-chip";
 import { EmptyState } from "@/components/shared/empty-state";
 import { KanbanBoard, type KanbanCardData } from "@/components/views/kanban-board";
 import { LEAD_STATUS_DOTS, LEAD_STATUS_ORDER } from "@/lib/lead-constants";
@@ -18,20 +19,31 @@ export interface KanbanLead {
   propertyType?: string;
   source?: string;
   date?: string;
+  assignedAt?: string | null;
+  /** Still waiting for the owner's first call since it was assigned. */
+  awaitingFirstContact?: boolean;
 }
 
 // These statuses need details first (visit slot, drop reason), so they're set from the lead page.
 export const KANBAN_LOCKED_STATUSES = ["Site Visit Scheduled", "Re Visit Scheduled", "Not Interested", "Dropped"];
 
 /** What a lead shows as a board card, and as a list row on phones. */
+/** A lead its owner hasn't contacted since it was assigned. */
+const waiting = (lead: KanbanLead) => !!lead.awaitingFirstContact && !!lead.assignedAt;
+
 export const leadCard = (lead: KanbanLead): KanbanCardData => ({
     title: lead.name,
     id: lead.id,
     href: `/leads/${lead.rawId}`,
-    subtitle: lead.mobile && (
-      <span className="flex items-center gap-1.5 tabular-nums">
-        <Phone className="size-3.5" strokeWidth={1.75} />
-        {lead.mobile}
+    subtitle: (lead.mobile || waiting(lead)) && (
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-1 tabular-nums">
+        {lead.mobile && (
+          <span className="flex items-center gap-1.5">
+            <Phone className="size-3.5" strokeWidth={1.75} />
+            {lead.mobile}
+          </span>
+        )}
+        {waiting(lead) && <WaitChip assignedAt={lead.assignedAt!} />}
       </span>
     ),
     footer:

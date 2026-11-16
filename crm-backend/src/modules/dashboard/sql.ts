@@ -253,12 +253,12 @@ export function attentionQueue({ ids, now }: Ctx, limit = 40) {
       LEFT JOIN fu ON fu.lead_id = o.id LEFT JOIN lt ON lt.id = o.id
   )
   SELECT id, name, status, uid AS "ownerId", CAST(due AS VARCHAR) AS due,
-    CASE WHEN due < ${istDate(now)} THEN 'overdue' WHEN due = ${istDate(now)} THEN 'today'
-      WHEN rnr >= 3 THEN 'rnr' WHEN last_owner IS NULL OR last_owner < ${now} - INTERVAL 7 DAY THEN 'neglected'
+    CASE WHEN last_owner IS NULL THEN 'uncontacted' WHEN due < ${istDate(now)} THEN 'overdue' WHEN due = ${istDate(now)} THEN 'today'
+      WHEN rnr >= 3 THEN 'rnr' WHEN last_owner < ${now} - INTERVAL 7 DAY THEN 'neglected'
       ELSE 'unscheduled' END AS reason,
     CAST(date_diff('day', COALESCE(last_owner, created_at), ${now}) AS INTEGER) AS "idleDays"
   FROM w WHERE due <= ${istDate(now)} OR due IS NULL OR rnr >= 3 OR last_owner IS NULL OR last_owner < ${now} - INTERVAL 7 DAY
-  ORDER BY CASE WHEN due < ${istDate(now)} THEN 0 WHEN due = ${istDate(now)} THEN 1 WHEN rnr >= 3 THEN 2
+  ORDER BY CASE WHEN last_owner IS NULL THEN -1 WHEN due < ${istDate(now)} THEN 0 WHEN due = ${istDate(now)} THEN 1 WHEN rnr >= 3 THEN 2
     WHEN last_owner IS NULL OR last_owner < ${now} - INTERVAL 7 DAY THEN 3 ELSE 4 END, due NULLS LAST, id
   LIMIT ${limit}`;
 }

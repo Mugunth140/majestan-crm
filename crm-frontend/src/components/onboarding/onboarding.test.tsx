@@ -54,10 +54,22 @@ describe("what's new", () => {
 
 describe("2.3.0", () => {
   it("opens What's new with the WhatsApp integration slide", async () => {
-    const { RELEASES, releasesSince } = await import("@/lib/release");
-    expect(RELEASES[0].version).toBe("2.3.0");
-    const steps = whatsNewSteps(releasesSince("2.2.0", RELEASES), "Staff");
+    const { RELEASES } = await import("@/lib/release");
+    const release = RELEASES.find((r) => r.version === "2.3.0")!;
+    const steps = whatsNewSteps([release], "Staff");
     expect(steps.map((s) => s.id).slice(0, 2)).toEqual(["whats-new", "whatsapp"]);
     expect(SLIDES.find((s) => s.id === "whatsapp")?.title).toBe("Introducing WhatsApp Integration");
+  });
+});
+
+describe("2.4.0", () => {
+  it("is the app version and lists the Call button, first contact and target colours", async () => {
+    const { APP_VERSION, RELEASES, releasesSince } = await import("@/lib/release");
+    expect(APP_VERSION).toBe("2.4.0");
+    expect(releasesSince("2.3.0", RELEASES).map((r) => r.version)).toEqual(["2.4.0"]);
+    const text = RELEASES[0].changes.map((c) => c.text).join(" ");
+    expect(text).toMatch(/Call button/);
+    expect(text).toMatch(/waiting for first contact/);
+    expect(text).toMatch(/80%/);
   });
 });

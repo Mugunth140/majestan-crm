@@ -92,6 +92,16 @@ export class Lead {
   @Column({ type: 'varchar', length: 255, nullable: true })
   drop_reason: string | null;
 
+  // Kept by database triggers (migration 085), never written by the app.
+  @Column({ type: 'datetime', precision: 6, nullable: true, insert: false, update: false })
+  assigned_at: Date | null;
+
+  @Column({ type: 'datetime', precision: 6, nullable: true, insert: false, update: false })
+  first_contacted_at: Date | null;
+
+  @Column({ type: 'tinyint', default: 0, insert: false, update: false })
+  first_contact_nudged: number;
+
   @CreateDateColumn()
   @Index()
   created_at: Date;

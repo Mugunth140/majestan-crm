@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactElement, ReactNode } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Phone } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar } from "@/components/record/feed";
 import { AssigneePicker, type Person } from "@/components/record/assignee-picker";
@@ -110,5 +110,37 @@ export function AssigneeButton({ name, empty, variant = "header", people = [], v
       clearLabel={clearLabel} allowClear={allowClear} loading={loading} onOpen={onOpen}>
       {content}
     </AssigneePicker>
+  );
+}
+
+/** A phone number as a `tel:` link: digits only, keeping a leading +. Null when there's no number to dial. */
+export function telHref(number?: string | null): string | null {
+  const raw = String(number ?? "").trim();
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length < 3) return null;
+  return `tel:${raw.startsWith("+") ? "+" : ""}${digits}`;
+}
+
+/**
+ * Calls the record's number in the phone's dialer. The call logger on the
+ * phone records the call, so nothing is tracked here.
+ */
+export function CallButton({ number, variant = "header" }: { number?: string | null; variant?: "header" | "phone" }) {
+  const href = telHref(number);
+  if (!href) return null;
+  const label = `Call ${String(number).trim()}`;
+  if (variant === "phone") {
+    return (
+      <a href={href} aria-label={label} title={label}
+        className="flex h-10 w-12 shrink-0 items-center justify-center rounded-xl bg-[#017D58]/10 text-[#017D58] transition-colors active:bg-[#017D58]/20 dark:bg-[#2FB585]/15 dark:text-[#2FB585]">
+        <Phone className="h-[18px] w-[18px]" />
+      </a>
+    );
+  }
+  return (
+    <a href={href} title={label} className={HEADER_BUTTON}>
+      <Phone className="h-3.5 w-3.5" />
+      Call
+    </a>
   );
 }

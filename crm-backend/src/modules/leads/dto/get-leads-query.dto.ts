@@ -58,6 +58,11 @@ export class GetLeadsQueryDto {
   @IsString()
   status?: string;
 
+  /** "1": only leads still waiting for their owner's first contact, longest wait first. */
+  @IsOptional()
+  @IsString()
+  waiting?: string;
+
   @IsOptional()
   @IsString()
   source?: string;

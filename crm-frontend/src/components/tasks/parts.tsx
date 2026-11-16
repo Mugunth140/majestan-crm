@@ -8,6 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { amount, dayGroup, paceGap, STATUS_META, timeLabel, TONE_COLOR } from "./format";
+import { dayPace, NO_PACE_COLOR, PACE_BANDS, paceBand, paceOf, type PaceBand } from "@/lib/target-pace";
 import type { ActivityItem, MetricPace, PaceStatus } from "./types";
 
 /* ───────────────────────── Status ───────────────────────── */
@@ -22,18 +23,29 @@ export function StatusPill({ status, className }: { status: PaceStatus; classNam
   );
 }
 
+/**
+ * The month's colour: against where a steady pace would be today while the
+ * month runs, against the whole target once it has closed, none before it starts.
+ */
+export function monthBand(m: Pick<MetricPace, "pct" | "expected" | "monthly" | "status">): PaceBand | null {
+  if (m.status === "upcoming") return null;
+  if (m.status === "done") return "green";
+  if (m.status === "missed") return paceBand(m.pct);
+  return paceOf((m.pct / 100) * m.monthly, m.expected)?.band ?? null;
+}
+
 /** Progress toward the month, with a tick where a steady pace would be today. */
 export function PaceBar({ m, size = "md" }: { m: Pick<MetricPace, "pct" | "expected" | "monthly" | "status" | "label">; size?: "sm" | "md" }) {
   const pct = Math.min(100, m.pct);
   const pace = m.monthly ? Math.min(100, (m.expected / m.monthly) * 100) : 0;
-  const tone = STATUS_META[m.status].tone;
+  const band = monthBand(m);
   return (
     <div
       className={cn("relative rounded-full bg-muted", size === "sm" ? "h-1.5" : "h-2")}
       role="progressbar" aria-valuenow={Math.round(m.pct)} aria-valuemin={0} aria-valuemax={100}
-      aria-label={`${m.label}: ${Math.round(m.pct)}% of the monthly target`}
+      aria-label={`${m.label}: ${Math.round(m.pct)}% of the monthly target${band ? `, ${PACE_BANDS[band].label.toLowerCase()}` : ""}`}
     >
-      <div className="h-full rounded-full transition-[width] duration-700 ease-out" style={{ width: `${pct}%`, background: tone === "muted" || tone === "info" ? "var(--series-1)" : TONE_COLOR[tone] }} />
+      <div className="h-full rounded-full transition-[width] duration-700 ease-out" style={{ width: `${pct}%`, background: band ? PACE_BANDS[band].color : NO_PACE_COLOR }} />
       {m.status !== "upcoming" && m.status !== "done" && pace > 0 && pace < 100 && (
         <span aria-hidden className={cn("absolute w-0.5 rounded-full bg-foreground/60", size === "sm" ? "-top-[3px] h-3" : "-top-1 h-4")} style={{ left: `calc(${pace}% - 1px)` }} />
       )}
@@ -139,6 +151,7 @@ export function TodayList({ metrics }: { metrics: MetricPace[] }) {
       {items.map((m) => {
         const met = m.today.remaining === 0;
         const pct = Math.min(100, (m.today.achieved / m.today.goal) * 100);
+        const band: PaceBand | null = met ? "green" : dayPace(m.today.achieved, m.today.goal)?.band ?? null;
         return (
           <li key={m.key} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
             <span aria-hidden className={cn("flex size-6 shrink-0 items-center justify-center rounded-full border", met && "border-transparent")} style={met ? { background: TONE_COLOR.good } : undefined}>
@@ -148,12 +161,13 @@ export function TodayList({ metrics }: { metrics: MetricPace[] }) {
               <div className="flex items-baseline justify-between gap-2">
                 <span className={cn("truncate text-[13px]", met ? "text-muted-foreground line-through decoration-muted-foreground/40" : "font-medium text-foreground")}>{m.label}</span>
                 <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground">
+                  {!met && band && <span className="mr-2 inline-flex items-center gap-1 text-foreground/80"><span aria-hidden className="size-1.5 rounded-full" style={{ background: PACE_BANDS[band].color }} />{PACE_BANDS[band].label}</span>}
                   {met ? "Met" : <><span className="font-medium text-foreground">{amount(m.unit, m.today.remaining)}</span> to go</>}
                   <span className="ml-2">{amount(m.unit, m.today.achieved)}/{amount(m.unit, m.today.goal)}</span>
                 </span>
               </div>
               <div className="mt-1.5 h-1 rounded-full bg-muted">
-                <div className="h-full rounded-full transition-[width] duration-700" style={{ width: `${pct}%`, background: met ? TONE_COLOR.good : "var(--series-1)" }} />
+                <div className="h-full rounded-full transition-[width] duration-700" style={{ width: `${pct}%`, background: band ? PACE_BANDS[band].color : NO_PACE_COLOR }} />
               </div>
             </div>
           </li>

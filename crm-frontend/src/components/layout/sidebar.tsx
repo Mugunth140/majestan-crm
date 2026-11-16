@@ -12,6 +12,7 @@ import { useSidebar } from "./sidebar-context";
 import { NotificationsPanel } from "./notifications-panel";
 import { UpdateButton, useAppUpdate } from "./app-update";
 import { useNavViewer } from "@/hooks/use-nav-viewer";
+import { badgeText, useWaitingLeads } from "@/hooks/use-waiting-leads";
 import { NAVIGATION, SETTINGS, canSee, type NavItem } from "./nav-items";
 import { SearchPalette, useSearchShortcut } from "./search-palette";
 import { WorkspaceMenu } from "./workspace-menu";
@@ -63,6 +64,9 @@ export function Sidebar() {
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const { unreadCount } = useNotifications();
   const user = useNavViewer();
+  const leadsItem = NAVIGATION.find((i) => i.key === "leads");
+  const leadsVisible = !!leadsItem && canSee(leadsItem, user);
+  const waiting = useWaitingLeads(!!user && leadsVisible);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const closeNotifications = useCallback(() => setNotificationsOpen(false), []);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -257,6 +261,9 @@ export function Sidebar() {
                       >
                         <Icon className={cn("size-4 shrink-0", item.color)} strokeWidth={active ? 2 : 1.75} />
                         {!isCollapsed && <span className="flex-1 truncate">{item.name}</span>}
+                        {item.key === "leads" && waiting && waiting.count > 0 && (
+                          <WaitingBadge count={waiting.count} overdue={waiting.overdue} collapsed={isCollapsed} />
+                        )}
                         {!isCollapsed && opensPanel && (
                           <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/70 transition-transform duration-150 group-hover/row:translate-x-0.5" />
                         )}
@@ -290,5 +297,21 @@ export function Sidebar() {
       <NotificationsPanel open={notificationsOpen} onClose={closeNotifications} toggleId="notifications-btn" />
       <SearchPalette open={searchOpen} onOpenChange={setSearchOpen} viewer={user} />
     </aside>
+  );
+}
+
+/** Leads still waiting for a first call: red once any has waited past the hour, amber before. */
+function WaitingBadge({ count, overdue, collapsed }: { count: number; overdue: number; collapsed: boolean }) {
+  const color = overdue > 0 ? "var(--status-bad)" : "var(--status-warn)";
+  const label = `${count} ${count === 1 ? "lead waits" : "leads wait"} for a first call${overdue ? `, ${overdue} past the hour` : ""}`;
+  if (collapsed) {
+    return <span role="img" aria-label={label} title={label} className="absolute right-1.5 top-1.5 size-2 rounded-full ring-2 ring-background" style={{ background: color }} />;
+  }
+  return (
+    <span title={label} aria-label={label}
+      className="ml-auto inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums text-white"
+      style={{ background: color }}>
+      {badgeText(count)}
+    </span>
   );
 }

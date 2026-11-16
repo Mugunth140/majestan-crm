@@ -19,7 +19,7 @@ import { statusDot, statusPillClass } from "@/components/tables/cells";
 import { FieldRow, InlineSelect, InlineText, Section, type Option } from "@/components/record/inline-field";
 import { Feed, TabHeader } from "@/components/record/feed";
 import { type Person } from "@/components/record/assignee-picker";
-import { AssigneeButton, StatusMenu, type StatusOption } from "@/components/record/header-actions";
+import { AssigneeButton, CallButton, StatusMenu, type StatusOption } from "@/components/record/header-actions";
 import { activityItems, type ActivityEntry } from "@/components/record/activity";
 import { HR_ACTIVITY, HR_DOCUMENT_LABELS } from "@/components/hr/hr-activity";
 import { HR_ENTITY, LeadConversation } from "@/components/record/conversation";
@@ -350,14 +350,17 @@ export default function HrDetail() {
       tabs={tabs}
       active={activeTab}
       onTab={setActiveTab}
-      actions={<>{statusMenu("h-8")}{assigneeButton("header")}</>}
+      actions={<>{statusMenu("h-8")}{assigneeButton("header")}<CallButton number={c.mobile} /></>}
       phone={
         <>
           <div className="flex flex-wrap items-center gap-2 text-[14px] text-muted-foreground">
             {statusMenu("h-7", "start")}
             <span className="truncate">{subtitle}</span>
           </div>
-          {assigneeButton("phone")}
+          <div className="flex gap-2">
+            <div className="min-w-0 flex-1">{assigneeButton("phone")}</div>
+            <CallButton number={c.mobile} variant="phone" />
+          </div>
         </>
       }
       aside={

@@ -49,6 +49,12 @@ export class LeadsController {
     return { success: true, ...data };
   }
 
+  /** How many of the user's leads wait for a first contact (the sidebar badge). */
+  @Get('waiting-count')
+  async waitingCount(@Request() req: any) {
+    return { success: true, data: await this.leadsService.waitingCount(req.user) };
+  }
+
   @Get()
   async getLeads(@Request() req: any, @Query() query: GetLeadsQueryDto) {
     const result = await this.leadsService.getLeads(req.user, query);

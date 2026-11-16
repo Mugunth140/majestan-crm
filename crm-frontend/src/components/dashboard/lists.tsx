@@ -6,6 +6,7 @@ import { Avatar } from "@/components/record/feed";
 import { cn } from "@/lib/utils";
 import { EmptyChart, STATUS, seriesColor, useCountUp, useDash } from "./chart-kit";
 import { formatValue, inr, metricDelta, shortDate, type Delta } from "./format";
+import { dayPace, NO_PACE_COLOR, PACE_BANDS, paceOf, weekPace, type PaceBand } from "@/lib/target-pace";
 import type { BlockOf, Insight, LeaderRow, MetricOut, QueueItem, TargetRow, Tone } from "./types";
 
 export function DeltaPill({ d, className }: { d: Delta | null; className?: string }) {
@@ -267,6 +268,7 @@ function InsightRow({ it }: { it: Insight }) {
 /* ───────────────────────────── Queue ───────────────────────────── */
 
 const REASONS: Record<string, { label: string; tone: Tone }> = {
+  uncontacted: { label: "Not contacted yet", tone: "bad" },
   overdue: { label: "Overdue", tone: "bad" },
   today: { label: "Due today", tone: "warn" },
   rnr: { label: "Not reachable ×3", tone: "warn" },
@@ -377,8 +379,10 @@ export function Targets({ block }: { block: BlockOf<"targets"> }) {
     <div className={cn("grid gap-3", block.personal && block.rows.length > 1 && "@lg:grid-cols-2", block.personal && block.rows.length >= 4 && "@5xl:grid-cols-4", block.personal && block.rows.length === 3 && "@4xl:grid-cols-3")}>
       {block.rows.map((r) => {
         const pct = r.monthly ? (r.achieved / r.monthly) * 100 : 0;
-        const pace = r.monthly ? (r.expected / r.monthly) * 100 : 0;
+        const tick = r.monthly ? (r.expected / r.monthly) * 100 : 0;
         const ahead = r.achieved >= r.expected;
+        const pace = paceOf(r.achieved, r.expected);
+        const fill = pace ? PACE_BANDS[pace.band].color : NO_PACE_COLOR;
         const forecastPct = r.monthly ? Math.round((r.forecast / r.monthly) * 100) : 0;
         return (
           <div key={`${r.personId}-${r.metric}`} className="rounded-lg border p-4">
@@ -393,19 +397,20 @@ export function Targets({ block }: { block: BlockOf<"targets"> }) {
               </div>
             </div>
             <div className="relative mt-3 h-2 rounded-full bg-muted" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label={`${r.label}: ${Math.round(pct)}% of the monthly target`}>
-              <div className="h-full rounded-full transition-[width] duration-700" style={{ width: `${Math.min(100, pct)}%`, background: ahead ? STATUS.good : seriesColor(0) }} />
-              <span aria-hidden title={`Expected by today: ${amount(r, r.expected)}`} className="absolute -top-1 h-4 w-0.5 rounded-full bg-foreground/70" style={{ left: `calc(${Math.min(100, pace)}% - 1px)` }} />
+              <div className="h-full rounded-full transition-[width] duration-700" style={{ width: `${Math.min(100, pct)}%`, background: fill }} />
+              <span aria-hidden title={`Expected by today: ${amount(r, r.expected)}`} className="absolute -top-1 h-4 w-0.5 rounded-full bg-foreground/70" style={{ left: `calc(${Math.min(100, tick)}% - 1px)` }} />
             </div>
             <div className="mt-2 flex flex-wrap justify-between gap-x-3 gap-y-1 text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1">
-                {ahead ? <Check aria-hidden className="size-3" style={{ color: STATUS.good }} /> : <AlertTriangle aria-hidden className="size-3" style={{ color: STATUS.warn }} />}
+                {pace && <PaceDot band={pace.band} />}
+                {pace && !ahead && <span className="font-medium text-foreground/85">{PACE_BANDS[pace.band].label} ·</span>}
                 {ahead ? "Ahead of pace" : `${amount(r, Math.max(0, r.expected - r.achieved))} behind pace`}
               </span>
               <span>On course for {forecastPct}%</span>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2 border-t pt-3 text-xs">
-              <MiniGoal label="Today" achieved={r.today.achieved} goal={r.today.goal} fmt={(v) => amount(r, v)} />
-              <MiniGoal label={`Week ${r.week.number}`} achieved={r.week.achieved} goal={r.week.target} fmt={(v) => amount(r, v)} />
+              <MiniGoal label="Today" achieved={r.today.achieved} goal={r.today.goal} fmt={(v) => amount(r, v)} pace={dayPace(r.today.achieved, r.today.goal)} />
+              <MiniGoal label={`Week ${r.week.number}`} achieved={r.week.achieved} goal={r.week.target} fmt={(v) => amount(r, v)} pace={weekPace(r.week.achieved, r.week.target)} />
             </div>
           </div>
         );
@@ -415,17 +420,30 @@ export function Targets({ block }: { block: BlockOf<"targets"> }) {
   );
 }
 
-function MiniGoal({ label, achieved, goal, fmt }: { label: string; achieved: number; goal: number; fmt: (v: number) => string }) {
+function MiniGoal({ label, achieved, goal, fmt, pace }: { label: string; achieved: number; goal: number; fmt: (v: number) => string; pace?: { band: PaceBand } | null }) {
   const done = goal > 0 && achieved >= goal;
+  const band = done ? "green" : pace?.band;
   return (
     <div>
-      <div className="text-muted-foreground">{label}</div>
+      <div className="whitespace-nowrap text-muted-foreground">{label}</div>
       <div className="mt-0.5 flex items-center gap-1 font-medium tabular-nums text-foreground">
         {fmt(achieved)}<span className="font-normal text-muted-foreground">/ {goal > 0 ? fmt(goal) : "—"}</span>
         {done && <Check aria-label="Done" className="size-3.5" style={{ color: STATUS.good }} />}
       </div>
+      {goal > 0 && (
+        <div className="mt-1.5 h-1 rounded-full bg-muted" role="progressbar" aria-valuenow={Math.round((achieved / goal) * 100)} aria-valuemin={0} aria-valuemax={100}
+          aria-label={`${label}: ${fmt(achieved)} of ${fmt(goal)}${band ? `, ${PACE_BANDS[band].label.toLowerCase()}` : ""}`}>
+          <div className="h-full rounded-full transition-[width] duration-700" style={{ width: `${Math.min(100, (achieved / goal) * 100)}%`, background: band ? PACE_BANDS[band].color : NO_PACE_COLOR }} />
+        </div>
+      )}
+      {band && !done && <div className="mt-1 truncate text-[11px] text-foreground/70">{PACE_BANDS[band].label}</div>}
     </div>
   );
+}
+
+/** The pace band's colour as a small dot beside its label. */
+function PaceDot({ band }: { band: PaceBand }) {
+  return <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: PACE_BANDS[band].color }} />;
 }
 
 /* ───────────────────────── Metric table ───────────────────────── */

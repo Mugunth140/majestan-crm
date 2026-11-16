@@ -19,7 +19,7 @@ import { PageActions } from "@/components/layout/page-actions";
 import { FieldRow, InlineSelect, InlineText, Section, type Option } from "@/components/record/inline-field";
 import { Feed, TabHeader } from "@/components/record/feed";
 import { type Person } from "@/components/record/assignee-picker";
-import { AssigneeButton, StatusMenu, type StatusOption } from "@/components/record/header-actions";
+import { AssigneeButton, CallButton, StatusMenu, type StatusOption } from "@/components/record/header-actions";
 import { activityItems, type ActivityEntry } from "@/components/record/activity";
 import { AGENT_ACTIVITY } from "@/components/agents/agent-activity";
 import { AGENT_ENTITY, LeadConversation } from "@/components/record/conversation";
@@ -306,6 +306,7 @@ function AgentDetail() {
         <div className="flex items-center gap-2">
           {statusMenu("h-8")}
           {assigneeButton("header")}
+          <CallButton number={agent.mobile_number} />
         </div>
       </PageActions>
 
@@ -315,7 +316,10 @@ function AgentDetail() {
           {statusMenu("h-7", "start")}
           <span className="truncate">{subtitle}</span>
         </div>
-        {assigneeButton("phone")}
+        <div className="flex gap-2">
+          <div className="min-w-0 flex-1">{assigneeButton("phone")}</div>
+          <CallButton number={agent.mobile_number} variant="phone" />
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">

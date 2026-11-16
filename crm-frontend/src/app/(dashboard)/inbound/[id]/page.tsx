@@ -23,7 +23,7 @@ import { MobileHeader } from "@/components/layout/mobile-header";
 import { PageActions } from "@/components/layout/page-actions";
 import { FieldRow, InlineMulti, InlineSelect, InlineText, Section, type Option } from "@/components/record/inline-field";
 import { Feed, TabHeader } from "@/components/record/feed";
-import { AssigneeButton, HEADER_BUTTON, StatusMenu, type StatusOption } from "@/components/record/header-actions";
+import { AssigneeButton, CallButton, HEADER_BUTTON, StatusMenu, type StatusOption } from "@/components/record/header-actions";
 import { ScoreRing } from "@/components/record/score-ring";
 import { activityItems, type ActivityEntry } from "@/components/record/activity";
 import { INBOUND_ACTIVITY } from "@/components/inbound/inbound-activity";
@@ -551,6 +551,7 @@ function InboundDetail() {
         <div className="flex items-center gap-2">
           {statusMenu("h-8")}
           {assigneeButton("header")}
+          <CallButton number={inbound.mobile_number} />
         </div>
       </PageActions>
 
@@ -563,7 +564,10 @@ function InboundDetail() {
             <span>{inboundCode(inbound)}</span>
           </div>
         </div>
-        {assigneeButton("phone")}
+        <div className="flex gap-2">
+          <div className="min-w-0 flex-1">{assigneeButton("phone")}</div>
+          <CallButton number={inbound.mobile_number} variant="phone" />
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">

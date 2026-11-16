@@ -1,4 +1,5 @@
 import { Injectable, ConflictException, NotFoundException, BadRequestException, ForbiddenException, Optional } from '@nestjs/common';
+import { FIRST_CONTACT_DONE_STATUSES, FIRST_CONTACT_SLA_MIN, waitingSql, workMinutesBetween } from './first-contact';
 import { leadScopeSql } from './lead-scope';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource } from '@nestjs/typeorm';
@@ -197,7 +198,9 @@ export class LeadsService {
         ? { date: visitInquiry.visit_date, slot: visitInquiry.visit_slot ?? null, intent: visitInquiry.intent ?? 'enquiry' }
         : null;
 
-    return { ...lead, is_converted: !!lead.converted_to, converted_record: await this.convertedRecord(lead), follow_ups: followUps, contact_logs: contactLogs, interestedProperty, visit };
+    const awaiting_first_contact = !!lead.assigned_staff_id && !!lead.assigned_at && !lead.first_contacted_at && !lead.converted_to
+      && !lead.is_unqualified && !FIRST_CONTACT_DONE_STATUSES.includes(lead.status || 'New Lead');
+    return { ...lead, is_converted: !!lead.converted_to, awaiting_first_contact, converted_record: await this.convertedRecord(lead), follow_ups: followUps, contact_logs: contactLogs, interestedProperty, visit };
   }
 
   // Acknowledge a lead's open website enquiries. Only the assigned staff
@@ -1102,6 +1105,8 @@ export class LeadsService {
     // A converted lead lives on as an Agent or Inbound record and is worked
     // there; it only lists here when staff ask for Converted leads on purpose.
     if (query?.status !== 'Converted') filterConds += ' AND l.converted_to IS NULL';
+    const waitingOnly = query?.waiting === '1' || query?.waiting === 'true';
+    if (waitingOnly) filterConds += ` AND ${waitingSql('l')}`;
     if (query?.source) {
       filterConds += ' AND l.lead_source = ?';
       params.push(query.source);
@@ -1236,6 +1241,9 @@ export class LeadsService {
       SELECT 'staff' AS kind, s.name AS value FROM leads l ${joinClauses} ${scopeWhere} AND s.name IS NOT NULL AND s.name <> ''
     `;
 
+    // Waiting leads in the current scope, for the toolbar's "N waiting" chip.
+    const waitingSqlCount = `SELECT COUNT(*) AS count FROM leads l ${joinClauses} ${scopeWhere} AND ${waitingSql('l')}`;
+
     const [countResult, optionRows] = await Promise.all([
       this.dataSource.query(countSql, listParams),
       this.dataSource.query(optionsSql, [...scopeParams, ...scopeParams, ...scopeParams, ...scopeParams, ...scopeParams]),
@@ -1257,6 +1265,9 @@ export class LeadsService {
         l.lead_source as source, 
         l.is_unqualified as isUnqualified, 
         l.created_at as createdAt,
+        l.assigned_at as assignedAt,
+        l.first_contacted_at as firstContactedAt,
+        ${waitingSql('l')} as awaitingFirstContact,
         s.name as staff,
         i.property_type as propertyType, 
         i.property_category as propertyCategory,
@@ -1273,11 +1284,12 @@ export class LeadsService {
       FROM leads l
       ${joinClauses}
       ${listWhere}
-      ORDER BY l.created_at DESC
+      ORDER BY ${waitingOnly ? 'l.assigned_at ASC,' : ''} l.created_at DESC
       LIMIT ? OFFSET ?
     `;
 
     const rawLeads = await this.dataSource.query(dataSql, [...listParams, limit, offset]);
+    const waitingResult = await this.dataSource.query(waitingSqlCount, scopeParams);
 
     const data = rawLeads.map((row: any, index: number) => ({
       sno: offset + index + 1,
@@ -1307,6 +1319,9 @@ export class LeadsService {
       lastFollowedUpTime: row.lastFollowedUpTime || null,
       lastFollowedUpNotes: row.lastFollowedUpNotes || null,
       isUnqualified: Boolean(row.isUnqualified),
+      assignedAt: row.assignedAt ?? null,
+      firstContactedAt: row.firstContactedAt ?? null,
+      awaitingFirstContact: Boolean(Number(row.awaitingFirstContact)),
       // Optional list columns (hidden until picked in the Columns menu).
       whatsapp: row.whatsapp || null,
       city: row.city || null,
@@ -1335,6 +1350,7 @@ export class LeadsService {
         page,
         limit,
         totalPages: Math.ceil(total / limit),
+        waiting: Number(waitingResult?.[0]?.count || 0),
         filterOptions: {
           statuses: [...optionSets.status].sort(),
           sources: [...optionSets.source].sort(),
@@ -1344,6 +1360,18 @@ export class LeadsService {
         },
       }
     };
+  }
+
+  /**
+   * Leads the user can see that still wait for their owner's first contact:
+   * how many, and how many have waited past the hour of working time.
+   */
+  async waitingCount(user?: any, now = new Date()): Promise<{ count: number; overdue: number }> {
+    const rows: { assignedAt: Date | string }[] = await this.dataSource.query(
+      `SELECT l.assigned_at AS assignedAt FROM leads l WHERE 1=1 ${leadScopeSql(user)} AND ${waitingSql('l')}`,
+    );
+    const overdue = rows.filter((r) => workMinutesBetween(new Date(r.assignedAt), now) >= FIRST_CONTACT_SLA_MIN).length;
+    return { count: rows.length, overdue };
   }
 
   async getCities(): Promise<{ id: number; city_name: string }[]> {

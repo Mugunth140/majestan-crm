@@ -29,9 +29,10 @@ import { useIsMobile } from "@/hooks/use-device";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { FirstContactBanner } from "@/components/leads/wait-chip";
 
 const LeadAttachments = dynamic(() => import("@/components/shared/lead-attachments").then(mod => mod.LeadAttachments), { ssr: false });
-import { AssigneeButton, HEADER_BUTTON, HEADER_PRIMARY, StatusMenu } from "@/components/record/header-actions";
+import { AssigneeButton, CallButton, HEADER_BUTTON, HEADER_PRIMARY, StatusMenu } from "@/components/record/header-actions";
 import type { Person } from "@/components/record/assignee-picker";
 import { MobileHeader } from "@/components/layout/mobile-header";
 import { formatTalkTime, sortContactLogs } from "@/lib/contact-log-utils";
@@ -693,6 +694,8 @@ function LeadDetail() {
     ? `/${lead.converted_record.type === "agent" ? "agent-network" : "inbound"}/${lead.converted_record.id}`
     : lead.converted_to === "agent" ? "/agent-network" : lead.converted_to === "inbound" ? "/inbound" : null;
   const convertedLabel = lead.converted_to === "agent" ? "Converted to agent" : "Converted to inbound";
+  // Whoever works the lead can ring it from here; the phone's call logger records the call.
+  const showCall = canEdit || role === "Super Admin";
   const openConvert = () => { setConvertTo(""); setConvertFeedback(""); setIsConvertOpen(true); };
 
   const inquiries: any[] = lead.inquiries || [];
@@ -899,6 +902,7 @@ function LeadDetail() {
         <div className="flex items-center gap-2">
           {statusMenu("h-8")}
           {assigneeButton("header")}
+          {showCall && <CallButton number={lead.mobile_number} />}
           {showConvert && (
             <button type="button" onClick={openConvert} className={HEADER_PRIMARY}>
               <TrendingUp className="h-3.5 w-3.5" />
@@ -933,8 +937,13 @@ function LeadDetail() {
                 {convertedLabel} <ArrowUpRight className="h-4 w-4" />
               </Link>
             )}
+            {showCall && <CallButton number={lead.mobile_number} variant="phone" />}
           </div>
       </div>
+
+      {lead.awaiting_first_contact && lead.assigned_at && (
+        <FirstContactBanner assignedAt={lead.assigned_at} owner={lead.assigned_staff?.name} isOwner={lead.assigned_staff_id === currentUserId} />
+      )}
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
 

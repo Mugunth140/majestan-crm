@@ -13,6 +13,28 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2.4.0",
+    date: "2026-11-16",
+    title: "Call in one tap, and no lead left waiting",
+    changes: [
+      { kind: "new", text: "Call button on lead, partner, inbound and HR pages: tap it to open your phone's dialer with the number filled in. The call logger tracks the call as usual." },
+      { kind: "new", text: "Leads waiting for a first contact are marked with how long they've waited in working time: green at first, amber after 15 minutes, red after an hour." },
+      { kind: "new", text: "The Leads list has a \"waiting for first contact\" filter, and the Leads menu shows how many are waiting." },
+      { kind: "new", text: "If a lead isn't contacted within an hour of working time, its owner gets a reminder; after two hours, their team lead is told. Managers and admins get a daily summary at 6:30 PM." },
+      { kind: "new", text: "Targets are coloured by how you're doing: red, orange, yellow, and green when you're at 80% or more of where you should be today." },
+      { kind: "new", text: "Converting a lead creates its partner or inbound record, and the lead page links to it." },
+      { kind: "new", text: "Website Users: people who registered on the website, now in the CRM." },
+      { kind: "new", text: "HR: a Contacted status after New Application, and Assigned staff and Position filters." },
+      { kind: "new", text: "Commercial and industrial requirements ask for ceiling height, road access, power load, loading bay, fire safety and more." },
+      { kind: "improved", text: "Sales staff and their team leads can convert their own leads." },
+      { kind: "improved", text: "Converted leads leave the leads list (filter by status Converted to see them) and their status is locked." },
+      { kind: "improved", text: "Scheduler: search by name, ID or phone." },
+      { kind: "improved", text: "Lists remember your filters, search, tab and page on each device." },
+      { kind: "improved", text: "The HR list loads faster, one page at a time." },
+      { kind: "improved", text: "Listings shared with a lead show a general name with only the locality and city." },
+    ],
+  },
+  {
     version: "2.3.0",
     date: "2026-11-11",
     title: "Introducing WhatsApp Integration",

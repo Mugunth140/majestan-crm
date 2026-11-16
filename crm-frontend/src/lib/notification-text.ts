@@ -20,6 +20,8 @@ const ROUTES: Record<string, string> = {
 
 /** The record a notification is about, or null when it isn't about one. */
 export function notificationHref(n: NotificationLike): string | null {
+  // The evening summary is about many leads: open the list filtered to them.
+  if (n.type === "first_contact_digest") return "/leads?waiting=1";
   const id = n.entity_id || n.lead_id;
   if (!id) return null;
   const route = ROUTES[n.entity_type || "lead"];

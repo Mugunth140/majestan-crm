@@ -6,11 +6,12 @@ import { Notification } from '../../database/entities/notification.entity';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationsListener } from './notifications.listener';
 import { FollowUpRemindersService } from './follow-up-reminders.service';
+import { FirstContactRemindersService } from './first-contact-reminders.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Notification]), AuthModule],
   controllers: [NotificationsController],
-  providers: [NotificationsService, NotificationsListener, FollowUpRemindersService],
+  providers: [NotificationsService, NotificationsListener, FollowUpRemindersService, FirstContactRemindersService],
   exports: [NotificationsService],
 })
 export class NotificationsModule {}

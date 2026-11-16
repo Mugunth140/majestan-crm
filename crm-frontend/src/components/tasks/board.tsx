@@ -10,7 +10,8 @@ import { PageActions } from "@/components/layout/page-actions";
 import { SegmentTabs, ToolbarSearch, ToolbarSelect, headerPrimaryClass, headerButtonClass } from "@/components/layout/list-page";
 import { EmptyState } from "@/components/shared/empty-state";
 import { amount, monthLabel, STATUS_META, TONE_COLOR } from "./format";
-import { PaceBar, SourceChip, StatusPill } from "./parts";
+import { monthBand, PaceBar, SourceChip, StatusPill } from "./parts";
+import { dayPace, PACE_BANDS } from "@/lib/target-pace";
 import { send, useAgo, type Live } from "./use-tasks";
 import type { Board, PaceStatus, TaskRow } from "./types";
 
@@ -247,6 +248,30 @@ function PeopleTable({ rows, open, toggle }: { rows: TaskRow[]; open: Set<number
   );
 }
 
+/** What is left today, with a dot for how the day is going against the clock. */
+function TodayLeft({ m }: { m: TaskRow["metrics"][number] }) {
+  const pace = dayPace(m.today.achieved, m.today.goal);
+  return (
+    <span className="inline-flex items-center justify-end gap-1.5" title={pace ? `Today: ${PACE_BANDS[pace.band].label}` : undefined}>
+      {pace && <span aria-hidden className="size-1.5 rounded-full" style={{ background: PACE_BANDS[pace.band].color }} />}
+      {amount(m.unit, m.today.remaining)}
+    </span>
+  );
+}
+
+/** The month's standing: a pace band while it runs, else Done, Missed or Planned. */
+function PaceCell({ m }: { m: TaskRow["metrics"][number] }) {
+  const band = monthBand(m);
+  const running = m.status !== "done" && m.status !== "missed" && m.status !== "upcoming";
+  const color = band ? PACE_BANDS[band].color : TONE_COLOR[STATUS_META[m.status].tone];
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span aria-hidden className="size-1.5 rounded-full" style={{ background: color }} />
+      {running && band ? PACE_BANDS[band].label : STATUS_META[m.status].label}
+    </span>
+  );
+}
+
 /** Each target of a person on one line: progress, pace, and what is left today and this week. */
 function MetricLines({ r }: { r: TaskRow }) {
   return (
@@ -268,9 +293,9 @@ function MetricLines({ r }: { r: TaskRow }) {
               <td className="py-2 pr-3"><span className="mr-2 text-foreground">{m.label}</span><SourceChip m={m} /></td>
               <td className="px-3 py-2 text-right tabular-nums"><span className="font-medium">{amount(m.unit, m.achieved)}</span><span className="text-muted-foreground"> / {amount(m.unit, m.monthly)}</span></td>
               <td className="px-3 py-2"><PaceBar size="sm" m={m} /></td>
-              <td className="px-3 py-2 text-right tabular-nums">{m.today.goal ? (m.today.remaining ? amount(m.unit, m.today.remaining) : <span style={{ color: TONE_COLOR.good }}>Met</span>) : "—"}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{m.today.goal ? (m.today.remaining ? <TodayLeft m={m} /> : <span style={{ color: TONE_COLOR.good }}>Met</span>) : "—"}</td>
               <td className="px-3 py-2 text-right tabular-nums">{m.week.remaining ? amount(m.unit, m.week.remaining) : <span style={{ color: TONE_COLOR.good }}>Met</span>}</td>
-              <td className="py-2 pl-3"><span className="inline-flex items-center gap-1.5"><span aria-hidden className="size-1.5 rounded-full" style={{ background: TONE_COLOR[STATUS_META[m.status].tone] }} />{STATUS_META[m.status].label}</span></td>
+              <td className="py-2 pl-3"><PaceCell m={m} /></td>
             </tr>
           ))}
         </tbody>
