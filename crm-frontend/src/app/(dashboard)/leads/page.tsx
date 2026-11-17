@@ -697,7 +697,7 @@ export default function LeadsPage() {
         <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
           {ex ? (
             <Badge className="font-medium shadow-sm border whitespace-nowrap bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800">
-              Exists • {ex.displayId}
+              Exists • {ex.displayId} · {ex.staff && ex.staff !== "Unassigned" ? ex.staff : "Unassigned"}
             </Badge>
           ) : (
             <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 whitespace-nowrap">
@@ -1467,7 +1467,7 @@ export default function LeadsPage() {
             <DialogTitle>Duplicates found</DialogTitle>
             <DialogDescription>
               {dupeRows.length} of {pendingImports.length} rows already exist in the CRM. Inserting will merge them
-              into the existing profiles instead of creating new leads.
+              into the existing profiles instead of creating new leads, and tell each lead's owner and their team lead.
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[280px] overflow-y-auto rounded-xl border border-border/60 divide-y divide-border/50">
@@ -1477,13 +1477,16 @@ export default function LeadsPage() {
                   <p className="font-medium text-foreground truncate">{i + 1}. {row.name}</p>
                   <p className="text-xs text-muted-foreground">{row.mobile}</p>
                 </div>
-                <Link
-                  href={`/leads/${existing.id}`}
-                  className="shrink-0 text-xs font-bold text-[#0052FF] hover:underline whitespace-nowrap"
-                  title={`${existing.name} • ${existing.staff ?? "Unassigned"}`}
-                >
-                  {existing.displayId} ↗
-                </Link>
+                <div className="shrink-0 text-right">
+                  <Link
+                    href={`/leads/${existing.id}`}
+                    className="text-xs font-bold text-[#0052FF] hover:underline whitespace-nowrap"
+                    title={existing.name}
+                  >
+                    {existing.displayId} ↗
+                  </Link>
+                  <p className="text-xs text-muted-foreground whitespace-nowrap">{existing.staff ?? "Unassigned"}</p>
+                </div>
               </div>
             ))}
           </div>

@@ -7,11 +7,13 @@ import { AuthModule } from '../auth/auth.module';
 import { NotificationsListener } from './notifications.listener';
 import { FollowUpRemindersService } from './follow-up-reminders.service';
 import { FirstContactRemindersService } from './first-contact-reminders.service';
+import { NotificationTriggersListener } from './notification-triggers.listener';
+import { TeamDigestsService } from './team-digests.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Notification]), AuthModule],
   controllers: [NotificationsController],
-  providers: [NotificationsService, NotificationsListener, FollowUpRemindersService, FirstContactRemindersService],
+  providers: [NotificationsService, NotificationsListener, FollowUpRemindersService, FirstContactRemindersService, NotificationTriggersListener, TeamDigestsService],
   exports: [NotificationsService],
 })
 export class NotificationsModule {}

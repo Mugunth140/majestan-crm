@@ -15,6 +15,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { NON_QUEUEABLE_LEAD_STATUSES } from '../leads/lead-statuses';
 import { PROPERTY_PAGE_SOURCE } from '../leads/website-sources';
 import { transferLeadToSales } from './transfer-to-sales';
+import { audience, teamLeadsOf } from '../notifications/recipients';
+import { AssignedEvent, NOTIFY_ASSIGNED } from '../notifications/notify-events';
 import { Agent } from '../../database/entities/agent.entity';
 import { AgentFollowUp } from '../../database/entities/agent-follow-up.entity';
 import { Inbound } from '../../database/entities/inbound.entity';
@@ -375,15 +377,22 @@ export class LeadRoutingService {
     });
     await this.dataSource.getRepository(RoutingHistory).save(rh);
 
-    // Notify assigned staff
-    await this.notificationsService.createNotification(
-      toUserId,
-      'Lead Assigned',
-      `Lead #${leadId} has been assigned to you`,
-      'lead_assigned',
-      leadId,
-      'lead',
-    );
+    // Notify assigned staff (not someone who took the lead themselves)
+    if (toUserId !== actionedById) {
+      await this.notificationsService.createNotification(
+        toUserId,
+        'Lead Assigned',
+        `Lead #${leadId} has been assigned to you`,
+        'lead_assigned',
+        leadId,
+        'lead',
+      );
+    }
+    // The previous owner hears it was moved.
+    this.events?.emit(NOTIFY_ASSIGNED, {
+      module: 'lead', actorId: actionedById, newOwnerTold: true,
+      changes: [{ id: leadId, from: prevAssignedId ?? null, to: toUserId }],
+    } satisfies AssignedEvent);
 
     return updated;
   }
@@ -510,7 +519,7 @@ export class LeadRoutingService {
         feedback,
         department: lead.department,
       }));
-      return target;
+      return { ...target, ownerId: prevAssignedId ?? null };
     });
 
     // Welcome drafts for brand-new records, after commit (same as adding them by hand).
@@ -528,7 +537,7 @@ export class LeadRoutingService {
       'lead',
     );
 
-    // Notify all Managers and Admins
+    // Managers and admins, the lead's owner and the owner's team leads.
     const managersAndAdmins = await this.dataSource
       .getRepository(User)
       .createQueryBuilder('u')
@@ -536,18 +545,21 @@ export class LeadRoutingService {
       .where('role.name IN (:...roles)', { roles: ['Manager', 'Admin'] })
       .andWhere('u.is_active = 1')
       .getMany();
+    // Best-effort, like the notifications themselves: a lookup failure never fails the conversion.
+    const ownerTeamLeads = done.ownerId != null
+      ? await teamLeadsOf(this.dataSource, [done.ownerId]).then((m) => m.get(done.ownerId!) ?? []).catch(() => [] as number[])
+      : [];
+    const told = audience([...managersAndAdmins.map((u) => u.id), done.ownerId, ...ownerTeamLeads], [requestingUserId]);
 
-    for (const u of managersAndAdmins) {
-      if (u.id !== requestingUserId) {
-        await this.notificationsService.createNotification(
-          u.id,
-          'Lead Converted',
-          `Lead #${leadId} was converted to ${convertTo}`,
-          'lead_converted',
-          leadId,
-          'lead',
-        );
-      }
+    for (const id of told) {
+      await this.notificationsService.createNotification(
+        id,
+        'Lead Converted',
+        `Lead #${leadId} was converted to ${convertTo}`,
+        'lead_converted',
+        leadId,
+        'lead',
+      );
     }
     return { kind: convertTo, id: done.id, existing: !done.created };
   }

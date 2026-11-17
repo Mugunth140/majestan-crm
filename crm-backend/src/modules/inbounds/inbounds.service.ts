@@ -39,6 +39,8 @@ const UNTRACKED = new Set([
   'is_queued', 'assigned_staff_id', 'follow_ups', 'contact_logs', 'units', 'assigned_staff', 'uploaded_by',
 ]);
 
+import { NOTIFY_ASSIGNED } from '../notifications/notify-events';
+import type { AssignedEvent } from '../notifications/notify-events';
 @Injectable()
 export class InboundsService {
   private _s3Client: S3Client | null = null;
@@ -276,6 +278,9 @@ export class InboundsService {
       entity: 'inbound' as const, entityId: r.id, actorId: actor?.id ?? null,
       type: staffId === null ? 'unassigned' : 'assigned', from: name(r.assigned_staff_id), to: name(staffId),
     })));
+    this.events?.emit(NOTIFY_ASSIGNED, {
+      module: 'inbound', actorId: actor?.id ?? null, changes: records.map(r => ({ id: r.id, from: r.assigned_staff_id ?? null, to: staffId })),
+    } satisfies AssignedEvent);
     return { success: true, assigned: ids.length };
   }
 

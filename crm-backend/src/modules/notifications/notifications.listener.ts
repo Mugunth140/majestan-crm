@@ -8,22 +8,6 @@ export class NotificationsListener {
 
   constructor(private readonly notificationsService: NotificationsService) {}
 
-  @OnEvent('lead.assigned')
-  async handleLeadAssignedEvent(payload: { userId: number; leadId: number; leadName: string }) {
-    try {
-      await this.notificationsService.createNotification(
-        payload.userId,
-        'New Lead Assigned',
-        `You have been assigned a new lead: ${payload.leadName}.`,
-        'assignment',
-        payload.leadId,
-        'lead'
-      );
-    } catch (error) {
-      this.logger.error('Failed to create notification for lead.assigned', error);
-    }
-  }
-
   @OnEvent('user.password_changed')
   async handlePasswordChangedEvent(payload: { userId: number }) {
     try {

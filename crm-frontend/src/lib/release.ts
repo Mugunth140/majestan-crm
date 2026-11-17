@@ -13,6 +13,26 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2.5.0",
+    date: "2026-11-17",
+    title: "Notifications that reach the right people",
+    changes: [
+      { kind: "new", text: "Repeat leads: when an Excel import, the New Lead form or 99acres brings in a lead that's already in the CRM, its owner and their team lead are told, and the lead's Activity shows where it came from again." },
+      { kind: "new", text: "The import review shows who owns each lead that already exists." },
+      { kind: "new", text: "You're told when a lead, candidate, inbound property or partner is assigned to you, and when one is moved away from you." },
+      { kind: "new", text: "Team leads hear about new leads and website enquiries waiting in the routing queue." },
+      { kind: "new", text: "A follow-up still not done an hour after it was due is passed to your team lead." },
+      { kind: "new", text: "At 3 PM you're told if you're well behind on today's targets, and your team lead gets one list of who is behind." },
+      { kind: "new", text: "You're told when your monthly targets are set or changed." },
+      { kind: "new", text: "Booking Advance, Agreement and Closed Won are announced to the lead's owner, their team lead and admins." },
+      { kind: "new", text: "Team leads get an evening summary of the leads their team marked Not Interested, Lost or Dropped." },
+      { kind: "new", text: "WhatsApp replies on leads with no owner go to that pipeline's team leads." },
+      { kind: "improved", text: "Fewer repeats: no notification for a follow-up you saved yourself or a lead you assigned to yourself, and \"moved to Sales\" goes only to the owner and Sales team leads." },
+      { kind: "improved", text: "Converting a lead now tells its owner and their team lead too." },
+      { kind: "improved", text: "Notifications load faster: read ones are cleared after 30 days, unread ones after 90." },
+    ],
+  },
+  {
     version: "2.4.0",
     date: "2026-11-16",
     title: "Call in one tap, and no lead left waiting",

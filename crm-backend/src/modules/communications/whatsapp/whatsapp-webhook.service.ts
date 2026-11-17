@@ -9,6 +9,7 @@ const MATCH_DIGITS = 10;
 const leadNumber = (column: string) =>
   `RIGHT(REGEXP_REPLACE(COALESCE(${column}, ''), '[^0-9]', ''), ${MATCH_DIGITS})`;
 
+import { leadRef, teamLeadsOfDept } from '../../notifications/recipients';
 @Injectable()
 export class WhatsappWebhookService {
   private readonly logger = new Logger(WhatsappWebhookService.name);
@@ -34,6 +35,7 @@ export class WhatsappWebhookService {
     id: number;
     name: string;
     assigned_staff_id: number | null;
+    department: string | null;
   } | null> {
     const key = phone.slice(-MATCH_DIGITS);
     if (key.length < MATCH_DIGITS) return null;
@@ -41,8 +43,9 @@ export class WhatsappWebhookService {
       id: number;
       name: string;
       assigned_staff_id: number | null;
+      department: string | null;
     }[] = await this.dataSource.query(
-      `SELECT id, name, assigned_staff_id FROM leads
+      `SELECT id, name, assigned_staff_id, department FROM leads
        WHERE ${leadNumber('whatsapp_number')} = ? OR ${leadNumber('mobile_number')} = ?
        ORDER BY updated_at DESC, id DESC LIMIT 1`,
       [key, key],
@@ -101,6 +104,19 @@ export class WhatsappWebhookService {
             `WhatsApp notification failed: ${error instanceof Error ? error.message : error}`,
           ),
         );
+    } else {
+      // Nobody owns the lead: the team leads of its pipeline pick it up.
+      try {
+        const tls = await teamLeadsOfDept(this.dataSource, lead.department || 'telecalling');
+        for (const tl of tls) {
+          await this.notifications.createNotification(
+            tl, 'WhatsApp on an unassigned lead', `${leadRef(lead.id)} sent a WhatsApp message and has no owner.`,
+            'whatsapp_unowned', lead.id, 'lead',
+          );
+        }
+      } catch (error) {
+        this.logger.warn(`WhatsApp notification failed: ${error instanceof Error ? error.message : error}`);
+      }
     }
   }
 

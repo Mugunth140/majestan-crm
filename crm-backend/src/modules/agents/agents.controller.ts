@@ -38,8 +38,8 @@ export class AgentsController {
   }
 
   @Post('bulk')
-  async bulkCreateAgents(@Body() body: { agents: any[] }) {
-    const result = await this.agentsService.bulkCreateAgents(body.agents);
+  async bulkCreateAgents(@Body() body: { agents: any[] }, @Request() req: any) {
+    const result = await this.agentsService.bulkCreateAgents(body.agents, req.user?.id ?? null);
     return { success: true, count: result.count };
   }
 

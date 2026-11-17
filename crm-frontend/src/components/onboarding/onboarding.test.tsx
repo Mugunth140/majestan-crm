@@ -63,13 +63,20 @@ describe("2.3.0", () => {
 });
 
 describe("2.4.0", () => {
-  it("is the app version and lists the Call button, first contact and target colours", async () => {
-    const { APP_VERSION, RELEASES, releasesSince } = await import("@/lib/release");
-    expect(APP_VERSION).toBe("2.4.0");
-    expect(releasesSince("2.3.0", RELEASES).map((r) => r.version)).toEqual(["2.4.0"]);
-    const text = RELEASES[0].changes.map((c) => c.text).join(" ");
+  it("lists the Call button, first contact and target colours", async () => {
+    const { RELEASES } = await import("@/lib/release");
+    const text = RELEASES.find((r) => r.version === "2.4.0")!.changes.map((c) => c.text).join(" ");
     expect(text).toMatch(/Call button/);
     expect(text).toMatch(/waiting for first contact/);
     expect(text).toMatch(/80%/);
+  });
+});
+
+describe("2.5.0", () => {
+  it("is the app version and leads with repeat-lead notifications", async () => {
+    const { APP_VERSION, RELEASES, releasesSince } = await import("@/lib/release");
+    expect(APP_VERSION).toBe("2.5.0");
+    expect(releasesSince("2.4.0", RELEASES).map((r) => r.version)).toEqual(["2.5.0"]);
+    expect(RELEASES[0].changes[0].text).toMatch(/^Repeat leads/);
   });
 });

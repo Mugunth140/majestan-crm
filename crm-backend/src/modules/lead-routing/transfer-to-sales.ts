@@ -3,6 +3,7 @@ import { Lead } from '../../database/entities/lead.entity';
 import { User } from '../../database/entities/user.entity';
 import { RoutingHistory } from '../../database/entities/routing-history.entity';
 import { NotificationsService } from '../notifications/notifications.service';
+import { audience, teamLeadsOfDept } from '../notifications/recipients';
 
 /**
  * Moves a lead into the sales pipeline without touching its owner. The lead and
@@ -47,14 +48,9 @@ export async function transferLeadToSales(
           select: { id: true, name: true },
         });
 
-    const salesDeptUsers = await dataSource
-      .getRepository(User)
-      .createQueryBuilder('u')
-      .leftJoinAndSelect('u.department', 'dept')
-      .leftJoinAndSelect('u.role', 'role')
-      .where('LOWER(dept.name) LIKE :deptName', { deptName: '%sales%' })
-      .andWhere('u.is_active = 1')
-      .getMany();
+    // The owner and the Sales team leads act on it; the rest of Sales doesn't need to hear.
+    const salesLeads = await teamLeadsOfDept(dataSource, 'sales');
+    const salesDeptUsers = audience([ownerId, ...salesLeads], [actionedById]).map((id) => ({ id }));
 
     const assignment = ownerId == null
       ? 'Added to the Sales queue.'

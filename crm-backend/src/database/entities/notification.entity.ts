@@ -22,7 +22,12 @@ export class Notification {
   @Column({ type: 'text' })
   message: string;
 
-  // 'lead_assigned' | 'lead_claimed' | 'lead_transferred' | 'rnr5_unassigned' | 'lead_converted' | 'followup_due'
+  // Lead routing: lead_assigned, lead_claimed, lead_claimed_team, lead_transferred, rnr5_unassigned, lead_converted,
+  //   lead_enquiry_attached, lead_enquiry_acknowledged, queue_new
+  // Any module: record_assigned, record_reassigned (entity_type says which), followup_due, followup_reminder, followup_missed
+  // Leads: first_contact_reminder, first_contact_escalation, first_contact_digest, lead_repeat, lead_repeat_team,
+  //   lead_milestone, lost_leads_digest, whatsapp_message, whatsapp_unowned
+  // Targets: targets_set, pace_alert, pace_team. Account: security
   @Column({ type: 'varchar', length: 50 })
   type: string;
 

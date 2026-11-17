@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import {
-  ArrowRightLeft, CalendarCheck, ClipboardPlus, ClipboardX, FileDown, FilePlus2, FileX2, Inbox, PencilLine, Share2, ShieldAlert, Sparkles, TrendingUp, UserCheck, UserMinus, UserPlus,
+  ArrowRightLeft, CalendarCheck, ClipboardPlus, ClipboardX, FileDown, FilePlus2, FileX2, Inbox, PencilLine, Repeat2, Share2, ShieldAlert, Sparkles, TrendingUp, UserCheck, UserMinus, UserPlus,
 } from "lucide-react";
 import { listingHref, type SharedListing } from "@/lib/listing-share";
 import { LEAD_STATUS_DOTS } from "@/lib/lead-constants";
@@ -87,6 +87,14 @@ function toItem(e: TimelineEntry): FeedItem {
       return { ...base, icon: <FilePlus2 />, title: <>{actor} attached <Value>{e.to}</Value></> };
     case "document_removed":
       return { ...base, icon: <FileX2 />, title: <>{actor} removed <Value>{e.from}</Value></> };
+    case "repeat_enquiry": {
+      const how = meta.via === "import" ? " in an Excel import" : "";
+      return {
+        ...base, icon: <Repeat2 />,
+        title: <>Came in again{e.to ? <> from <Value>{e.to}</Value></> : null}{how}{e.actor ? <> by {actor}</> : null}</>,
+        body: meta.remarks ? `Remarks: ${String(meta.remarks)}` : null,
+      };
+    }
     case "routing":
       return routingItem(e, actor, base);
     case "listing_downloaded": {

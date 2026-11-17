@@ -2,6 +2,8 @@ import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@ne
 import { DataSource } from 'typeorm';
 import { NotificationsService } from './notifications.service';
 import { NON_QUEUEABLE_LEAD_STATUSES } from '../leads/lead-statuses';
+import { FIRST_CONTACT_SLA_MIN, workMinutesBetween } from '../leads/first-contact';
+import { leadRef, teamLeadsOf } from './recipients';
 
 /** A follow-up with no time set is due at the start of the working day. */
 export const DEFAULT_DUE_TIME = '09:00';
@@ -19,6 +21,8 @@ interface ReminderSource {
   /** Records that no longer need following up. */
   eligible: string;
   params: unknown[];
+  /** Calls, messages and emails logged on the record: any after the due time count as following up. */
+  contacts: { table: string; foreignKey: string };
 }
 
 export const REMINDER_SOURCES: ReminderSource[] = [
@@ -31,6 +35,7 @@ export const REMINDER_SOURCES: ReminderSource[] = [
     recipient: 'COALESCE(r.assigned_staff_id, f.created_by_id)',
     eligible: `r.status NOT IN (${NON_QUEUEABLE_LEAD_STATUSES.map(() => '?').join(', ')}) AND r.is_unqualified = 0`,
     params: [...NON_QUEUEABLE_LEAD_STATUSES],
+    contacts: { table: 'contact_logs', foreignKey: 'lead_id' },
   },
   {
     entityType: 'inbound',
@@ -41,6 +46,7 @@ export const REMINDER_SOURCES: ReminderSource[] = [
     recipient: 'COALESCE(r.assigned_staff_id, f.created_by_id)',
     eligible: "r.is_queued = 0 AND r.status NOT IN ('Closed', 'Rejected')",
     params: [],
+    contacts: { table: 'inbound_contact_logs', foreignKey: 'inbound_id' },
   },
   {
     entityType: 'agent',
@@ -51,6 +57,7 @@ export const REMINDER_SOURCES: ReminderSource[] = [
     recipient: 'COALESCE(r.assigned_staff_id, f.created_by_id)',
     eligible: '1 = 1',
     params: [],
+    contacts: { table: 'agent_contact_logs', foreignKey: 'agent_id' },
   },
   {
     entityType: 'hr',
@@ -61,6 +68,7 @@ export const REMINDER_SOURCES: ReminderSource[] = [
     recipient: 'r.assignedStaffId',
     eligible: "r.status NOT IN ('Joined', 'Rejected')",
     params: [],
+    contacts: { table: 'hr_contact_logs', foreignKey: 'hr_candidate_id' },
   },
 ];
 
@@ -115,6 +123,7 @@ export class FollowUpRemindersService implements OnApplicationBootstrap, OnModul
     this.running = true;
     try {
       for (const source of REMINDER_SOURCES) await this.remind(source, now);
+      for (const source of REMINDER_SOURCES) await this.escalate(source, now);
     } catch (error) {
       this.logger.error(`Follow-up reminders failed: ${(error as Error).message}`);
     } finally {
@@ -151,6 +160,51 @@ export class FollowUpRemindersService implements OnApplicationBootstrap, OnModul
         Number(row.recordId),
         source.entityType,
       );
+    }
+  }
+  /**
+   * A follow-up still not done an hour of working time after it was due goes to
+   * the owner's team leads. "Done" means a newer follow-up, or a call, message
+   * or email logged on the record since the due time. Only today's follow-ups.
+   */
+  private async escalate(source: ReminderSource, now: Date) {
+    const { date } = indiaNow(now);
+    const due = `LEFT(COALESCE(f.next_follow_up_time, '${DEFAULT_DUE_TIME}'), 5)`;
+    const rows: { followUpId: number; recordId: number; name: string; userId: number | null; owner: string | null; due: string }[] =
+      await this.dataSource.query(
+        `SELECT f.id AS followUpId, r.id AS recordId, ${source.name} AS name, ${source.recipient} AS userId, u.name AS owner, ${due} AS due
+         FROM (
+           SELECT *, ROW_NUMBER() OVER (PARTITION BY ${source.foreignKey} ORDER BY created_at DESC, id DESC) AS rn
+           FROM ${source.table}
+           WHERE ${source.foreignKey} IN (SELECT ${source.foreignKey} FROM ${source.table} WHERE next_follow_up_date = ?)
+         ) f
+         JOIN ${source.recordTable} r ON r.id = f.${source.foreignKey}
+         LEFT JOIN users u ON u.id = ${source.recipient}
+         WHERE f.rn = 1 AND f.next_follow_up_date = ?
+           AND f.reminded_for = CONCAT(?, ' ', ${due})
+           AND (f.escalated_for IS NULL OR f.escalated_for <> f.reminded_for)
+           AND NOT EXISTS (
+             SELECT 1 FROM ${source.contacts.table} c
+              WHERE c.${source.contacts.foreignKey} = r.id AND c.sent_by_id IS NOT NULL
+                AND c.created_at >= CONVERT_TZ(CONCAT(?, ' ', ${due}), '+05:30', '+00:00')
+           )
+           AND ${source.eligible}`,
+        [date, date, date, date, ...source.params],
+      );
+    const late = rows.filter((row) => workMinutesBetween(new Date(`${date}T${row.due}:00+05:30`), now) >= FIRST_CONTACT_SLA_MIN);
+    if (!late.length) return;
+    const tls = await teamLeadsOf(this.dataSource, late.map((row) => Number(row.userId)).filter(Boolean));
+    for (const row of late) {
+      // Mark first, as with reminders.
+      await this.dataSource.query(`UPDATE ${source.table} SET escalated_for = reminded_for WHERE id = ?`, [row.followUpId]);
+      if (!row.userId) continue;
+      const what = source.entityType === 'lead'
+        ? leadRef(row.recordId)
+        : `${MODULE_LABELS[source.entityType]} ${row.name || `#${row.recordId}`}`;
+      const message = `${row.owner || 'Its owner'} hasn't followed up on ${what}, due at ${formatDueTime(row.due)}.`;
+      for (const tl of tls.get(Number(row.userId)) ?? []) {
+        await this.notifications.createNotification(tl, 'Follow-up missed', message, 'followup_missed', Number(row.recordId), source.entityType);
+      }
     }
   }
 }

@@ -12,10 +12,10 @@ export class NotificationsService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
+  // Browsers pick up new notifications from the stream's 5-second poll; this
+  // only signals in-process listeners, so it no longer reloads the whole list.
   private async notifyClient(userId: number) {
-    const notifications = await this.getNotificationsForUser(userId);
-    const unread_count = notifications.filter(n => !n.is_read).length;
-    this.eventEmitter.emit(`notification.user_${userId}`, { notifications, unread_count });
+    this.eventEmitter.emit(`notification.user_${userId}`, { userId });
   }
 
   async createNotification(
@@ -40,11 +40,23 @@ export class NotificationsService {
     return saved;
   }
 
-  async getNotificationsForUser(userId: number): Promise<Notification[]> {
+  /** The newest notifications (old ones are pruned daily; see pruneOld). */
+  async getNotificationsForUser(userId: number, limit = 300): Promise<Notification[]> {
     return this.notificationRepo.find({
       where: { user_id: userId },
       order: { created_at: 'DESC' },
+      take: limit,
     });
+  }
+
+  /** Read notifications go after 30 days, unread ones after 90. Returns how many were removed. */
+  async pruneOld(): Promise<number> {
+    const result = await this.notificationRepo.query(
+      `DELETE FROM notifications
+        WHERE (is_read = 1 AND created_at < NOW() - INTERVAL 30 DAY)
+           OR created_at < NOW() - INTERVAL 90 DAY`,
+    );
+    return Number(result?.affectedRows ?? 0);
   }
 
   async markAsRead(id: number, userId: number): Promise<void> {

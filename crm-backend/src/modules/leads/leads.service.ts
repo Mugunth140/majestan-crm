@@ -20,6 +20,7 @@ import { NON_QUEUEABLE_LEAD_STATUSES, SALES_PIPELINE_STATUSES } from './lead-sta
 import { transferLeadToSales } from '../lead-routing/transfer-to-sales';
 import { NotificationsService } from '../notifications/notifications.service';
 import { LeadEventsService } from './lead-events.service';
+import { AssignedEvent, LeadRepeatEvent, NOTIFY_ASSIGNED, NOTIFY_LEAD_REPEAT, NOTIFY_QUEUE, QueueEvent } from '../notifications/notify-events';
 import { S3Client } from 'bun';
 import { extname } from 'path';
 import { fetchWatermarkedImage, isImageMimetype } from '../../common/imgproxy-watermark';
@@ -30,6 +31,8 @@ export interface CreateLeadResult {
   isExistingCustomer: boolean;
   existingStaff?: string;
   eventId?: number;
+  /** The website sent the same submission again: already announced. */
+  repeatSubmission?: boolean;
 }
 
 export interface DuplicateLeadInfo {
@@ -290,8 +293,8 @@ export class LeadsService {
       }
     }
 
-    // Send followup_due notification to assigned staff when a next follow-up date is scheduled
-    if (body.nextFollowUpDate && lead.assigned_staff_id) {
+    // Tell the owner when someone else schedules a follow-up on their lead (not when they did it themselves).
+    if (body.nextFollowUpDate && lead.assigned_staff_id && Number(lead.assigned_staff_id) !== Number(actorId)) {
       const leadDisplayId = `L${String(leadId).padStart(5, '0')}`;
       await this.notificationsService.createNotification(
         lead.assigned_staff_id,
@@ -776,10 +779,46 @@ export class LeadsService {
         await manager.save(LeadFollowUp, followUps, { chunk: 1000 });
       }
 
-      return { count: created, created, existing, assigned };
+      // A row that matched an existing lead leaves a trace on it: the source it came
+      // from again and its remarks, so the owner can see why they were told.
+      const repeats = [...rowsByMobile.entries()]
+        .filter(([mobile]) => existingMap.has(mobile))
+        .map(([mobile, rows]) => ({ lead: existingMap.get(mobile)!, row: rows[0] }));
+      if (repeats.length) {
+        await this.leadEvents?.record(repeats.map(({ lead, row }) => ({
+          leadId: lead.id,
+          actorId: actionedBy?.id ?? null,
+          type: 'repeat_enquiry' as const,
+          to: row.source || null,
+          meta: { via: 'import', remarks: row.commissionRemarks || null, name: row.name || null },
+        })), manager);
+      }
+
+      const announce = {
+        repeats: repeats.map(({ lead }) => ({ id: lead.id, ownerId: lead.assigned_staff_id ?? null })),
+        assigned: leadsToCreate.filter((item) => item.assigneeId != null).map((item) => ({ id: savedByMobile.get(item.mobile)!.id, to: item.assigneeId! })),
+        queued: leadsToCreate.filter((item) => item.assigneeId == null).map((item) => savedByMobile.get(item.mobile)!.id),
+      };
+      return { count: created, created, existing, assigned, announce };
     });
 
-    return summary;
+    const { announce, ...counts } = summary;
+    const actorId = actionedBy?.id ?? null;
+    if (announce.repeats.length) {
+      // No person behind the call means an integration (99acres), not an Excel import.
+      this.events?.emit(NOTIFY_LEAD_REPEAT, {
+        leads: announce.repeats, via: actorId ? 'import' : 'entry', source: actorId ? null : normalizedLeads[0]?.source ?? null, actorId,
+      } satisfies LeadRepeatEvent);
+    }
+    if (announce.assigned.length) {
+      this.events?.emit(NOTIFY_ASSIGNED, {
+        module: 'lead', actorId, changes: announce.assigned.map((a) => ({ id: a.id, from: null, to: a.to })),
+      } satisfies AssignedEvent);
+    }
+    if (announce.queued.length) {
+      this.events?.emit(NOTIFY_QUEUE, { leadIds: announce.queued, source: actorId ? null : normalizedLeads[0]?.source ?? null, actorId } satisfies QueueEvent);
+    }
+    return counts;
   }
 
   // ── Duplicate pre-checks (warn before submit / insert) ────────────────────
@@ -833,16 +872,43 @@ export class LeadsService {
   }
 
   /** Creates or merges a lead, then announces it (after commit) for emails. */
-  async createLead(body: any): Promise<CreateLeadResult> {
+  async createLead(body: any, actorId: number | null = null): Promise<CreateLeadResult> {
     const result = await this.createLeadRecord(body);
     if (result.lead && this.events) {
       const withVisit = body.intent === 'site_visit' && Boolean(body.visitDate ?? body.visit_date);
       if (!result.isExistingCustomer) {
-        await this.events.emitAsync('leads.lead.created', { entityId: result.lead.id, actorId: body.createdById ?? null, withVisit });
+        await this.events.emitAsync('leads.lead.created', { entityId: result.lead.id, actorId: actorId ?? body.createdById ?? null, withVisit });
       }
       if (withVisit) await this.events.emitAsync('leads.site_visit.scheduled', { entityId: result.lead.id, actorId: null });
     }
+    await this.announceCreated(result, body, actorId);
     return result;
+  }
+
+  /** Tells the right people about a lead that was just entered: its owner, the queue, or a repeat. */
+  private async announceCreated(result: CreateLeadResult, body: any, actorId: number | null) {
+    const lead = result.lead;
+    const source = body.source ?? body.lead_source ?? null;
+    if (result.repeatSubmission) return;
+    if (result.eventId) {
+      // A website enquiry waits in the routing queue, matched to a lead or not.
+      const label = body.propertyCode ? `for property ${body.propertyCode}` : source ? `from ${String(source).replace(/^Website – /, '')}` : '';
+      this.events?.emit(NOTIFY_QUEUE, { enquiry: { label: label.trim(), leadId: lead?.id ?? null }, actorId } satisfies QueueEvent);
+      return;
+    }
+    if (!lead) return;
+    if (result.isExistingCustomer) {
+      await this.leadEvents?.record({ leadId: lead.id, actorId, type: 'repeat_enquiry', to: source, meta: { via: 'entry', name: body.name ?? null } });
+      this.events?.emit(NOTIFY_LEAD_REPEAT, {
+        leads: [{ id: lead.id, ownerId: lead.assigned_staff_id ?? null }], via: 'entry', source, actorId,
+      } satisfies LeadRepeatEvent);
+      return;
+    }
+    if (lead.assigned_staff_id) {
+      this.events?.emit(NOTIFY_ASSIGNED, { module: 'lead', actorId, changes: [{ id: lead.id, from: null, to: lead.assigned_staff_id }] } satisfies AssignedEvent);
+    } else {
+      this.events?.emit(NOTIFY_QUEUE, { leadIds: [lead.id], source, actorId } satisfies QueueEvent);
+    }
   }
 
   private async createLeadRecord(body: any): Promise<CreateLeadResult> {    // Normalise: frontend sends 'mobile', legacy DTO used 'mobile_number'
@@ -870,7 +936,7 @@ export class LeadsService {
         }
         if(normalised.analyticsSubmissionId){
           const prior=await eventRepo.findOne({where:{analyticsSubmissionId:normalised.analyticsSubmissionId}});
-          if(prior)return {lead:matchedLead,isExistingCustomer:!!matchedLead,existingStaff:matchedLead?.assigned_staff?.name??'Unassigned'};
+          if(prior)return {lead:matchedLead,isExistingCustomer:!!matchedLead,existingStaff:matchedLead?.assigned_staff?.name??'Unassigned',eventId:prior.id,repeatSubmission:true};
         }
         const event = eventRepo.create({
           analyticsSubmissionId:normalised.analyticsSubmissionId||null,analyticsSessionId:normalised.analyticsSessionId||null,analyticsPageId:normalised.analyticsPageId||null,

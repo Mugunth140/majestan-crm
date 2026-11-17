@@ -1,4 +1,7 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Optional } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { NOTIFY_TARGETS } from '../notifications/notify-events';
+import type { TargetsEvent } from '../notifications/notify-events';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, In } from 'typeorm';
 import { extname } from 'path';
@@ -61,7 +64,13 @@ const STATUS_RANK: Record<PaceStatus, number> = { behind: 0, missed: 0, on_pace:
 export class TasksService {
   constructor(
     @InjectDataSource() private dataSource: DataSource,
+    @Optional() private readonly events?: EventEmitter2,
   ) {}
+
+  /** People whose targets were set or changed hear about it. */
+  private announceTargets(userIds: number[], month: string, changed: boolean, actorId: number | null) {
+    if (userIds.length) this.events?.emit(NOTIFY_TARGETS, { userIds, month, changed, actorId } satisfies TargetsEvent);
+  }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -134,6 +143,25 @@ export class TasksService {
           ...pace,
         };
       });
+  }
+
+  /** Everyone's goal and progress today on this month's active, automatically counted targets (for the pace alerts). */
+  async todayStandings(): Promise<{ userId: number; name: string; metrics: { label: string; goal: number; achieved: number }[] }[]> {
+    const today = istToday();
+    const templates = await this.dataSource.getRepository(TaskTemplate).find({
+      where: { month: today.slice(0, 7), status: 'active' },
+      relations: { metricTargets: true, assignedTo: true },
+    });
+    if (!templates.length) return [];
+    const progress = await dailyProgress(this.dataSource, templates);
+    return templates
+      .filter(t => t.assignedTo?.is_active !== false)
+      .map(t => ({
+        userId: t.assigned_to,
+        name: t.assignedTo?.name ?? `#${t.assigned_to}`,
+        // Only what the CRM counts by itself: hand-logged targets are often entered at the end of the day.
+        metrics: this.metricsOf(t, progress, today).filter(m => m.tracking === 'auto').map(m => ({ label: m.label, goal: m.today.goal, achieved: m.today.achieved })),
+      }));
   }
 
   private row(template: TaskTemplate, person: Member, progress: DailyProgress, today: string): TaskRow {
@@ -335,6 +363,7 @@ export class TasksService {
     const taken = new Set(existing.map(t => t.assigned_to));
     const skipped: { id: number; name: string; reason: string }[] = [];
     const created: number[] = [];
+    const createdFor: number[] = [];
 
     await this.dataSource.transaction(async manager => {
       for (const id of assignees) {
@@ -348,8 +377,10 @@ export class TasksService {
         }));
         await manager.getRepository(TaskMetricTarget).save(this.targetRows(saved.id, metrics, catalog).map(r => manager.getRepository(TaskMetricTarget).create(r)));
         created.push(saved.id);
+        createdFor.push(id);
       }
     });
+    this.announceTargets(createdFor, month, false, user.sub);
     return { month, created, skipped };
   }
 
@@ -373,6 +404,7 @@ export class TasksService {
         await repo.save(current ? Object.assign(current, row) : repo.create(row));
       }
     });
+    if (metrics.length) this.announceTargets([template.assigned_to], template.month, true, user.sub);
     return this.getTaskById(id, user);
   }
 
@@ -389,6 +421,7 @@ export class TasksService {
     const previous = await repo.find({ where: { assigned_to: In(ids), month: this.shiftMonth(month, -1) }, relations: { metricTargets: true } });
     const taken = new Set((await repo.find({ where: { assigned_to: In(ids), month } })).map(t => t.assigned_to));
     const created: number[] = [];
+    const createdFor: number[] = [];
     await this.dataSource.transaction(async manager => {
       for (const t of previous) {
         const person = people.find(p => p.id === t.assigned_to);
@@ -404,8 +437,10 @@ export class TasksService {
           tracking_type: trackingOf(m.metric_key, m.tracking_type),
         })));
         created.push(saved.id);
+        createdFor.push(t.assigned_to);
       }
     });
+    this.announceTargets(createdFor, month, false, user.sub);
     return { month, created, skipped: [] };
   }
 

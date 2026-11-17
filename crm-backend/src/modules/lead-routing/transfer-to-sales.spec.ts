@@ -5,7 +5,8 @@ import { RoutingHistory } from '../../database/entities/routing-history.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { transferLeadToSales } from './transfer-to-sales';
 
-function createHarness(salesUsers: Array<{ id: number }> = [{ id: 3 }]) {
+/** `salesLeads`: the Sales team leads the lookup returns. */
+function createHarness(salesLeads: Array<{ id: number }> = [{ id: 3 }]) {
   const lead = {
     id: 7,
     department: 'telecalling',
@@ -21,7 +22,7 @@ function createHarness(salesUsers: Array<{ id: number }> = [{ id: 3 }]) {
     leftJoinAndSelect: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
-    getMany: jest.fn(async () => salesUsers),
+    getMany: jest.fn(async () => salesLeads),
   };
 
   const dataSource: any = {
@@ -31,6 +32,7 @@ function createHarness(salesUsers: Array<{ id: number }> = [{ id: 3 }]) {
       if (entity === User) return { findOne: ownerFindOne, createQueryBuilder: jest.fn(() => queryBuilder) };
       throw new Error('unexpected entity');
     }),
+    query: jest.fn(async () => salesLeads),
   };
   dataSource.transaction = jest.fn(async (callback: (manager: any) => Promise<unknown>) => callback(dataSource));
 

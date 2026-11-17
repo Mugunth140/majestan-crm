@@ -80,8 +80,8 @@ export class LeadsController {
   }
 
   @Post()
-  async createLead(@Body() body: CreateLeadDto) {
-    const result = await this.leadsService.createLead(body);
+  async createLead(@Body() body: CreateLeadDto, @Request() req: any) {
+    const result = await this.leadsService.createLead(body, req.user?.id ?? null);
     return {
       success: true,
       isExistingCustomer: result.isExistingCustomer,

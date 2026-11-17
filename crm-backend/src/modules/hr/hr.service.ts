@@ -37,6 +37,8 @@ function interviewSignature(c: Partial<HrCandidate>) {
   return [toDateOnly(c.interviewDate), toTimeOnly(c.interviewTime), c.interviewMode ?? null, c.interviewLocation?.trim() || null, c.interviewLink?.trim() || null].join('|');
 }
 
+import { NOTIFY_ASSIGNED } from '../notifications/notify-events';
+import type { AssignedEvent } from '../notifications/notify-events';
 @Injectable()
 export class HrService {
   constructor(
@@ -207,6 +209,9 @@ export class HrService {
     if (candidates.length !== new Set(ids).size) throw new NotFoundException('One or more candidates were not found');
     await this.repo.update({ id: In(ids) }, { assignedStaffId: target });
     await this.recordAssignments(candidates.filter(c => (c.assignedStaffId ?? null) !== target).map(c => ({ id: c.id, from: c.assignedStaffId ?? null })), target, actor);
+    this.events?.emit(NOTIFY_ASSIGNED, {
+      module: 'hr', actorId: actor?.id ?? null, changes: candidates.map(c => ({ id: c.id, from: c.assignedStaffId ?? null, to: target })),
+    } satisfies AssignedEvent);
     return { success: true, assigned: ids.length };
   }
 

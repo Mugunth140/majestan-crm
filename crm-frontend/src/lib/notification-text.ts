@@ -18,14 +18,24 @@ const ROUTES: Record<string, string> = {
   hr: "hr",
 };
 
-/** The record a notification is about, or null when it isn't about one. */
+/** Notifications about a page rather than one record. */
+const PAGES: Record<string, string> = {
+  first_contact_digest: "/leads?waiting=1",
+  queue_new: "/lead-routing",
+  targets_set: "/tasks",
+  pace_alert: "/tasks",
+  pace_team: "/tasks",
+  lost_leads_digest: "/leads",
+};
+
+/** Where a notification leads: its record, its page, or the module list when it covers several records. */
 export function notificationHref(n: NotificationLike): string | null {
-  // The evening summary is about many leads: open the list filtered to them.
-  if (n.type === "first_contact_digest") return "/leads?waiting=1";
-  const id = n.entity_id || n.lead_id;
-  if (!id) return null;
+  if (n.type && PAGES[n.type]) return PAGES[n.type];
   const route = ROUTES[n.entity_type || "lead"];
-  return route ? `/${route}/${id}` : null;
+  const id = n.entity_id || n.lead_id;
+  if (id) return route ? `/${route}/${id}` : null;
+  // "5 leads were assigned to you": open that module's list.
+  return route && n.entity_type ? `/${route}` : null;
 }
 
 /** A follow-up reminder's parts, from its "Name · Module · 2:30 PM" message. */

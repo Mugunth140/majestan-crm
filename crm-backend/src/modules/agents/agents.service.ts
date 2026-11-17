@@ -22,6 +22,8 @@ export interface CreateAgentResult {
   existingStaff?: string;
 }
 
+import { NOTIFY_ASSIGNED } from '../notifications/notify-events';
+import type { AssignedEvent } from '../notifications/notify-events';
 @Injectable()
 export class AgentsService {
   constructor(
@@ -100,6 +102,7 @@ export class AgentsService {
       await this.recordEvents?.record({
         entity: 'agent', entityId: id, actorId, type: assigned.to === null ? 'unassigned' : 'assigned', from: name(assigned.from), to: name(assigned.to),
       });
+      this.events?.emit(NOTIFY_ASSIGNED, { module: 'agent', actorId, changes: [{ id, ...assigned }] } satisfies AssignedEvent);
     }
     if (saved.status !== previousStatus) {
       await this.recordEvents?.record({ entity: 'agent', entityId: id, actorId, type: 'status_changed', field: 'status', from: previousStatus, to: saved.status });
@@ -222,7 +225,7 @@ export class AgentsService {
     return { ...agent, follow_ups: followUps, contact_logs: contactLogs };
   }
 
-  async bulkCreateAgents(agents: any[]) {
+  async bulkCreateAgents(agents: any[], actorId: number | null = null) {
     if (!agents || agents.length === 0) return { count: 0 };
 
     return this.dataSource.transaction(async (manager: EntityManager) => {
@@ -302,7 +305,14 @@ export class AgentsService {
         await manager.save(AgentFollowUp, followUps, { chunk: 1000 });
       }
 
-      return { count: normalizedAgents.length };
+      const assigned = agentsToCreate
+        .map(({ row }) => rowToAgentMap.get(row))
+        .filter((a): a is Agent => !!a?.assigned_staff_id)
+        .map((a) => ({ id: a.id, from: null, to: a.assigned_staff_id }));
+      return { count: normalizedAgents.length, assigned };
+    }).then(({ assigned = [], ...result }: { count: number; assigned?: { id: number; from: null; to: number }[] }) => {
+      if (assigned.length) this.events?.emit(NOTIFY_ASSIGNED, { module: 'agent', actorId, changes: assigned } satisfies AssignedEvent);
+      return result;
     });
   }
 
@@ -320,6 +330,11 @@ export class AgentsService {
     if (!result.isExistingAgent) {
       await this.recordEvents?.record({ entity: 'agent', entityId: result.agent.id, actorId, type: 'created', to: result.agent.status });
       await this.events?.emitAsync('partners.agent.created', { entityId: result.agent.id, actorId });
+      if (result.agent.assigned_staff_id) {
+        this.events?.emit(NOTIFY_ASSIGNED, {
+          module: 'agent', actorId, changes: [{ id: result.agent.id, from: null, to: result.agent.assigned_staff_id }],
+        } satisfies AssignedEvent);
+      }
     }
     return result;
   }

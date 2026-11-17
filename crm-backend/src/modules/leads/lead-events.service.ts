@@ -15,7 +15,8 @@ export type LeadEventType =
   | 'visit_scheduled'
   | 'document_added'
   | 'document_removed'
-  | 'listing_downloaded';
+  | 'listing_downloaded'
+  | 'repeat_enquiry';
 
 export interface LeadEventInput {
   leadId: number;
