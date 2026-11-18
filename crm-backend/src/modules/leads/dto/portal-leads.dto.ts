@@ -1,7 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayNotEmpty, IsArray, IsEmail, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, ValidateNested } from 'class-validator';
 
-export class NinetyNineAcresLeadDto {
+export class PortalLeadDto {
   @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsString() @IsNotEmpty() @MaxLength(255)
   name: string;
@@ -27,8 +27,8 @@ export class NinetyNineAcresLeadDto {
   remarks?: string;
 }
 
-export class NinetyNineAcresLeadsDto {
+export class PortalLeadsDto {
   @IsArray() @ArrayNotEmpty() @ArrayMaxSize(100)
-  @ValidateNested({ each: true }) @Type(() => NinetyNineAcresLeadDto)
-  leads: NinetyNineAcresLeadDto[];
+  @ValidateNested({ each: true }) @Type(() => PortalLeadDto)
+  leads: PortalLeadDto[];
 }

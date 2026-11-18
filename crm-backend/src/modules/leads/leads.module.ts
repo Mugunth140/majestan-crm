@@ -1,6 +1,6 @@
-import { NinetyNineAcresController } from './ninety-nine-acres.controller';
-import { NinetyNineAcresKeyGuard } from './guards/ninety-nine-acres-key.guard';
-import { NinetyNineAcresService } from './integrations/ninety-nine-acres.service';
+import { MagicbricksController, NinetyNineAcresController } from './portal-leads.controller';
+import { MagicbricksKeyGuard, NinetyNineAcresKeyGuard } from './guards/portal-key.guard';
+import { PortalLeadsService } from './integrations/portal-leads.service';
 import { Module } from '@nestjs/common';
 import { LeadsController } from './leads.controller';
 import { WebsiteLeadsController } from './website-leads.controller';
@@ -14,8 +14,8 @@ import { SALES_MAIL_EVENTS } from './mail/sales-mails';
 
 @Module({
   imports: [NotificationsModule, AuthModule, MailModule.forFeature(SALES_MAIL_EVENTS)],
-  controllers: [LeadsController, WebsiteLeadsController, NinetyNineAcresController],
-  providers: [LeadsService, LeadEventsService, LeadShareService, NinetyNineAcresKeyGuard, NinetyNineAcresService],
+  controllers: [LeadsController, WebsiteLeadsController, NinetyNineAcresController, MagicbricksController],
+  providers: [LeadsService, LeadEventsService, LeadShareService, NinetyNineAcresKeyGuard, MagicbricksKeyGuard, PortalLeadsService],
   exports: [LeadsService, LeadEventsService],
 })
 export class LeadsModule {}

@@ -3,44 +3,52 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import request from 'supertest';
-import { NinetyNineAcresController } from './ninety-nine-acres.controller';
-import { NinetyNineAcresService } from './integrations/ninety-nine-acres.service';
-import { NinetyNineAcresKeyGuard } from './guards/ninety-nine-acres-key.guard';
+import { MagicbricksController, NinetyNineAcresController } from './portal-leads.controller';
+import { PortalLeadsService } from './integrations/portal-leads.service';
+import { MagicbricksKeyGuard, NinetyNineAcresKeyGuard } from './guards/portal-key.guard';
 import { LeadsService } from './leads.service';
 import { AllExceptionsFilter } from '../../common/filters/all-exceptions.filter';
-import { ninetyNineAcresJsonParser } from '../../common/middleware/ninety-nine-acres-json';
+import { portalJsonParser } from '../../common/middleware/portal-json';
 
-describe('99acres push HTTP contract', () => {
+const PORTALS = [
+  { portal: '99acres', path: '/api/v1/leads/99acres', env: 'NINETY_NINE_ACRES_API_KEY', source: '99acres', other: { path: '/api/v1/leads/magicbricks', env: 'MAGICBRICKS_API_KEY' } },
+  { portal: 'Magicbricks', path: '/api/v1/leads/magicbricks', env: 'MAGICBRICKS_API_KEY', source: 'Magic Bricks', other: { path: '/api/v1/leads/99acres', env: 'NINETY_NINE_ACRES_API_KEY' } },
+];
+
+describe.each(PORTALS)('$portal push HTTP contract', ({ path, env, source, other }) => {
   let app: INestApplication;
   const key = 'test-portal-key';
-  const path = '/api/v1/leads/99acres';
   const row = { name: ' Ravi Kumar ', mobile: '+91 98765 43210', email: 'ravi@example.com', remarks: 'Enquiry from property portal' };
   const bulk = jest.fn();
   const findSource = jest.fn();
-  const oldKey = process.env.NINETY_NINE_ACRES_API_KEY;
+  const oldKeys = { [env]: process.env[env], [other.env]: process.env[other.env] };
   beforeAll(async () => {
-    const module = await Test.createTestingModule({ controllers: [NinetyNineAcresController], providers: [NinetyNineAcresService, NinetyNineAcresKeyGuard,
+    const module = await Test.createTestingModule({ controllers: [NinetyNineAcresController, MagicbricksController], providers: [PortalLeadsService, NinetyNineAcresKeyGuard, MagicbricksKeyGuard,
       { provide: getDataSourceToken(), useValue: { getRepository: () => ({ findOne: findSource }) } },
       { provide: LeadsService, useValue: { bulkCreateLeads: bulk } },
     ] }).compile();
     app = module.createNestApplication({ logger: false });
-    app.use(path, ninetyNineAcresJsonParser);
+    app.use([path, other.path], portalJsonParser);
     app.useGlobalFilters(new AllExceptionsFilter());
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     jest.spyOn(console, 'warn').mockImplementation(() => {});
     await app.init();
   });
   beforeEach(() => {
-    process.env.NINETY_NINE_ACRES_API_KEY = key;
+    process.env[env] = key;
+    process.env[other.env] = 'the-other-portal-key';
     bulk.mockReset().mockResolvedValue({ count: 1, created: 1, existing: 0, assigned: 0 });
-    findSource.mockReset().mockResolvedValue({ id: 99, name: '99acres', is_active: true });
+    findSource.mockReset().mockResolvedValue({ id: 99, name: source, is_active: true });
   });
-  afterAll(async () => { await app.close(); jest.restoreAllMocks(); if (oldKey === undefined) delete process.env.NINETY_NINE_ACRES_API_KEY; else process.env.NINETY_NINE_ACRES_API_KEY = oldKey; });
+  afterAll(async () => {
+    await app.close(); jest.restoreAllMocks();
+    for (const [name, value] of Object.entries(oldKeys)) if (value === undefined) delete process.env[name]; else process.env[name] = value;
+  });
   it('accepts minimal lead JSON and responds with counts after import, without requiring a login token', async () => {
     const response = await request(app.getHttpServer()).post(path).set('X-API-Key', key).send({ leads: [row] }).expect(200);
     expect(response.body).toEqual({ success: true, received: 1, created: 1, existing: 0 });
     expect(bulk).toHaveBeenCalledWith([expect.objectContaining({ name: 'Ravi Kumar', mobile: '9876543210', commissionRemarks: row.remarks, leadSourceId: 99 })], { role: 'Staff' });
-    expect(findSource).toHaveBeenCalledWith({ where: { name: '99acres', is_active: true } });
+    expect(findSource).toHaveBeenCalledWith({ where: { name: source, is_active: true } });
   });
   it('ignores assignment, source IDs, and other internal bulk-import fields', async () => {
     await request(app.getHttpServer()).post(path).set('X-API-Key', key).send({ leads: [{ ...row, source: 'Website', assignedStaffId: 12, leadSourceId: -1, propertyType: 'apartment', commissionRemarks: 'Unwanted internal field' }] }).expect(200);
@@ -61,11 +69,16 @@ describe('99acres push HTTP contract', () => {
     const call = request(app.getHttpServer()).post(path); if (value) call.set('X-API-Key', value);
     await call.send({ leads: [row] }).expect(401); expect(bulk).not.toHaveBeenCalled(); expect(findSource).not.toHaveBeenCalled();
   });
+  it("does not accept the other portal's key", async () => {
+    await request(app.getHttpServer()).post(path).set('X-API-Key', 'the-other-portal-key').send({ leads: [row] }).expect(401);
+    await request(app.getHttpServer()).post(other.path).set('X-API-Key', key).send({ leads: [row] }).expect(401);
+    expect(bulk).not.toHaveBeenCalled();
+  });
   it('does not accept the website key header', async () => {
     await request(app.getHttpServer()).post(path).set('X-Service-Key', key).send({ leads: [row] }).expect(401);
   });
   it('fails closed when the backend key is unset', async () => {
-    delete process.env.NINETY_NINE_ACRES_API_KEY;
+    delete process.env[env];
     await request(app.getHttpServer()).post(path).set('X-API-Key', key).send({ leads: [row] }).expect(503);
     expect(bulk).not.toHaveBeenCalled();
   });

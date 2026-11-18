@@ -3,15 +3,18 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { LeadSource } from '../../../database/entities/lead-source.entity';
 import { LeadsService } from '../leads.service';
-import { NinetyNineAcresLeadsDto } from '../dto/ninety-nine-acres-leads.dto';
+import { PortalLeadsDto } from '../dto/portal-leads.dto';
+
+/** Lead Source each portal's leads are filed under (names match case-insensitively). */
+export const PORTAL_SOURCES = { ninetyNineAcres: '99acres', magicbricks: 'Magic Bricks' } as const;
 
 @Injectable()
-export class NinetyNineAcresService {
+export class PortalLeadsService {
   constructor(@InjectDataSource() private readonly db: DataSource, private readonly leads: LeadsService) {}
 
-  async receive(body: NinetyNineAcresLeadsDto) {
-    const source = await this.db.getRepository(LeadSource).findOne({ where: { name: '99acres', is_active: true } });
-    if (!source) throw new ServiceUnavailableException('The 99acres Lead Source must be active');
+  async receive(sourceName: string, body: PortalLeadsDto) {
+    const source = await this.db.getRepository(LeadSource).findOne({ where: { name: sourceName, is_active: true } });
+    if (!source) throw new ServiceUnavailableException(`The ${sourceName} Lead Source must be active`);
     const rows = body.leads.map(row => ({
       name: row.name,
       mobile: row.mobile,
