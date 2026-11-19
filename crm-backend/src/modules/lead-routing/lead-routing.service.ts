@@ -123,6 +123,13 @@ export class LeadRoutingService {
     const ownerIds = [...new Set(items.filter(l => repeatsByLead.has(l.id) && l.assigned_staff_id).map(l => l.assigned_staff_id))];
     const owners: any[] = ownerIds.length ? await this.dataSource.query('SELECT id, name FROM users WHERE id IN (?)', [ownerIds]) : [];
     const ownerName = new Map(owners.map(o => [o.id, o.name]));
+    // A new lead's remarks are its first note: portals and imports save them that way.
+    const firstNotes: any[] = await this.dataSource.query(
+      `SELECT f.lead_id, f.notes FROM lead_follow_ups f
+       JOIN (SELECT MIN(id) AS id FROM lead_follow_ups WHERE lead_id IN (?) AND notes IS NOT NULL AND notes <> '' GROUP BY lead_id) earliest ON earliest.id = f.id`,
+      [leadIds],
+    );
+    const firstNote = new Map(firstNotes.map(n => [n.lead_id, n.notes]));
 
     const enriched = items.map((lead) => {
       const lastHistory = historyMap.get(lead.id);
@@ -147,6 +154,8 @@ export class LeadRoutingService {
         repeat_source: latest?.source ?? null,
         repeat_message: latest?.message ?? null,
         repeat_at: latest?.created_at ?? null,
+        // What the customer said: the latest repeat's remarks, else what the lead arrived with.
+        remarks: latest?.message || firstNote.get(lead.id) || null,
         current_owner_name: leadRepeats.length && lead.assigned_staff_id ? ownerName.get(lead.assigned_staff_id) ?? null : null,
       };
     });

@@ -98,10 +98,11 @@ describe('LeadRoutingService queue', () => {
         return [{ id: 80, matched_lead_id: 4605, created_at: new Date('2026-11-19T06:48:24Z'), source: '99Acres', message: '4Bed villa' }];
       }
       if (sql.includes('FROM users')) return [{ id: 9, name: 'Abarna' }];
+      if (sql.includes('FROM lead_follow_ups')) return [{ lead_id: 4605, notes: 'Rs1.5 Crore villa' }, { lead_id: 4629, notes: '2Bed Apartment, Vadavalli' }];
       return [];
     });
     const { items } = await service.getQueue('telecalling', 1, 10);
-    expect(items[0]).toMatchObject({ id: 4605, type: 'Repeat', repeat_event_ids: [80], repeat_source: '99Acres', current_owner_name: 'Abarna' });
-    expect(items[1]).toMatchObject({ id: 4629, type: 'New', repeat_event_ids: [], current_owner_name: null });
+    expect(items[0]).toMatchObject({ id: 4605, type: 'Repeat', repeat_event_ids: [80], repeat_source: '99Acres', current_owner_name: 'Abarna', remarks: '4Bed villa' });
+    expect(items[1]).toMatchObject({ id: 4629, type: 'New', repeat_event_ids: [], current_owner_name: null, remarks: '2Bed Apartment, Vadavalli' });
   });
 });

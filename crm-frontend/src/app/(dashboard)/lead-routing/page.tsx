@@ -56,6 +56,8 @@ interface QueueLead {
   repeat_at?: string | null;
   /** Who has the lead now (repeats only). */
   current_owner_name?: string | null;
+  /** The latest repeat's remarks, or what a new lead arrived with. */
+  remarks?: string | null;
 }
 
 interface EnquiryLead {
@@ -767,12 +769,21 @@ export default function LeadRoutingPage() {
         if (l.type !== "Repeat") return <StatusCell status="New" tone="blue" />;
         const from = [l.repeat_source, l.current_owner_name ? `with ${l.current_owner_name}` : null].filter(Boolean).join(" · ");
         return (
-          <div className="flex flex-col items-start gap-0.5" title={l.repeat_message || undefined}>
+          <div className="flex flex-col items-start gap-0.5">
             <StatusCell status="Repeat" tone="amber" />
             {from && <span className="max-w-[180px] truncate text-xs text-muted-foreground">{from}</span>}
           </div>
         );
       },
+    },
+    {
+      accessorKey: "remarks",
+      header: "Remarks",
+      cell: ({ row }) => (
+        <span className="line-clamp-2 min-w-[200px] max-w-[260px] whitespace-normal text-xs leading-snug text-muted-foreground" title={row.original.remarks || undefined}>
+          {row.original.remarks || "—"}
+        </span>
+      ),
     },
     {
       accessorKey: "status",
