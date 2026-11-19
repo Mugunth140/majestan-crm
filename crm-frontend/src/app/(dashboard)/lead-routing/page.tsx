@@ -48,6 +48,14 @@ interface QueueLead {
   release_reason?: string;
   days_in_queue?: number;
   department?: { name: string };
+  /** Repeat: 99acres, Magicbricks or an Excel import sent a lead that's already in the CRM. */
+  type?: "New" | "Repeat";
+  repeat_event_ids?: number[];
+  repeat_source?: string | null;
+  repeat_message?: string | null;
+  repeat_at?: string | null;
+  /** Who has the lead now (repeats only). */
+  current_owner_name?: string | null;
 }
 
 interface EnquiryLead {
@@ -74,7 +82,7 @@ interface EnquiryLead {
   message: string | null;
 }
 
-/** Sources that feed the enquiry queue: website forms, plus repeats from portals and Excel imports. */
+/** Sources that feed the enquiry queue: website forms. Portal and import repeats go to the Routing Queue. */
 const ENQUIRY_SOURCE_OPTIONS = [
   "Website – Project page",
   "Website – Property page",
@@ -85,10 +93,6 @@ const ENQUIRY_SOURCE_OPTIONS = [
   "Website – Financial Assistance page",
   "Website – Contact page",
   "Website – Enquiry form",
-  // Repeat leads from portal pushes and Excel imports.
-  "99Acres",
-  "Magic Bricks",
-  "Excel import",
 ].map((value) => ({ label: value.replace(/^Website – /, ""), value }));
 
 /** "Website – Liaisoning page" → "Liaisoning page". */
@@ -133,6 +137,7 @@ const EVENT_TYPE_OPTIONS = [
 const EVENT_TONES: Record<string, StatusTone> = { assigned: "blue", claimed: "green", released: "amber", converted: "violet" };
 
 const QUEUE_FIELDS: ViewField<QueueLead>[] = [
+  { id: "type", label: "Type", get: (l) => l.type ?? "New", order: ["New", "Repeat"], dot: (v) => statusDot(v, v === "Repeat" ? "amber" : "blue") },
   { id: "status", label: "Last status", get: (l) => l.status, order: LEAD_STATUS_ORDER, dot: (v) => LEAD_STATUS_DOTS[v] ?? "bg-gray-400" },
   { id: "held_by", label: "Previously held by", get: (l) => l.previously_held_by },
   { id: "reason", label: "Release reason", get: (l) => l.release_reason },
@@ -631,6 +636,20 @@ export default function LeadRoutingPage() {
     clearSelection();
   };
 
+  // A repeat stays with whoever has it: its enquiries are added to the lead and it leaves the queue.
+  const keepRepeatsWithOwner = async (rows: QueueLead[], clearSelection: () => void) => {
+    const eventIds = rows.filter((r) => r.type === "Repeat" && r.current_owner_name).flatMap((r) => r.repeat_event_ids ?? []);
+    const results = await Promise.allSettled(eventIds.map(async (id) => {
+      const res = await apiFetch(`${API_URL}/lead-routing/enquiry-queue/accept/${id}`, { method: "POST" });
+      if (!res.ok) throw new Error();
+    }));
+    const failed = results.filter((r) => r.status === "rejected").length;
+    if (failed) toast.error(`Failed on ${failed} repeat${failed === 1 ? "" : "s"}`);
+    else toast.success("Kept with the current owner");
+    fetchQueue();
+    clearSelection();
+  };
+
   const handleAssignLead = async (toUserId: number) => {
     if (assignLeadIds.length === 0) return;
     setIsAssigning(true);
@@ -739,6 +758,21 @@ export default function LeadRoutingPage() {
       accessorKey: "mobile_number",
       header: "Mobile",
       cell: ({ row }) => <span className="tabular-nums">{row.original.mobile_number || "—"}</span>,
+    },
+    {
+      accessorKey: "type",
+      header: "Type",
+      cell: ({ row }) => {
+        const l = row.original;
+        if (l.type !== "Repeat") return <StatusCell status="New" tone="blue" />;
+        const from = [l.repeat_source, l.current_owner_name ? `with ${l.current_owner_name}` : null].filter(Boolean).join(" · ");
+        return (
+          <div className="flex flex-col items-start gap-0.5" title={l.repeat_message || undefined}>
+            <StatusCell status="Repeat" tone="amber" />
+            {from && <span className="max-w-[180px] truncate text-xs text-muted-foreground">{from}</span>}
+          </div>
+        );
+      },
     },
     {
       accessorKey: "status",
@@ -1190,6 +1224,16 @@ export default function LeadRoutingPage() {
                               Assign Lead
                             </Button>
                           )}
+                          {role !== "Staff" && selectedRows.some((r) => r.type === "Repeat" && r.current_owner_name) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="border-[#0052FF]/30 text-[#0052FF] hover:bg-[#0052FF]/10"
+                              onClick={() => keepRepeatsWithOwner(selectedRows, clearSelection)}
+                            >
+                              Keep with owner
+                            </Button>
+                          )}
                         </>
                       );
                     }}
@@ -1197,7 +1241,7 @@ export default function LeadRoutingPage() {
                   }
                   getKey={(l) => l.id}
                   onOpen={(l) => router.push(`/leads/${l.id}`)}
-                  card={(l) => ({ title: l.name, id: l.display_id || `L${String(l.id).padStart(5, "0")}`, href: `/leads/${l.id}`, subtitle: l.mobile_number, footer: l.previously_held_by ? `Held by ${l.previously_held_by}` : undefined, tag: `${l.days_in_queue ?? 0}d in queue` })}
+                  card={(l) => ({ title: l.name, id: l.display_id || `L${String(l.id).padStart(5, "0")}`, href: `/leads/${l.id}`, subtitle: l.mobile_number, footer: l.type === "Repeat" ? `Repeat${l.current_owner_name ? ` · with ${l.current_owner_name}` : ""}` : l.previously_held_by ? `Held by ${l.previously_held_by}` : undefined, tag: `${l.days_in_queue ?? 0}d in queue` })}
                   totalCount={queueTotal}
                   noun="leads"
                 />

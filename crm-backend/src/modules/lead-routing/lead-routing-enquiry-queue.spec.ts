@@ -225,4 +225,10 @@ describe('LeadRoutingService enquiry queue (event-sourced)', () => {
     const degraded = await service.getEnquiryQueue(1, 10);
     expect(degraded.items[0].property_title).toBeNull();
   });
+
+  it('leaves portal and import repeats to the Routing Queue', async () => {
+    queryMock.mockResolvedValueOnce([{ total: 0 }]);
+    await service.getEnquiryQueue(1, 10);
+    expect(queryMock.mock.calls[0][0]).toContain("(e.source IS NULL OR e.source LIKE 'Website%')");
+  });
 });

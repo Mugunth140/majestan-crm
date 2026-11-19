@@ -88,11 +88,11 @@ describe("2.5.1", () => {
   });
 });
 
-describe("2.5.2", () => {
-  it("is the app version and announces repeat leads in the routing queue", async () => {
+describe("2.5.3", () => {
+  it("is the app version and announces portal repeats in the Routing Queue", async () => {
     const { APP_VERSION, RELEASES, releasesSince } = await import("@/lib/release");
-    expect(APP_VERSION).toBe("2.5.2");
-    expect(releasesSince("2.5.1", RELEASES).map((r) => r.version)).toEqual(["2.5.2"]);
-    expect(RELEASES[0].changes[0].text).toMatch(/^Repeat leads in the routing queue/);
+    expect(APP_VERSION).toBe("2.5.3");
+    expect(releasesSince("2.5.2", RELEASES).map((r) => r.version)).toEqual(["2.5.3"]);
+    expect(RELEASES[0].changes[0].text).toMatch(/^Leads from 99acres, Magicbricks and Excel imports all come into the Routing Queue/);
   });
 });

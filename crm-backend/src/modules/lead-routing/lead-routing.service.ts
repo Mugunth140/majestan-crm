@@ -51,6 +51,14 @@ export function canConvertLead(
 /** Website forms name themselves "Website – …"; older rows have no source. Portal and import repeats name their lead source. */
 const isWebsiteEvent = (event: { source?: string | null }) => !event.source || event.source.startsWith('Website');
 
+/**
+ * Open repeats that belong in the Routing Queue rather than the Enquiry Queue: everything not from a
+ * website form (99acres, Magicbricks, Excel imports). Matches isWebsiteEvent; the event table is `r`.
+ */
+const ROUTING_REPEAT = `r.status = 'open' AND r.matched_lead_id IS NOT NULL AND r.source IS NOT NULL AND r.source NOT LIKE 'Website%'`;
+/** Enquiry Queue rows: website-form events only (older rows have no source). */
+const ENQUIRY_EVENT = `(e.source IS NULL OR e.source LIKE 'Website%')`;
+
 @Injectable()
 export class LeadRoutingService {
   constructor(
@@ -67,15 +75,17 @@ export class LeadRoutingService {
     const [items, total] = await this.dataSource
       .getRepository(Lead)
       .createQueryBuilder('lead')
-      .where('lead.assigned_staff_id IS NULL')
-      .andWhere('lead.converted_to IS NULL')
+      .where('lead.converted_to IS NULL')
       .andWhere('lead.department = :department', { department })
       .andWhere('lead.status NOT IN (:...excluded)', { excluded: NON_QUEUEABLE_LEAD_STATUSES })
-      // A lead stays out of Routing only while it has pending decisions;
-      // converted/decided website leads flow into Routing normally; legacy
-      // website leads surface in Routing once their backfilled events resolve.
-      .andWhere(`NOT EXISTS (SELECT 1 FROM website_enquiry_events e WHERE (e.matched_lead_id = lead.id OR e.resolved_lead_id = lead.id) AND e.status = 'open')`)
-      .orderBy('lead.created_at', 'DESC')
+      // Two kinds of row: an unassigned lead (New), and a lead a portal or import sent again (Repeat),
+      // even one that already has an owner. An unassigned lead stays out while it has pending website
+      // decisions; those live in the Enquiry Queue.
+      .andWhere(`((lead.assigned_staff_id IS NULL
+          AND NOT EXISTS (SELECT 1 FROM website_enquiry_events e WHERE (e.matched_lead_id = lead.id OR e.resolved_lead_id = lead.id) AND e.status = 'open'))
+        OR EXISTS (SELECT 1 FROM website_enquiry_events r WHERE r.matched_lead_id = lead.id AND ${ROUTING_REPEAT}))`)
+      // Newest arrival first: a repeat sorts by when it came in again.
+      .orderBy(`COALESCE((SELECT MAX(r.created_at) FROM website_enquiry_events r WHERE r.matched_lead_id = lead.id AND ${ROUTING_REPEAT}), lead.created_at)`, 'DESC')
       .skip(skip)
       .take(limit)
       .getManyAndCount();
@@ -102,10 +112,25 @@ export class LeadRoutingService {
       }
     });
 
+    // The open repeats on this page, oldest first, and who owns those leads now.
+    const repeats: any[] = await this.dataSource.query(
+      `SELECT r.id, r.matched_lead_id, r.created_at, r.source, r.message FROM website_enquiry_events r
+       WHERE r.matched_lead_id IN (?) AND ${ROUTING_REPEAT} ORDER BY r.id`,
+      [leadIds],
+    );
+    const repeatsByLead = new Map<number, any[]>();
+    for (const r of repeats) repeatsByLead.set(r.matched_lead_id, [...(repeatsByLead.get(r.matched_lead_id) ?? []), r]);
+    const ownerIds = [...new Set(items.filter(l => repeatsByLead.has(l.id) && l.assigned_staff_id).map(l => l.assigned_staff_id))];
+    const owners: any[] = ownerIds.length ? await this.dataSource.query('SELECT id, name FROM users WHERE id IN (?)', [ownerIds]) : [];
+    const ownerName = new Map(owners.map(o => [o.id, o.name]));
+
     const enriched = items.map((lead) => {
       const lastHistory = historyMap.get(lead.id);
+      const leadRepeats = repeatsByLead.get(lead.id) ?? [];
+      const latest = leadRepeats[leadRepeats.length - 1];
 
-      const referenceDate = lastHistory ? lastHistory.created_at : lead.created_at;
+      // A repeat has waited since it first came in again.
+      const referenceDate = leadRepeats.length ? leadRepeats[0].created_at : lastHistory ? lastHistory.created_at : lead.created_at;
       const daysInQueue = Math.floor(
         (Date.now() - new Date(referenceDate).getTime()) / (1000 * 60 * 60 * 24),
       );
@@ -115,6 +140,14 @@ export class LeadRoutingService {
         previously_held_by: lastHistory?.from_user?.name ?? null,
         release_reason: lastHistory?.event_type ?? null,
         days_in_queue: daysInQueue,
+        type: leadRepeats.length ? 'Repeat' : 'New',
+        // Open repeat events: Keep with owner accepts these; Assign and Take Lead attach them.
+        repeat_event_ids: leadRepeats.map(r => r.id),
+        repeat_count: leadRepeats.length,
+        repeat_source: latest?.source ?? null,
+        repeat_message: latest?.message ?? null,
+        repeat_at: latest?.created_at ?? null,
+        current_owner_name: leadRepeats.length && lead.assigned_staff_id ? ownerName.get(lead.assigned_staff_id) ?? null : null,
       };
     });
 
@@ -172,7 +205,7 @@ export class LeadRoutingService {
       `SELECT COUNT(*) AS total
        FROM website_enquiry_events e
        LEFT JOIN leads l ON l.id = e.matched_lead_id
-       WHERE e.status = 'open'
+       WHERE e.status = 'open' AND ${ENQUIRY_EVENT}
          AND (l.id IS NULL OR l.status NOT IN ('Not Interested', 'Dropped'))${filterConds}`,
       filterParams,
     );
@@ -199,7 +232,7 @@ export class LeadRoutingService {
        FROM website_enquiry_events e
        LEFT JOIN leads l ON l.id = e.matched_lead_id
        LEFT JOIN users s ON s.id = l.assigned_staff_id
-       WHERE e.status = 'open'
+       WHERE e.status = 'open' AND ${ENQUIRY_EVENT}
          AND (l.id IS NULL OR l.status NOT IN ('Not Interested', 'Dropped'))${filterConds}
        ORDER BY e.id DESC
        LIMIT ? OFFSET ?`,
@@ -296,9 +329,14 @@ export class LeadRoutingService {
     if (requestingRole && !['Staff', 'Team Lead', 'Manager'].includes(requestingRole)) {
       throw new ForbiddenException('Your role cannot claim leads');
     }
+    let previousOwnerId: number | null = null;
     await this.dataSource.transaction(async (manager) => {
+      // A repeat may still have an owner: they hear it was taken, and history shows the move.
+      const [before] = await manager.query('SELECT assigned_staff_id FROM leads WHERE id = ? FOR UPDATE', [leadId]);
+      previousOwnerId = before?.assigned_staff_id ?? null;
       const result = await manager.query(
-        'UPDATE leads SET assigned_staff_id = ? WHERE id = ? AND assigned_staff_id IS NULL AND converted_to IS NULL',
+        `UPDATE leads SET assigned_staff_id = ? WHERE id = ? AND converted_to IS NULL
+           AND (assigned_staff_id IS NULL OR EXISTS (SELECT 1 FROM website_enquiry_events r WHERE r.matched_lead_id = leads.id AND ${ROUTING_REPEAT}))`,
         [requestingUserId, leadId]
       );
       if (result.affectedRows === 0) {
@@ -306,12 +344,13 @@ export class LeadRoutingService {
       }
 
       const lead = await manager.getRepository(Lead).findOne({ where: { id: leadId } });
+      await this.attachRoutingRepeats(manager, leadId, requestingUserId);
 
       const rh = manager.getRepository(RoutingHistory).create({
         lead_id: leadId,
         event_type: 'Claimed',
         to_user_id: requestingUserId,
-        from_user_id: null,
+        from_user_id: previousOwnerId,
         department: lead?.department,
       });
       await manager.save(rh);
@@ -351,7 +390,32 @@ export class LeadRoutingService {
       }
     });
 
+    if (previousOwnerId && previousOwnerId !== requestingUserId) {
+      this.events?.emit(NOTIFY_ASSIGNED, {
+        module: 'lead', actorId: requestingUserId, newOwnerTold: true,
+        changes: [{ id: leadId, from: previousOwnerId, to: requestingUserId }],
+      } satisfies AssignedEvent);
+    }
     return { success: true };
+  }
+
+  /**
+   * Closes a lead's open portal/import repeats once it is routed: each becomes an attached enquiry on
+   * the lead, with its remarks as a note, as Accept does in the Enquiry Queue.
+   */
+  private async attachRoutingRepeats(manager: EntityManager, leadId: number, actorId: number | null) {
+    const events: any[] = await manager.query(
+      `SELECT * FROM website_enquiry_events r WHERE r.matched_lead_id = ? AND ${ROUTING_REPEAT} FOR UPDATE`,
+      [leadId],
+    );
+    for (const event of events) {
+      await this.inquiryFromEvent(manager, leadId, event, false);
+      await this.messageNote(manager, leadId, event);
+      await manager.getRepository(WebsiteEnquiryEvent).save({
+        ...event, status: 'attached', resolved_lead_id: leadId, decided_by: actorId, decided_at: new Date(),
+      });
+    }
+    return events.length;
   }
 
   // Role gate is fail-open on a missing role (preserves behavior for any
@@ -368,7 +432,11 @@ export class LeadRoutingService {
     const prevAssignedId = lead.assigned_staff_id;
 
     lead.assigned_staff_id = toUserId;
-    const updated = await leadRepo.save(lead);
+    const updated = await this.dataSource.transaction(async (manager) => {
+      const saved = await manager.getRepository(Lead).save(lead);
+      await this.attachRoutingRepeats(manager, leadId, actionedById);
+      return saved;
+    });
 
     const rh = this.dataSource.getRepository(RoutingHistory).create({
       lead_id: leadId,

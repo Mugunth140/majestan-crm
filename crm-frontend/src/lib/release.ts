@@ -13,6 +13,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2.5.3",
+    date: "2026-11-19",
+    title: "Portal repeats in the Routing Queue",
+    changes: [
+      { kind: "improved", text: "Leads from 99acres, Magicbricks and Excel imports all come into the Routing Queue, new and repeat. A lead that's already in the CRM shows as Repeat with who has it now. Assign it or Take Lead to move it, or Keep with owner to leave it where it is. Website repeats stay in the Enquiry Queue." },
+    ],
+  },
+  {
     version: "2.5.2",
     date: "2026-11-19",
     title: "Repeat leads in the routing queue",
