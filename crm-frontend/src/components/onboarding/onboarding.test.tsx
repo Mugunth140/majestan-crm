@@ -73,10 +73,19 @@ describe("2.4.0", () => {
 });
 
 describe("2.5.0", () => {
-  it("is the app version and leads with repeat-lead notifications", async () => {
+  it("leads with repeat-lead notifications", async () => {
+    const { RELEASES } = await import("@/lib/release");
+    expect(RELEASES.find((r) => r.version === "2.5.0")!.changes[0].text).toMatch(/^Repeat leads/);
+  });
+});
+
+describe("2.5.1", () => {
+  it("is the app version and lists the portal and sublocation fixes", async () => {
     const { APP_VERSION, RELEASES, releasesSince } = await import("@/lib/release");
-    expect(APP_VERSION).toBe("2.5.0");
-    expect(releasesSince("2.4.0", RELEASES).map((r) => r.version)).toEqual(["2.5.0"]);
-    expect(RELEASES[0].changes[0].text).toMatch(/^Repeat leads/);
+    expect(APP_VERSION).toBe("2.5.1");
+    expect(releasesSince("2.5.0", RELEASES).map((r) => r.version)).toEqual(["2.5.1"]);
+    const text = RELEASES[0].changes.map((c) => c.text).join(" ");
+    expect(text).toMatch(/99acres and Magicbricks/);
+    expect(text).toMatch(/Sublocation/);
   });
 });

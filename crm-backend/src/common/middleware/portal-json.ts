@@ -16,6 +16,17 @@ export function bodyShape(value: unknown, depth = 0): unknown {
   return value === null ? 'null' : typeof value;
 }
 
+/**
+ * Magicbricks sends one lead as a bare object ({ name, mobile, ... }); a list of leads may also
+ * come bare. Wrap either as { leads: [...] } so both portals share one format.
+ */
+export function asLeadsEnvelope(body: unknown): unknown {
+  if (Array.isArray(body)) return { leads: body };
+  if (body && typeof body === 'object' && !('leads' in body) && ('mobile' in body || 'name' in body))
+    return { leads: [body] };
+  return body;
+}
+
 /** Body parser for property-portal pushes (99acres, Magicbricks). */
 export const portalJsonParser: RequestHandler = (req, res, next) => parse(req, res, error => {
   const portal = req.originalUrl.includes('magicbricks') ? 'Magicbricks' : '99acres';
@@ -25,6 +36,9 @@ export const portalJsonParser: RequestHandler = (req, res, next) => parse(req, r
     logger.warn(`${portal} push: invalid JSON (content-type ${req.headers['content-type'] ?? 'none'})`);
     return next(new BadRequestException('Invalid JSON body'));
   }
-  if (!error) logger.log(`${portal} push shape (content-type ${req.headers['content-type'] ?? 'none'}): ${JSON.stringify(bodyShape(req.body))}`);
+  if (!error) {
+    logger.log(`${portal} push shape (content-type ${req.headers['content-type'] ?? 'none'}): ${JSON.stringify(bodyShape(req.body))}`);
+    req.body = asLeadsEnvelope(req.body);
+  }
   return next(error);
 });

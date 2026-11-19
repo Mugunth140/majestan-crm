@@ -374,15 +374,15 @@ export default function MasterSublocationsPage() {
 
         {/* Add Dialog */}
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-          <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-0 overflow-hidden">
-            <div className="px-5 md:px-6 pt-5 md:pt-6">
+          <DialogContent className="flex w-[95vw] max-w-lg sm:max-w-lg max-h-[calc(100dvh-2rem)] flex-col gap-0 rounded-2xl p-0 overflow-hidden">
+            <div className="shrink-0 px-5 md:px-6 pt-5 md:pt-6 pr-12">
               <DialogHeader className="text-left">
                 <DialogTitle className="text-lg font-semibold">Add Sublocation</DialogTitle>
                 <DialogDescription className="mt-1">Create a new locality and map it to a city.</DialogDescription>
               </DialogHeader>
             </div>
-            <form onSubmit={handleAdd}>
-              <div className="px-5 md:px-6 py-5 space-y-5">
+            <form onSubmit={handleAdd} className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-5 md:px-6 py-5 space-y-5">
             <div className="space-y-2">
               <label className="text-sm font-medium">City *</label>
               <CitySelect value={form.city_id} onChange={(v) => setForm({ ...form, city_id: v })} />
@@ -401,7 +401,7 @@ export default function MasterSublocationsPage() {
                 placeholder="Shown on the site as 'Overview of {locality}' — e.g. schools, connectivity, lifestyle..."
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                rows={4}
+                className="h-36 max-h-36 resize-none field-sizing-fixed"
               />
             </div>
             <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
@@ -412,7 +412,7 @@ export default function MasterSublocationsPage() {
               <Switch checked={form.is_active === 1} onCheckedChange={(v) => setForm({ ...form, is_active: v ? 1 : 0 })} />
             </div>
           </div>
-          <DialogFooter className="px-5 md:px-6 py-4 border-t border-border/60 bg-muted/40 flex-row items-center gap-2">
+          <DialogFooter className="mx-0 mb-0 shrink-0 px-5 md:px-6 py-4 border-t border-border/60 bg-muted/40 flex-row items-center gap-2">
             <div className="ml-auto flex items-center gap-2">
               <Button type="button" variant="outline" className="h-10 px-5 rounded-xl" onClick={() => setIsAddOpen(false)}>Cancel</Button>
               <Button type="submit" className="h-10 px-5 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC]" disabled={isSubmitting}>
@@ -426,15 +426,15 @@ export default function MasterSublocationsPage() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-0 overflow-hidden">
-          <div className="px-5 md:px-6 pt-5 md:pt-6">
+        <DialogContent className="flex w-[95vw] max-w-lg sm:max-w-lg max-h-[calc(100dvh-2rem)] flex-col gap-0 rounded-2xl p-0 overflow-hidden">
+          <div className="shrink-0 px-5 md:px-6 pt-5 md:pt-6 pr-12">
             <DialogHeader className="text-left">
               <DialogTitle className="text-lg font-semibold">Edit Sublocation</DialogTitle>
               <DialogDescription className="mt-1">Update locality details.</DialogDescription>
             </DialogHeader>
           </div>
-          <form onSubmit={handleEdit}>
-            <div className="px-5 md:px-6 py-5 space-y-5">
+          <form onSubmit={handleEdit} className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-5 md:px-6 py-5 space-y-5">
               <div className="space-y-2">
                 <label className="text-sm font-medium">City *</label>
                 <CitySelect value={form.city_id} onChange={(v) => setForm({ ...form, city_id: v })} />
@@ -453,7 +453,7 @@ export default function MasterSublocationsPage() {
                   placeholder="Shown on the site as 'Overview of {locality}' — e.g. schools, connectivity, lifestyle..."
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  rows={4}
+                  className="h-36 max-h-36 resize-none field-sizing-fixed"
                 />
               </div>
               <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
@@ -464,7 +464,7 @@ export default function MasterSublocationsPage() {
                 <Switch checked={form.is_active === 1} onCheckedChange={(v) => setForm({ ...form, is_active: v ? 1 : 0 })} />
               </div>
             </div>
-            <DialogFooter className="px-5 md:px-6 py-4 border-t border-border/60 bg-muted/40 flex-row items-center gap-2">
+            <DialogFooter className="mx-0 mb-0 shrink-0 px-5 md:px-6 py-4 border-t border-border/60 bg-muted/40 flex-row items-center gap-2">
               <div className="ml-auto flex items-center gap-2">
                 <Button type="button" variant="outline" className="h-10 px-5 rounded-xl" onClick={() => setIsEditOpen(false)}>Cancel</Button>
                 <Button type="submit" className="h-10 px-5 rounded-xl bg-[#0052FF] text-white hover:bg-[#0040CC]" disabled={isSubmitting}>

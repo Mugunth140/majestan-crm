@@ -13,6 +13,15 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2.5.1",
+    date: "2026-11-19",
+    title: "Portal leads and smaller screens",
+    changes: [
+      { kind: "fixed", text: "Leads from 99acres and Magicbricks now come straight into the routing queue." },
+      { kind: "fixed", text: "Add and Edit Sublocation fit laptop and phone screens, and a long overview scrolls inside its box." },
+    ],
+  },
+  {
     version: "2.5.0",
     date: "2026-11-17",
     title: "Notifications that reach the right people",

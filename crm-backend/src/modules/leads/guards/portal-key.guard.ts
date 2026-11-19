@@ -32,13 +32,22 @@ export function describeRefusedKey(headers: Record<string, unknown>, expected: s
   };
 }
 
+/**
+ * The key as given, or without its "sk-" prefix: 99acres saved the key without it. The part
+ * after "sk-" is the whole secret, so this does not make the key any easier to guess.
+ */
+export function keyMatches(provided: string, expected: string) {
+  if (same(provided, expected)) return true;
+  return expected.startsWith('sk-') && !provided.startsWith('sk-') && same('sk-' + provided, expected);
+}
+
 /** Checks X-API-Key against the portal's own key, so each portal can be revoked on its own. */
 function checkKey(context: ExecutionContext, envVar: string, portal: string) {
   const expected = process.env[envVar];
   if (!expected) throw new ServiceUnavailableException(`${portal} integration is not configured`);
   const headers = context.switchToHttp().getRequest().headers ?? {};
   const provided = headers['x-api-key'];
-  if (typeof provided !== 'string' || !provided || !same(provided, expected)) {
+  if (typeof provided !== 'string' || !provided || !keyMatches(provided, expected)) {
     logger.warn(`${portal} key refused ${JSON.stringify(describeRefusedKey(headers, expected))}`);
     throw new UnauthorizedException('Invalid integration key');
   }

@@ -54,6 +54,14 @@ describe.each(PORTALS)('$portal push HTTP contract', ({ path, env, source, other
     await request(app.getHttpServer()).post(path).set('X-API-Key', key).send({ leads: [{ ...row, source: 'Website', assignedStaffId: 12, leadSourceId: -1, propertyType: 'apartment', commissionRemarks: 'Unwanted internal field' }] }).expect(200);
     expect(bulk.mock.calls[0][0][0]).toEqual({ name: 'Ravi Kumar', mobile: '9876543210', email: 'ravi@example.com', commissionRemarks: row.remarks, leadSourceId: 99 });
   });
+  it('accepts one lead sent without the leads list, as Magicbricks sends it', async () => {
+    await request(app.getHttpServer()).post(path).set('X-API-Key', key).send(row).expect(200);
+    expect(bulk.mock.calls[0][0]).toEqual([expect.objectContaining({ name: 'Ravi Kumar', mobile: '9876543210' })]);
+  });
+  it('accepts a bare list of leads', async () => {
+    await request(app.getHttpServer()).post(path).set('X-API-Key', key).send([row, { ...row, mobile: '9876543211' }]).expect(200);
+    expect(bulk.mock.calls[0][0]).toHaveLength(2);
+  });
   it('requires only name and mobile', async () => {
     await request(app.getHttpServer()).post(path).set('X-API-Key', key).send({ leads: [{ name: 'Ravi', mobile: '9876543210' }] }).expect(200);
     expect(bulk.mock.calls[0][0][0]).toMatchObject({ name: 'Ravi', mobile: '9876543210', email: undefined, commissionRemarks: undefined });
