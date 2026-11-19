@@ -111,4 +111,17 @@ describe('LeadsService.bulkCreateLeads announcements', () => {
       expect.objectContaining({ leadIds: [102] }),
     );
   });
+
+  it('marks a repeat from a portal push as a new enquiry, not an Excel import', async () => {
+    const { service, events, leadEvents } = setup();
+    await service.bulkCreateLeads(
+      [{ name: 'Suganya', mobile: '9884012345', source: '99Acres', commissionRemarks: 'Portal enquiry' }],
+      { role: 'Staff' },
+    );
+    expect(leadEvents.record).toHaveBeenCalledWith(
+      [expect.objectContaining({ leadId: 4488, actorId: null, to: '99Acres', meta: expect.objectContaining({ via: 'entry' }) })],
+      expect.anything(),
+    );
+    expect(events.emit).toHaveBeenCalledWith(NOTIFY_LEAD_REPEAT, expect.objectContaining({ via: 'entry', source: '99Acres' }));
+  });
 });

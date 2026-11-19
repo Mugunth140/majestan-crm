@@ -790,7 +790,8 @@ export class LeadsService {
           actorId: actionedBy?.id ?? null,
           type: 'repeat_enquiry' as const,
           to: row.source || null,
-          meta: { via: 'import', remarks: row.commissionRemarks || null, name: row.name || null },
+          // No person behind the call means a portal push (99acres, Magicbricks), not an Excel import.
+          meta: { via: actionedBy?.id ? 'import' : 'entry', remarks: row.commissionRemarks || null, name: row.name || null },
         })), manager);
       }
 
