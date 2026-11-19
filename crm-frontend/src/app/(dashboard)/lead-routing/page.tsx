@@ -74,7 +74,7 @@ interface EnquiryLead {
   message: string | null;
 }
 
-/** Website forms that feed the enquiry queue; values match the CRM's lead sources. */
+/** Sources that feed the enquiry queue: website forms, plus repeats from portals and Excel imports. */
 const ENQUIRY_SOURCE_OPTIONS = [
   "Website – Project page",
   "Website – Property page",
@@ -85,6 +85,10 @@ const ENQUIRY_SOURCE_OPTIONS = [
   "Website – Financial Assistance page",
   "Website – Contact page",
   "Website – Enquiry form",
+  // Repeat leads from portal pushes and Excel imports.
+  "99Acres",
+  "Magic Bricks",
+  "Excel import",
 ].map((value) => ({ label: value.replace(/^Website – /, ""), value }));
 
 /** "Website – Liaisoning page" → "Liaisoning page". */

@@ -1,3 +1,4 @@
+import { WebsiteEnquiryEvent } from '../../database/entities/website-enquiry-event.entity';
 import { Test, TestingModule } from '@nestjs/testing';
 import { LeadsService } from './leads.service';
 import { Lead } from '../../database/entities/lead.entity';
@@ -40,6 +41,7 @@ describe('LeadsService.bulkCreateLeads assign-on-insert', () => {
         if (entity === User) return userRepo;
         if (entity === LeadInquiry) return inquiryRepo;
         if (entity === LeadFollowUp) return followUpRepo;
+        if (entity === WebsiteEnquiryEvent) return { create: (o: any) => ({ ...o }) };
         throw new Error('unexpected repository');
       },
       save: jest.fn(async (entity: any, entities?: any) => {

@@ -3,6 +3,7 @@ import { Lead } from '../../database/entities/lead.entity';
 import { LeadFollowUp } from '../../database/entities/lead-follow-up.entity';
 import { LeadInquiry } from '../../database/entities/lead-inquiry.entity';
 import { LeadSource } from '../../database/entities/lead-source.entity';
+import { WebsiteEnquiryEvent } from '../../database/entities/website-enquiry-event.entity';
 import {
   NOTIFY_ASSIGNED,
   NOTIFY_LEAD_REPEAT,
@@ -27,7 +28,7 @@ describe('LeadsService.bulkCreateLeads announcements', () => {
             }),
             create: (obj: any) => ({ ...obj }),
           };
-        if (entity === LeadInquiry || entity === LeadFollowUp)
+        if (entity === LeadInquiry || entity === LeadFollowUp || entity === WebsiteEnquiryEvent)
           return { create: (obj: any) => ({ ...obj }) };
         // Assignee lookup: Abarna (4) is in Telecalling.
         return {
@@ -56,7 +57,7 @@ describe('LeadsService.bulkCreateLeads announcements', () => {
       events as any,
       leadEvents as any,
     );
-    return { service, events, leadEvents };
+    return { service, events, leadEvents, manager };
   }
 
   it('records repeats on the existing lead and announces repeats, assignments and queued leads', async () => {
@@ -110,6 +111,23 @@ describe('LeadsService.bulkCreateLeads announcements', () => {
       NOTIFY_QUEUE,
       expect.objectContaining({ leadIds: [102] }),
     );
+  });
+
+  it('puts each repeat in the routing queue as an open enquiry on its lead', async () => {
+    const { service, manager } = setup();
+    await service.bulkCreateLeads(
+      [{ name: ' Suganya ', mobile: '9884012345', source: '99Acres', email: 'suganya@example.com', commissionRemarks: 'Wants a 3BHK' }],
+      { role: 'Staff' },
+    );
+    expect(manager.save).toHaveBeenCalledWith(WebsiteEnquiryEvent, [
+      expect.objectContaining({ matched_lead_id: 4488, status: 'open', intent: 'enquiry', source: '99Acres', name: 'Suganya', mobile_number: '9884012345', email: 'suganya@example.com', message: 'Wants a 3BHK' }),
+    ]);
+  });
+
+  it('names an Excel repeat with no source by how it came in', async () => {
+    const { service, manager } = setup();
+    await service.bulkCreateLeads([{ name: 'S', mobile: '9884012345' }], { id: 1, role: 'Team Lead' });
+    expect(manager.save).toHaveBeenCalledWith(WebsiteEnquiryEvent, [expect.objectContaining({ source: 'Excel import' })]);
   });
 
   it('marks a repeat from a portal push as a new enquiry, not an Excel import', async () => {

@@ -793,6 +793,19 @@ export class LeadsService {
           // No person behind the call means a portal push (99acres, Magicbricks), not an Excel import.
           meta: { via: actionedBy?.id ? 'import' : 'entry', remarks: row.commissionRemarks || null, name: row.name || null },
         })), manager);
+        // Put each repeat in the routing queue as a Repeat enquiry on its lead, so the
+        // team can Accept (attach it to the lead) or Acknowledge it like a website repeat.
+        const queue = manager.getRepository(WebsiteEnquiryEvent);
+        await manager.save(WebsiteEnquiryEvent, repeats.map(({ lead, row }) => queue.create({
+          name: row.name ? String(row.name).trim() || undefined : undefined,
+          mobile_number: lead.mobile_number,
+          email: row.email ? String(row.email).trim() || undefined : undefined,
+          source: (row.source || (actionedBy?.id ? 'Excel import' : 'Portal')).slice(0, 100),
+          message: row.commissionRemarks ? String(row.commissionRemarks) : null,
+          intent: 'enquiry',
+          matched_lead_id: lead.id,
+          status: 'open',
+        })));
       }
 
       const announce = {

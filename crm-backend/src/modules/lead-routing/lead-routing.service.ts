@@ -47,6 +47,10 @@ export function canConvertLead(
   return pipeline != null && pipeline === String(lead.department ?? '').toLowerCase();
 }
 
+
+/** Website forms name themselves "Website – …"; older rows have no source. Portal and import repeats name their lead source. */
+const isWebsiteEvent = (event: { source?: string | null }) => !event.source || event.source.startsWith('Website');
+
 @Injectable()
 export class LeadRoutingService {
   constructor(
@@ -681,7 +685,8 @@ export class LeadRoutingService {
         visit_date: event.intent === 'site_visit' ? (event.visit_date ?? null) : null,
         visit_slot: event.intent === 'site_visit' ? (event.visit_slot ?? null) : null,
         preferences: event.preferences ?? null,
-        source: 'website',
+        // Portal and Excel-import repeats are queued here too; only website forms say 'website'.
+        source: isWebsiteEvent(event) ? 'website' : null,
         is_new_lead: isNewLead,
       }),
     );
@@ -864,8 +869,8 @@ export class LeadRoutingService {
       await this.notifyLeadOwner(
         lead,
         requestingUserId,
-        'Website enquiry attached',
-        `Website enquiry ${this.enquiryLabel(event)} attached to Lead #${lead.id}`,
+        isWebsiteEvent(event) ? 'Website enquiry attached' : 'Repeat enquiry attached',
+        `${isWebsiteEvent(event) ? 'Website enquiry' : 'Repeat enquiry'} ${this.enquiryLabel(event)} attached to Lead #${lead.id}`,
         'lead_enquiry_attached',
       );
       return { leadId: lead.id, inquiryId: inquiry.id, withVisit: bookedVisit(event) };
@@ -899,8 +904,8 @@ export class LeadRoutingService {
         await this.notifyLeadOwner(
           lead,
           requestingUserId,
-          'Website enquiry acknowledged',
-          `Website enquiry ${this.enquiryLabel(event)} acknowledged on Lead #${lead.id}`,
+          isWebsiteEvent(event) ? 'Website enquiry acknowledged' : 'Repeat enquiry acknowledged',
+          `${isWebsiteEvent(event) ? 'Website enquiry' : 'Repeat enquiry'} ${this.enquiryLabel(event)} acknowledged on Lead #${lead.id}`,
           'lead_enquiry_acknowledged',
         );
       }
