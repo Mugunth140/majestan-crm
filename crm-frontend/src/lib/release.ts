@@ -13,6 +13,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2.5.4",
+    date: "2026-11-20",
+    title: "Road name and property age on requirements",
+    changes: [
+      { kind: "new", text: "Requirements now have a Road name, picked from the road list in Master Registry, and a Property age: New / under construction, 1–5, 5–10 or 10+ years. Set them on the lead page or in the New Lead form. Land requirements don't ask for an age." },
+    ],
+  },
+  {
     version: "2.5.3",
     date: "2026-11-19",
     title: "Portal repeats in the Routing Queue",

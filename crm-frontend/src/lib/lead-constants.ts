@@ -152,6 +152,18 @@ export const FACING_OPTIONS = [
   { label: "North-East", value: "North-East" }, { label: "North-West", value: "North-West" },
   { label: "South-East", value: "South-East" }, { label: "South-West", value: "South-West" }, { label: "Any", value: "Any" },
 ];
+/** Age of the property the customer wants; the same buckets and values as the site search's `propertyAge` filter. */
+export const PROPERTY_AGE_OPTIONS = [
+  { label: "New / under construction", value: "new" },
+  { label: "1–5 years", value: "1-5" },
+  { label: "5–10 years", value: "5-10" },
+  { label: "10+ years", value: "10+" },
+];
+// Land has no building, so it has no age.
+const LAND_TYPES = ["plot", "commercial_land", "industrial_land"];
+/** Whether a requirement asks how old the property should be. */
+export const asksPropertyAge = (category?: string | null, type?: string | null) =>
+  category !== "agricultural" && !(type && LAND_TYPES.includes(type));
 export const DECISION_MAKERS = [
   "Self", "Spouse", "Father", "Mother", "Son", "Daughter", "Brother", "Sister", "Father-in-law", "Mother-in-law",
   "Business Partner", "Joint Family", "Other Relative",

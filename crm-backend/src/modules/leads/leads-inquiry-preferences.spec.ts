@@ -44,6 +44,15 @@ describe('LeadsService.updateInquiry preferencesPatch', () => {
     expect(result.preferences).toEqual({ bhk: '3', maxBudget: 9000000 });
   });
 
+  it('patches road name and property age like any other preference', async () => {
+    await service.updateInquiry(1, 5, { preferencesPatch: { roadName: 'Avinashi Road', propertyAge: '1-5' } });
+    expect(JSON.parse(query.mock.calls[0][1][0])).toEqual({ roadName: 'Avinashi Road', propertyAge: '1-5' });
+
+    query.mockClear();
+    await service.updateInquiry(1, 5, { preferencesPatch: { roadName: '' } });
+    expect(JSON.parse(query.mock.calls[0][1][0])).toEqual({ roadName: null });
+  });
+
   it('leaves preferences to a full replacement when one is sent', async () => {
     await service.updateInquiry(1, 5, { preferences: { bhk: '2' } });
     expect(saved.preferences).toEqual({ bhk: '2' });

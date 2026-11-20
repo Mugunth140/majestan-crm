@@ -9,7 +9,7 @@ import { apiFetch } from "@/lib/api-fetch";
 import { useDebounce } from "@/hooks/use-debounce";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { FormSelect } from "@/components/shared/form-select";
+import { FormSelect, SearchableFormSelect } from "@/components/shared/form-select";
 import { PriceInput } from "@/components/shared/price-input";
 import { DateTimePicker } from "@/components/shared/datetime-picker";
 import { SearchCombobox } from "@/components/shared/search-combobox";
@@ -20,8 +20,10 @@ import {
 } from "@/components/shared/focus-modal";
 import {
   AREA_CATEGORIES, BHK_OPTIONS, DECISION_MAKERS, FACING_OPTIONS, FUNDERS, FURNISHING_OPTIONS,
-  PROPERTY_CATEGORIES, PROPERTY_TYPES_MAP, PURCHASE_TIMELINES, PURCHASE_TYPES, QUALIFICATION_PURPOSES,
+  PROPERTY_AGE_OPTIONS, PROPERTY_CATEGORIES, PROPERTY_TYPES_MAP, PURCHASE_TIMELINES, PURCHASE_TYPES, QUALIFICATION_PURPOSES,
+  asksPropertyAge,
 } from "@/lib/lead-constants";
+import { loadRoadNames, type RoadNameOption } from "@/lib/road-names";
 import { parseIndianCurrency } from "@/lib/indian-currency";
 import { siteFieldValue, siteFieldsFor, siteFieldsTitle } from "@/lib/requirement-site-fields";
 import { joinProjects, searchProjects } from "@/lib/project-search";
@@ -48,7 +50,7 @@ const STEPS = [
 ] as const;
 type StepKey = (typeof STEPS)[number]["key"];
 
-type Prefs = Partial<Record<"minBudget" | "maxBudget" | "furnished" | "floorNumber" | "minArea" | "maxArea", string>> & {
+type Prefs = Partial<Record<"minBudget" | "maxBudget" | "furnished" | "floorNumber" | "minArea" | "maxArea" | "roadName" | "propertyAge", string>> & {
   bhk?: string[];
   facing?: string[];
   /** Commercial / industrial site needs (see requirement-site-fields). */
@@ -129,6 +131,7 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
     try { return JSON.parse(localStorage.getItem("crm_user") ?? "null"); } catch { return null; }
   });
   const [cities, setCities] = useState<{ id: number; city_name: string }[] | null>(null);
+  const [roadNames, setRoadNames] = useState<RoadNameOption[]>([]);
   const [sources, setSources] = useState<{ label: string; value: string }[] | null>(null);
   const [localities, setLocalities] = useState<{ id: number; locality_name: string }[]>([]);
   const [staff, setStaff] = useState<{ id: number; name: string; department?: { name?: string } }[] | null>(null);
@@ -162,6 +165,7 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
         setSources([...(s.success ? s.data : []), { label: "Others", value: "others" }]);
       })
       .catch(() => { if (live) { setCities([]); setSources([{ label: "Others", value: "others" }]); toast.error("Couldn't load cities and sources."); } });
+    loadRoadNames().then((r) => { if (live) setRoadNames(r); });
     return () => { live = false; };
   }, [open]);
 
@@ -270,6 +274,7 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
         const v = siteFieldValue(f, site[f.key]);
         if (v != null) prefs[f.key] = v;
       }
+      if (!asksPropertyAge(form.category, form.propertyType)) delete prefs.propertyAge;
       if (prefs.minBudget) prefs.minBudget = parseIndianCurrency(String(prefs.minBudget));
       if (prefs.maxBudget) prefs.maxBudget = parseIndianCurrency(String(prefs.maxBudget));
       const city = cities?.find((c) => String(c.id) === form.city)?.city_name ?? "";
@@ -482,6 +487,10 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
                   onValueChange={(v) => setForm((f) => ({ ...f, cityId: v, subLocations: [] }))} />
               )}
             </FocusField>
+            <FocusField label="Road name" optional>
+              <SearchableFormSelect name="roadName" placeholder="Select road" searchPlaceholder="Search roads…" className={SELECT}
+                value={form.prefs.roadName || null} options={roadNames} onValueChange={(v) => setPref("roadName", v)} />
+            </FocusField>
           </FieldRow>
           {form.cityId && (
             <FocusField label="Localities" optional>
@@ -524,6 +533,13 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
             <PriceInput value={p.maxBudget ?? ""} onChange={(v) => setPref("maxBudget", v)} placeholder="e.g. 1.2Cr" className={INPUT} />
           </FocusField>
         </FieldRow>
+        {asksPropertyAge(form.category, form.propertyType) && (
+          <FieldRow>
+            <FocusField label="Property age" optional>
+              <FormSelect name="propertyAge" placeholder="Any age" className={SELECT} value={p.propertyAge || null} options={PROPERTY_AGE_OPTIONS} onValueChange={(v) => setPref("propertyAge", v)} />
+            </FocusField>
+          </FieldRow>
+        )}
         {form.category === "residential" && (
           <>
             <FocusField label="BHK" optional hint="Pick every size the customer would consider.">

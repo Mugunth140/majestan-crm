@@ -88,11 +88,11 @@ describe("2.5.1", () => {
   });
 });
 
-describe("2.5.3", () => {
-  it("is the app version and announces portal repeats in the Routing Queue", async () => {
+describe("2.5.4", () => {
+  it("is the app version and announces road name and property age on requirements", async () => {
     const { APP_VERSION, RELEASES, releasesSince } = await import("@/lib/release");
-    expect(APP_VERSION).toBe("2.5.3");
-    expect(releasesSince("2.5.2", RELEASES).map((r) => r.version)).toEqual(["2.5.3"]);
-    expect(RELEASES[0].changes[0].text).toMatch(/^Leads from 99acres, Magicbricks and Excel imports all come into the Routing Queue/);
+    expect(APP_VERSION).toBe("2.5.4");
+    expect(releasesSince("2.5.3", RELEASES).map((r) => r.version)).toEqual(["2.5.4"]);
+    expect(RELEASES[0].changes[0].text).toMatch(/^Requirements now have a Road name/);
   });
 });

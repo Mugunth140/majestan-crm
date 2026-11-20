@@ -3,9 +3,10 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import {
-  AREA_CATEGORIES, BHK_OPTIONS as BHK, CAR_PARKING_OPTIONS, LIFT_OPTIONS, DECISION_MAKERS, FACING_OPTIONS as FACING, FUNDERS, FURNISHING_OPTIONS as FURNISHING, PROPERTY_CATEGORIES, PROPERTY_TYPES_MAP, PURCHASE_TIMELINES, PURCHASE_TYPES, QUALIFICATION_PURPOSES, facingList, prefList,
+  AREA_CATEGORIES, BHK_OPTIONS as BHK, CAR_PARKING_OPTIONS, LIFT_OPTIONS, DECISION_MAKERS, FACING_OPTIONS as FACING, FUNDERS, FURNISHING_OPTIONS as FURNISHING, PROPERTY_AGE_OPTIONS, PROPERTY_CATEGORIES, PROPERTY_TYPES_MAP, PURCHASE_TIMELINES, PURCHASE_TYPES, QUALIFICATION_PURPOSES, asksPropertyAge, facingList, prefList,
 } from "@/lib/lead-constants";
 import { formatIndianCurrencyShort, parseIndianCurrency } from "@/lib/indian-currency";
+import { loadRoadNames } from "@/lib/road-names";
 import { joinProjects, searchProjects, splitProjects } from "@/lib/project-search";
 import { siteFieldValue, siteFieldsFor, siteFieldsTitle, type SiteField } from "@/lib/requirement-site-fields";
 import { InlineCheck, InlineMulti, InlineSearchMulti, InlineSelect, InlineText, withCurrent, type Option } from "@/components/record/inline-field";
@@ -68,6 +69,7 @@ export function RequirementFields({ inquiry, canEdit, save }: {
   save: (patch: Record<string, unknown>) => Promise<unknown>;
 }) {
   const [cities, setCities] = useState<Option[]>([]);
+  const [roadNames, setRoadNames] = useState<Option[]>([]);
   const [localities, setLocalities] = useState<{ city: number; options: Option[] } | null>(null);
   const cityId = inquiry.city_id ?? null;
   const category = inquiry.property_category ?? null;
@@ -76,11 +78,14 @@ export function RequirementFields({ inquiry, canEdit, save }: {
   const facing = prefList(prefs.facing, FACING);
   // Older requirements hold one furnishing value; newer ones a list.
   const furnished = prefList(prefs.furnished, FURNISHING);
+  const roadName = typeof prefs.roadName === "string" ? prefs.roadName : null;
+  const propertyAge = typeof prefs.propertyAge === "string" ? prefs.propertyAge : null;
   const off = !canEdit;
 
   useEffect(() => {
     let live = true;
     loadCities().then((c) => { if (live) setCities(c.map((x) => ({ label: x.city_name, value: String(x.id) }))); });
+    loadRoadNames().then((r) => { if (live) setRoadNames(r); });
     return () => { live = false; };
   }, []);
 
@@ -134,6 +139,8 @@ export function RequirementFields({ inquiry, canEdit, save }: {
         <InlineMulti label="Locations" values={inquiry.sub_locations ?? []} options={localityOptions} disabled={off}
           placeholder={cityId ? "Select…" : "Pick a city first"} emptyHint={cityId ? "No localities for this city." : "Pick a city first."}
           onSave={(v) => save({ subLocations: v.length ? v : null })} />
+        <InlineSelect clearable searchable label="Road name" value={roadName} options={withCurrent(roadNames, roadName)} disabled={off}
+          onSave={(v) => setPref("roadName", v)} />
         <InlineSelect clearable label="Timeline" value={inquiry.purchase_timeline} options={PURCHASE_TIMELINES} disabled={off} onSave={(v) => save({ purchaseTimeline: v || null })} />
         <InlineSelect clearable label="Purpose" value={inquiry.qualification_purpose} options={QUALIFICATION_PURPOSES} disabled={off} onSave={(v) => save({ qualificationPurpose: v || null })} />
         <InlineSelect clearable label="Decision maker" value={inquiry.decision_maker} options={withCurrent(DECISION_MAKERS, inquiry.decision_maker)} disabled={off}
@@ -143,6 +150,10 @@ export function RequirementFields({ inquiry, canEdit, save }: {
       <Group title="Preferences">
         {budget("minBudget", "Min budget", "e.g. 50L")}
         {budget("maxBudget", "Max budget", "e.g. 1.2Cr")}
+        {asksPropertyAge(category, inquiry.property_type) && (
+          <InlineSelect clearable label="Property age" value={propertyAge} options={withCurrent(PROPERTY_AGE_OPTIONS, propertyAge)} disabled={off}
+            onSave={(v) => setPref("propertyAge", v)} />
+        )}
         {category === "residential" && (
           <>
             <InlineMulti label="BHK" values={bhk} options={withCurrentList(BHK, bhk)} disabled={off}
