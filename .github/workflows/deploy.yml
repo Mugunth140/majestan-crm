@@ -52,5 +52,6 @@ jobs:
     steps:
       - name: Trigger VPS Webhook
         run: |
-          curl -X POST "http://${{ secrets.SERVER_IP }}:9000/hooks/deploy-majestan" \
+          # HTTPS through Caddy, so the token is never sent in clear text.
+          curl --fail-with-body -X POST "https://api.prismark.in/hooks/deploy-majestan" \
                -H "X-Deploy-Token: ${{ secrets.WEBHOOK_SECRET }}"
