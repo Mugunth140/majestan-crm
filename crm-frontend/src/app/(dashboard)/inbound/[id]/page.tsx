@@ -11,6 +11,7 @@ import { canViewInboundContacts } from "@/lib/permissions";
 import { sortContactLogs } from "@/lib/contact-log-utils";
 import { formatIndianCurrencyShort, parseIndianCurrency } from "@/lib/indian-currency";
 import { INBOUND_STATUS_OPTIONS } from "@/lib/inbound-status";
+import { loadLeadSources } from "@/lib/lead-sources";
 import {
   ADVANCE_MONTHS, BHK_CHOICES, BROKERAGE_ACCEPTED, BROKERAGE_PAYERS, BROKERAGE_TYPES, INBOUND_CATEGORIES, INBOUND_PURPOSES, INDIAN_STATES,
   INBOUND_STATUSES, INBOUND_STATUS_TONES, INBOUND_TYPES, KEY_HOLDERS, PRIMARY_CONTACTS, SPECIAL_PURPOSES,
@@ -131,6 +132,7 @@ function InboundDetail() {
   const [activity, setActivity] = useState<ActivityEntry[] | null>(null);
   const [mailRefresh, setMailRefresh] = useState(0);
   const [cities, setCities] = useState<Option[]>([]);
+  const [sources, setSources] = useState<Option[]>([]);
   const [localities, setLocalities] = useState<{ city: string; options: Option[] } | null>(null);
   const [staff, setStaff] = useState<{ canAssign: boolean; people: { id: number; name: string }[] }>({ canAssign: false, people: [] });
   const [photoOpen, setPhotoOpen] = useState(false);
@@ -181,6 +183,7 @@ function InboundDetail() {
   useEffect(() => {
     let live = true;
     apiFetch(`${API_URL}/master/cities`).then((r) => r.json()).then((d) => { if (live && d.success) setCities(d.data); }).catch(() => {});
+    loadLeadSources().then((s) => { if (live) setSources(s); });
     apiJson<{ canAssign?: boolean; data?: { id: number; name: string }[] }>(`${API_URL}/inbounds/staff-list`)
       .then((r) => { if (live) setStaff({ canAssign: !!r.canAssign, people: r.data ?? [] }); })
       .catch(() => {});
@@ -359,6 +362,7 @@ function InboundDetail() {
           <InlineSelect label="Type" value={type} options={withCurrent((category && INBOUND_TYPES[category]) || [], type)} placeholder={category ? "Select…" : "Pick a category first"} disabled={!category} onSave={(v) => save({ property_type: v })} />
           {(hasBhk(category, type) || inbound.bhk) && <InlineSelect label="BHK" value={inbound.bhk} options={withCurrent(BHK_CHOICES, inbound.bhk)} onSave={(v) => save({ bhk: v })} />}
           <InlineSelect label="Purpose" value={inbound.purpose} options={withCurrent(INBOUND_PURPOSES, inbound.purpose)} onSave={(v) => save({ purpose: v })} />
+          <InlineSelect clearable searchable label="Source" value={inbound.source} options={withCurrent(sources, inbound.source)} onSave={(v) => save({ source: v || null })} />
           {(category === "commercial" || special.length > 0) && (
             <InlineMulti label="Suits" values={special} options={[...new Set([...SPECIAL_PURPOSES, ...special])].map((s) => ({ label: s, value: s }))} onSave={(v) => save({ special_purpose: v.length ? v.join(", ") : null })} />
           )}

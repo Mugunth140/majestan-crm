@@ -4,16 +4,16 @@ import { EMPTY_INBOUND, checkInbound, inboundPayload, normalizeCategoryAndType, 
 const form = (patch: Partial<InboundForm>): InboundForm => ({ ...EMPTY_INBOUND, ...patch });
 
 describe("inbound quick capture (phone)", () => {
-  it("needs a category, type and a 10-15 digit mobile", () => {
-    expect(Object.keys(checkInbound("capture", form({})))).toEqual(["category", "type", "mobile"]);
-    expect(checkInbound("capture", form({ category: "commercial", type: "office", mobile: "+91 98765 43210" }))).toEqual({});
-    expect(checkInbound("capture", form({ category: "commercial", type: "office", mobile: "98765" })).mobile).toBeTruthy();
+  it("needs a category, type, purpose and a 10-15 digit mobile; source is optional", () => {
+    expect(Object.keys(checkInbound("capture", form({})))).toEqual(["category", "type", "purpose", "mobile"]);
+    expect(checkInbound("capture", form({ category: "commercial", type: "office", purpose: "Lease", mobile: "+91 98765 43210" }))).toEqual({});
+    expect(checkInbound("capture", form({ category: "commercial", type: "office", purpose: "Rent", mobile: "98765" })).mobile).toBeTruthy();
   });
 
   it("sends only what the phone asks for", () => {
-    const body = inboundPayload(form({ category: "residential", type: "villa", mobile: " 9876543210 ", inbound_status: "available", alternate_contact: "9000000000", owner_name: "ignored" }), true);
+    const body = inboundPayload(form({ category: "residential", type: "villa", purpose: "Sale", source: "99acres", mobile: " 9876543210 ", inbound_status: "available", alternate_contact: "9000000000", owner_name: "ignored" }), true);
     expect(body).toEqual({
-      quick_capture: true, property_category: "residential", property_type: "villa", mobile_number: "9876543210",
+      quick_capture: true, property_category: "residential", property_type: "villa", purpose: "Sale", source: "99acres", mobile_number: "9876543210",
       inbound_status: "available", alternate_contact: "9000000000", alternative_contact: null,
     });
   });
@@ -45,7 +45,8 @@ describe("inbound full form", () => {
       category: "commercial", type: "shop", purpose: "Rent", total_rent: "40000", advance: "6", special: ["Gym"],
       units: [{ floor_label: "Ground", area: "800 sq ft", price: "40000", notes: "" }, { floor_label: " ", area: "", price: "", notes: "" }],
     }));
-    expect(body).toMatchObject({ total_rent: 40000, advance: "6", special_purpose: "Gym", sale_price: null });
+    expect(body).toMatchObject({ total_rent: 40000, advance: "6", special_purpose: "Gym", sale_price: null, source: null });
+    expect(inboundPayload(form({ source: "Magic Bricks" })).source).toBe("Magic Bricks");
     expect(body.units).toEqual([{ floor_label: "Ground", area: "800 sq ft", price: 40000, notes: null }]);
   });
 });

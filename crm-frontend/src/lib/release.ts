@@ -13,6 +13,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2.5.5",
+    date: "2026-11-21",
+    title: "Purpose and source on new inbounds",
+    changes: [
+      { kind: "new", text: "Adding an inbound from your phone now asks for the Purpose (Sale, Rent or Lease) and the Source, such as 99acres or Magic Bricks. Sources come from the Lead Sources list in Master Registry. The source shows on the inbound's page and in inbound reports, and the desktop form asks for it too." },
+    ],
+  },
+  {
     version: "2.5.4",
     date: "2026-11-20",
     title: "Road name and property age on requirements",

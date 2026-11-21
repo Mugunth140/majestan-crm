@@ -131,7 +131,7 @@ export function inboundErrorMessage(result: unknown): string | undefined {
 export type FloorRow = { floor_label: string; area: string; price: string; notes: string };
 
 export const EMPTY_INBOUND = {
-  property_title: "", category: "", type: "", bhk: "", purpose: "", special: [] as string[],
+  property_title: "", category: "", type: "", bhk: "", purpose: "", source: "", special: [] as string[],
   status: "New Inbound", inbound_status: "",
   state: "Tamil Nadu", city: "", locality: "", area: "", landmark: "", latitude: "", longitude: "",
   total_rent: "", sale_price: "", advance: "", rent_per_sqft: "", floor_number: "", units: [] as FloorRow[],
@@ -165,6 +165,7 @@ export function checkInbound(step: InboundStep, f: InboundForm): Record<string, 
     need("category", "Pick a property category.");
     need("type", "Pick a property type.");
   }
+  if (step === "capture") need("purpose", "Pick sale, rent or lease.");
   if (step === "capture" && !MOBILE.test(f.mobile.trim())) e.mobile = "Enter a mobile number with 10 to 15 digits.";
   if (step === "property") {
     need("property_title", "Give the property a title.");
@@ -232,6 +233,8 @@ export function inboundPayload(f: InboundForm, quick = false): Record<string, un
       quick_capture: true,
       property_category: f.category,
       property_type: f.type,
+      purpose: f.purpose,
+      source: f.source || null,
       mobile_number: f.mobile.trim(),
       inbound_status: f.inbound_status || null,
       alternate_contact: text(f.alternate_contact),
@@ -246,6 +249,7 @@ export function inboundPayload(f: InboundForm, quick = false): Record<string, un
     property_type: f.type,
     bhk: hasBhk(f.category, f.type) ? f.bhk || null : null,
     purpose: f.purpose,
+    source: f.source || null,
     special_purpose: f.category === "commercial" && f.special.length ? f.special.join(", ") : null,
     status: f.status,
     inbound_status: f.inbound_status || null,

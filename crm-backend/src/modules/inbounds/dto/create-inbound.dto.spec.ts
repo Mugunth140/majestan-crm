@@ -132,6 +132,15 @@ describe('CreateInboundDto (inbound form contract)', () => {
     expect(errors).toEqual([]);
   });
 
+  it('keeps the purpose and source a phone quick capture sends', async () => {
+    const payload = { quick_capture: true, property_category: 'residential', property_type: 'villa', purpose: 'Lease', source: 'Magic Bricks', mobile_number: '9876543210' };
+    const dto = plainToInstance(CreateInboundDto, payload);
+    expect(await validate(dto as object, { whitelist: true })).toHaveLength(0);
+    expect(dto).toMatchObject({ purpose: 'Lease', source: 'Magic Bricks' });
+    expect(await pipeValidate(CreateInboundDto, { ...payload, source: null })).toHaveLength(0);
+    expect((await pipeValidate(CreateInboundDto, { ...payload, source: 'x'.repeat(101) })).map(e => e.property)).toContain('source');
+  });
+
   it('accepts a minimal payload with category and mobile number', async () => {
     const errors = await pipeValidate(CreateInboundDto, { property_category: 'commercial', mobile_number: '+91 98765 43210' });
     expect(errors).toEqual([]);

@@ -49,6 +49,10 @@ export class Inbound {
   @Column({ type: 'varchar', nullable: true })
   purpose: string;
 
+  /** Where the inbound came from: a lead source name from Master Registry. Migration 088. */
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  source: string | null;
+
   @Column({ type: 'varchar', nullable: true })
   bhk: string;
 

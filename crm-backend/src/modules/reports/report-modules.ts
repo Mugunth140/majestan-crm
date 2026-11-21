@@ -100,6 +100,7 @@ const inbound: ReportModule = {
     lst('category', 'Category', 'i.property_category'),
     lst('type', 'Property type', 'i.property_type', 'text', true),
     lst('purpose', 'Purpose', 'i.purpose', 'text', true),
+    lst('source', 'Source', 'i.source'),
     lst('bhk', 'BHK', 'i.bhk'),
     lst('floor', 'Floor', 'i.floor_number'),
     lst('city', 'City', 'i.city', 'text', true),

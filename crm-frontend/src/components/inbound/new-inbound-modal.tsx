@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Camera, Loader2, MapPin, Plus, UploadCloud, X } from "lucide-react";
 import { apiFetch } from "@/lib/api-fetch";
 import { inboundLocation } from "@/lib/inbound-location";
+import { loadLeadSources, type SourceOption } from "@/lib/lead-sources";
 import { setPersistedState } from "@/hooks/use-persisted-state";
 import { INBOUND_STATUS_OPTIONS } from "@/lib/inbound-status";
 import { Input } from "@/components/ui/input";
@@ -100,6 +101,7 @@ export function NewInboundModal({ open, onOpenChange, onCreated, quick = false }
   const [photo, setPhoto] = useState<{ file: File; url: string } | null>(null);
   const [locating, setLocating] = useState(false);
   const [cities, setCities] = useState<{ label: string; value: string }[] | null>(null);
+  const [sources, setSources] = useState<SourceOption[]>([]);
   const [localities, setLocalities] = useState<{ city: string; options: { label: string; value: string }[] } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -140,6 +142,13 @@ export function NewInboundModal({ open, onOpenChange, onCreated, quick = false }
       .catch(() => {});
     return () => { live = false; };
   }, [form.city]);
+
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    loadLeadSources().then((s) => { if (live) setSources(s); });
+    return () => { live = false; };
+  }, [open]);
 
   // The phone form starts listening for a location as soon as it opens.
   useEffect(() => {
@@ -270,6 +279,18 @@ export function NewInboundModal({ open, onOpenChange, onCreated, quick = false }
     </FieldRow>
   );
 
+  const purposeField = (
+    <FocusField required name="purpose" label="Purpose" error={errors.purpose}>
+      <FormSelect name="purpose" placeholder="Sale, rent or lease" className={SELECT} value={form.purpose || null} options={INBOUND_PURPOSES} onValueChange={(v) => set("purpose", v)} />
+    </FocusField>
+  );
+  const sourceField = (
+    <FocusField label="Source" optional>
+      <SearchableFormSelect name="source" placeholder="99acres, Magic Bricks…" searchPlaceholder="Search sources…" className={SELECT}
+        value={form.source || null} options={sources} onValueChange={(v) => set("source", v)} />
+    </FocusField>
+  );
+
   const photoField = (
     <FocusField label="Property photo" optional hint="A clear photo of the front. Its GPS position fills in the location when the phone saved one.">
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" onChange={pickPhoto} className="hidden" />
@@ -297,6 +318,10 @@ export function NewInboundModal({ open, onOpenChange, onCreated, quick = false }
     body = (
       <FocusSection title="Quick capture" description="The basics now; the rest can be filled in from the inbound's page.">
         {categoryFields}
+        <FieldRow>
+          {purposeField}
+          {sourceField}
+        </FieldRow>
         <FocusField required name="mobile" label="Owner's mobile" htmlFor="ni-mobile" error={errors.mobile}>
           <Input id="ni-mobile" type="tel" inputMode="tel" autoComplete="tel" value={form.mobile} onChange={(e) => set("mobile", e.target.value)} placeholder="98765 43210" className={INPUT} />
         </FocusField>
@@ -322,15 +347,14 @@ export function NewInboundModal({ open, onOpenChange, onCreated, quick = false }
         </FocusField>
         {categoryFields}
         <FieldRow>
-          <FocusField required name="purpose" label="Purpose" error={errors.purpose}>
-            <FormSelect name="purpose" placeholder="Sale, rent or lease" className={SELECT} value={form.purpose || null} options={INBOUND_PURPOSES} onValueChange={(v) => set("purpose", v)} />
-          </FocusField>
+          {purposeField}
           {hasBhk(form.category, form.type) && (
             <FocusField label="BHK" optional>
               <FormSelect name="bhk" placeholder="Select" className={SELECT} value={form.bhk || null} options={BHK_CHOICES} onValueChange={(v) => set("bhk", v)} />
             </FocusField>
           )}
         </FieldRow>
+        {sourceField}
         {form.category === "commercial" && (
           <FocusField label="Suits" optional hint="Uses the space is fit for.">
             <Chips options={SPECIAL_PURPOSES} value={form.special} onChange={(v) => set("special", v)} />

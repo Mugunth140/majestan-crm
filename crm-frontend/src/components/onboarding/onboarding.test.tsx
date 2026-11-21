@@ -88,11 +88,11 @@ describe("2.5.1", () => {
   });
 });
 
-describe("2.5.4", () => {
-  it("is the app version and announces road name and property age on requirements", async () => {
+describe("2.5.5", () => {
+  it("is the app version and announces purpose and source on new inbounds", async () => {
     const { APP_VERSION, RELEASES, releasesSince } = await import("@/lib/release");
-    expect(APP_VERSION).toBe("2.5.4");
-    expect(releasesSince("2.5.3", RELEASES).map((r) => r.version)).toEqual(["2.5.4"]);
-    expect(RELEASES[0].changes[0].text).toMatch(/^Requirements now have a Road name/);
+    expect(APP_VERSION).toBe("2.5.5");
+    expect(releasesSince("2.5.4", RELEASES).map((r) => r.version)).toEqual(["2.5.5"]);
+    expect(RELEASES[0].changes[0].text).toMatch(/^Adding an inbound from your phone now asks for the Purpose/);
   });
 });

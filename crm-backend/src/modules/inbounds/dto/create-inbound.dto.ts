@@ -299,8 +299,10 @@ export class CreateInboundDto {
   @IsString({ each: true })
   listed_on?: string[];
 
+  /** A lead source name from Master Registry (99acres, Magic Bricks...). */
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   source?: string;
 
   // Set server-side for Staff role from the JWT identity, which may arrive
