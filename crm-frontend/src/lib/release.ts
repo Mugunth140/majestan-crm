@@ -13,6 +13,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2.5.7",
+    date: "2026-11-24",
+    title: "Correct Contacted count in the lead funnel",
+    changes: [
+      { kind: "fixed", text: "The Lead-to-booking funnel and Leads by source no longer count every lead as Contacted. A lead counts once someone reaches the customer: a call that connected, a message or follow-up from a person, or a status change. The automatic follow-up on new leads and unanswered calls don't count." },
+    ],
+  },
+  {
     version: "2.5.6",
     date: "2026-11-24",
     title: "Status progress and lead requirements on the dashboard",

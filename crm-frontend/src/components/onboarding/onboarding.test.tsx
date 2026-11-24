@@ -96,12 +96,19 @@ describe("2.5.5", () => {
 });
 
 describe("2.5.6", () => {
-  it("is the app version and announces the dashboard status progress and requirements", async () => {
-    const { APP_VERSION, RELEASES, releasesSince } = await import("@/lib/release");
-    expect(APP_VERSION).toBe("2.5.6");
-    expect(releasesSince("2.5.5", RELEASES).map((r) => r.version)).toEqual(["2.5.6"]);
-    const text = RELEASES[0].changes.map((c) => c.text).join(" ");
+  it("announces the dashboard status progress and requirements", async () => {
+    const { RELEASES } = await import("@/lib/release");
+    const text = RELEASES.find((r) => r.version === "2.5.6")!.changes.map((c) => c.text).join(" ");
     expect(text).toMatch(/Progress tab/);
     expect(text).toMatch(/Lead requirements/);
+  });
+});
+
+describe("2.5.7", () => {
+  it("is the app version and announces the Contacted fix", async () => {
+    const { APP_VERSION, RELEASES, releasesSince } = await import("@/lib/release");
+    expect(APP_VERSION).toBe("2.5.7");
+    expect(releasesSince("2.5.6", RELEASES).map((r) => r.version)).toEqual(["2.5.7"]);
+    expect(RELEASES[0].changes[0].text).toMatch(/no longer count every lead as Contacted/);
   });
 });

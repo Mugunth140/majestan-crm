@@ -607,10 +607,16 @@ export function leadCohort({ range }: Ctx, owners?: string) {
     SELECT id, COALESCE(NULLIF(TRIM(lead_source), ''), 'Unknown') AS source, status, created_at FROM leads
      WHERE created_at >= ${utcStart(range.from)} AND created_at < ${end(range)} ${owners ? `AND assigned_staff_id IN (${owners})` : ''}
   ), touched AS (
-    SELECT DISTINCT entity_id AS lead_id FROM all_contacts WHERE entity = 'lead'
-    UNION SELECT DISTINCT lead_id FROM lead_follow_ups
+    -- Reached the customer: a call that connected, a message or follow-up from a person, or a
+    -- status move off New Lead. The follow-up created with every new lead has no author, and
+    -- unanswered dials have no duration, so neither counts.
+    SELECT DISTINCT entity_id AS lead_id FROM all_contacts
+     WHERE entity = 'lead' AND sent_by_id IS NOT NULL AND (contact_type <> 'call' OR COALESCE(call_duration, 0) > 0)
+    UNION SELECT DISTINCT lead_id FROM lead_follow_ups WHERE created_by_id IS NOT NULL
+    UNION SELECT DISTINCT lead_id FROM lead_events WHERE type = 'status_changed' AND to_value NOT IN ('New Lead', 'Converted')
   ), j AS (
-    SELECT l.id, l.source, CASE WHEN t.lead_id IS NULL THEN 0 ELSE 1 END AS contacted,
+    SELECT l.id, l.source,
+      CASE WHEN t.lead_id IS NOT NULL OR l.status NOT IN ('New Lead', 'Converted') THEN 1 ELSE 0 END AS contacted,
       ${reached('qualified', [...QUALIFIED, 'Property Shared', 'Site Visit Scheduled', 'Site Visit Completed', 'Re Visit Scheduled', 'Re Visit Completed', 'Negotiation', ...BOOKED])},
       ${reached('sv_sched', ['Site Visit Scheduled', 'Site Visit Completed', 'Re Visit Scheduled', 'Re Visit Completed', 'Negotiation', ...BOOKED])},
       ${reached('sv_done', ['Site Visit Completed', 'Re Visit Scheduled', 'Re Visit Completed', 'Negotiation', ...BOOKED])},
