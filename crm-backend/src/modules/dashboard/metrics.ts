@@ -178,6 +178,73 @@ export const DEPT_METRICS: Record<DeptKey, MetricDef[]> = {
   other: [M.calls_out, M.connected, M.followups_logged, M.unique_leads, M.ontime],
 };
 
+/** One step of a status journey: the counter that says how many records reached it. */
+export type JourneyStageDef = {
+  key: string; label: string; detail: string; counter: string;
+  /** A step not every record needs (a revisit), so falling short of it is no drop-off. */
+  optional?: boolean;
+  /** How the summary sentence says this step, for one and for many; {n} is the count. */
+  say: [string, string];
+};
+export type JourneyDef = {
+  title: string; noun: string; stages: JourneyStageDef[]; exits: JourneyStageDef[];
+  /** Which records the journey follows, and the steps drawn on its trend chart. */
+  kind: 'lead' | 'inbound' | 'hr'; trend: string[];
+};
+
+const leadJourney: JourneyDef = {
+  title: 'Lead journey',
+  noun: 'leads',
+  kind: 'lead',
+  trend: ['new', 'contacted', 'qualified', 'sv_sched', 'sv_done'],
+  stages: [
+    { key: 'new', label: 'New leads', detail: 'Leads given to them to work', counter: 'assigned_n', say: ['got {n} new lead', 'got {n} new leads'] },
+    { key: 'contacted', label: 'Contacted', detail: 'Spoke to the customer', counter: 'ev_contacted', say: ['contacted {n}', 'contacted {n}'] },
+    { key: 'qualified', label: 'Qualified', detail: 'Budget and need confirmed', counter: 'ev_qualified_only', say: ['qualified {n}', 'qualified {n}'] },
+    { key: 'shared', label: 'Property shared', detail: 'Matching properties sent', counter: 'ev_shared', say: ['shared properties with {n}', 'shared properties with {n}'] },
+    { key: 'interested', label: 'Interested', detail: 'Customer liked a property', counter: 'ev_interested', say: ['found {n} interested', 'found {n} interested'] },
+    { key: 'sv_sched', label: 'Site visit scheduled', detail: 'Visit booked with the customer', counter: 'ev_sv_sched', say: ['scheduled {n} site visit', 'scheduled {n} site visits'] },
+    { key: 'sv_done', label: 'Site visit done', detail: 'Customer saw the property', counter: 'ev_sv_done', say: ['completed {n} site visit', 'completed {n} site visits'] },
+    { key: 'revisit', label: 'Revisit', detail: 'Came back for another look', optional: true, counter: 'ev_revisit', say: ['had {n} revisit', 'had {n} revisits'] },
+  ],
+  exits: [{ key: 'dropped', label: 'Dropped out', detail: 'Not interested, dropped or lost', counter: 'ev_dropped', say: ['{n} lead dropped out', '{n} leads dropped out'] }],
+};
+
+/** The status journey on a person's Progress tab, for departments that work a module with statuses. */
+export const STATUS_JOURNEYS: Partial<Record<DeptKey, JourneyDef>> = {
+  telecalling: leadJourney,
+  sales: leadJourney,
+  sourcing: {
+    title: 'Inbound journey',
+    noun: 'inbounds',
+    kind: 'inbound',
+    trend: ['added', 'available', 'fixed', 'done'],
+    stages: [
+      { key: 'added', label: 'New inbounds', detail: 'Properties they added', counter: 'src_added', say: ['added {n} inbound', 'added {n} inbounds'] },
+      { key: 'available', label: 'Available', detail: 'Owner confirmed it is on the market', counter: 'inb_available', say: ['confirmed {n} available', 'confirmed {n} available'] },
+      { key: 'fixed', label: 'Sent for verification', detail: 'Handed to the verification team', counter: 'inb_fixed', say: ['sent {n} for verification', 'sent {n} for verification'] },
+      { key: 'done', label: 'Verification done', detail: 'Checked and ready to list', counter: 'inb_done', say: ['finished {n} verification', 'finished {n} verifications'] },
+    ],
+    exits: [{ key: 'na', label: 'Not available', detail: 'Sold, let out or withdrawn', counter: 'inb_na', say: ['{n} inbound was not available', '{n} inbounds were not available'] }],
+  },
+  hr: {
+    title: 'Hiring journey',
+    noun: 'candidates',
+    kind: 'hr',
+    trend: ['apps', 'short', 'int_sched', 'offer', 'joined'],
+    stages: [
+      { key: 'apps', label: 'New candidates', detail: 'Applications given to them', counter: 'hr_apps', say: ['got {n} new candidate', 'got {n} new candidates'] },
+      { key: 'short', label: 'Resume shortlisted', detail: 'Profile fits the role', counter: 'hr_shortlisted', say: ['shortlisted {n}', 'shortlisted {n}'] },
+      { key: 'int_sched', label: 'Interview scheduled', detail: 'Interview date fixed', counter: 'hr_int_sched', say: ['scheduled {n} interview', 'scheduled {n} interviews'] },
+      { key: 'int_done', label: 'Interview completed', detail: 'Candidate was interviewed', counter: 'hr_int_done', say: ['completed {n} interview', 'completed {n} interviews'] },
+      { key: 'selected', label: 'Selected', detail: 'Cleared the interview', counter: 'hr_selected', say: ['selected {n}', 'selected {n}'] },
+      { key: 'offer', label: 'Offer sent', detail: 'Offer letter released', counter: 'hr_offers', say: ['sent {n} offer', 'sent {n} offers'] },
+      { key: 'joined', label: 'Joined', detail: 'Started work', counter: 'hr_joined', say: ['saw {n} join', 'saw {n} join'] },
+    ],
+    exits: [{ key: 'rejected', label: 'Rejected', detail: 'Not taken forward', counter: 'hr_rejected', say: ['{n} candidate was rejected', '{n} candidates were rejected'] }],
+  },
+};
+
 /** Headline tiles per department, in reading order. */
 export const HEADLINE: Record<DeptKey, string[]> = {
   telecalling: ['calls_out', 'conn_rate', 'first_resp', 'qualified', 'sv_sched', 'ontime', 'neglected', 'crm'],

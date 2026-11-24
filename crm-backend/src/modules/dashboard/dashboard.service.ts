@@ -14,7 +14,7 @@ import {
 import * as Q from './sql';
 import {
   addCounters, compute, DEPARTMENTS, DEPT_METRICS, deptKeyOf, deptLabel, HEADLINE, median, percentile,
-  SCORE_METRICS, type Counters, type DeptKey, type MetricDef,
+  SCORE_METRICS, STATUS_JOURNEYS, type Counters, type DeptKey, type JourneyDef, type JourneyStageDef, type MetricDef,
 } from './metrics';
 import { hrTab, sourcingTab } from './module-tabs';
 import { changeInsights, outlierInsights, targetInsights, workloadInsights } from './insights';
@@ -40,6 +40,17 @@ type Data = {
 const ALL_DEFS: Map<string, MetricDef> = new Map(
   Object.values(DEPT_METRICS).flat().map(d => [d.key, d]),
 );
+const PURPOSE_LABELS: Record<string, string> = {
+  buy: 'Buy', rental: 'Rent', sale: 'Sell', construction: 'Construction', liasioning: 'Liaisoning', property_management: 'Property management', unknown: 'Not set',
+};
+const TIMELINE_LABELS: Record<string, string> = {
+  immediate: 'Immediately', within_30_days: 'Within 30 days', '3_months': 'In 3 months', '6_months': 'In 6 months', just_enquiry: 'Just enquiring',
+};
+const titleCase = (v: string) => (v === 'unknown' ? 'Not set' : v.replace(/_/g, ' ').replace(/^./, ch => ch.toUpperCase()));
+/** Readable names for raw statuses in the "where they stand now" chart. */
+const MIX_LABELS: Record<string, string> = {
+  available: 'Available', not_available: 'Not available', fixed_verification: 'Fixed verification', verification_done: 'Verification done', none: 'Not set',
+};
 const SERIES_LABELS: Record<string, string> = {
   calls: 'Calls', connected: 'Connected', talk: 'Talk minutes', followups: 'Follow-ups', qualified: 'Qualified',
   sv_sched: 'Visits scheduled', sv_done: 'Visits completed', nego: 'Negotiations', booked: 'Bookings', dropped: 'Dropped',
@@ -243,7 +254,7 @@ export class DashboardService {
   private async counters(ctx: Q.Ctx): Promise<Map<number, PeriodCounters>> {
     const periodQueries = [
       Q.callCounters, Q.touchCounters, Q.followUpDiscipline, Q.statusCounters, Q.responseCounters, Q.crmCompliance,
-      Q.handoffCounters, Q.visitAttendance, Q.salesJourneys, Q.sourcingCounters, Q.verificationCounters, Q.hrCounters, Q.manualTaskCounters,
+      Q.handoffCounters, Q.visitAttendance, Q.salesJourneys, Q.sourcingCounters, Q.verificationCounters, Q.inboundStatusCounters, Q.hrCounters, Q.manualTaskCounters,
       Q.leadWorkCounters,
     ];
     const [snapshot, ...results] = await Promise.all([
@@ -795,6 +806,21 @@ export class DashboardService {
     const sections: Section[] = [
       { id: 'hero', title: viewingSelf ? `Good to see you, ${person.name.split(' ')[0]}` : person.name, blocks: [{ kind: 'progress', id: 'hero', title: 'Progress', span: 'full', hero }] },
     ];
+    const journey = STATUS_JOURNEYS[dept];
+    if (journey) {
+      const cur = this.sum(data, [person.id], 'cur');
+      const prev = this.sum(data, [person.id], 'prev');
+      const stage = (d: JourneyStageDef) => ({ key: d.key, label: d.label, detail: d.detail, say: d.say, optional: d.optional, value: cur[d.counter] ?? 0, prev: prev[d.counter] ?? 0 });
+      sections.push({
+        id: 'journey', title: journey.title, hideHeader: true,
+        blocks: [{
+          kind: 'journey', id: 'journey', title: journey.title, span: 'full', noun: journey.noun,
+          person: viewingSelf ? 'You' : person.name.split(' ')[0], self: viewingSelf,
+          period: { from: data.range.from, to: data.range.to, prevFrom: data.range.prevFrom, prevTo: data.range.prevTo },
+          stages: journey.stages.map(stage), exits: journey.exits.map(stage),
+        }, ...(await this.journeyCharts(journey, person, data))],
+      });
+    }
     if (deptPeers.length > 1) {
       sections.push({ id: 'team-board', title: viewingSelf ? 'Your team' : `${deptLabel(dept)} team`, description: 'Everyone in the department, ranked on the same score.', blocks: [this.leaderboard('dept-board', `${deptLabel(dept)} leaderboard`, dept, deptPeers, data)] });
     }
@@ -810,6 +836,81 @@ export class DashboardService {
       { id: 'actions', title: 'Priority actions', blocks: [await this.queue('person-queue', 'Leads to work next', [person], data.range, 15)] },
     );
     return sections;
+  }
+
+  /** What customers asked for in the period's lead requirements, for the Overview. */
+  private async requirementsSection(ctx: Q.Ctx): Promise<Section> {
+    const [counts, mix, series] = await Promise.all([
+      this.store.query<Record<string, number | string>>(Q.requirementCounters(ctx)),
+      this.store.query<{ dim: string; label: string; value: number }>(Q.requirementMix(ctx)),
+      this.store.query<{ t: string; k: string; n: number }>(Q.requirementSeries(ctx)),
+    ]);
+    const c = (p: 'cur' | 'prev') => Object.fromEntries(Object.entries(counts.find(r => r.p === p) ?? {}).map(([k, v]) => [k, Number(v) || 0]));
+    const [cur, prev] = [c('cur'), c('prev')];
+    const share = (k: string, x: Counters) => (x.n ? Math.round(((x[k] ?? 0) / x.n) * 100) : null);
+    const avg = (sum: string, n: string, x: Counters) => (x[n] ? Math.round((x[sum] ?? 0) / x[n]) : null);
+    const tile = (key: string, label: string, fmt: MetricOut['fmt'], value: (x: Counters) => number | null, hint?: string): MetricOut =>
+      ({ key, label, fmt, better: fmt === 'inr' ? 'none' : 'up', value: value(cur), prev: value(prev), hint });
+    const dim = (d: string) => mix.filter(m => m.dim === d);
+    const bars = (d: string, name: (v: string) => string = v => v, limit = 10): Bar[] =>
+      dim(d).slice(0, limit).map(m => ({ label: name(m.label), value: Number(m.value) }));
+    // Budget bands arrive as "order|label" so they read low to high.
+    const bands = (d: string): Bar[] => dim(d).map(m => { const [o, l] = m.label.split('|'); return { o: Number(o), label: l, value: Number(m.value) }; })
+      .sort((a, b) => a.o - b.o).map(({ label, value }) => ({ label, value }));
+    const byT = new Map<string, Record<string, number>>();
+    for (const r of series) byT.set(r.t, { ...(byT.get(r.t) ?? {}), [r.k]: Number(r.n) });
+    const kinds = [{ key: 'buy', label: 'Buy' }, { key: 'rent', label: 'Rent' }, { key: 'other', label: 'Other' }];
+    return {
+      id: 'requirements', title: 'Lead requirements', description: 'What customers asked for in requirements added in the period.',
+      blocks: [
+        { kind: 'kpis', id: 'req-kpis', title: 'Requirements', span: 'full', metrics: [
+          tile('req_n', 'Requirements added', 'n', x => x.n ?? 0),
+          tile('req_buy', 'Looking to buy', 'n', x => x.buy ?? 0),
+          tile('req_rent', 'Looking to rent', 'n', x => x.rent ?? 0),
+          tile('req_complete', 'Complete requirements', 'pct', x => share('complete_n', x), 'Property type, budget and location all filled in'),
+          tile('req_buy_budget', 'Avg buying budget', 'inr', x => avg('buy_budget_sum', 'buy_budget_n', x)),
+          tile('req_rent_budget', 'Avg monthly rent budget', 'inr', x => avg('rent_budget_sum', 'rent_budget_n', x)),
+          tile('req_budget', 'With a budget', 'pct', x => share('budget_n', x)),
+          tile('req_loc', 'With a location', 'pct', x => share('loc_n', x)),
+        ] },
+        { kind: 'trend', id: 'req-trend', title: 'Requirements over time', subtitle: 'Added in the period, by what the customer wants', span: 'twoThirds', fmt: 'n',
+          series: kinds, bucket: ctx.range.bucket,
+          points: this.buckets(ctx.range).map(t => ({ t, v: Object.fromEntries(kinds.map(k => [k.key, byT.get(t)?.[k.key] ?? 0])) })) },
+        { kind: 'donut', id: 'req-purpose', title: 'Buy, rent or other', span: 'third', centerLabel: 'Requirements',
+          slices: dim('purpose').map(m => ({ label: PURPOSE_LABELS[m.label] ?? titleCase(m.label), value: Number(m.value) })) },
+        { kind: 'bars', id: 'req-types', title: 'Most wanted property types', span: 'half', fmt: 'n', bars: bars('type', titleCase) },
+        { kind: 'bars', id: 'req-locations', title: 'Most asked locations', span: 'half', fmt: 'n', bars: bars('location') },
+        { kind: 'bars', id: 'req-buy-budget', title: 'Buying budget', subtitle: 'Requirements to buy, by budget', span: 'half', fmt: 'n', bars: bands('buy_budget') },
+        { kind: 'bars', id: 'req-rent-budget', title: 'Monthly rent budget', subtitle: 'Requirements to rent, by budget', span: 'half', fmt: 'n', bars: bands('rent_budget') },
+        { kind: 'bars', id: 'req-bhk', title: 'BHK asked for', span: 'third', fmt: 'n', bars: bars('bhk', v => (/^\d+$/.test(v) ? `${v} BHK` : titleCase(v))).sort((a, b) => a.label.localeCompare(b.label, 'en', { numeric: true })) },
+        { kind: 'bars', id: 'req-timeline', title: 'How soon they want it', span: 'third', fmt: 'n', bars: bars('timeline', v => TIMELINE_LABELS[v] ?? titleCase(v)) },
+        { kind: 'bars', id: 'req-roads', title: 'Most asked roads', span: 'third', fmt: 'n', bars: bars('road') },
+      ],
+    };
+  }
+
+  /** Charts under the journey: its steps over time, where the records stand now, and this period against the last. */
+  private async journeyCharts(journey: JourneyDef, person: Person, data: Data): Promise<Block[]> {
+    const ctx: Q.Ctx = { ids: Q.idList([person.id]), range: data.range, now: Q.nowLiteral() };
+    const [rows, mix] = await Promise.all([
+      this.store.query<{ t: string; k: string; n: number }>(Q.journeySeries(ctx, journey.kind)),
+      this.store.query<{ label: string; value: number }>(Q.journeyMix(ctx, journey.kind)),
+    ]);
+    const byT = new Map<string, Record<string, number>>();
+    for (const r of rows) byT.set(r.t, { ...(byT.get(r.t) ?? {}), [r.k]: Number(r.n) });
+    const label = new Map([...journey.stages, ...journey.exits].map(d => [d.key, d.label]));
+    const points = this.buckets(data.range).map(t => ({ t, v: Object.fromEntries(journey.trend.map(k => [k, byT.get(t)?.[k] ?? 0])) }));
+    const cur = this.sum(data, [person.id], 'cur');
+    const prev = this.sum(data, [person.id], 'prev');
+    return [
+      { kind: 'trend', id: 'journey-trend', title: 'Over time', subtitle: `${journey.noun[0].toUpperCase()}${journey.noun.slice(1)} moved into each step`, span: 'twoThirds', fmt: 'n',
+        series: journey.trend.map(k => ({ key: k, label: label.get(k) ?? k })), points, bucket: data.range.bucket },
+      { kind: 'donut', id: 'journey-now', title: 'Where they stand now', subtitle: `All ${journey.noun} they own today`, span: 'third',
+        centerLabel: journey.noun[0].toUpperCase() + journey.noun.slice(1), slices: mix.map(m => ({ label: MIX_LABELS[m.label] ?? m.label, value: Number(m.value) })) },
+      { kind: 'compare', id: 'journey-compare', title: 'This period vs previous', subtitle: 'Each step, side by side', span: 'full',
+        groups: [...journey.stages.map(d => ({ d, bad: false })), ...journey.exits.map(d => ({ d, bad: true }))]
+          .map(({ d, bad }) => ({ label: d.label, value: cur[d.counter] ?? 0, prev: prev[d.counter] ?? 0, bad })) },
+    ];
   }
 
   /** The person's daily activity over the last 180 days, for streaks and personal bests. */
@@ -1078,6 +1179,7 @@ export class DashboardService {
           this.sourceBars('org-sources', cohort, 'full'),
         ],
       },
+      await this.requirementsSection(ctx),
       {
         id: 'lead-work', title: 'Lead metrics', description: 'Follow-ups, how often each lead is contacted, and the properties shared with them.',
         blocks: [

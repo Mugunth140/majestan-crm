@@ -88,7 +88,11 @@ export type Block =
   | (Base & { kind: 'queue'; items: { id: number; name: string; status: string; ownerId: number; owner?: string; due: string | null; reason: string; idleDays: number }[] })
   | (Base & { kind: 'targets'; rows: TargetRow[]; personal: boolean })
   | (Base & { kind: 'table'; metrics: MetricOut[] })
-  | (Base & { kind: 'progress'; hero: ProgressHero });
+  | (Base & { kind: 'progress'; hero: ProgressHero })
+  | (Base & { kind: 'compare'; groups: { label: string; value: number; prev: number; bad: boolean }[] })
+  | (Base & { kind: 'journey'; noun: string; person: string; self: boolean; period: { from: string; to: string; prevFrom: string; prevTo: string }; stages: JourneyStage[]; exits: JourneyStage[] });
+
+export type JourneyStage = { key: string; label: string; detail: string; say: [string, string]; value: number; prev: number; optional?: boolean };
 
 export type Achievement = { key: string; period: string; title: string; detail: string; unlocked: boolean; celebrate: boolean };
 

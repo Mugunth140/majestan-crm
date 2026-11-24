@@ -149,6 +149,9 @@ export function statusCounters({ ids, range }: Ctx) {
     ${stage('ev_sv_done', ['Site Visit Completed'])},
     ${stage('ev_rsv_sched', ['Re Visit Scheduled'])},
     ${stage('ev_rsv_done', ['Re Visit Completed'])},
+    ${stage('ev_qualified_only', ['Qualified'])},
+    ${stage('ev_interested', ['Interested'])},
+    ${stage('ev_revisit', ['Re Visit Scheduled', 'Re Visit Completed'])},
     ${stage('ev_nego', ['Negotiation'])},
     ${stage('ev_booked', BOOKED)},
     ${stage('ev_dropped', DROPPED)},
@@ -439,6 +442,18 @@ export function verificationCounters({ ids, range, now }: Ctx) {
     FULL JOIN fu ON fu.uid = COALESCE(dec.uid, pend.uid) AND fu.p = COALESCE(dec.p, pend.p)`;
 }
 
+/** Inbound availability moves made by the person; each inbound counts once per availability per period. */
+export function inboundStatusCounters({ ids, range }: Ctx) {
+  const stage = (name: string, value: string) => `COUNT(DISTINCT entity_id) FILTER (WHERE to_value = '${value}') AS ${name}`;
+  return `
+  SELECT actor_id AS uid, ${periodOf('created_at', range)} AS p,
+    ${stage('inb_available', 'available')}, ${stage('inb_fixed', 'fixed_verification')},
+    ${stage('inb_done', 'verification_done')}, ${stage('inb_na', 'not_available')}
+  FROM record_events
+  WHERE entity = 'inbound' AND field = 'inbound_status' AND actor_id IN (${ids}) AND ${inBothPeriods('created_at', range)}
+  GROUP BY ALL`;
+}
+
 /** Hiring work: applications owned and status moves made by the recruiter. */
 export function hrCounters({ ids, range, now }: Ctx) {
   const stage = (name: string, value: string) => `COUNT(DISTINCT e.entity_id) FILTER (WHERE e.to_value = '${value}') AS ${name}`;
@@ -507,6 +522,50 @@ export function activitySeries({ ids, range }: Ctx, from = range.from, to = rang
      WHERE entity = 'hr' AND type = 'status_changed' AND actor_id IN (${ids}) AND ${within('created_at')}
   )
   SELECT uid, t, k, COUNT(*) AS n, SUM(c) AS connected, SUM(s) AS seconds FROM e GROUP BY ALL`;
+}
+
+const bucketOf = (col: string, bucket: Range['bucket']) => bucket === 'hour'
+  ? `CAST(hour(${col} + INTERVAL 330 MINUTE) AS VARCHAR)`
+  : bucket === 'week' ? `CAST(date_trunc('week', ${istDate(col)}) AS VARCHAR)` : `CAST(${istDate(col)} AS VARCHAR)`;
+
+export type JourneyKind = 'lead' | 'inbound' | 'hr';
+
+/** Status moves per time bucket, keyed by journey step, for the person's journey trend. Each record counts once per step per bucket. */
+export function journeySeries({ ids, range }: Ctx, kind: JourneyKind) {
+  const within = (col: string) => `${col} >= ${utcStart(range.from)} AND ${col} < ${end(range)}`;
+  const step = (map: [string, string][]) => `CASE ${map.map(([v, k]) => `WHEN to_value = '${v}' THEN '${k}'`).join(' ')} END`;
+  const events = kind === 'lead' ? `
+    SELECT r.lead_id AS id, r.created_at AS ts, 'new' AS k FROM routing_histories r
+     WHERE r.to_user_id IN (${ids}) AND r.to_user_id IS DISTINCT FROM r.from_user_id AND ${within('r.created_at')}
+    UNION ALL SELECT l.id, l.created_at, 'new' FROM leads l
+     WHERE l.assigned_staff_id IN (${ids}) AND ${within('l.created_at')} AND NOT EXISTS (SELECT 1 FROM routing_histories h WHERE h.lead_id = l.id)
+    UNION ALL SELECT lead_id, created_at, CASE WHEN to_value IN (${list(DROPPED)}) THEN 'dropped' ELSE ${step([
+      ['Contacted', 'contacted'], ['Qualified', 'qualified'], ['Property Shared', 'shared'], ['Interested', 'interested'],
+      ['Site Visit Scheduled', 'sv_sched'], ['Site Visit Completed', 'sv_done'], ['Re Visit Scheduled', 'revisit'], ['Re Visit Completed', 'revisit'],
+    ])} END FROM lead_events
+     WHERE type = 'status_changed' AND actor_id IN (${ids}) AND ${within('created_at')}`
+    : kind === 'inbound' ? `
+    SELECT id, created_at AS ts, 'added' AS k FROM inbounds WHERE uploaded_by_id IN (${ids}) AND ${within('created_at')}
+    UNION ALL SELECT entity_id, created_at, ${step([['available', 'available'], ['fixed_verification', 'fixed'], ['verification_done', 'done'], ['not_available', 'na']])}
+     FROM record_events WHERE entity = 'inbound' AND field = 'inbound_status' AND actor_id IN (${ids}) AND ${within('created_at')}`
+    : `
+    SELECT id, "createdAt" AS ts, 'apps' AS k FROM hr_candidates WHERE "assignedStaffId" IN (${ids}) AND ${within('"createdAt"')}
+    UNION ALL SELECT entity_id, created_at, ${step([
+      ['Resume Shortlisted', 'short'], ['Interview Scheduled', 'int_sched'], ['Interview Completed', 'int_done'], ['Selected', 'selected'],
+      ['Offer Sent', 'offer'], ['Joined', 'joined'], ['Rejected', 'rejected'],
+    ])} FROM record_events WHERE entity = 'hr' AND type = 'status_changed' AND actor_id IN (${ids}) AND ${within('created_at')}`;
+  return `
+  WITH e AS (${events})
+  SELECT ${bucketOf('ts', range.bucket)} AS t, k, COUNT(DISTINCT id) AS n FROM e WHERE k IS NOT NULL GROUP BY ALL`;
+}
+
+/** Where the person's records stand right now, by status (a snapshot, not the period). */
+export function journeyMix({ ids }: Ctx, kind: JourneyKind) {
+  if (kind === 'lead') return statusMix({ ids } as Ctx);
+  if (kind === 'inbound') return `SELECT COALESCE(NULLIF(inbound_status, ''), 'none') AS label, COUNT(*) AS value FROM inbounds
+    WHERE assigned_staff_id IN (${ids}) OR (assigned_staff_id IS NULL AND uploaded_by_id IN (${ids})) GROUP BY ALL ORDER BY value DESC`;
+  return `SELECT COALESCE(NULLIF(status, ''), 'New') AS label, COUNT(*) AS value FROM hr_candidates
+    WHERE "assignedStaffId" IN (${ids}) GROUP BY ALL ORDER BY value DESC`;
 }
 
 /** Calls by weekday and IST hour, for the time-of-day heatmap. */
@@ -607,6 +666,63 @@ export function supplyDemand({ range }: Ctx) {
   )
   SELECT COALESCE(d.k, s.k) AS label, COALESCE(d.n, 0) AS demand, COALESCE(s.n, 0) AS supply
   FROM demand d FULL JOIN supply s ON s.k = d.k ORDER BY demand DESC, supply DESC LIMIT 14`;
+}
+
+// ── Lead requirements (lead_inquiries) ───────────────────────────────────
+
+const pref = (k: string) => `json_extract_string(preferences, '$.${k}')`;
+/** The budget a requirement states: its maximum, else its minimum; null when absent or zero. */
+const budget = `NULLIF(TRY_CAST(COALESCE(NULLIF(${pref('maxBudget')}, ''), NULLIF(${pref('minBudget')}, '')) AS DOUBLE), 0)`;
+const hasLocation = `(city_id IS NOT NULL OR COALESCE(TRY(json_array_length(sub_locations)), 0) > 0)`;
+const kindOf = `CASE WHEN purchase_type = 'buy' THEN 'buy' WHEN purchase_type = 'rental' THEN 'rent' ELSE 'other' END`;
+
+/** Requirements added in each period, and how complete they were. */
+export function requirementCounters({ range }: Ctx) {
+  return `
+  SELECT ${periodOf('created_at', range)} AS p,
+    COUNT(*) AS n,
+    COUNT(*) FILTER (WHERE purchase_type = 'buy') AS buy,
+    COUNT(*) FILTER (WHERE purchase_type = 'rental') AS rent,
+    COUNT(${budget}) AS budget_n,
+    COUNT(*) FILTER (WHERE ${hasLocation}) AS loc_n,
+    COUNT(*) FILTER (WHERE NULLIF(property_type, '') IS NOT NULL AND ${budget} IS NOT NULL AND ${hasLocation}) AS complete_n,
+    COALESCE(SUM(${budget}) FILTER (WHERE purchase_type = 'buy'), 0) AS buy_budget_sum,
+    COUNT(${budget}) FILTER (WHERE purchase_type = 'buy') AS buy_budget_n,
+    COALESCE(SUM(${budget}) FILTER (WHERE purchase_type = 'rental'), 0) AS rent_budget_sum,
+    COUNT(${budget}) FILTER (WHERE purchase_type = 'rental') AS rent_budget_n
+  FROM lead_inquiries WHERE ${inBothPeriods('created_at', range)}
+  GROUP BY ALL`;
+}
+
+/**
+ * What the period's requirements asked for, one row per dimension and value.
+ * `ord` fixes the order of budget bands; other dimensions sort by count.
+ */
+export function requirementMix({ range }: Ctx) {
+  const inPeriod = `created_at >= ${utcStart(range.from)} AND created_at < ${end(range)}`;
+  const band = (bands: [number, string][]) => `CASE ${bands.map(([lt, l], i) => `WHEN b < ${lt} THEN '${i}|${l}'`).join(' ')} ELSE '${bands.length}|${'{last}'}' END`;
+  const buy = band([[3e6, 'Under ₹30 L'], [5e6, '₹30–50 L'], [1e7, '₹50 L–1 Cr'], [2e7, '₹1–2 Cr']]).replace('{last}', '₹2 Cr+');
+  const rent = band([[15000, 'Under ₹15k'], [25000, '₹15–25k'], [50000, '₹25–50k'], [100000, '₹50k–1 L']]).replace('{last}', '₹1 L+');
+  return `
+  WITH r AS (SELECT *, ${budget} AS b FROM lead_inquiries WHERE ${inPeriod})
+  SELECT 'purpose' AS dim, COALESCE(NULLIF(purchase_type, ''), 'unknown') AS label, COUNT(*) AS value FROM r GROUP BY ALL
+  UNION ALL SELECT 'type', COALESCE(NULLIF(property_type, ''), NULLIF(property_category, ''), 'unknown'), COUNT(*) FROM r GROUP BY ALL
+  UNION ALL SELECT 'buy_budget', ${buy}, COUNT(*) FROM r WHERE purchase_type = 'buy' AND b IS NOT NULL GROUP BY ALL
+  UNION ALL SELECT 'rent_budget', ${rent}, COUNT(*) FROM r WHERE purchase_type = 'rental' AND b IS NOT NULL GROUP BY ALL
+  UNION ALL SELECT 'location', TRIM(loc), COUNT(*) FROM (SELECT unnest(json_extract_string(sub_locations, '$[*]')) AS loc FROM r WHERE json_type(sub_locations) = 'ARRAY') WHERE NULLIF(TRIM(loc), '') IS NOT NULL GROUP BY ALL
+  UNION ALL SELECT 'bhk', TRIM(v), COUNT(*) FROM (
+    SELECT unnest(CASE WHEN json_type(preferences, '$.bhk') = 'ARRAY' THEN json_extract_string(preferences, '$.bhk[*]') ELSE [${pref('bhk')}] END) AS v FROM r WHERE preferences IS NOT NULL
+  ) WHERE NULLIF(TRIM(v), '') IS NOT NULL GROUP BY ALL
+  UNION ALL SELECT 'timeline', purchase_timeline, COUNT(*) FROM r WHERE NULLIF(purchase_timeline, '') IS NOT NULL GROUP BY ALL
+  UNION ALL SELECT 'road', TRIM(${pref('roadName')}), COUNT(*) FROM r WHERE NULLIF(TRIM(${pref('roadName')}), '') IS NOT NULL GROUP BY ALL
+  ORDER BY dim, value DESC`;
+}
+
+/** Requirements added per time bucket, split into buy, rent and other. */
+export function requirementSeries({ range }: Ctx) {
+  return `
+  SELECT ${bucketOf('created_at', range.bucket)} AS t, ${kindOf} AS k, COUNT(*) AS n FROM lead_inquiries
+  WHERE created_at >= ${utcStart(range.from)} AND created_at < ${end(range)} GROUP BY ALL`;
 }
 
 /** Hiring pipeline snapshot and source effectiveness for the population. */

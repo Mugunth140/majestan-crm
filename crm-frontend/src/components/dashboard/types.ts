@@ -108,7 +108,11 @@ export type Block =
   | (Base & { kind: "queue"; items: QueueItem[] })
   | (Base & { kind: "targets"; rows: TargetRow[]; personal: boolean })
   | (Base & { kind: "table"; metrics: MetricOut[] })
-  | (Base & { kind: "progress"; hero: ProgressHero });
+  | (Base & { kind: "progress"; hero: ProgressHero })
+  | (Base & { kind: "compare"; groups: { label: string; value: number; prev: number; bad: boolean }[] })
+  | (Base & { kind: "journey"; noun: string; person: string; self: boolean; period: { from: string; to: string; prevFrom: string; prevTo: string }; stages: JourneyStage[]; exits: JourneyStage[] });
+
+export type JourneyStage = { key: string; label: string; detail: string; say: [string, string]; value: number; prev: number; optional?: boolean };
 
 export type BlockOf<K extends Block["kind"]> = Extract<Block, { kind: K }>;
 

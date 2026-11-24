@@ -72,8 +72,9 @@ export class InboundsService {
     return this._s3Client;
   }
 
-  async uploadImage(id: number, file: Express.Multer.File, actorId: number | null = null) {
+  async uploadImage(id: number, file: Express.Multer.File, actorId: number | null = null, user?: any) {
     const inbound = await this.mustFindOne(id);
+    await this.assertCanOpen(inbound, user);
     const hadPhoto = !!inbound.image_url;
 
     if (file.size > 10 * 1024 * 1024) {
@@ -142,7 +143,7 @@ export class InboundsService {
         current.google_map_location = '';
       }
       return manager.save(Inbound, current);
-    });
+    }).then((saved) => this.forUser(saved, user));
   }
 
   /** Keep only rows with a floor label; coerce price to number-or-undefined. */
@@ -285,13 +286,12 @@ export class InboundsService {
   }
 
   async updateAuthorized(id: number, data: any, actor: any) {
-    if (data.assigned_staff_id !== undefined) {
-      const current = await this.mustFindOne(id);
-      if (current.assigned_staff_id !== data.assigned_staff_id) {
-        throw new BadRequestException('Use Assign to change the assigned staff member');
-      }
+    const current = await this.mustFindOne(id);
+    await this.assertCanOpen(current, actor);
+    if (data.assigned_staff_id !== undefined && current.assigned_staff_id !== data.assigned_staff_id) {
+      throw new BadRequestException('Use Assign to change the assigned staff member');
     }
-    return this.update(id, data, actor?.id ?? null);
+    return this.forUser(await this.update(id, data, actor?.id ?? null), actor);
   }
 
   /**
@@ -382,14 +382,23 @@ export class InboundsService {
 
   async findOne(id: number, user?: any): Promise<Inbound> {
     const inbound = await this.mustFindOne(id);
-
-    if (user && user.role === 'Staff' && inbound.assigned_staff_id !== user.id && inbound.uploaded_by_id !== user.id && !(inbound.is_queued && await this.canManageQueue(user))
-      && !(inbound.inbound_status === 'fixed_verification' && await this.canVerify(user))) {
-      throw new NotFoundException(`Inbound with ID ${id} not found`);
-    }
-
+    await this.assertCanOpen(inbound, user);
     const canSee = await this.canSeeContacts(user);
     return canSee ? inbound : this.stripContacts(inbound);
+  }
+
+  /** Staff only reach their own, uploaded, queued (inbound team) or to-verify (sourcing) inbounds. No user = internal call. */
+  private async assertCanOpen(inbound: Inbound, user?: any): Promise<void> {
+    if (user && user.role === 'Staff' && inbound.assigned_staff_id !== user.id && inbound.uploaded_by_id !== user.id && !(inbound.is_queued && await this.canManageQueue(user))
+      && !(inbound.inbound_status === 'fixed_verification' && await this.canVerify(user))) {
+      throw new NotFoundException(`Inbound with ID ${inbound.id} not found`);
+    }
+  }
+
+  /** A record sent back to a user, with contacts hidden unless they may see them. */
+  private async forUser<T extends Record<string, any>>(record: T, user?: any): Promise<T> {
+    if (!user || await this.canSeeContacts(user)) return record;
+    return this.stripContacts(record);
   }
 
   /** Internal fetch without contact masking (for update/remove/logging flows). */
@@ -485,8 +494,8 @@ export class InboundsService {
   }
 
   
-  async addContactLog(inboundId: number, payload: Partial<InboundContactLog>, userId: number | null): Promise<InboundContactLog> {
-    const inbound = await this.mustFindOne(inboundId);
+  async addContactLog(inboundId: number, payload: Partial<InboundContactLog>, userId: number | null, user?: any): Promise<InboundContactLog> {
+    await this.assertCanOpen(await this.mustFindOne(inboundId), user);
     
     const contactLog = this.contactLogsRepository.create({
       ...payload,
@@ -497,8 +506,8 @@ export class InboundsService {
     return this.contactLogsRepository.save(contactLog);
   }
 
-  async addFollowUp(inboundId: number, body: any, userId: number | null): Promise<InboundFollowUp> {
-    const inbound = await this.mustFindOne(inboundId);
+  async addFollowUp(inboundId: number, body: any, userId: number | null, user?: any): Promise<InboundFollowUp> {
+    await this.assertCanOpen(await this.mustFindOne(inboundId), user);
     
     const followUp = this.followUpsRepository.create({
       inbound_id: inboundId,

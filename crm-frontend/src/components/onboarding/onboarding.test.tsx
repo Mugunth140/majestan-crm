@@ -89,10 +89,19 @@ describe("2.5.1", () => {
 });
 
 describe("2.5.5", () => {
-  it("is the app version and announces purpose and source on new inbounds", async () => {
+  it("announces purpose and source on new inbounds", async () => {
+    const { RELEASES } = await import("@/lib/release");
+    expect(RELEASES.find((r) => r.version === "2.5.5")!.changes[0].text).toMatch(/^Adding an inbound from your phone now asks for the Purpose/);
+  });
+});
+
+describe("2.5.6", () => {
+  it("is the app version and announces the dashboard status progress and requirements", async () => {
     const { APP_VERSION, RELEASES, releasesSince } = await import("@/lib/release");
-    expect(APP_VERSION).toBe("2.5.5");
-    expect(releasesSince("2.5.4", RELEASES).map((r) => r.version)).toEqual(["2.5.5"]);
-    expect(RELEASES[0].changes[0].text).toMatch(/^Adding an inbound from your phone now asks for the Purpose/);
+    expect(APP_VERSION).toBe("2.5.6");
+    expect(releasesSince("2.5.5", RELEASES).map((r) => r.version)).toEqual(["2.5.6"]);
+    const text = RELEASES[0].changes.map((c) => c.text).join(" ");
+    expect(text).toMatch(/Progress tab/);
+    expect(text).toMatch(/Lead requirements/);
   });
 });

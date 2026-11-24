@@ -13,6 +13,7 @@ import { RANGES } from "./format";
 import { PeriodPicker } from "@/components/shared/period-picker";
 import { Insights, Kpis, Leaderboard, MetricTable, Queue, Targets } from "./lists";
 import { Progress, confetti } from "./progress";
+import { Compare, Journey } from "./journey";
 import { DashboardSkeleton } from "./skeleton";
 import { SubjectPicker } from "./subject-picker";
 import type { Block, RangeKey, Report, Section, Span, Subjects } from "./types";
@@ -228,6 +229,7 @@ function SectionView({ section }: { section: Section }) {
 function BlockView({ block }: { block: Block }) {
   if (block.kind === "kpis") return <Kpis block={block} />;
   if (block.kind === "progress") return <Progress hero={block.hero} />;
+  if (block.kind === "journey") return <Journey block={block} />;
   return (
     <article
       data-series={block.kind === "trend" ? block.series.map((s) => s.key).join(" ") : undefined}
@@ -269,6 +271,7 @@ function BlockBody({ block }: { block: Block }) {
     case "queue": return <Queue block={block} />;
     case "targets": return <Targets block={block} />;
     case "table": return <MetricTable block={block} />;
+    case "compare": return <Wide min={block.groups.length * 64}><Compare block={block} /></Wide>;
     default: return null;
   }
 }

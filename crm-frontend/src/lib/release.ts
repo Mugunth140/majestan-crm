@@ -13,6 +13,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2.5.6",
+    date: "2026-11-24",
+    title: "Status progress and lead requirements on the dashboard",
+    changes: [
+      { kind: "new", text: "Each person's Progress tab now shows where their work stands by status, as a percentage of what came in: for leads New, Contacted, Qualified, Property shared, Interested, Site visit scheduled, Site visit done and Revisit, with similar steps for inbounds and hiring. Charts show the steps over time, where everything stands now, and this period against the last. It all follows the date you pick." },
+      { kind: "new", text: "The Overview has a Lead requirements section: how many requirements came in, buy or rent, average budgets, the most wanted property types, locations, roads and BHK, budget bands and how soon customers want to move." },
+      { kind: "fixed", text: "Staff can only edit, add follow-ups, log calls or add photos on inbounds they can open, and an owner's phone number and email stay hidden after saving an inbound for those who can't see them." },
+    ],
+  },
+  {
     version: "2.5.5",
     date: "2026-11-21",
     title: "Purpose and source on new inbounds",

@@ -37,7 +37,7 @@ export class InboundsController {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
-    return this.inboundsService.uploadImage(+id, file, req.user?.id ?? null);
+    return this.inboundsService.uploadImage(+id, file, req.user?.id ?? null, req.user);
   }
 
   @Post()
@@ -98,7 +98,7 @@ export class InboundsController {
     @Body() payload: CreateInboundFollowUpDto,
     @Request() req: any,
   ) {
-    const data = await this.inboundsService.addFollowUp(+id, payload, req.user?.id ?? null);
+    const data = await this.inboundsService.addFollowUp(+id, payload, req.user?.id ?? null, req.user);
     return { success: true, data };
   }
 
@@ -108,7 +108,7 @@ export class InboundsController {
     @Body() payload: CreateInboundContactLogDto,
     @Request() req: any,
   ) {
-    const data = await this.inboundsService.addContactLog(+id, payload, req.user?.id ?? null);
+    const data = await this.inboundsService.addContactLog(+id, payload, req.user?.id ?? null, req.user);
     return { success: true, data };
   }
 
