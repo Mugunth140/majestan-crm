@@ -17,7 +17,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/tables/table-skeleton";
 import { PageActions } from "@/components/layout/page-actions";
-import { ListBody, ListFrame, ListToolbar, ToolbarEnd, ToolbarSearch, headerPrimaryClass } from "@/components/layout/list-page";
+import { ListBody, ListFrame, ListToolbar, SegmentTabs, ToolbarEnd, ToolbarSearch, headerPrimaryClass } from "@/components/layout/list-page";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -65,9 +66,10 @@ function UsersList() {
     fetchUsers();
   }, []);
 
-  const displayedUsers = deptFilter 
-    ? users.filter(u => u.department?.name === deptFilter)
-    : users;
+  const [tab, setTab] = usePersistedState<UserTab>("users:tab", "active", { allowed: ["active", "inactive"] });
+  const inDept = deptFilter ? users.filter(u => u.department?.name === deptFilter) : users;
+  const activeCount = inDept.filter(u => u.is_active).length;
+  const displayedUsers = inDept.filter(u => !!u.is_active === (tab === "active"));
   const [search, setSearch] = useState("");
   const q = search.trim().toLowerCase();
   const searchedUsers = q
@@ -178,6 +180,8 @@ function UsersList() {
 
       <ListFrame>
         <ListToolbar>
+          <SegmentTabs tabs={[{ value: "active", label: `Active · ${activeCount}` }, { value: "inactive", label: `Inactive · ${inDept.length - activeCount}` }]}
+            value={tab} onChange={setTab} label="Status" />
           {deptFilter && <span className="text-[14px] font-medium">{deptFilter} users</span>}
           <ToolbarEnd>
             {views.picker}
@@ -234,6 +238,8 @@ function UsersList() {
     </div>
   );
 }
+
+type UserTab = "active" | "inactive";
 
 const USER_FIELDS: ViewField[] = [
   { id: "role", label: "Role", get: (u) => u.role?.name || "No Role" },

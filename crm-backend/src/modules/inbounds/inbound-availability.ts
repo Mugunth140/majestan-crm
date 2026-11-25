@@ -33,3 +33,10 @@ export function availabilityRoute(
 
 /** Sourcing staff work the Verification Queue. */
 export const isSourcingDepartment = (name?: string | null) => /sourcing/i.test(name ?? '');
+
+/** The inbound team works the inbound Queue and can be assigned inbounds: an Inbound department, or Sourcing where there is none. */
+export const isInboundTeam = (name?: string | null) =>
+  (name ?? '').toLowerCase().replace(/[^a-z]/g, '').startsWith('inbound') || isSourcingDepartment(name);
+
+/** Who can be given an inbound in Assign: the Sales and Sourcing teams (and an Inbound department, if one exists). */
+export const canHoldInbounds = (name?: string | null) => isInboundTeam(name) || /sales/i.test(name ?? '');

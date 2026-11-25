@@ -22,14 +22,14 @@ function OpenInboundAssignmentDialog({ open, count, busy, onClose, onConfirm }: 
     let live = true;
     apiJson<{ data: InboundStaff[] }>(`${API_URL}/inbounds/staff-list`).then(result => {
       if (live) setStaff(result.data);
-    }).catch(() => { if (live) setError('Could not load inbound staff. Close and retry.'); })
+    }).catch(() => { if (live) setError('Could not load the Sales and Sourcing staff. Close and retry.'); })
       .finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
   }, [open]);
   return <Dialog open={open} onOpenChange={value => { if (!value && !busy) onClose(); }}>
     <DialogContent className="sm:max-w-md" showCloseButton={!busy}>
       <DialogHeader><DialogTitle>Assign Inbounds</DialogTitle>
-        <DialogDescription>Select an inbound team member for {count} inbound{count === 1 ? '' : 's'}.</DialogDescription></DialogHeader>
+        <DialogDescription>Pick someone from Sales or Sourcing for {count} inbound{count === 1 ? '' : 's'}.</DialogDescription></DialogHeader>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       <div className="space-y-2 max-h-72 overflow-y-auto" role="radiogroup" aria-label="Inbound assignee">
         {loading ? <div className="h-16 rounded-xl bg-muted animate-pulse" role="status" aria-label="Loading inbound staff" /> : [

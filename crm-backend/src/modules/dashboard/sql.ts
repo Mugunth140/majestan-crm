@@ -732,6 +732,60 @@ export function sourcingStages({ ids, range }: Ctx) {
     FROM inbounds WHERE uploaded_by_id IN (${ids}) AND ${inBothPeriods('created_at', range)} GROUP BY ALL`;
 }
 
+// ── Sourcing detail ──────────────────────────────────────────────────────
+
+/** Rent or sale, from the purpose typed in, else from which price was filled. */
+const INBOUND_PURPOSE = `CASE
+    WHEN LOWER(TRIM(purpose)) LIKE 'rent%' OR LOWER(TRIM(purpose)) LIKE 'lease%' THEN 'rent'
+    WHEN LOWER(TRIM(purpose)) LIKE 'sale%' OR LOWER(TRIM(purpose)) LIKE 'sell%' THEN 'sale'
+    WHEN COALESCE(total_rent, 0) > 0 THEN 'rent'
+    WHEN COALESCE(sale_price, 0) > 0 THEN 'sale'
+    ELSE 'unknown' END`;
+
+/** Inbounds with their category and purpose worked out; `everyone` skips the uploader filter. */
+const sourcedInbounds = (ids: string, everyone: boolean, period: string) => `
+  SELECT *, ${categoryOf('property_category', 'property_type')} AS cat, ${INBOUND_PURPOSE} AS pur
+  FROM inbounds WHERE ${everyone ? '' : `uploaded_by_id IN (${ids}) AND `}${period}`;
+
+/**
+ * Inbounds sourced in the period, broken down four ways, each with its availability stage:
+ * segment (category|purpose), type (category|type), status (work status) and source.
+ */
+export function sourcingDetail({ ids, range }: Ctx, everyone = false) {
+  return `
+  WITH i AS (${sourcedInbounds(ids, everyone, `created_at >= ${utcStart(range.from)} AND created_at < ${end(range)}`)}),
+  d AS (
+    SELECT 'segment' AS dim, cat || '|' || pur AS label, inbound_status AS st FROM i
+    UNION ALL SELECT 'type', cat || '|' || COALESCE(NULLIF(REPLACE(LOWER(TRIM(property_type)), ' ', '_'), ''), 'unknown'), inbound_status FROM i
+    UNION ALL SELECT 'status', COALESCE(NULLIF(TRIM(status), ''), 'New Inbound'), inbound_status FROM i
+    UNION ALL SELECT 'source', COALESCE(NULLIF(TRIM(source), ''), 'Not recorded'), inbound_status FROM i
+  )
+  SELECT dim, label, COUNT(*) AS sourced,
+    COUNT(*) FILTER (WHERE NULLIF(st, '') IS NULL) AS unchecked,
+    COUNT(*) FILTER (WHERE st = 'available') AS validated,
+    COUNT(*) FILTER (WHERE st = 'fixed_verification') AS verifying,
+    COUNT(*) FILTER (WHERE st = 'verification_done') AS verified,
+    COUNT(*) FILTER (WHERE st = 'not_available') AS not_available
+  FROM d GROUP BY ALL ORDER BY dim, sourced DESC, label`;
+}
+
+/** Per period: residential and commercial counts, asking prices, and how complete the listings are. */
+export function sourcingFacts({ ids, range }: Ctx, everyone = false) {
+  return `
+  WITH i AS (${sourcedInbounds(ids, everyone, inBothPeriods('created_at', range))})
+  SELECT ${periodOf('created_at', range)} AS p, COUNT(*) AS n,
+    COUNT(*) FILTER (WHERE cat = 'residential') AS res,
+    COUNT(*) FILTER (WHERE cat = 'commercial') AS com,
+    AVG(total_rent) FILTER (WHERE pur = 'rent' AND cat = 'residential' AND total_rent > 0) AS rent_res,
+    AVG(total_rent) FILTER (WHERE pur = 'rent' AND cat = 'commercial' AND total_rent > 0) AS rent_com,
+    AVG(sale_price) FILTER (WHERE pur = 'sale' AND sale_price > 0) AS sale_avg,
+    COUNT(*) FILTER (WHERE NULLIF(TRIM(image_url), '') IS NOT NULL) AS photo,
+    COUNT(*) FILTER (WHERE latitude IS NOT NULL OR NULLIF(TRIM(google_map_location), '') IS NOT NULL) AS located,
+    COUNT(*) FILTER (WHERE LOWER(TRIM(brokerage_accepted)) = 'yes') AS brokerage_yes,
+    COUNT(*) FILTER (WHERE NULLIF(TRIM(brokerage_accepted), '') IS NOT NULL) AS brokerage_asked
+  FROM i GROUP BY ALL`;
+}
+
 /**
  * Buyer demand (requirements in the last 90 days) against available supply
  * (open or verified inbound listings), by property type.
@@ -749,6 +803,22 @@ export function supplyDemand({ range }: Ctx) {
   FROM demand d FULL JOIN supply s ON s.k = d.k ORDER BY demand DESC, supply DESC LIMIT 14`;
 }
 
+// ── Residential or commercial ────────────────────────────────────────────
+
+/** Home types; anything else with a type is commercial (offices, shops, warehouses, land for business). */
+const HOME_TYPES = ['apartment', 'villa', 'independent_house', 'individual_portion', 'plot', 'farm_house', 'builder_floor', 'row_house', 'penthouse', 'studio', 'pg_service_apartment'];
+
+/**
+ * 'residential', 'commercial' or 'unknown', from the record's category, else its property type.
+ * Industrial and institutional count as commercial.
+ */
+export const categoryOf = (cat: string, type: string) => `CASE
+    WHEN LOWER(TRIM(${cat})) = 'residential' THEN 'residential'
+    WHEN LOWER(TRIM(${cat})) IN ('commercial', 'industrial', 'institutional') THEN 'commercial'
+    WHEN REPLACE(LOWER(TRIM(${type})), ' ', '_') IN (${HOME_TYPES.map(t => `'${t}'`).join(', ')}) THEN 'residential'
+    WHEN NULLIF(TRIM(${type}), '') IS NOT NULL THEN 'commercial'
+    ELSE 'unknown' END`;
+
 // ── Lead requirements (lead_inquiries) ───────────────────────────────────
 
 const pref = (k: string) => `json_extract_string(preferences, '$.${k}')`;
@@ -759,8 +829,14 @@ const kindOf = `CASE WHEN purchase_type = 'buy' THEN 'buy' WHEN purchase_type = 
 
 /** Requirements added in each period, and how complete they were. */
 export function requirementCounters({ range }: Ctx) {
+  const rent = (cat: string) => `purchase_type = 'rental' AND ${categoryOf('property_category', 'property_type')} = '${cat}'`;
   return `
   SELECT ${periodOf('created_at', range)} AS p,
+    COUNT(*) FILTER (WHERE ${categoryOf('property_category', 'property_type')} = 'commercial') AS commercial,
+    COALESCE(SUM(${budget}) FILTER (WHERE ${rent('residential')}), 0) AS rent_res_sum,
+    COUNT(${budget}) FILTER (WHERE ${rent('residential')}) AS rent_res_n,
+    COALESCE(SUM(${budget}) FILTER (WHERE ${rent('commercial')}), 0) AS rent_com_sum,
+    COUNT(${budget}) FILTER (WHERE ${rent('commercial')}) AS rent_com_n,
     COUNT(*) AS n,
     COUNT(*) FILTER (WHERE purchase_type = 'buy') AS buy,
     COUNT(*) FILTER (WHERE purchase_type = 'rental') AS rent,

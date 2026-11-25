@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY_INBOUND, checkInbound, inboundPayload, normalizeCategoryAndType, parseInboundPrice, type InboundForm } from "./inbound-form";
+import { EMPTY_INBOUND, INBOUND_TYPES, checkInbound, hasBhk, hasFloor, inboundPayload, normalizeCategoryAndType, parseInboundPrice, typeLabel, type InboundForm } from "./inbound-form";
 
 const form = (patch: Partial<InboundForm>): InboundForm => ({ ...EMPTY_INBOUND, ...patch });
 
@@ -77,4 +77,13 @@ it("accepts rupee labels and zero in the same parser used by inline pricing", ()
   expect(parseInboundPrice("0")).toBe(0);
   expect(parseInboundPrice("")).toBeNull();
   expect(() => parseInboundPrice("garbage")).toThrow();
+});
+
+describe("residential types", () => {
+  it("offers Individual / Portion House with BHK and floor", () => {
+    expect(INBOUND_TYPES.residential.map(t => t.value)).toContain("individual_portion");
+    expect(typeLabel("individual_portion")).toBe("Individual / Portion House");
+    expect(hasBhk("residential", "individual_portion")).toBe(true);
+    expect(hasFloor("individual_portion")).toBe(true);
+  });
 });

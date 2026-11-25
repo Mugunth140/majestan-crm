@@ -13,6 +13,19 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2.5.9",
+    date: "2026-11-26",
+    title: "Inbound assigning, sourcing detail and rent budgets",
+    changes: [
+      { kind: "fixed", text: "Assign on Inbound lists the Sales and Sourcing teams again. The Sourcing team can also work the inbound Queue and assign from it." },
+      { kind: "new", text: "Residential inbounds have a new property type: Individual / Portion House, with BHK and floor." },
+      { kind: "new", text: "Sourcing has much more detail, on the Overview and the Sourcing tab: residential and commercial sourced, rent or sale, residential and commercial property types, work status and source, each with where the listings stand. New tiles show average rent and sale price asked, and how many listings have photos, a map location and brokerage accepted." },
+      { kind: "improved", text: "Lead requirements split the average rent budget into residential and commercial, and count commercial requirements." },
+      { kind: "improved", text: "Achievements and Targets on personal dashboards are stacked, each using the full width." },
+      { kind: "improved", text: "Users has Active and Inactive tabs, so people who left are kept apart." },
+    ],
+  },
+  {
     version: "2.5.8",
     date: "2026-11-25",
     title: "Fuller lead funnel, sources and targets on the dashboard",

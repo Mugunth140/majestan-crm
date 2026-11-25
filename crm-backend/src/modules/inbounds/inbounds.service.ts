@@ -14,7 +14,7 @@ import { extname } from 'path';
 import { readInboundPhotoCoordinates, submissionStatuses } from './inbound-submissions';
 import { buildWatermarkedImageUrl } from '../../common/imgproxy-watermark';
 import { RecordEventsService } from '../record-events/record-events.service';
-import { availabilityRoute, isSourcingDepartment } from './inbound-availability';
+import { availabilityRoute, canHoldInbounds, isInboundTeam, isSourcingDepartment } from './inbound-availability';
 
 // Sensitive contact values masked for Team Lead / Staff without the
 // `inbounds.call_tracking` grant. Names, roles and the property address stay
@@ -223,7 +223,7 @@ export class InboundsService {
     if (['Admin', 'Super Admin', 'Manager'].includes(user?.role?.name || user?.role)) return true;
     if (!user?.id) return false;
     const person = await this.userRepository().findOne({ where: { id: Number(user.id), is_active: true }, relations: { department: true } });
-    return !!person?.department?.name?.toLowerCase().replace(/[^a-z]/g, '').startsWith('inbound');
+    return isInboundTeam(person?.department?.name);
   }
 
   /** Admins, managers and the sourcing department work the Verification Queue. */
@@ -259,14 +259,14 @@ export class InboundsService {
   async assignableStaff() {
     const people = await this.userRepository().find({ where: { is_active: true }, relations: { department: true },
       select: { id: true, name: true, department: { id: true, name: true } }, order: { name: 'ASC' } });
-    return people.filter(person => person.department?.name?.toLowerCase().replace(/[^a-z]/g, '').startsWith('inbound'))
+    return people.filter(person => canHoldInbounds(person.department?.name))
       .map(person => ({ id: person.id, name: person.name }));
   }
 
   async assign(ids: number[], staffId: number | null, actor: any) {
-    if (!(await this.canManageQueue(actor))) throw new ForbiddenException('Only inbound staff and managers can assign inbounds');
+    if (!(await this.canManageQueue(actor))) throw new ForbiddenException('Only the inbound or sourcing team and managers can assign inbounds');
     if (staffId !== null && !(await this.assignableStaff()).some(person => person.id === staffId)) {
-      throw new BadRequestException('Choose an active inbound staff member');
+      throw new BadRequestException('Choose an active member of the Sales or Sourcing team');
     }
     const records = await this.inboundsRepository.find({ where: { id: In(ids) }, select: { id: true, assigned_staff_id: true } });
     if (records.length !== ids.length) throw new NotFoundException('One or more inbounds were not found');

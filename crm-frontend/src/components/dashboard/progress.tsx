@@ -76,7 +76,7 @@ export function Progress({ hero }: { hero: ProgressHero }) {
         />
       </div>
 
-      <div className={cn("rounded-xl border bg-card p-5", targets.length ? "lg:col-span-7 lg:self-start" : "lg:col-span-12")}>
+      <div className="rounded-xl border bg-card p-5 lg:col-span-12">
         <div className="mb-4 flex items-center gap-3">
           <span className="text-[13px] text-muted-foreground">Achievements</span>
           <div className="h-1.5 max-w-40 flex-1 rounded-full bg-muted" aria-hidden>
@@ -84,7 +84,7 @@ export function Progress({ hero }: { hero: ProgressHero }) {
           </div>
           <span className="ml-auto text-xs tabular-nums text-muted-foreground">{unlocked} of {hero.achievements.length} unlocked</span>
         </div>
-        <ul className={cn("grid gap-2 sm:grid-cols-2", !targets.length && "lg:grid-cols-3 xl:grid-cols-4")}>
+        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {badges.map((a, i) => <Badge key={`${a.key}-${a.period}`} a={a} className={!allBadges && i >= PHONE_BADGES ? "max-sm:hidden" : undefined} />)}
         </ul>
         {!allBadges && badges.length > PHONE_BADGES && (
@@ -95,7 +95,7 @@ export function Progress({ hero }: { hero: ProgressHero }) {
       </div>
 
       {targets.length > 0 && (
-        <div className="min-w-0 rounded-xl border bg-card p-5 lg:col-span-5">
+        <div className="min-w-0 rounded-xl border bg-card p-5 lg:col-span-12">
           <div className="mb-4 flex items-center gap-2 text-[13px] text-muted-foreground">
             <Target aria-hidden className="size-4" />
             Targets · today, this week and this month

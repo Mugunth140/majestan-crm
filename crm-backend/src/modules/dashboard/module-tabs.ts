@@ -1,5 +1,6 @@
 import { addDays, inBothPeriods, istDate, periodOf, utcStart, type Range } from './range';
-import { supplyDemand, type Ctx } from './sql';
+import { sourcingDetail, sourcingFacts, supplyDemand, type Ctx } from './sql';
+import { sourcingDetailBlocks, type DetailRow } from './sourcing-detail';
 import { compute, DEPT_METRICS, type Counters, type MetricDef } from './metrics';
 import type { Bar, Block, Insight, MetricOut, Person, Section } from './types';
 
@@ -317,19 +318,15 @@ export const sourcingSql = {
     SELECT ${bucketOf('created_at', range)}, 'agents', COUNT(*) FROM agents WHERE ${within('created_at', range)} GROUP BY ALL`,
 };
 
-const STAGES = [
-  { key: 'unchecked', label: 'Awaiting validation' }, { key: 'validated', label: 'Validated' },
-  { key: 'verifying', label: 'In verification' }, { key: 'verified', label: 'Verified' }, { key: 'not_available', label: 'Not available' },
-];
 
 export async function sourcingTab(query: Query, ctx: Ctx, people: Person[]): Promise<Section[]> {
   const { range, now } = ctx;
-  const [totals, [s = {}], stages, areas, purposes, categories, uploaders, partners, [qa = {}], series, supply] = await Promise.all([
-    query<Row>(sourcingSql.totals(range)), query<Row>(sourcingSql.snapshot(now)), query<Row>(sourcingSql.stages(range)),
-    query<Row>(sourcingSql.by('area', range)), query<Row>(sourcingSql.by('purpose', range)), query<Row>(sourcingSql.by('category', range)),
+  const [totals, [s = {}], areas, uploaders, partners, [qa = {}], series, supply, detail, facts] = await Promise.all([
+    query<Row>(sourcingSql.totals(range)), query<Row>(sourcingSql.snapshot(now)), query<Row>(sourcingSql.by('area', range)),
     query<Row>(sourcingSql.people(range)), query<Row>(sourcingSql.partners()), query<Row>(sourcingSql.queueAge(now)),
     query<{ t: string; k: string; n: number }>(sourcingSql.series(range)),
     query<{ label: string; demand: number; supply: number }>(supplyDemand(ctx)),
+    query<DetailRow>(sourcingDetail(ctx, true)), query<Row>(sourcingFacts(ctx, true)),
   ]);
   const { cur, prev } = periods(totals);
   const names = named(people);
@@ -375,16 +372,11 @@ export async function sourcingTab(query: Query, ctx: Ctx, people: Person[]): Pro
     {
       id: 'src-stock', title: 'Inventory', description: 'What was sourced in the period, and where it stands.',
       blocks: [
-        { kind: 'stacked', id: 'src-types', title: 'By property type', subtitle: 'Listings sourced and their current stage', fmt: 'n', span: 'full', keys: STAGES,
-          rows: stages.map(r => ({ label: nice(r.type), values: Object.fromEntries(STAGES.map(st => [st.key, n(r[st.key])])) })) },
+        ...sourcingDetailBlocks('src', detail, facts as Record<string, number | string | null>[]),
         { kind: 'bars', id: 'src-area', title: 'Top localities', subtitle: 'Listings sourced, and how many are verified', fmt: 'n', span: 'half', valueLabel: 'Sourced', secondaryLabel: 'Verified',
           bars: areas.map(r => ({ label: String(r.label), value: n(r.value), secondary: n(r.verified) })) },
         { kind: 'bars', id: 'src-gaps', title: 'Supply against demand', subtitle: 'Buyer requirements (90 days) against available listings, by type', fmt: 'n', span: 'half', valueLabel: 'Requirements', secondaryLabel: 'Listings',
           bars: supply.map(r => ({ label: nice(r.label), value: n(r.demand), secondary: n(r.supply), tone: n(r.supply) < n(r.demand) / 2 ? 'bad' : undefined })) },
-        { kind: 'donut', id: 'src-purpose', title: 'Rent or sale', subtitle: 'Listings sourced in the period', span: 'half', centerLabel: 'Listings',
-          slices: purposes.map(r => ({ label: nice(r.label), value: n(r.value) })) },
-        { kind: 'donut', id: 'src-category', title: 'Category', subtitle: 'Listings sourced in the period', span: 'half', centerLabel: 'Listings',
-          slices: categories.map(r => ({ label: nice(r.label), value: n(r.value) })) },
         { kind: 'kpis', id: 'src-stock-kpis', title: 'Stock', span: 'full', metrics: [
           snap('verified_stock', 'Verified listings in stock', n(s.verified_stock), 'up'),
           { key: 'src_localities', label: 'Localities covered', fmt: 'n', better: 'up', value: cur.src_localities ?? 0, prev: prev.src_localities ?? 0 },

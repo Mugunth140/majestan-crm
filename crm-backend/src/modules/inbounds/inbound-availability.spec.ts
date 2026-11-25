@@ -1,4 +1,4 @@
-import { availabilityRoute, isSourcingDepartment } from './inbound-availability';
+import { availabilityRoute, canHoldInbounds, isInboundTeam, isSourcingDepartment } from './inbound-availability';
 
 describe('inbound availability routing', () => {
   it('queues available inbounds nobody has picked up', () => {
@@ -30,5 +30,20 @@ describe('inbound availability routing', () => {
     expect(isSourcingDepartment('Sourcing Department')).toBe(true);
     expect(isSourcingDepartment('Sales Department')).toBe(false);
     expect(isSourcingDepartment(null)).toBe(false);
+  });
+
+  it('counts the Inbound and Sourcing departments as the inbound team', () => {
+    expect(isInboundTeam('Inbound Department')).toBe(true);
+    expect(isInboundTeam('In-bound')).toBe(true);
+    expect(isInboundTeam('Sourcing Department')).toBe(true);
+    expect(isInboundTeam('Sales Department')).toBe(false);
+    expect(isInboundTeam(undefined)).toBe(false);
+  });
+
+  it('lets Sales and Sourcing people hold inbounds, not other departments', () => {
+    expect(canHoldInbounds('Sales Department')).toBe(true);
+    expect(canHoldInbounds('Sourcing Department')).toBe(true);
+    expect(canHoldInbounds('Telecalling Department')).toBe(false);
+    expect(canHoldInbounds(null)).toBe(false);
   });
 });

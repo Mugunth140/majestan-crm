@@ -17,6 +17,7 @@ import {
   SCORE_METRICS, STATUS_JOURNEYS, type Counters, type DeptKey, type JourneyDef, type JourneyStageDef, type MetricDef,
 } from './metrics';
 import { hrTab, sourcingTab } from './module-tabs';
+import { sourcingDetailBlocks, type DetailRow } from './sourcing-detail';
 import { changeInsights, outlierInsights, targetInsights, workloadInsights } from './insights';
 import type {
   Achievement, Bar, Block, Insight, LeaderRow, MetricOut, Person, ProgressHero, Scope, Section, Subject, Tab, TargetRow, Viewer,
@@ -880,9 +881,11 @@ export class DashboardService {
           tile('req_n', 'Requirements added', 'n', x => x.n ?? 0),
           tile('req_buy', 'Looking to buy', 'n', x => x.buy ?? 0),
           tile('req_rent', 'Looking to rent', 'n', x => x.rent ?? 0),
+          tile('req_commercial', 'Commercial requirements', 'n', x => x.commercial ?? 0, 'Offices, shops, warehouses and other business space'),
           tile('req_complete', 'Complete requirements', 'pct', x => share('complete_n', x), 'Property type, budget and location all filled in'),
           tile('req_buy_budget', 'Avg buying budget', 'inr', x => avg('buy_budget_sum', 'buy_budget_n', x)),
-          tile('req_rent_budget', 'Avg monthly rent budget', 'inr', x => avg('rent_budget_sum', 'rent_budget_n', x)),
+          tile('req_rent_res_budget', 'Avg residential rent budget', 'inr', x => avg('rent_res_sum', 'rent_res_n', x), 'Monthly rent, for homes'),
+          tile('req_rent_com_budget', 'Avg commercial rent budget', 'inr', x => avg('rent_com_sum', 'rent_com_n', x), 'Monthly rent, for offices, shops and other business space'),
           tile('req_budget', 'With a budget', 'pct', x => share('budget_n', x)),
           tile('req_loc', 'With a location', 'pct', x => share('loc_n', x)),
         ] },
@@ -1057,23 +1060,11 @@ export class DashboardService {
     return sections;
   }
 
-  /** Sourcing done in the period, and how far each property type got through validation and verification. */
+  /** Headline sourcing numbers for the period: sourced, validated and verified. */
   private sourcingBlocks(rows: Record<string, number | string>[]): Block[] {
-    const STAGES = [
-      { key: 'unchecked', label: 'Awaiting validation' }, { key: 'validated', label: 'Validated' },
-      { key: 'verifying', label: 'In verification' }, { key: 'verified', label: 'Verified' }, { key: 'not_available', label: 'Not available' },
-    ];
     const total = (p: string, k: string) => rows.filter(r => r.p === p).reduce((s, r) => s + Number(r[k] ?? 0), 0);
     // Validated means the owner confirmed it: everything that went on to verification counts too.
     const passed = (p: string) => total(p, 'validated') + total(p, 'verifying') + total(p, 'verified');
-    const byType = new Map<string, Record<string, number>>();
-    for (const r of rows.filter(r => r.p === 'cur')) {
-      const name = String(r.type).replace(/_/g, ' ').trim().toLowerCase();
-      const label = name.charAt(0).toUpperCase() + name.slice(1);
-      const v = byType.get(label) ?? {};
-      for (const k of ['sourced', ...STAGES.map(st => st.key)]) v[k] = (v[k] ?? 0) + Number(r[k] ?? 0);
-      byType.set(label, v);
-    }
     const tile = (key: string, label: string, value: (p: string) => number | null, fmt: MetricOut['fmt'] = 'n', hint?: string): MetricOut =>
       ({ key, label, fmt, better: 'up', value: value('cur'), prev: value('prev'), hint });
     return [
@@ -1083,12 +1074,6 @@ export class DashboardService {
         tile('src_verified', 'Verification done', p => total(p, 'verified')),
         tile('src_verified_rate', 'Verified of sourced', p => (total(p, 'sourced') ? pctOf(total(p, 'verified'), total(p, 'sourced')) : null), 'pct'),
       ] },
-      {
-        kind: 'stacked', id: 'sourcing-types', title: 'Sourcing by property type', subtitle: 'Properties sourced in the period and where each one stands', fmt: 'n', span: 'full',
-        keys: STAGES,
-        rows: [...byType].sort((a, b) => b[1].sourced - a[1].sourced).slice(0, 10)
-          .map(([label, v]) => ({ label, values: Object.fromEntries(STAGES.map(st => [st.key, v[st.key] ?? 0])) })),
-      },
     ];
   }
 
@@ -1100,7 +1085,7 @@ export class DashboardService {
     const ctx: Q.Ctx = { ids: Q.idList(ids), range, now: Q.nowLiteral() };
     const cur = this.sum(data, ids, 'cur');
     const prev = this.sum(data, ids, 'prev');
-    const [cohort, health, supply, mixRows, forecastCohort, stageRows, pathRows, repeatRows] = await Promise.all([
+    const [cohort, health, supply, mixRows, forecastCohort, stageRows, pathRows, repeatRows, detailRows, factRows] = await Promise.all([
       this.store.query<Record<string, number | string>>(Q.leadCohort(ctx)),
       this.store.query<Record<string, number>>(Q.dataHealth(ctx)),
       this.store.query<{ label: string; demand: number; supply: number }>(Q.supplyDemand(ctx)),
@@ -1109,6 +1094,8 @@ export class DashboardService {
       this.store.query<Record<string, number | string>>(Q.sourcingStages(ctx)),
       this.store.query<PathRow>(Q.leadPath(ctx)),
       this.store.query<{ source: string; repeats: number }>(Q.repeatsBySource(ctx)),
+      this.store.query<DetailRow>(Q.sourcingDetail(ctx)),
+      this.store.query<Record<string, number | string | null>>(Q.sourcingFacts(ctx)),
     ]);
     const total = (rows: Record<string, number | string>[], k: string) => rows.reduce((s, r) => s + Number(r[k] ?? 0), 0);
 
@@ -1199,8 +1186,11 @@ export class DashboardService {
           this.kpis('lead-work-kpis', 'Lead work', ['fu_new', 'fu_old', 'contact_freq', 'unique_leads', 'shares', 'shares_per_lead', 'shares_per_worked', 'share_to_visit'], data, ids),
           this.leaderboard('lead-work-people', 'Lead work by person', 'sales', visible.filter(p => p.dept === 'telecalling' || p.dept === 'sales'), data, visible,
             ['contact_freq', 'fu_new', 'fu_old', 'shares', 'shares_per_lead', 'shares_per_worked']),
-          ...this.sourcingBlocks(stageRows),
         ],
+      },
+      {
+        id: 'sourcing', title: 'Sourcing', description: 'Properties the team sourced in the period: residential or commercial, rent or sale, type, status and source.',
+        blocks: [...this.sourcingBlocks(stageRows), ...sourcingDetailBlocks('org-src', detailRows, factRows)],
       },
       {
         id: 'lead-health', title: 'Lead health',

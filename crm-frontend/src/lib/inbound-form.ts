@@ -20,7 +20,8 @@ export const INBOUND_CATEGORIES: Opt[] = [
 export const INBOUND_TYPES: Record<string, Opt[]> = {
   residential: [
     { label: "Apartment", value: "apartment" }, { label: "Villa", value: "villa" },
-    { label: "Independent House", value: "independent_house" }, { label: "Plot", value: "plot" },
+    { label: "Independent House", value: "independent_house" }, { label: "Individual / Portion House", value: "individual_portion" },
+    { label: "Plot", value: "plot" },
     { label: "Farm House", value: "farm_house" }, { label: "Builder Floor", value: "builder_floor" },
   ],
   commercial: [
@@ -74,8 +75,8 @@ export const INBOUND_STATUS_TONES: Record<string, StatusTone> = {
 };
 export const INBOUND_STATUSES = Object.keys(INBOUND_STATUS_TONES);
 
-const FLOOR_TYPES = ["apartment", "builder_floor", "office", "shop", "showroom", "commercial_building", "hotel", "restaurant", "school", "college", "hospital", "clinic", "training_centre"];
-const BHK_TYPES = ["apartment", "villa", "independent_house"];
+const FLOOR_TYPES = ["apartment", "builder_floor", "individual_portion", "office", "shop", "showroom", "commercial_building", "hotel", "restaurant", "school", "college", "hospital", "clinic", "training_centre"];
+const BHK_TYPES = ["apartment", "villa", "independent_house", "individual_portion"];
 // Commercial types priced per floor (land has no floors).
 const FLOOR_PRICING_TYPES = ["office", "shop", "showroom", "commercial_building", "warehouse", "hotel", "restaurant"];
 

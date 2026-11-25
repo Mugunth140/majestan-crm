@@ -11,7 +11,7 @@ describe('Inbound Queue', () => {
   let repo: any;
   let users: any;
   beforeEach(() => {
-    users = { find: jest.fn(async () => [{ id: 12, name: 'Kavya', department: { name: 'Inbound' } }, { id: 13, name: 'Arjun', department: { name: 'Sales' } }]),
+    users = { find: jest.fn(async () => [{ id: 12, name: 'Kavya', department: { name: 'Inbound' } }, { id: 13, name: 'Arjun', department: { name: 'Telecalling' } }]),
       findOne: jest.fn(async () => ({ id: 12, department: { name: 'Inbound Department' } })) };
     repo = { create: (value: any) => ({ id: 1, ...value }), save: jest.fn(async (value: any) => value),
       find: jest.fn(async () => [{ id: 1 }]), findOne: jest.fn(async () => ({ id: 1, uploaded_by_id: 7, assigned_staff_id: 12, is_queued: false })),
@@ -34,17 +34,25 @@ describe('Inbound Queue', () => {
     await service.assign([1], 12, { id: 12, role: 'Staff' });
     expect(repo.update).toHaveBeenCalledWith(expect.anything(), { assigned_staff_id: 12, is_queued: false });
   });
+  it('lists only Sales and Sourcing people in Assign, and lets Sourcing assign', async () => {
+    users.find.mockResolvedValue([{ id: 20, name: 'Meena', department: { name: 'Sourcing Department' } }, { id: 13, name: 'Arjun', department: { name: 'Sales Department' } },
+      { id: 14, name: 'Divya', department: { name: 'Telecalling Department' } }, { id: 15, name: 'Ravi', department: { name: 'HR Department' } }]);
+    users.findOne.mockResolvedValue({ id: 20, department: { name: 'Sourcing Department' } });
+    expect(await service.assignableStaff()).toEqual([{ id: 20, name: 'Meena' }, { id: 13, name: 'Arjun' }]);
+    await service.assign([1], 20, { id: 20, role: 'Staff' });
+    expect(repo.update).toHaveBeenCalledWith(expect.anything(), { assigned_staff_id: 20, is_queued: false });
+  });
   it('returns an unassigned record to Queue', async () => {
     await service.assign([1], null, { id: 9, role: 'Admin' });
     expect(repo.update).toHaveBeenCalledWith(expect.anything(), { assigned_staff_id: null, is_queued: true });
   });
   it('rejects assignments by field staff outside the inbound department', async () => {
     users.findOne.mockResolvedValue({ department: { name: 'Field' } });
-    await expect(service.assign([1], 12, { id: 7, role: 'Staff' })).rejects.toThrow('Only inbound');
+    await expect(service.assign([1], 12, { id: 7, role: 'Staff' })).rejects.toThrow('Only the inbound or sourcing team');
     expect(repo.update).not.toHaveBeenCalled();
   });
   it('rejects unknown, non-inbound and inactive target staff', async () => {
-    for (const staffId of [13, 999]) await expect(service.assign([1], staffId, { role: 'Admin' })).rejects.toThrow('active inbound');
+    for (const staffId of [13, 999]) await expect(service.assign([1], staffId, { role: 'Admin' })).rejects.toThrow('Sales or Sourcing team');
     expect(repo.update).not.toHaveBeenCalled();
   });
   it('validates the entire bulk selection before assigning', async () => {
