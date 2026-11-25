@@ -13,6 +13,18 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2.5.8",
+    date: "2026-11-25",
+    title: "Fuller lead funnel, sources and targets on the dashboard",
+    changes: [
+      { kind: "improved", text: "The Lead-to-booking funnel now has every step: Contacted, Qualified, Property shared, Interested, Visit scheduled, Visit completed, Negotiation and Booked. Stage-wise leakage shows where the leads that stopped went: not interested or lost, on hold, or still being worked. A new chart shows where every lead from the period stands now. Leads converted to an inbound or agent are left out." },
+      { kind: "new", text: "Leads by source shows repeat leads for each source. Pick a source, such as 99acres, to see its own funnel next to the list." },
+      { kind: "improved", text: "The Lead journey on each person's Progress tab now shows Negotiation and Booked, their repeat leads, leads on hold (Future follow-up, Other location) and Not interested, Dropped and Lost separately." },
+      { kind: "improved", text: "Targets sit next to Achievements on personal dashboards. Department tabs add everyone's targets up into one figure per target instead of listing each person." },
+      { kind: "improved", text: "The Telecalling leaderboard shows On-time follow-up before Qualified leads and adds Site visits completed. Signals such as Top performer or Slowing down moved out of the table into their own card." },
+    ],
+  },
+  {
     version: "2.5.7",
     date: "2026-11-24",
     title: "Correct Contacted count in the lead funnel",

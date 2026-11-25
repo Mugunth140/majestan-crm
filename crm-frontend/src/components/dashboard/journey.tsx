@@ -1,5 +1,7 @@
 "use client";
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
+import { useState } from "react";
+import { Funnel } from "./charts";
 import { cn } from "@/lib/utils";
 import { delta, shortDate } from "./format";
 import type { BlockOf, JourneyStage } from "./types";
@@ -58,6 +60,19 @@ function Row({ stage, pct, color, better = "up" }: { stage: JourneyStage; pct: n
   );
 }
 
+/** A labelled group of rows under the main steps, measured against the same first step. */
+function Group({ title, rows, base, color, better = "up" }: { title: string; rows?: JourneyStage[]; base: JourneyStage; color: string; better?: "up" | "down" }) {
+  if (!rows?.length) return null;
+  return (
+    <section className="mt-4 border-t border-dashed pt-3">
+      <h4 className="mb-2 text-[11.5px] font-medium uppercase tracking-wide text-muted-foreground">{title}</h4>
+      <ol className="space-y-3">
+        {rows.map((r) => <Row key={r.key} stage={r} pct={shareOfFirst([base, r], 1)} color={color} better={better} />)}
+      </ol>
+    </section>
+  );
+}
+
 /** A status pipeline as progress bars: each step as a % of what came in, its count, and the change on the previous period. */
 export function Journey({ block }: { block: BlockOf<"journey"> }) {
   const { stages, exits, period } = block;
@@ -76,12 +91,12 @@ export function Journey({ block }: { block: BlockOf<"journey"> }) {
           <Row key={s.key} stage={s} pct={shareOfFirst(stages, i)} color={`var(--seq-${6 - Math.round((i * 2) / last)})`} />
         ))}
       </ol>
-      {exits.length > 0 && (
-        <ol className="mt-4 space-y-3 border-t border-dashed pt-4">
-          {exits.map((e) => (
-            <Row key={e.key} stage={e} pct={shareOfFirst([stages[0], e], 1)} color="var(--status-bad)" better="down" />
-          ))}
-        </ol>
+      {stages[0] && (
+        <>
+          <Group title="Came back" rows={block.extras} base={stages[0]} color="var(--status-good)" />
+          <Group title="On hold" rows={block.parked} base={stages[0]} color="var(--status-warn)" better="down" />
+          <Group title="Dropped out" rows={exits} base={stages[0]} color="var(--status-bad)" better="down" />
+        </>
       )}
     </article>
   );
@@ -114,6 +129,102 @@ export function Compare({ block }: { block: BlockOf<"compare"> }) {
         {block.groups.map((g) => (
           <span key={g.label} className="line-clamp-2 min-w-0 flex-1 text-center text-[11px] leading-tight text-muted-foreground">{g.label}</span>
         ))}
+      </div>
+    </div>
+  );
+}
+
+const OUTCOMES = [
+  { key: "lost", label: "Not interested, lost or dropped", color: "var(--status-bad)" },
+  { key: "parked", label: "Future follow-up or other location", color: "var(--status-warn)" },
+  { key: "open", label: "Still open at this step", color: "var(--seq-3)" },
+] as const;
+
+/** Share of the leads at a step that went no further, rounded; 0 when none got there. */
+export const stoppedShare = (r: { base: number; lost: number; parked: number; open: number }) =>
+  r.base > 0 ? Math.round(((r.lost + r.parked + r.open) / r.base) * 100) : 0;
+
+/** Leads that stopped between funnel steps, split by where they are now. */
+export function Leakage({ block }: { block: BlockOf<"leakage"> }) {
+  return (
+    <div>
+      <ol className="space-y-2.5">
+        {block.rows.map((r) => {
+          const stopped = r.lost + r.parked + r.open;
+          return (
+            <li
+              key={r.from}
+              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:grid-cols-[13rem_minmax(0,1fr)_3rem]"
+              title={`${n.format(stopped)} of ${n.format(r.base)} stopped at ${r.from.toLowerCase()}: ${n.format(r.lost)} lost, ${n.format(r.parked)} parked, ${n.format(r.open)} still open`}
+            >
+              <span className="truncate text-[13px] text-foreground/85">{r.from} <span className="text-muted-foreground">→</span> {r.to}</span>
+              <div className="col-span-2 flex h-2.5 overflow-hidden rounded-full bg-muted sm:col-span-1 sm:col-start-2 sm:row-start-1">
+                {OUTCOMES.map((o) => {
+                  const v = r[o.key];
+                  return v > 0 && r.base > 0 ? <div key={o.key} className="h-full transition-[width] duration-500" style={{ width: `${(v / r.base) * 100}%`, background: o.color }} /> : null;
+                })}
+              </div>
+              <span className="col-start-2 row-start-1 text-right text-[13px] font-medium tabular-nums sm:col-start-3">{stoppedShare(r)}%</span>
+            </li>
+          );
+        })}
+      </ol>
+      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-[11.5px] text-muted-foreground">
+        {OUTCOMES.map((o) => (
+          <span key={o.key} className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-sm" style={{ background: o.color }} />{o.label}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Leads by source on the left; the picked source's funnel through the statuses on the right. */
+export function Sources({ block }: { block: BlockOf<"sources"> }) {
+  const [picked, setPicked] = useState(0);
+  const rows = block.rows;
+  if (!rows.length) return <p className="py-8 text-center text-[13px] text-muted-foreground">No new leads in this period</p>;
+  const sel = rows[Math.min(picked, rows.length - 1)];
+  const max = Math.max(1, ...rows.map((r) => r.leads));
+  return (
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="min-w-0">
+        <div className="mb-1 grid grid-cols-[minmax(0,1fr)_3.5rem_3.5rem_3.5rem] gap-2 px-2 text-[11px] text-muted-foreground">
+          <span />
+          <span className="text-right">Repeat</span>
+          <span className="text-right">Booked</span>
+          <span className="text-right">Leads</span>
+        </div>
+        <ul className="space-y-0.5" role="listbox" aria-label="Lead sources">
+          {rows.map((r, i) => {
+            const on = r === sel;
+            return (
+              <li key={r.label}>
+                <button
+                  type="button" role="option" aria-selected={on} onClick={() => setPicked(i)}
+                  className={cn("grid w-full grid-cols-[minmax(0,1fr)_3.5rem_3.5rem_3.5rem] items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",
+                    on ? "bg-muted" : "hover:bg-muted/50")}
+                >
+                  <span className="min-w-0">
+                    <span className={cn("block truncate", on ? "font-medium text-foreground" : "text-foreground/85")}>{r.label}</span>
+                    <span className="mt-1 block h-1.5 rounded-full bg-muted">
+                      <span className="block h-full rounded-full transition-[width] duration-500" style={{ width: `${Math.max(r.leads ? 1.5 : 0, (r.leads / max) * 100)}%`, background: on ? "var(--seq-6)" : "var(--seq-4)" }} />
+                    </span>
+                  </span>
+                  <span className="text-right tabular-nums text-muted-foreground">{n.format(r.repeats)}</span>
+                  <span className="text-right tabular-nums text-muted-foreground">{n.format(r.booked)}</span>
+                  <span className="text-right font-medium tabular-nums text-foreground">{n.format(r.leads)}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+      <div className="min-w-0 rounded-lg border p-3 sm:p-4">
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <h4 className="text-[13px] font-semibold text-foreground">{sel.label} funnel</h4>
+          <span className="text-[11.5px] text-muted-foreground">{n.format(sel.leads)} new · {n.format(sel.repeats)} repeat</span>
+        </div>
+        <Funnel block={{ kind: "funnel", id: `${block.id}-funnel`, title: `${sel.label} funnel`, span: "full", stages: block.steps.map((label, i) => ({ label, value: sel.funnel[i] ?? 0 })) }} />
       </div>
     </div>
   );

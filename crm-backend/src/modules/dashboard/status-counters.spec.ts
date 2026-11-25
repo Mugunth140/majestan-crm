@@ -1,6 +1,6 @@
 import { DuckDBInstance } from '@duckdb/node-api';
 import { parseRange } from './range';
-import { inboundStatusCounters, journeyMix, journeySeries, statusCounters, type Ctx } from './sql';
+import { inboundStatusCounters, journeyMix, journeySeries, repeatCounters, statusCounters, type Ctx } from './sql';
 import { STATUS_JOURNEYS } from './metrics';
 
 /** The Progress tab's status section, run in DuckDB as the dashboard does. */
@@ -38,10 +38,13 @@ describe('status counts on the Progress tab', () => {
 
     const leads = STATUS_JOURNEYS.telecalling!;
     expect(leads.stages.map(m => m.label)).toEqual([
-      'New leads', 'Contacted', 'Qualified', 'Property shared', 'Interested', 'Site visit scheduled', 'Site visit done', 'Revisit',
+      'New leads', 'Contacted', 'Qualified', 'Property shared', 'Interested', 'Site visit scheduled', 'Site visit done', 'Revisit', 'Negotiation', 'Booked',
     ]);
     const counters = { ...rows.cur, assigned_n: 6 } as Record<string, number>;
-    expect(leads.stages.map(m => counters[m.counter] ?? 0)).toEqual([6, 1, 1, 1, 1, 1, 1, 1]);
+    expect(leads.stages.map(m => counters[m.counter] ?? 0)).toEqual([6, 1, 1, 1, 1, 1, 1, 1, 0, 0]);
+    expect(leads.exits.map(m => m.label)).toEqual(['Not interested', 'Dropped', 'Lost']);
+    expect(leads.parked!.map(m => m.label)).toEqual(['Future follow-up', 'Other location']);
+    expect(leads.extras!.map(m => m.counter)).toEqual(['repeat_n']);
     expect(STATUS_JOURNEYS.sales).toBe(leads);
   });
 
@@ -102,5 +105,26 @@ describe('status counts on the Progress tab', () => {
     expect(await read(journeySeries(ctx, 'hr'))).toEqual(['2026-11-01 apps 1', '2026-11-11 joined 1']);
     expect(await read(journeyMix(ctx, 'hr'))).toEqual(['Joined 1']);
     conn.closeSync();
+  });
+
+  it('splits dropped-out and on-hold statuses and counts repeat leads once per owner', async () => {
+    const ev = (lead: number, type: string, to: string, at: string) => `(${lead}, 7, '${type}', '${to}', TIMESTAMP '${at}')`;
+    const setup = [
+      'CREATE TABLE lead_events (lead_id INT, actor_id INT, type VARCHAR, to_value VARCHAR, created_at TIMESTAMP)',
+      `INSERT INTO lead_events VALUES ${[
+        ev(1, 'status_changed', 'Not Interested', '2026-11-10 05:00:00'), ev(2, 'status_changed', 'Lost', '2026-11-10 05:00:00'),
+        ev(3, 'status_changed', 'Dropped', '2026-11-10 05:00:00'), ev(4, 'status_changed', 'Future Follow-up', '2026-11-10 05:00:00'),
+        ev(5, 'status_changed', 'Other Location', '2026-11-10 05:00:00'),
+        ev(6, 'repeat_enquiry', '99acres', '2026-11-10 05:00:00'), ev(6, 'repeat_enquiry', 'Magicbricks', '2026-11-12 05:00:00'),
+        ev(8, 'repeat_enquiry', 'Website', '2026-11-12 05:00:00'), ev(6, 'repeat_enquiry', '99acres', '2026-10-10 05:00:00'),
+      ].join(',')}`,
+      'CREATE TABLE leads (id INT, assigned_staff_id INT)',
+      'INSERT INTO leads VALUES (6, 7), (8, 9)',
+    ];
+    const status = await run(setup, statusCounters(ctx));
+    expect(status.cur).toMatchObject({ ev_dropped: 3, ev_not_interested: 1, ev_dropped_only: 1, ev_lost: 1, ev_future: 1, ev_other_loc: 1 });
+    const repeats = await run(setup, repeatCounters(ctx));
+    expect(repeats.cur).toMatchObject({ repeat_n: 1 });
+    expect(repeats.prev).toMatchObject({ repeat_n: 1 });
   });
 });

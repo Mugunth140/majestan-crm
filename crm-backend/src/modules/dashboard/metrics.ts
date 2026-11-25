@@ -188,6 +188,8 @@ export type JourneyStageDef = {
 };
 export type JourneyDef = {
   title: string; noun: string; stages: JourneyStageDef[]; exits: JourneyStageDef[];
+  /** Shown apart from the steps: records that came back (repeats) and ones put on hold. */
+  extras?: JourneyStageDef[]; parked?: JourneyStageDef[];
   /** Which records the journey follows, and the steps drawn on its trend chart. */
   kind: 'lead' | 'inbound' | 'hr'; trend: string[];
 };
@@ -206,8 +208,21 @@ const leadJourney: JourneyDef = {
     { key: 'sv_sched', label: 'Site visit scheduled', detail: 'Visit booked with the customer', counter: 'ev_sv_sched', say: ['scheduled {n} site visit', 'scheduled {n} site visits'] },
     { key: 'sv_done', label: 'Site visit done', detail: 'Customer saw the property', counter: 'ev_sv_done', say: ['completed {n} site visit', 'completed {n} site visits'] },
     { key: 'revisit', label: 'Revisit', detail: 'Came back for another look', optional: true, counter: 'ev_revisit', say: ['had {n} revisit', 'had {n} revisits'] },
+    { key: 'nego', label: 'Negotiation', detail: 'Discussing price and terms', optional: true, counter: 'ev_nego', say: ['negotiated with {n}', 'negotiated with {n}'] },
+    { key: 'booked', label: 'Booked', detail: 'Booking advance, agreement or closed won', optional: true, counter: 'ev_booked', say: ['booked {n}', 'booked {n}'] },
   ],
-  exits: [{ key: 'dropped', label: 'Dropped out', detail: 'Not interested, dropped or lost', counter: 'ev_dropped', say: ['{n} lead dropped out', '{n} leads dropped out'] }],
+  extras: [
+    { key: 'repeat', label: 'Repeat leads', detail: 'Their leads that enquired again from a portal, an import or the website', counter: 'repeat_n', say: ['had {n} repeat lead', 'had {n} repeat leads'] },
+  ],
+  parked: [
+    { key: 'future', label: 'Future follow-up', detail: 'Customer asked to be called later', counter: 'ev_future', say: ['parked {n} for later', 'parked {n} for later'] },
+    { key: 'other_loc', label: 'Other location', detail: 'Wants a location we don\'t cover', counter: 'ev_other_loc', say: ['marked {n} other location', 'marked {n} other location'] },
+  ],
+  exits: [
+    { key: 'not_interested', label: 'Not interested', detail: 'Customer said no', counter: 'ev_not_interested', say: ['{n} lead not interested', '{n} leads not interested'] },
+    { key: 'dropped', label: 'Dropped', detail: 'Dropped by the team', counter: 'ev_dropped_only', say: ['{n} lead dropped', '{n} leads dropped'] },
+    { key: 'lost', label: 'Lost', detail: 'Bought elsewhere or went cold', counter: 'ev_lost', say: ['{n} lead lost', '{n} leads lost'] },
+  ],
 };
 
 /** The status journey on a person's Progress tab, for departments that work a module with statuses. */
@@ -243,6 +258,11 @@ export const STATUS_JOURNEYS: Partial<Record<DeptKey, JourneyDef>> = {
     ],
     exits: [{ key: 'rejected', label: 'Rejected', detail: 'Not taken forward', counter: 'hr_rejected', say: ['{n} candidate was rejected', '{n} candidates were rejected'] }],
   },
+};
+
+/** Leaderboard columns where they differ from the first six headline tiles. */
+export const BOARD: Partial<Record<DeptKey, string[]>> = {
+  telecalling: ['calls_out', 'conn_rate', 'first_resp', 'ontime', 'qualified', 'sv_sched', 'sv_done'],
 };
 
 /** Headline tiles per department, in reading order. */

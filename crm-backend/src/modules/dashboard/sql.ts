@@ -155,9 +155,26 @@ export function statusCounters({ ids, range }: Ctx) {
     ${stage('ev_nego', ['Negotiation'])},
     ${stage('ev_booked', BOOKED)},
     ${stage('ev_dropped', DROPPED)},
+    ${stage('ev_not_interested', ['Not Interested'])},
+    ${stage('ev_dropped_only', ['Dropped'])},
+    ${stage('ev_lost', ['Lost'])},
+    ${stage('ev_future', ['Future Follow-up'])},
+    ${stage('ev_other_loc', ['Other Location'])},
     COUNT(*) AS status_changes
   FROM lead_events
   WHERE type = 'status_changed' AND actor_id IN (${ids}) AND ${inBothPeriods('created_at', range)}
+  GROUP BY ALL`;
+}
+
+/**
+ * Repeat enquiries: leads the person owns that came in again (a portal, an import or the
+ * website) in the period. Each lead counts once per period however often it repeated.
+ */
+export function repeatCounters({ ids, range }: Ctx) {
+  return `
+  SELECT l.assigned_staff_id AS uid, ${periodOf('e.created_at', range)} AS p, COUNT(DISTINCT e.lead_id) AS repeat_n
+  FROM lead_events e JOIN leads l ON l.id = e.lead_id
+  WHERE e.type = 'repeat_enquiry' AND l.assigned_staff_id IN (${ids}) AND ${inBothPeriods('e.created_at', range)}
   GROUP BY ALL`;
 }
 
@@ -596,6 +613,26 @@ export function lossReasons({ ids, range }: Ctx) {
 }
 
 /**
+ * Leads created in the period. Leads converted to an inbound or agent are sellers and agents,
+ * not buyers to work, so they stay out.
+ */
+const cohortLeads = (range: Range, owners?: string) => `
+    SELECT id, COALESCE(NULLIF(TRIM(lead_source), ''), 'Unknown') AS source, status, created_at FROM leads
+     WHERE created_at >= ${utcStart(range.from)} AND created_at < ${end(range)} ${owners ? `AND assigned_staff_id IN (${owners})` : ''}
+       AND COALESCE(status, '') <> 'Converted'`;
+
+/**
+ * Leads someone reached: a call that connected, a message or follow-up from a person, or a
+ * status move off New Lead. The follow-up created with every new lead has no author, and
+ * unanswered dials have no duration, so neither counts.
+ */
+const CONTACTED = `
+    SELECT DISTINCT entity_id AS lead_id FROM all_contacts
+     WHERE entity = 'lead' AND sent_by_id IS NOT NULL AND (contact_type <> 'call' OR COALESCE(call_duration, 0) > 0)
+    UNION SELECT DISTINCT lead_id FROM lead_follow_ups WHERE created_by_id IS NOT NULL
+    UNION SELECT DISTINCT lead_id FROM lead_events WHERE type = 'status_changed' AND to_value NOT IN ('New Lead', 'Converted')`;
+
+/**
  * Leads created in the period and how far each got, for the end-to-end funnel
  * and lead source quality. `owners` limits it to leads owned by the population.
  */
@@ -603,18 +640,7 @@ export function leadCohort({ range }: Ctx, owners?: string) {
   const reached = (name: string, values: string[]) =>
     `MAX(CASE WHEN e.to_value IN (${list(values)}) OR l.status IN (${list(values)}) THEN 1 ELSE 0 END) AS ${name}`;
   return `
-  WITH l AS (
-    SELECT id, COALESCE(NULLIF(TRIM(lead_source), ''), 'Unknown') AS source, status, created_at FROM leads
-     WHERE created_at >= ${utcStart(range.from)} AND created_at < ${end(range)} ${owners ? `AND assigned_staff_id IN (${owners})` : ''}
-  ), touched AS (
-    -- Reached the customer: a call that connected, a message or follow-up from a person, or a
-    -- status move off New Lead. The follow-up created with every new lead has no author, and
-    -- unanswered dials have no duration, so neither counts.
-    SELECT DISTINCT entity_id AS lead_id FROM all_contacts
-     WHERE entity = 'lead' AND sent_by_id IS NOT NULL AND (contact_type <> 'call' OR COALESCE(call_duration, 0) > 0)
-    UNION SELECT DISTINCT lead_id FROM lead_follow_ups WHERE created_by_id IS NOT NULL
-    UNION SELECT DISTINCT lead_id FROM lead_events WHERE type = 'status_changed' AND to_value NOT IN ('New Lead', 'Converted')
-  ), j AS (
+  WITH l AS (${cohortLeads(range, owners)}), touched AS (${CONTACTED}), j AS (
     SELECT l.id, l.source,
       CASE WHEN t.lead_id IS NOT NULL OR l.status NOT IN ('New Lead', 'Converted') THEN 1 ELSE 0 END AS contacted,
       ${reached('qualified', [...QUALIFIED, 'Property Shared', 'Site Visit Scheduled', 'Site Visit Completed', 'Re Visit Scheduled', 'Re Visit Completed', 'Negotiation', ...BOOKED])},
@@ -630,6 +656,55 @@ export function leadCohort({ range }: Ctx, owners?: string) {
   SELECT source, COUNT(*) AS leads, SUM(contacted) AS contacted, SUM(qualified) AS qualified, SUM(sv_sched) AS sv_sched,
     SUM(sv_done) AS sv_done, SUM(nego) AS nego, SUM(booked) AS booked, SUM(dropped) AS dropped
   FROM j GROUP BY ALL ORDER BY leads DESC`;
+}
+
+/**
+ * The lead funnel's steps after Contacted, with the statuses that mean a lead reached each
+ * one. A revisit means the first visit was done. Future Follow-up and Other Location park a
+ * lead without moving it along.
+ */
+export const LEAD_PATH: { key: string; label: string; statuses: string[] }[] = [
+  { key: 'qualified', label: 'Qualified', statuses: ['Qualified'] },
+  { key: 'shared', label: 'Property shared', statuses: ['Property Shared'] },
+  { key: 'interested', label: 'Interested', statuses: ['Interested'] },
+  { key: 'sv_sched', label: 'Visit scheduled', statuses: ['Site Visit Scheduled'] },
+  { key: 'sv_done', label: 'Visit completed', statuses: ['Site Visit Completed', 'Re Visit Scheduled', 'Re Visit Completed'] },
+  { key: 'nego', label: 'Negotiation', statuses: ['Negotiation'] },
+  { key: 'booked', label: 'Booked', statuses: BOOKED },
+];
+export const PARKED = ['Future Follow-up', 'Other Location'];
+
+/**
+ * Leads created in the period by the furthest step each reached (0 created, 1 contacted, then
+ * LEAD_PATH in order), how each ended up (lost, parked or still open) and its status now.
+ */
+export function leadPath({ range }: Ctx, owners?: string) {
+  const rank = (col: string) => `CASE ${LEAD_PATH.map((st, i) => `WHEN ${col} IN (${list(st.statuses)}) THEN ${i + 2}`).join(' ')} ELSE 0 END`;
+  return `
+  WITH l AS (${cohortLeads(range, owners)}), touched AS (${CONTACTED}),
+  j AS (
+    SELECT l.id, l.source, l.status,
+      GREATEST(MAX(${rank('e.to_value')}), ${rank('l.status')},
+        CASE WHEN BOOL_OR(t.lead_id IS NOT NULL) OR l.status NOT IN ('New Lead', 'Converted') THEN 1 ELSE 0 END) AS step
+    FROM l LEFT JOIN touched t ON t.lead_id = l.id
+      LEFT JOIN lead_events e ON e.lead_id = l.id AND e.type = 'status_changed'
+    GROUP BY l.id, l.source, l.status
+  )
+  SELECT source, step, CASE WHEN status IN (${list(DROPPED)}) THEN 'lost' WHEN status IN (${list(PARKED)}) THEN 'parked' ELSE 'open' END AS outcome,
+    status, COUNT(*) AS n
+  FROM j GROUP BY ALL`;
+}
+
+/**
+ * Repeat enquiries in the period by the source they came from again: each lead counts once per
+ * source. `owners` limits it to leads owned by the population.
+ */
+export function repeatsBySource({ range }: Ctx, owners?: string) {
+  return `
+  SELECT COALESCE(NULLIF(TRIM(e.to_value), ''), 'Unknown') AS source, COUNT(DISTINCT e.lead_id) AS repeats
+  FROM lead_events e ${owners ? `JOIN leads l ON l.id = e.lead_id AND l.assigned_staff_id IN (${owners})` : ''}
+  WHERE e.type = 'repeat_enquiry' AND e.created_at >= ${utcStart(range.from)} AND e.created_at < ${end(range)}
+  GROUP BY ALL`;
 }
 
 /** Inbound listings by area and by property type in the period. */

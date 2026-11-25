@@ -76,7 +76,7 @@ export type LeaderRow = {
 export type Block =
   | (Base & { kind: 'kpis'; metrics: MetricOut[] })
   | (Base & { kind: 'trend'; fmt: Fmt; series: { key: string; label: string }[]; points: { t: string; v: Record<string, number> }[]; bucket: 'hour' | 'day' | 'week' })
-  | (Base & { kind: 'bars'; fmt: Fmt; bars: Bar[]; secondaryLabel?: string; valueLabel?: string })
+  | (Base & { kind: 'bars'; fmt: Fmt; bars: Bar[]; secondaryLabel?: string; valueLabel?: string; /** Show every bar instead of the first few. */ showAll?: boolean; /** Legend words for bar tones, in place of On track / Watch / Behind. */ toneLabels?: Partial<Record<'good' | 'warn' | 'bad', string>> })
   | (Base & { kind: 'stacked'; fmt: Fmt; keys: { key: string; label: string }[]; rows: { label: string; personId?: number; values: Record<string, number> }[] })
   | (Base & { kind: 'donut'; slices: { label: string; value: number; href?: string }[]; centerLabel: string; /** A big ring with no legend; slices name themselves on hover. */ ring?: boolean })
   | (Base & { kind: 'funnel'; stages: { label: string; value: number; href?: string }[] })
@@ -84,13 +84,19 @@ export type Block =
   | (Base & { kind: 'scatter'; x: { label: string; fmt: Fmt }; y: { label: string; fmt: Fmt }; points: { label: string; x: number; y: number; personId?: number }[] })
   | (Base & { kind: 'radar'; axes: { label: string; value: number }[] })
   | (Base & { kind: 'leaderboard'; columns: { key: string; label: string; fmt: Fmt; better: Better }[]; rows: LeaderRow[] })
+  /** People with something worth a look: leading, slowing, overloaded and the like. */
+  | (Base & { kind: 'signals'; people: { personId: number; name: string; avatar: string | null; role: string; flags: string[] }[] })
   | (Base & { kind: 'insights'; items: Insight[] })
   | (Base & { kind: 'queue'; items: { id: number; name: string; status: string; ownerId: number; owner?: string; due: string | null; reason: string; idleDays: number }[] })
   | (Base & { kind: 'targets'; rows: TargetRow[]; personal: boolean })
   | (Base & { kind: 'table'; metrics: MetricOut[] })
   | (Base & { kind: 'progress'; hero: ProgressHero })
   | (Base & { kind: 'compare'; groups: { label: string; value: number; prev: number; bad: boolean }[] })
-  | (Base & { kind: 'journey'; noun: string; person: string; self: boolean; period: { from: string; to: string; prevFrom: string; prevTo: string }; stages: JourneyStage[]; exits: JourneyStage[] });
+  /** Leads by source with repeat enquiries; picking a source shows its own funnel through the statuses. */
+  | (Base & { kind: 'sources'; steps: string[]; rows: { label: string; leads: number; repeats: number; booked: number; funnel: number[]; href?: string }[] })
+  /** Leads lost between funnel steps, split by where they went: lost, parked, or still open at the step. */
+  | (Base & { kind: 'leakage'; rows: { from: string; to: string; base: number; lost: number; parked: number; open: number; href?: string }[] })
+  | (Base & { kind: 'journey'; noun: string; person: string; self: boolean; period: { from: string; to: string; prevFrom: string; prevTo: string }; stages: JourneyStage[]; exits: JourneyStage[]; extras?: JourneyStage[]; parked?: JourneyStage[] });
 
 export type JourneyStage = { key: string; label: string; detail: string; say: [string, string]; value: number; prev: number; optional?: boolean };
 
@@ -104,6 +110,8 @@ export type ProgressHero = {
   streak: { days: number; metric: string };
   best: { value: number; date: string | null; metric: string; today: number };
   achievements: Achievement[];
+  /** The person's targets, shown beside the achievements. */
+  targets: TargetRow[];
   strengths: MetricOut[];
   weaknesses: MetricOut[];
   change: number | null;

@@ -156,7 +156,7 @@ export function BarList({ block }: { block: BlockOf<"bars"> }) {
   const bars = block.bars;
   if (!bars.length || bars.every((b) => !b.value && !b.secondary)) return <EmptyChart />;
   const max = block.fmt === "pct" ? Math.max(100, ...bars.map((b) => b.value)) : Math.max(1, ...bars.map((b) => b.value));
-  const shown = all ? bars : bars.slice(0, SHOW);
+  const shown = all || block.showAll ? bars : bars.slice(0, SHOW);
   const toned = bars.some((b) => b.tone);
 
   return (
@@ -168,7 +168,7 @@ export function BarList({ block }: { block: BlockOf<"bars"> }) {
         </div>
       )}
       {shown.map((b, i) => <BarRow key={`${b.label}-${i}`} bar={b} max={max} fmt={block.fmt} active={hover === i} dim={hover !== null && hover !== i} onHover={(on) => setHover(on ? i : null)} />)}
-      {bars.length > SHOW && (
+      {bars.length > SHOW && !block.showAll && (
         <button type="button" onClick={() => setAll((v) => !v)} className="mt-1 inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground">
           {all ? "Show fewer" : `Show all ${bars.length}`}
           <ChevronDown className={cn("size-3.5 transition-transform", all && "rotate-180")} />
@@ -178,7 +178,7 @@ export function BarList({ block }: { block: BlockOf<"bars"> }) {
         <div className="flex flex-wrap gap-3 px-2 pt-2 text-[11px] text-muted-foreground">
           {(["good", "warn", "bad"] as Tone[]).filter((t) => bars.some((b) => b.tone === t)).map((t) => {
             const Icon = TONE_ICON[t];
-            return <span key={t} className="inline-flex items-center gap-1"><Icon className="size-3" style={{ color: STATUS[t] }} />{TONE_TEXT[t]}</span>;
+            return <span key={t} className="inline-flex items-center gap-1"><Icon className="size-3" style={{ color: STATUS[t] }} />{block.toneLabels?.[t] ?? TONE_TEXT[t]}</span>;
           })}
         </div>
       )}

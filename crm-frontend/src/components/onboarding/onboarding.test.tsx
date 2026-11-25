@@ -105,10 +105,18 @@ describe("2.5.6", () => {
 });
 
 describe("2.5.7", () => {
-  it("is the app version and announces the Contacted fix", async () => {
+  it("announces the Contacted fix", async () => {
+    const { RELEASES } = await import("@/lib/release");
+    expect(RELEASES.find((r) => r.version === "2.5.7")!.changes[0].text).toMatch(/no longer count every lead as Contacted/);
+  });
+});
+
+describe("2.5.8", () => {
+  it("is the app version and announces the funnel, sources, journey, targets and leaderboard changes", async () => {
     const { APP_VERSION, RELEASES, releasesSince } = await import("@/lib/release");
-    expect(APP_VERSION).toBe("2.5.7");
-    expect(releasesSince("2.5.6", RELEASES).map((r) => r.version)).toEqual(["2.5.7"]);
-    expect(RELEASES[0].changes[0].text).toMatch(/no longer count every lead as Contacted/);
+    expect(APP_VERSION).toBe("2.5.8");
+    expect(releasesSince("2.5.7", RELEASES).map((r) => r.version)).toEqual(["2.5.8"]);
+    const text = RELEASES[0].changes.map((c) => c.text).join(" ");
+    for (const part of [/Lead-to-booking funnel/, /repeat leads for each source/, /Lead journey/, /Targets sit next to Achievements/, /Signals/]) expect(text).toMatch(part);
   });
 });

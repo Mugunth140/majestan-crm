@@ -157,7 +157,6 @@ export function Leaderboard({ block }: { block: BlockOf<"leaderboard"> }) {
             {head("score", "Score", "left")}
             {head("change", "Change")}
             {block.columns.map((c) => <Fragment key={c.key}>{head(c.key, c.label)}</Fragment>)}
-            <th scope="col" className="px-3 py-2.5 pr-4 text-left font-medium sm:pr-5">Signals</th>
           </tr>
         </thead>
         <tbody>
@@ -174,14 +173,35 @@ export function Leaderboard({ block }: { block: BlockOf<"leaderboard"> }) {
                 const top = v !== null && v !== undefined && best[c.key] === v;
                 return <td key={c.key} className={cn("px-3 py-3 text-right tabular-nums", top ? "font-semibold text-foreground" : "text-foreground/80")}>{formatValue(c.fmt, v)}</td>;
               })}
-              <td className="px-3 py-3 pr-4 sm:pr-5">
-                <div className="flex flex-wrap gap-1">{r.flags.length ? r.flags.map((f) => <FlagChip key={f} flag={f} />) : <span className="text-muted-foreground">—</span>}</div>
-              </td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
+  );
+}
+
+/** People the leaderboard flags, each with their signals, as a grid of cards. */
+export function Signals({ block }: { block: BlockOf<"signals"> }) {
+  const { openPerson, canOpen } = useDash();
+  return (
+    <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+      {block.people.map((p) => {
+        const open = canOpen(p.personId) ? () => openPerson(p.personId) : undefined;
+        return (
+          <li key={p.personId}>
+            <button type="button" disabled={!open} onClick={open}
+              className={cn("flex w-full items-start gap-2.5 rounded-lg border bg-background/40 p-3 text-left", open && "hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}>
+              <Avatar name={p.name} src={p.avatar} userId={p.personId} staff className="size-7 shrink-0" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] font-medium text-foreground">{p.name}</span>
+                <span className="mt-1.5 flex flex-wrap gap-1">{p.flags.map((f) => <FlagChip key={f} flag={f} />)}</span>
+              </span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

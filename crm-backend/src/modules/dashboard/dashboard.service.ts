@@ -13,7 +13,7 @@ import {
 } from './range';
 import * as Q from './sql';
 import {
-  addCounters, compute, DEPARTMENTS, DEPT_METRICS, deptKeyOf, deptLabel, HEADLINE, median, percentile,
+  addCounters, compute, DEPARTMENTS, DEPT_METRICS, deptKeyOf, deptLabel, BOARD, HEADLINE, median, percentile,
   SCORE_METRICS, STATUS_JOURNEYS, type Counters, type DeptKey, type JourneyDef, type JourneyStageDef, type MetricDef,
 } from './metrics';
 import { hrTab, sourcingTab } from './module-tabs';
@@ -222,7 +222,7 @@ export class DashboardService {
     const sections = await (dept === 'hr' ? hrTab : sourcingTab)(query, ctx, roster);
     if (members.length) {
       const data = await this.load(members, range);
-      sections.push({ id: `${dept}-board`, title: `${deptLabel(dept)} team`, blocks: [this.leaderboard(`${dept}-board`, 'Team leaderboard', dept, members, data)] });
+      sections.push({ id: `${dept}-board`, title: `${deptLabel(dept)} team`, blocks: this.withSignals(this.leaderboard(`${dept}-board`, 'Team leaderboard', dept, members, data)) });
     }
     return sections;
   }
@@ -254,7 +254,7 @@ export class DashboardService {
   private async counters(ctx: Q.Ctx): Promise<Map<number, PeriodCounters>> {
     const periodQueries = [
       Q.callCounters, Q.touchCounters, Q.followUpDiscipline, Q.statusCounters, Q.responseCounters, Q.crmCompliance,
-      Q.handoffCounters, Q.visitAttendance, Q.salesJourneys, Q.sourcingCounters, Q.verificationCounters, Q.inboundStatusCounters, Q.hrCounters, Q.manualTaskCounters,
+      Q.handoffCounters, Q.visitAttendance, Q.salesJourneys, Q.sourcingCounters, Q.verificationCounters, Q.inboundStatusCounters, Q.repeatCounters, Q.hrCounters, Q.manualTaskCounters,
       Q.leadWorkCounters,
     ];
     const [snapshot, ...results] = await Promise.all([
@@ -471,7 +471,7 @@ export class DashboardService {
     return flags;
   }
 
-  private leaderboard(id: string, title: string, dept: DeptKey, people: Person[], data: Data, peersFor = people, keys = HEADLINE[dept].slice(0, 6)): Block {
+  private leaderboard(id: string, title: string, dept: DeptKey, people: Person[], data: Data, peersFor = people, keys = BOARD[dept] ?? HEADLINE[dept].slice(0, 6)): Block {
     const defs = keys.map(k => ALL_DEFS.get(k)!).filter(Boolean);
     const scored = people.map(p => ({ p, s: this.score(p, data, peersFor.filter(x => x.dept === p.dept)) }));
     const top = new Set(scored.filter(x => x.s.score !== null).sort((a, b) => b.s.score! - a.s.score!).slice(0, Math.min(3, Math.ceil(people.length / 3))).map(x => x.p.id));
@@ -482,6 +482,16 @@ export class DashboardService {
       flags: this.flags(p, data, peersFor.filter(x => x.dept === p.dept), top),
     })).sort((a, b) => (b.score ?? -1) - (a.score ?? -1) || a.name.localeCompare(b.name));
     return { kind: 'leaderboard', id, title, span: 'full', columns: defs.map(d => ({ key: d.key, label: d.label, fmt: d.fmt, better: d.better })), rows };
+  }
+
+  /** A leaderboard and, beside it, the people it flags. */
+  private withSignals(board: Block): Block[] {
+    const rows = (board as Extract<Block, { kind: 'leaderboard' }>).rows.filter(r => r.flags.length);
+    if (!rows.length) return [board];
+    return [board, {
+      kind: 'signals', id: `${board.id}-signals`, title: 'Signals', subtitle: 'Who stands out in this period, and why', span: 'full',
+      people: rows.map(r => ({ personId: r.personId, name: r.name, avatar: r.avatar, role: r.role, flags: r.flags })),
+    }];
   }
 
   private async queue(id: string, title: string, people: Person[], range: Range, limit = 40): Promise<Block> {
@@ -595,7 +605,13 @@ export class DashboardService {
     ];
     if (charts.length) sections.push({ id: 'charts', title: 'Breakdown', blocks: charts });
     const targetRows = data.targets.filter(t => ids.includes(t.personId));
-    if (targetRows.length) sections.push({ id: 'targets', title: 'Targets this month', blocks: [{ kind: 'targets', id: `${dept}-targets`, title: 'Target achievement', span: 'full', rows: targetRows, personal: !!focus }] });
+    if (targetRows.length) {
+      // One person in focus keeps their own targets; the department sees them added up per metric.
+      const people = new Set(targetRows.map(t => t.personId)).size;
+      sections.push({ id: 'targets', title: 'Targets this month', blocks: [focus
+        ? { kind: 'targets', id: `${dept}-targets`, title: 'Target achievement', span: 'full', rows: targetRows, personal: true }
+        : { kind: 'targets', id: `${dept}-targets`, title: 'Department targets', subtitle: `Everyone's targets added up · ${people} ${people === 1 ? 'person' : 'people'}`, span: 'full', rows: combineTargets(targetRows), personal: true }] });
+    }
     sections.push({ id: 'all', title: 'All metrics', blocks: [{ kind: 'table', id: `${dept}-table`, title: 'Every metric', subtitle: focus ? 'Compared with the previous period and the department median' : 'Compared with the previous period', span: 'full', metrics: defs.map(d => this.metric(d, data, ids, peers)) }] });
     return sections;
   }
@@ -629,17 +645,14 @@ export class DashboardService {
   }
 
   /** New leads in the period per source (99acres, website…), with how many were booked. */
-  private sourceBars(id: string, rows: Record<string, number | string>[], span: Block['span']): Block {
-    const sorted = rows.map(r => ({ label: String(r.source), value: Number(r.leads ?? 0), secondary: Number(r.booked ?? 0) }))
-      .filter(r => r.value > 0).sort((a, b) => b.value - a.value);
-    const shown = sorted.length > 12 ? sorted.slice(0, 11) : sorted;
-    const rest = sorted.slice(shown.length);
-    const bars: Bar[] = shown.map(r => ({ ...r, href: leadsHref({ source: r.label }) }));
-    if (rest.length) bars.push({ label: `Other (${rest.length} sources)`, value: rest.reduce((n, r) => n + r.value, 0), secondary: rest.reduce((n, r) => n + r.secondary, 0) });
-    return {
-      kind: 'bars', id, title: 'Leads by source', subtitle: `${sorted.reduce((n, r) => n + r.value, 0)} new leads in the period, and how many were booked`,
-      fmt: 'n', span, valueLabel: 'Leads', secondaryLabel: 'Booked', bars,
-    };
+  /** Leads by source for a team: leads they own, created in the period, and their repeats. */
+  private async teamSources(id: string, range: Range, ids: number[]): Promise<Block> {
+    const ctx: Q.Ctx = { ids: 'NULL', range, now: Q.nowLiteral() };
+    const [path, repeats] = await Promise.all([
+      this.store.query<PathRow>(Q.leadPath(ctx, Q.idList(ids))),
+      this.store.query<{ source: string; repeats: number }>(Q.repeatsBySource(ctx, Q.idList(ids))),
+    ]);
+    return sourcesBlock(id, path, repeats);
   }
 
   private async sourceQuality(range: Range, span: Block['span']): Promise<Block[]> {
@@ -716,7 +729,7 @@ export class DashboardService {
     const sections: Section[] = [
       { id: 'team-key', title: `${deptLabel(dept)} team`, blocks: [{ kind: 'kpis', id: `${dept}-team-kpis`, title: 'Team health', span: 'full', metrics: teamTiles }] },
       { id: 'insights', title: 'What needs attention', blocks: [{ kind: 'insights', id: `${dept}-insights`, title: 'Highlights and risks', span: 'full', items: insights }] },
-      { id: 'board', title: 'People', blocks: [board] },
+      { id: 'board', title: 'People', blocks: this.withSignals(board) },
       {
         id: 'team-charts', title: 'Team breakdown', blocks: [
           ...(targetBars.length ? [{ kind: 'bars', id: `${dept}-target-bars`, title: 'Target vs actual', subtitle: 'Achieved against today’s expected pace', fmt: 'pct', span: 'half', bars: targetBars } as Block] : []),
@@ -725,7 +738,7 @@ export class DashboardService {
           this.trend(`${dept}-team-trend`, 'Team productivity trend', DEPT_SERIES[dept], data, ids, 'half'),
           this.activityCalendar(`${dept}-calendar`, people, data, PRIMARY[dept]),
           ...(dept === 'telecalling' || dept === 'sales'
-            ? [this.sourceBars(`${dept}-sources`, await this.store.query<Record<string, number | string>>(Q.leadCohort({ ids: 'NULL', range: data.range, now: Q.nowLiteral() }, Q.idList(ids))), 'half')]
+            ? [await this.teamSources(`${dept}-sources`, data.range, ids)]
             : []),
         ],
       },
@@ -786,7 +799,7 @@ export class DashboardService {
       score: s.score, scoreBasis: s.basis, rank: rank >= 0 ? rank + 1 : null, rankOf: scores.length,
       streak: { days: streak, metric: SERIES_LABELS[primary] ?? primary },
       best: { ...best, metric: SERIES_LABELS[primary] ?? primary },
-      achievements, strengths, weaknesses, change: this.primaryChange(person, data),
+      achievements, targets, strengths, weaknesses, change: this.primaryChange(person, data),
     };
     const met = targets.filter(t => t.achieved >= t.monthly).length;
     const behind = targets.filter(t => t.achieved < t.expected * 0.9).length;
@@ -818,13 +831,13 @@ export class DashboardService {
           person: viewingSelf ? 'You' : person.name.split(' ')[0], self: viewingSelf,
           period: { from: data.range.from, to: data.range.to, prevFrom: data.range.prevFrom, prevTo: data.range.prevTo },
           stages: journey.stages.map(stage), exits: journey.exits.map(stage),
+          extras: journey.extras?.map(stage), parked: journey.parked?.map(stage),
         }, ...(await this.journeyCharts(journey, person, data))],
       });
     }
     if (deptPeers.length > 1) {
-      sections.push({ id: 'team-board', title: viewingSelf ? 'Your team' : `${deptLabel(dept)} team`, description: 'Everyone in the department, ranked on the same score.', blocks: [this.leaderboard('dept-board', `${deptLabel(dept)} leaderboard`, dept, deptPeers, data)] });
+      sections.push({ id: 'team-board', title: viewingSelf ? 'Your team' : `${deptLabel(dept)} team`, description: 'Everyone in the department, ranked on the same score.', blocks: this.withSignals(this.leaderboard('dept-board', `${deptLabel(dept)} leaderboard`, dept, deptPeers, data)) });
     }
-    if (targets.length) sections.push({ id: 'targets', title: 'Targets', blocks: [{ kind: 'targets', id: 'my-targets', title: 'Today, this week and this month', span: 'full', rows: targets, personal: true }] });
     sections.push(
       { id: 'shared', title: 'At a glance', blocks: [{ kind: 'kpis', id: 'shared-kpis', title: 'Work summary', span: 'full', metrics: shared }] },
       {
@@ -1024,7 +1037,7 @@ export class DashboardService {
     for (const d of DEPARTMENTS) {
       const members = visible.filter(p => p.dept === d.key);
       if (!members.length) continue;
-      sections.push({ id: `people-${d.key}`, title: d.label, blocks: [this.leaderboard(`board-${d.key}`, `${d.label} leaderboard`, d.key, members, data)] });
+      sections.push({ id: `people-${d.key}`, title: d.label, blocks: this.withSignals(this.leaderboard(`board-${d.key}`, `${d.label} leaderboard`, d.key, members, data)) });
     }
     const points = visible.map(p => {
       const c = data.counters.get(p.id)?.cur ?? {};
@@ -1087,13 +1100,15 @@ export class DashboardService {
     const ctx: Q.Ctx = { ids: Q.idList(ids), range, now: Q.nowLiteral() };
     const cur = this.sum(data, ids, 'cur');
     const prev = this.sum(data, ids, 'prev');
-    const [cohort, health, supply, mixRows, forecastCohort, stageRows] = await Promise.all([
+    const [cohort, health, supply, mixRows, forecastCohort, stageRows, pathRows, repeatRows] = await Promise.all([
       this.store.query<Record<string, number | string>>(Q.leadCohort(ctx)),
       this.store.query<Record<string, number>>(Q.dataHealth(ctx)),
       this.store.query<{ label: string; demand: number; supply: number }>(Q.supplyDemand(ctx)),
       this.store.query<{ label: string; value: number }>(Q.statusMix(ctx)),
       this.store.query<Record<string, number | string>>(Q.leadCohort({ ...ctx, range: { ...range, from: addDays(range.today, -179) } })),
       this.store.query<Record<string, number | string>>(Q.sourcingStages(ctx)),
+      this.store.query<PathRow>(Q.leadPath(ctx)),
+      this.store.query<{ source: string; repeats: number }>(Q.repeatsBySource(ctx)),
     ]);
     const total = (rows: Record<string, number | string>[], k: string) => rows.reduce((s, r) => s + Number(r[k] ?? 0), 0);
 
@@ -1113,14 +1128,10 @@ export class DashboardService {
     insights.push(...targetInsights(data.targets, this.monthFraction(range)).slice(0, 3));
 
     // Funnel and leakage.
-    const stages: [string, string][] = [['Leads created', 'leads'], ['Contacted', 'contacted'], ['Qualified', 'qualified'], ['Visit scheduled', 'sv_sched'], ['Visit completed', 'sv_done'], ['Negotiation', 'nego'], ['Booked', 'booked']];
-    const funnel = stages.map(([label, k]) => ({ label, value: total(cohort, k) }));
-    const leakage: Bar[] = funnel.slice(1).map((s, i) => ({
-      label: `${funnel[i].label} → ${s.label}`, value: funnel[i].value ? Math.round(((funnel[i].value - s.value) / funnel[i].value) * 100) : 0,
-      tone: funnel[i].value && (funnel[i].value - s.value) / funnel[i].value > 0.6 ? 'bad' : undefined,
-    }));
-    const worst = [...leakage].filter(l => l.value > 0).sort((a, b) => b.value - a.value)[0];
-    if (worst && funnel[0].value >= MIN_FUNNEL) insights.unshift({ tone: 'bad', title: `Biggest leak: ${worst.label}`, detail: `${worst.value}% of leads created in the period stop at this step.` });
+    const { funnel, leakage, now: statusNow } = leadPathBlocks(pathRows);
+    const worst = leakage.filter(l => l.base > 0 && l.lost + l.parked + l.open > 0)
+      .map(l => ({ ...l, share: Math.round(((l.lost + l.parked + l.open) / l.base) * 100) })).sort((a, b) => b.share - a.share)[0];
+    if (worst && funnel[0].value >= MIN_FUNNEL) insights.unshift({ tone: 'bad', title: `Biggest leak: ${worst.from} → ${worst.to}`, detail: `${worst.share}% of leads that got to ${worst.from.toLowerCase()} went no further.` });
     const unanswered = (cur.assigned_n ?? 0) - (cur.resp_sla_n ?? 0);
     if ((cur.assigned_n ?? 0) >= 10 && unanswered / cur.assigned_n > 0.3) {
       insights.unshift({ tone: 'bad', title: `${Math.round((unanswered / cur.assigned_n) * 100)}% of new leads missed the 1-hour response`, detail: `${unanswered} of ${cur.assigned_n} assignments were not touched within a working hour.` });
@@ -1174,9 +1185,11 @@ export class DashboardService {
       {
         id: 'conversion', title: 'Conversion', description: 'Leads created in the period and how far they got.',
         blocks: [
-          { kind: 'funnel', id: 'org-funnel', title: 'Lead-to-booking funnel', span: 'half', stages: funnel },
-          { kind: 'bars', id: 'org-leakage', title: 'Stage-wise leakage', subtitle: 'Share of leads lost between steps', fmt: 'pct', span: 'half', bars: leakage },
-          this.sourceBars('org-sources', cohort, 'full'),
+          { kind: 'funnel', id: 'org-funnel', title: 'Lead-to-booking funnel', subtitle: 'Each step counts leads that reached it or went further', span: 'half', stages: funnel },
+          { kind: 'leakage', id: 'org-leakage', title: 'Stage-wise leakage', subtitle: 'Leads that stopped at each step, and where they are now', span: 'half', rows: leakage },
+          { kind: 'bars', id: 'org-status-now', title: 'Where these leads are now', subtitle: 'Leads created in the period by their current status', fmt: 'n', span: 'full', bars: statusNow,
+            showAll: true, toneLabels: { good: 'Booked', warn: 'Parked', bad: 'Dropped out' } },
+          sourcesBlock('org-sources', pathRows, repeatRows),
         ],
       },
       await this.requirementsSection(ctx),
@@ -1254,6 +1267,77 @@ export class DashboardService {
       { id: 'queue', title: 'Overdue and neglected', blocks: [await this.queue('org-queue', 'Leads needing action across the business', visible, range, 25)] },
     ];
   }
+}
+
+/** Targets added up per metric, so a department reads as one team rather than person by person. */
+export function combineTargets(rows: TargetRow[]): TargetRow[] {
+  const by = new Map<string, TargetRow>();
+  for (const t of rows) {
+    const c = by.get(t.metric);
+    if (!c) { by.set(t.metric, { ...t, personId: 0, name: 'Department', week: { ...t.week }, today: { ...t.today } }); continue; }
+    c.monthly += t.monthly; c.achieved += t.achieved; c.expected += t.expected; c.forecast += t.forecast;
+    c.week.target += t.week.target; c.week.achieved += t.week.achieved;
+    c.today.goal += t.today.goal; c.today.achieved += t.today.achieved;
+  }
+  return [...by.values()];
+}
+
+type PathRow = { source?: string; step: number; outcome: 'lost' | 'parked' | 'open'; status: string; n: number };
+
+/**
+ * Leads by source, most first, with repeat enquiries and each source's funnel. Sources are matched
+ * ignoring case and spaces, so a repeat from "99Acres" lands on the "99acres" row. Past eleven
+ * sources the rest fold into Other.
+ */
+export function sourcesBlock(id: string, path: PathRow[], repeats: { source: string; repeats: number }[]): Block {
+  const steps = leadPathBlocks([]).funnel.map(f => f.label);
+  const keyOf = (s: string) => s.toLowerCase().replace(/\s+/g, '');
+  const by = new Map<string, { label: string; leads: number; repeats: number; funnel: number[] }>();
+  const row = (label: string) => {
+    const k = keyOf(label);
+    if (!by.has(k)) by.set(k, { label, leads: 0, repeats: 0, funnel: steps.map(() => 0) });
+    return by.get(k)!;
+  };
+  for (const r of path) {
+    const s = row(String(r.source ?? 'Unknown'));
+    const n = Number(r.n);
+    s.leads += n;
+    for (let i = 0; i <= Math.min(Number(r.step), steps.length - 1); i++) s.funnel[i] += n;
+  }
+  for (const r of repeats) row(String(r.source)).repeats += Number(r.repeats);
+  const sorted = [...by.values()].sort((a, b) => b.leads - a.leads || b.repeats - a.repeats);
+  const shown = sorted.length > 12 ? sorted.slice(0, 11) : sorted;
+  const rest = sorted.slice(shown.length);
+  const rows: { label: string; leads: number; repeats: number; booked: number; funnel: number[]; href?: string }[] =
+    shown.map(r => ({ ...r, booked: r.funnel[steps.length - 1], href: leadsHref({ source: r.label }) }));
+  if (rest.length) {
+    const funnel = steps.map((_, i) => rest.reduce((n, r) => n + r.funnel[i], 0));
+    rows.push({ label: `Other (${rest.length} sources)`, leads: rest.reduce((n, r) => n + r.leads, 0), repeats: rest.reduce((n, r) => n + r.repeats, 0), funnel, booked: funnel[steps.length - 1] });
+  }
+  const total = sorted.reduce((n, r) => n + r.leads, 0);
+  return { kind: 'sources', id, title: 'Leads by source', subtitle: `${total} new leads in the period. Pick a source to see how far its leads got.`, span: 'full', steps, rows };
+}
+
+/** Funnel, leakage and current-status bars from leadPath rows. */
+export function leadPathBlocks(rows: PathRow[]) {
+  const steps = [{ label: 'Leads created' }, { label: 'Contacted' }, ...Q.LEAD_PATH.map(p => ({ label: p.label }))];
+  const at = (i: number) => rows.filter(r => Number(r.step) === i);
+  const sum = (list: typeof rows) => list.reduce((a, r) => a + Number(r.n), 0);
+  const funnel = steps.map((st, i) => ({ label: st.label, value: sum(rows.filter(r => Number(r.step) >= i)) }));
+  const leakage = steps.slice(0, -1).map((st, i) => {
+    const stopped = at(i);
+    return {
+      from: st.label, to: steps[i + 1].label, base: funnel[i].value,
+      lost: sum(stopped.filter(r => r.outcome === 'lost')), parked: sum(stopped.filter(r => r.outcome === 'parked')), open: sum(stopped.filter(r => r.outcome === 'open')),
+    };
+  });
+  const order = ['New Lead', 'Contacted', ...Q.LEAD_PATH.flatMap(p => p.statuses), ...Q.PARKED, ...Q.DROPPED];
+  const byStatus = new Map<string, number>();
+  for (const r of rows) byStatus.set(r.status ?? 'Unknown', (byStatus.get(r.status ?? 'Unknown') ?? 0) + Number(r.n));
+  const now: Bar[] = [...byStatus].sort(([a], [b]) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99))
+    .map(([label, value]) => ({ label, value, href: leadsHref({ status: label }),
+      tone: Q.DROPPED.includes(label) ? 'bad' as const : Q.PARKED.includes(label) ? 'warn' as const : Q.BOOKED.includes(label) ? 'good' as const : undefined }));
+  return { funnel, leakage, now };
 }
 
 const MIN_FUNNEL = 10;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { periodLabel, shareOfFirst } from "./journey";
+import { periodLabel, shareOfFirst, stoppedShare } from "./journey";
 import type { JourneyStage } from "./types";
 
 const st = (key: string, value: number): JourneyStage => ({ key, label: key, detail: "", say: ["", ""], value, prev: 0 });
@@ -13,5 +13,9 @@ describe("status journey", () => {
   it("labels the picked period, or a single day", () => {
     expect(periodLabel("2026-10-26", "2026-11-24")).toBe("26 Oct – 24 Nov");
     expect(periodLabel("2026-11-24", "2026-11-24")).toBe("24 Nov");
+  });
+  it("shows the share of leads that stopped at a step", () => {
+    expect(stoppedShare({ base: 453, lost: 80, parked: 0, open: 141 })).toBe(49);
+    expect(stoppedShare({ base: 0, lost: 0, parked: 0, open: 0 })).toBe(0);
   });
 });

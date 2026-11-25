@@ -11,9 +11,9 @@ import { DashContext } from "./chart-kit";
 import { BarList, Donut, Funnel, Heatmap, Radar, Scatter, StackedBars, TrendChart } from "./charts";
 import { RANGES } from "./format";
 import { PeriodPicker } from "@/components/shared/period-picker";
-import { Insights, Kpis, Leaderboard, MetricTable, Queue, Targets } from "./lists";
+import { Insights, Kpis, Leaderboard, Signals, MetricTable, Queue, Targets } from "./lists";
 import { Progress, confetti } from "./progress";
-import { Compare, Journey } from "./journey";
+import { Compare, Journey, Leakage, Sources } from "./journey";
 import { DashboardSkeleton } from "./skeleton";
 import { SubjectPicker } from "./subject-picker";
 import type { Block, RangeKey, Report, Section, Span, Subjects } from "./types";
@@ -271,6 +271,9 @@ function BlockBody({ block }: { block: Block }) {
     case "queue": return <Queue block={block} />;
     case "targets": return <Targets block={block} />;
     case "table": return <MetricTable block={block} />;
+    case "signals": return <Signals block={block} />;
+    case "sources": return <Sources block={block} />;
+    case "leakage": return <Leakage block={block} />;
     case "compare": return <Wide min={block.groups.length * 64}><Compare block={block} /></Wide>;
     default: return null;
   }
