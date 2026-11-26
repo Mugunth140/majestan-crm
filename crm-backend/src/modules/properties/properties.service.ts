@@ -835,7 +835,7 @@ export class PropertiesService {
 
     const VALID_PROPERTY_TYPES = new Set([
       'apartment', 'villa', 'plot', 'commercial', 'coworking',
-      'farmland', 'industrial', 'individual_portion', 'investment_property', 'pg_service_apartment', 'farm_house', 'other',
+      'farmland', 'industrial', 'individual_portion', 'portion', 'investment_property', 'pg_service_apartment', 'farm_house', 'other',
     ]);
 
     for (let idx = 0; idx < (dto.properties as any[]).length; idx++) {

@@ -69,7 +69,7 @@ export class CreatePropertyDto {
   listingType!: 'Sell' | 'Rent';
 
   @IsString()
-  propertyType!: 'apartment' | 'villa' | 'plot' | 'commercial' | 'coworking' | 'farmland' | 'industrial' | 'individual_portion' | 'investment_property' | 'pg_service_apartment' | 'farm_house';
+  propertyType!: 'apartment' | 'villa' | 'plot' | 'commercial' | 'coworking' | 'farmland' | 'industrial' | 'individual_portion' | 'portion' | 'investment_property' | 'pg_service_apartment' | 'farm_house';
 
   @IsOptional() @Type(() => Number) @IsNumber()
   price!: number;

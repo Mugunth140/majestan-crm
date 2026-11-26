@@ -19,13 +19,13 @@ import {
   FieldRow, FOCUS_BUTTON, FOCUS_FIELD, FocusField, FocusModal, FocusSection, ToggleCard, fieldName, stepStatus,
 } from "@/components/shared/focus-modal";
 import {
-  AREA_CATEGORIES, BHK_OPTIONS, DECISION_MAKERS, FACING_OPTIONS, FUNDERS, FURNISHING_OPTIONS,
+  BHK_OPTIONS, DECISION_MAKERS, FACING_OPTIONS, FUNDERS, FURNISHING_OPTIONS,
   PROPERTY_AGE_OPTIONS, PROPERTY_CATEGORIES, PROPERTY_TYPES_MAP, PURCHASE_TIMELINES, PURCHASE_TYPES, QUALIFICATION_PURPOSES,
   asksPropertyAge,
 } from "@/lib/lead-constants";
 import { loadRoadNames, type RoadNameOption } from "@/lib/road-names";
 import { parseIndianCurrency } from "@/lib/indian-currency";
-import { siteFieldValue, siteFieldsFor, siteFieldsTitle } from "@/lib/requirement-site-fields";
+import { requirementShows, siteFieldValue, siteFieldsFor, siteFieldsTitle } from "@/lib/requirement-site-fields";
 import { joinProjects, searchProjects } from "@/lib/project-search";
 import type { DuplicateLeadInfo } from "@/lib/lead-import";
 import { cn } from "@/lib/utils";
@@ -269,8 +269,13 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
       const assignee = isStaff ? (form.assignee === "queue" ? null : user?.id ?? null) : form.assignee === "queue" ? null : Number(form.assignee);
       const { site = {}, ...plainPrefs } = form.prefs;
       const prefs: Record<string, unknown> = Object.fromEntries(Object.entries(plainPrefs).filter(([, v]) => v !== "" && v != null && !(Array.isArray(v) && !v.length)));
-      // Only the questions the chosen category asks; answers left from another category are dropped.
-      for (const f of siteFieldsFor(form.category)) {
+      // Only the questions the chosen category and type ask; answers left from another choice are dropped.
+      const shows = requirementShows(form.category, form.propertyType);
+      if (!shows.rooms) { delete prefs.bhk; delete prefs.floorNumber; }
+      if (!shows.furnishing) delete prefs.furnished;
+      if (!shows.facing) delete prefs.facing;
+      if (!shows.area) { delete prefs.minArea; delete prefs.maxArea; }
+      for (const f of siteFieldsFor(form.category, form.propertyType)) {
         const v = siteFieldValue(f, site[f.key]);
         if (v != null) prefs[f.key] = v;
       }
@@ -523,6 +528,8 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
     );
   } else if (active === "preferences") {
     const p = form.prefs;
+    const shows = requirementShows(form.category, form.propertyType);
+    const siteFields = siteFieldsFor(form.category, form.propertyType);
     body = (
       <FocusSection title="Preferences" description="Optional details that help match the right properties.">
         <FieldRow>
@@ -540,25 +547,31 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
             </FocusField>
           </FieldRow>
         )}
-        {form.category === "residential" && (
-          <>
-            <FocusField label="BHK" optional hint="Pick every size the customer would consider.">
-              <ChipMultiSelect label="BHK" options={BHK_OPTIONS} value={p.bhk ?? []} onChange={(v) => setPref("bhk", v)} />
-            </FocusField>
-            <FieldRow>
+        {shows.rooms && (
+          <FocusField label="BHK" optional hint="Pick every size the customer would consider.">
+            <ChipMultiSelect label="BHK" options={BHK_OPTIONS} value={p.bhk ?? []} onChange={(v) => setPref("bhk", v)} />
+          </FocusField>
+        )}
+        {(shows.furnishing || shows.rooms) && (
+          <FieldRow>
+            {shows.furnishing && (
               <FocusField label="Furnishing" optional>
                 <FormSelect name="furnished" placeholder="Select" className={SELECT} value={p.furnished || null} options={FURNISHING_OPTIONS} onValueChange={(v) => setPref("furnished", v)} />
               </FocusField>
+            )}
+            {shows.rooms && (
               <FocusField label="Floor" htmlFor="nl-floor" optional>
                 <Input id="nl-floor" value={p.floorNumber ?? ""} onChange={(e) => setPref("floorNumber", e.target.value)} placeholder="Ground, 1st, High" className={INPUT} />
               </FocusField>
-            </FieldRow>
-            <FocusField label="Facing" optional>
-              <ChipMultiSelect label="Facing" options={FACING_OPTIONS} value={p.facing ?? []} exclusive="Any" onChange={(v) => setPref("facing", v)} />
-            </FocusField>
-          </>
+            )}
+          </FieldRow>
         )}
-        {AREA_CATEGORIES.includes(form.category) && (
+        {shows.facing && (
+          <FocusField label="Facing" optional>
+            <ChipMultiSelect label="Facing" options={FACING_OPTIONS} value={p.facing ?? []} exclusive="Any" onChange={(v) => setPref("facing", v)} />
+          </FocusField>
+        )}
+        {shows.area && (
           <FieldRow>
             <FocusField label="Min area" htmlFor="nl-mina" optional>
               <Input id="nl-mina" type="number" min="0" value={p.minArea ?? ""} onChange={(e) => setPref("minArea", e.target.value)} placeholder="sq ft" className={INPUT} />
@@ -568,11 +581,11 @@ export function NewLeadModal({ open, onOpenChange, onCreated }: {
             </FocusField>
           </FieldRow>
         )}
-        {siteFieldsFor(form.category).length > 0 && (
+        {siteFields.length > 0 && (
           <div className="space-y-3 pt-1">
             <p className="text-[13px] font-medium text-muted-foreground">{siteFieldsTitle(form.category)}</p>
             <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
-              {siteFieldsFor(form.category).map((f) => {
+              {siteFields.map((f) => {
                 const v = p.site?.[f.key];
                 const put = (val: string | boolean) => setPref("site", { ...p.site, [f.key]: val });
                 const id = `nl-site-${f.key}`;

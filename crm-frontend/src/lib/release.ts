@@ -13,6 +13,16 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2.5.11",
+    date: "2026-11-26",
+    title: "Individual Portion, smarter requirements and India-time analytics",
+    changes: [
+      { kind: "new", text: "Properties has a new type: Individual Portion, for a single portion of a house. It shows on the website and matches Independent House and Builder Floor requirements." },
+      { kind: "fixed", text: "Lead requirements ask what fits the property type. Offices, shops and showrooms ask about furnishing; warehouse and factory questions only show for warehouse and industrial types; plots skip BHK, furnishing and floor." },
+      { kind: "fixed", text: "Website analytics counts days in India time, so a new day starts at 12:00 AM IST instead of 5:30 AM. Early-morning enquiries now count on the right day." },
+    ],
+  },
+  {
     version: "2.5.10",
     date: "2026-11-26",
     title: "A clearer Assign on Inbound",

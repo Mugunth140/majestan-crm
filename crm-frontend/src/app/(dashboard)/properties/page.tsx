@@ -44,6 +44,7 @@ const PROPERTY_TYPE_OPTIONS = [
   { value: "farmland", label: "Farmland" },
   { value: "industrial", label: "Industrial" },
   { value: "individual_portion", label: "Independent House" },
+  { value: "portion", label: "Individual Portion" },
   { value: "investment_property", label: "Investment Property" },
   { value: "farm_house", label: "Farm House" },
   { value: "pg_service_apartment", label: "PG / Service Apartment" },

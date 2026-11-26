@@ -1312,7 +1312,7 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
   const rentPerSqft = calculateRentPerSqft(parseIndianCurrency(price), measuredAreaSqft ?? 0);
   const automaticPricePerSqft = calculateRentPerSqft(parseIndianCurrency(price), measuredAreaSqft ?? 0);
   const expectedMonthlyRentPerSqft = calculateRentPerSqft(parseIndianCurrency(monthlyRent), measuredAreaSqft ?? 0);
-  const isResidential = ["apartment", "villa", "individual_portion", "investment_property", "pg_service_apartment", "farm_house"].includes(propertyType);
+  const isResidential = ["apartment", "villa", "individual_portion", "portion", "investment_property", "pg_service_apartment", "farm_house"].includes(propertyType);
   const generalFinance = propertyType === "apartment" && listingType === "Buy";
   // Only Plot exposes a selectable rate basis. Normalize it when changing type.
   useEffect(() => {
@@ -1655,7 +1655,7 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
       errs.push({ field: "landArea", message: "Enter a valid nonnegative land area." });
     }
     const activeMeasurements: [string, string][] =
-      ["apartment", "villa", "individual_portion", "investment_property", "pg_service_apartment", "farm_house"].includes(propertyType)
+      ["apartment", "villa", "individual_portion", "portion", "investment_property", "pg_service_apartment", "farm_house"].includes(propertyType)
         ? [["builtUpArea", builtUpArea], ["carpetArea", carpetArea], ["plotArea", plotArea], ["superBuiltUpArea", superBuiltUpArea], ["udsArea", udsArea]]
         : propertyType === "commercial" ? [["builtUpArea", builtUpArea], ["carpetArea", carpetArea], ["plotArea", plotArea], ["udsArea", udsArea]]
         : propertyType === "coworking" ? [["builtUpArea", builtUpArea], ["carpetArea", carpetArea]]
@@ -1897,7 +1897,7 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
       };
 
       // Apartment / Villa / Individual Portion fields
-      if (["apartment", "villa", "individual_portion", "investment_property", "pg_service_apartment", "farm_house"].includes(propertyType)) {
+      if (["apartment", "villa", "individual_portion", "portion", "investment_property", "pg_service_apartment", "farm_house"].includes(propertyType)) {
         Object.assign(payload, {
           unitType: unitType.trim() || undefined,
           unitNumber: unitNumber.trim() || undefined,
@@ -3530,7 +3530,7 @@ export function PropertyForm({ mode, initialData, onSuccess, onClose }: Property
           </DetailGroups>
         </section>}
         {/* ---- Apartment / Villa / Individual House Details ---- */}
-        {["apartment", "villa", "individual_portion", "investment_property", "farm_house"].includes(propertyType) && (
+        {["apartment", "villa", "individual_portion", "portion", "investment_property", "farm_house"].includes(propertyType) && (
           <div className={sec("details")} data-pf-step="details">
             <h3 className={sectionTitle}>
               {PROPERTY_TYPE_LABELS[propertyType]}

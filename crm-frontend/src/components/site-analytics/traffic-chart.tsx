@@ -61,7 +61,7 @@ export function TrafficChart({
   return (
     <DataCard title="Traffic over time" columns={false}>
       <div className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs text-muted-foreground">
-        <span>Daily totals · UTC</span>
+        <span>Daily totals · IST</span>
         <div
           className="flex gap-1 rounded-lg bg-muted p-1"
           aria-label="Chart metric"
@@ -120,7 +120,7 @@ export function TrafficChart({
           }}
         >
           <title>
-            Daily {metric === "visitors" ? "visitors" : "page views"} in UTC
+            Daily {metric === "visitors" ? "visitors" : "page views"} in IST
           </title>
           <defs>
             <clipPath id={`clip-${id}`}>

@@ -7,6 +7,7 @@ import {
   DEFAULT_RANGE,
   duration,
   selectedRange,
+  istDateTime,
   vitalRating,
   countryLabel,
   restoreRange,
@@ -15,16 +16,22 @@ import { analyticsFixture } from "@/components/site-analytics/test-fixtures";
 import { NAVIGATION, canSee } from "@/components/layout/nav-items";
 import { lockedFor } from "./nav-access";
 describe("website analytics presentation rules", () => {
-  it("uses UTC days across local midnight and remembers relative presets", () => {
+  it("starts a new day at 00:00 IST and remembers relative presets", () => {
+    // 00:15 IST on 6 Nov is already 6 Nov, though UTC is still 5 Nov.
     expect(
       selectedRange(DEFAULT_RANGE, Date.parse("2026-11-06T00:15:00+05:30")),
-    ).toEqual({ from: "2026-10-30", to: "2026-11-06" });
+    ).toEqual({ from: "2026-10-31", to: "2026-11-07" });
+    // 22:00 UTC on 6 Nov is 03:30 IST on 7 Nov.
     expect(
       selectedRange(
         { preset: "today", from: "", to: "" },
         Date.parse("2026-11-06T22:00:00Z"),
       ),
+    ).toEqual({ from: "2026-11-07", to: "2026-11-08" });
+    expect(
+      selectedRange({ preset: "today", from: "", to: "" }, Date.parse("2026-11-06T23:59:00+05:30")),
     ).toEqual({ from: "2026-11-06", to: "2026-11-07" });
+    expect(istDateTime("2026-11-25 21:57:07")).toMatch(/26 Nov 2026.*3:27\s?am IST/i);
     expect(
       restoreRange({ preset: "unbounded", from: "", to: "" }),
     ).toBeUndefined();

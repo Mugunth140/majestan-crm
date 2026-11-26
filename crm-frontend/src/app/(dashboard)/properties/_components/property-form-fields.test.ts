@@ -210,3 +210,19 @@ describe("Owner occupied", () => {
     expect(visible("ownerOccupied", "apartment", "Rent")).toBe(false);
   });
 });
+
+describe("Individual Portion", () => {
+  it("has the house's home fields without the whole-plot ones, and always asks which portion", () => {
+    for (const listing of ["Buy", "Rent"]) {
+      for (const field of ["bedrooms", "bathrooms", "floorNumber", "furnishingStatus", "ownerOccupied", "parkingSpaces"]) expect(visible(field, "portion", listing), `${field} ${listing}`).toBe(true);
+      for (const field of ["plotArea", "plotBoundaries", "numberOfPortions", "hasGroundFloor", "architecturalStyle", "landArea"]) expect(visible(field, "portion", listing), `${field} ${listing}`).toBe(false);
+      expect(visible("availablePortion", "portion", listing)).toBe(true);
+    }
+    expect(visible("availablePortion", "individual_portion", "Rent")).toBe(false);
+  });
+
+  it("can be listed for sale and for rent", () => {
+    expect(isPropertyTypeAllowed("portion", "Buy", "Individual Portion")).toBe(true);
+    expect(isPropertyTypeAllowed("portion", "Rent", "Individual Portion")).toBe(true);
+  });
+});

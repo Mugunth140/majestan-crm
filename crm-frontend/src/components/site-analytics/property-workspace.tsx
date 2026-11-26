@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { AlertTriangle, ChevronRight, X } from "lucide-react";
 import { apiJson } from "@/lib/api-fetch";
 import { cn } from "@/lib/utils";
+import { istDate } from "@/lib/site-analytics";
 import { SearchableFormSelect } from "@/components/shared/form-select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toolbarFilterButton, segmentClass } from "@/components/layout/list-page";
@@ -164,7 +165,7 @@ export function PropertyWorkspace({ from, to }: { from: string; to: string }) {
                   ))}
                   <label className="flex flex-col gap-1 text-[12px] text-muted-foreground sm:col-span-2">
                     Inventory as it was on
-                    <input type="date" min={shown?.coverage.historyFrom?.slice(0, 10)} max={new Date().toISOString().slice(0, 10)} value={filters.asOf || ""}
+                    <input type="date" min={shown?.coverage.historyFrom?.slice(0, 10)} max={istDate(Date.now())} value={filters.asOf || ""}
                       onChange={(e) => change("asOf", e.target.value)}
                       className="h-8 rounded-md border bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-1/2" />
                   </label>

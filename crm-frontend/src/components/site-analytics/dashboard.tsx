@@ -23,6 +23,7 @@ import {
   percent,
   restoreRange,
   selectedRange,
+  ANALYTICS_TIME_ZONE,
   MAX_RANGE_DAYS,
   type RangeSelection,
   type SiteReport,
@@ -319,8 +320,8 @@ export function SiteAnalyticsDashboard() {
           value={selection.preset}
           from={selection.from}
           to={selection.to}
-          timeZone="UTC"
-          note={`UTC days · up to ${MAX_RANGE_DAYS} days`}
+          timeZone={ANALYTICS_TIME_ZONE}
+          note={`India time (IST) days · up to ${MAX_RANGE_DAYS} days`}
           onPreset={(preset) => setSelection((s) => ({ ...s, preset }))}
           onRange={(from, to) => setSelection({ preset: "custom", from, to })}
         />
@@ -394,7 +395,7 @@ export function SiteAnalyticsDashboard() {
           report.performance.length === 0 ? (
             <DataCard title="No website activity in this range" columns={false}>
               <p className="py-8 text-sm text-muted-foreground">
-                Try a different UTC date range. Visits appear here after the
+                Try a different date range. Visits appear here after the
                 website collector is enabled and receives traffic.
               </p>
             </DataCard>

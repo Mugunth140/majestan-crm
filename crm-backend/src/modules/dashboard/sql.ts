@@ -806,7 +806,7 @@ export function supplyDemand({ range }: Ctx) {
 // ── Residential or commercial ────────────────────────────────────────────
 
 /** Home types; anything else with a type is commercial (offices, shops, warehouses, land for business). */
-const HOME_TYPES = ['apartment', 'villa', 'independent_house', 'individual_portion', 'plot', 'farm_house', 'builder_floor', 'row_house', 'penthouse', 'studio', 'pg_service_apartment'];
+const HOME_TYPES = ['apartment', 'villa', 'independent_house', 'individual_portion', 'portion', 'plot', 'farm_house', 'builder_floor', 'row_house', 'penthouse', 'studio', 'pg_service_apartment'];
 
 /**
  * 'residential', 'commercial' or 'unknown', from the record's category, else its property type.

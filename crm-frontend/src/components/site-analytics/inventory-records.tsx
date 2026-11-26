@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiJson } from "@/lib/api-fetch";
+import { istDateTime } from "@/lib/site-analytics";
 import {
   Dialog,
   DialogContent,
@@ -405,7 +406,7 @@ export function ListingInsightsDialog({
         <DialogHeader>
           <DialogTitle>{data?.record.title || "Listing insights"}</DialogTitle>
           <DialogDescription>
-            UTC activity, current listing information and recorded history.
+            India-time (IST) activity, current listing information and recorded history.
           </DialogDescription>
         </DialogHeader>
         {result?.key !== query ? (
@@ -598,7 +599,7 @@ export function ListingInsightsDialog({
                         {e.subject} · {e.action}
                       </strong>
                       <span className="ml-3 text-muted-foreground">
-                        {e.at} UTC
+                        {istDateTime(e.at)}
                       </span>
                       <p className="mt-1">
                         {changedFields(e.before_json, e.after_json)}

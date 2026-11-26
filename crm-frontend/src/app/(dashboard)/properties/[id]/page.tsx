@@ -275,7 +275,7 @@ export default function PropertyViewPage() {
     }
     return `${initialArea(det[field], field, det.measurementUnits ?? {}, base)} ${det.measurementUnits?.[field] || base}`;
   };
-  const isApartmentLike = ["apartment", "villa", "individual_portion", "investment_property", "pg_service_apartment", "farm_house"].includes(type);
+  const isApartmentLike = ["apartment", "villa", "individual_portion", "portion", "investment_property", "pg_service_apartment", "farm_house"].includes(type);
   const isPlotLike = ["plot", "farmland"].includes(type);
 
   const title = property.title || `Property #${property.id}`;

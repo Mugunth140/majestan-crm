@@ -27,7 +27,7 @@ export function analyticsRange(from: unknown, to: unknown) {
     Date.parse(to) - Date.parse(from) > MAX_DAYS * DAY
   ) {
     throw new BadRequestException(
-      `Use valid UTC dates from < to, at most ${MAX_DAYS} days. The end date is exclusive.`,
+      `Use valid dates (India time days) from < to, at most ${MAX_DAYS} days. The end date is exclusive.`,
     );
   }
   return { from, to };

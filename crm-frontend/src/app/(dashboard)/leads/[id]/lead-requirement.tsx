@@ -3,12 +3,12 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 import {
-  AREA_CATEGORIES, BHK_OPTIONS as BHK, CAR_PARKING_OPTIONS, LIFT_OPTIONS, DECISION_MAKERS, FACING_OPTIONS as FACING, FUNDERS, FURNISHING_OPTIONS as FURNISHING, PROPERTY_AGE_OPTIONS, PROPERTY_CATEGORIES, PROPERTY_TYPES_MAP, PURCHASE_TIMELINES, PURCHASE_TYPES, QUALIFICATION_PURPOSES, asksPropertyAge, facingList, prefList,
+  BHK_OPTIONS as BHK, CAR_PARKING_OPTIONS, LIFT_OPTIONS, DECISION_MAKERS, FACING_OPTIONS as FACING, FUNDERS, FURNISHING_OPTIONS as FURNISHING, PROPERTY_AGE_OPTIONS, PROPERTY_CATEGORIES, PROPERTY_TYPES_MAP, PURCHASE_TIMELINES, PURCHASE_TYPES, QUALIFICATION_PURPOSES, asksPropertyAge, facingList, prefList,
 } from "@/lib/lead-constants";
 import { formatIndianCurrencyShort, parseIndianCurrency } from "@/lib/indian-currency";
 import { loadRoadNames } from "@/lib/road-names";
 import { joinProjects, searchProjects, splitProjects } from "@/lib/project-search";
-import { siteFieldValue, siteFieldsFor, siteFieldsTitle, type SiteField } from "@/lib/requirement-site-fields";
+import { requirementShows, siteFieldValue, siteFieldsFor, siteFieldsTitle, type SiteField } from "@/lib/requirement-site-fields";
 import { InlineCheck, InlineMulti, InlineSearchMulti, InlineSelect, InlineText, withCurrent, type Option } from "@/components/record/inline-field";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api/v1";
@@ -49,7 +49,6 @@ const withCurrentList = (options: Option[], values: string[]) =>
   [...options, ...values.filter((v) => !options.some((o) => o.value === v)).map((v) => ({ label: v, value: v }))];
 
 // Parking, lift and pets matter for homes and offices, not land.
-const AMENITY_CATEGORIES = ["residential", "commercial"];
 
 const money = (v: unknown) => (typeof v === "number" ? formatIndianCurrencyShort(v) : v == null ? "" : String(v));
 
@@ -109,7 +108,8 @@ export function RequirementFields({ inquiry, canEdit, save }: {
       onSave={(v) => setPref(key, v ? parseIndianCurrency(v) || null : null)} />
   );
 
-  const siteFields = siteFieldsFor(category);
+  const siteFields = siteFieldsFor(category, inquiry.property_type);
+  const shows = requirementShows(category, inquiry.property_type);
   const siteInput = (f: SiteField) => {
     const raw = prefs[f.key];
     const save = (v: unknown) => setPref(f.key, siteFieldValue(f, v));
@@ -154,34 +154,38 @@ export function RequirementFields({ inquiry, canEdit, save }: {
           <InlineSelect clearable label="Property age" value={propertyAge} options={withCurrent(PROPERTY_AGE_OPTIONS, propertyAge)} disabled={off}
             onSave={(v) => setPref("propertyAge", v)} />
         )}
-        {category === "residential" && (
-          <>
-            <InlineMulti label="BHK" values={bhk} options={withCurrentList(BHK, bhk)} disabled={off}
-              onSave={(v) => setPref("bhk", v.length ? prefList(v, BHK) : null)} />
-            <InlineMulti label="Furnishing" values={furnished} options={withCurrentList(FURNISHING, furnished)} disabled={off}
-              onSave={(v) => setPref("furnished", v.length ? prefList(v, FURNISHING) : null)} />
-            <InlineText label="Floor" value={prefs.floorNumber as string | undefined} placeholder="e.g. Ground, 1st, High" disabled={off} onSave={(v) => setPref("floorNumber", v)} />
-            <InlineMulti label="Facing" values={facing} options={withCurrentList(FACING, facing)} disabled={off}
-              onSave={(v) => { const list = facingList(v); return setPref("facing", list.length ? prefList(list, FACING) : null); }} />
-          </>
+        {shows.rooms && (
+          <InlineMulti label="BHK" values={bhk} options={withCurrentList(BHK, bhk)} disabled={off}
+            onSave={(v) => setPref("bhk", v.length ? prefList(v, BHK) : null)} />
         )}
-        {category && AREA_CATEGORIES.includes(category) && (
+        {shows.furnishing && (
+          <InlineMulti label="Furnishing" values={furnished} options={withCurrentList(FURNISHING, furnished)} disabled={off}
+            onSave={(v) => setPref("furnished", v.length ? prefList(v, FURNISHING) : null)} />
+        )}
+        {shows.rooms && (
+          <InlineText label="Floor" value={prefs.floorNumber as string | undefined} placeholder="e.g. Ground, 1st, High" disabled={off} onSave={(v) => setPref("floorNumber", v)} />
+        )}
+        {shows.facing && (
+          <InlineMulti label="Facing" values={facing} options={withCurrentList(FACING, facing)} disabled={off}
+            onSave={(v) => { const list = facingList(v); return setPref("facing", list.length ? prefList(list, FACING) : null); }} />
+        )}
+        {shows.area && (
           <>
             <InlineText label="Min area" type="number" value={prefs.minArea as string | undefined} placeholder="sq ft" disabled={off} onSave={(v) => setPref("minArea", v)} />
             <InlineText label="Max area" type="number" value={prefs.maxArea as string | undefined} placeholder="sq ft" disabled={off} onSave={(v) => setPref("maxArea", v)} />
           </>
         )}
-        {category && AMENITY_CATEGORIES.includes(category) && (
-          <>
-            <InlineSelect clearable label="Car parking" value={prefs.carParking == null ? null : String(prefs.carParking)} options={CAR_PARKING_OPTIONS} disabled={off}
-              onSave={(v) => setPref("carParking", v)} />
-            {category === "residential" && (
-              <InlineSelect clearable label="Lift" value={prefs.lift == null ? null : String(prefs.lift)} options={LIFT_OPTIONS} disabled={off}
-                onSave={(v) => setPref("lift", v)} />
-            )}
-            <InlineCheck label="Pet friendly" text="Needs a pet-friendly home" checked={prefs.petFriendly === true} disabled={off}
-              onSave={(v) => setPref("petFriendly", v || null)} />
-          </>
+        {shows.carParking && (
+          <InlineSelect clearable label="Car parking" value={prefs.carParking == null ? null : String(prefs.carParking)} options={CAR_PARKING_OPTIONS} disabled={off}
+            onSave={(v) => setPref("carParking", v)} />
+        )}
+        {shows.rooms && (
+          <InlineSelect clearable label="Lift" value={prefs.lift == null ? null : String(prefs.lift)} options={LIFT_OPTIONS} disabled={off}
+            onSave={(v) => setPref("lift", v)} />
+        )}
+        {shows.petFriendly && (
+          <InlineCheck label="Pet friendly" text="Needs a pet-friendly home" checked={prefs.petFriendly === true} disabled={off}
+            onSave={(v) => setPref("petFriendly", v || null)} />
         )}
         {inquiry.property_type === "independent_house" && (
           <InlineCheck label="Owner occupied" text="Wants an owner-occupied house" checked={prefs.ownerOccupied === true} disabled={off}

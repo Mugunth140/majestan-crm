@@ -71,6 +71,17 @@ const DAY = 86400_000;
 /** The server takes at most a year. */
 export const MAX_RANGE_DAYS = 366;
 export const utcDate = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+/** Analytics days are India-time days: a new day starts at 00:00 IST. */
+export const ANALYTICS_TIME_ZONE = "Asia/Kolkata";
+/** The IST calendar day an instant falls on. */
+export const istDate = (ms: number) => utcDate(ms + 330 * 60_000);
+/** A UTC timestamp from the analytics store ("2026-11-26 08:32:41"), shown in IST. */
+export const istDateTime = (utc: string) => {
+  const at = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(utc) ? utc : utc.replace(" ", "T") + "Z");
+  return Number.isFinite(at.getTime())
+    ? new Intl.DateTimeFormat("en-IN", { timeZone: ANALYTICS_TIME_ZONE, day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }).format(at) + " IST"
+    : utc;
+};
 export function restoreRange(raw: unknown): RangeSelection | undefined {
   if (!raw || typeof raw !== "object") return;
   const r = raw as Partial<RangeSelection>;
@@ -83,7 +94,7 @@ export function restoreRange(raw: unknown): RangeSelection | undefined {
   return r as RangeSelection;
 }
 export function selectedRange(selection: RangeSelection, now = Date.now()) {
-  const today = Date.parse(utcDate(now));
+  const today = Date.parse(istDate(now));
   if (selection.preset !== "custom") {
     const days = selection.preset === "today" ? 1 : Number(selection.preset);
     return {

@@ -38,6 +38,7 @@ const TYPE_NAMES: Record<string, string> = {
   apartment: 'Apartment',
   villa: 'Villa',
   individual_portion: 'Independent House',
+  portion: 'Individual Portion',
   investment_property: 'Investment Property',
   pg_service_apartment: 'PG / Service Apartment',
   farm_house: 'Farm House',
@@ -47,7 +48,7 @@ const TYPE_NAMES: Record<string, string> = {
   coworking: 'Coworking Space',
   industrial: 'Industrial Property',
 };
-const BHK_TYPES = ['apartment', 'villa', 'individual_portion', 'investment_property', 'farm_house'];
+const BHK_TYPES = ['apartment', 'villa', 'individual_portion', 'portion', 'investment_property', 'farm_house'];
 
 /**
  * The name a property goes out under, e.g. "3BHK Apartment in Valavalli,

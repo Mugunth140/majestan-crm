@@ -86,6 +86,9 @@ export const PROPERTY_FIELD_RULES: Record<string, FieldRule> = {
   incrementalRent: { types: ["coworking"], listing: "Rent" },
 };
 
+/** Whole-house and plot fields an individual portion doesn't have. */
+const PORTION_HIDDEN = ["plotArea", "plotBoundaries", "plotFacing", "numberOfPortions", "hasGroundFloor", "architecturalStyle", "availableFloorNumbers", "landArea"];
+
 export function isPropertyFieldVisible(
   field: string,
   propertyType: string | null | undefined,
@@ -97,6 +100,13 @@ export function isPropertyFieldVisible(
   // values like an empty selection, including older drafts and API records.
   propertyType ??= "";
   furnishingStatus ??= "";
+  // An individual portion is one floor or part of a house: the house's fields,
+  // without the whole-plot ones, and always which portion is on offer.
+  if (propertyType === "portion") {
+    if (PORTION_HIDDEN.includes(field)) return false;
+    if (field === "availablePortion") return true;
+    return isPropertyFieldVisible(field, "individual_portion", listingType, tenantOccupied, furnishingStatus);
+  }
   if (propertyType === "pg_service_apartment") {
     if (field === "superBuiltUpArea") return true;
     if (["individualBathrooms", "attachedBathrooms", "negotiable", "taxes", "roadName", "roadAccess", "rentPerSqft", "unitType", "unitNumber", "numberOfFlats", "towerNos", "noOfLifts", "parking", "parkingType", "guestParking", "udsArea", "outdoorSpaces", "floorFacing", "propertyFacing", "openSides", "suitableFor", "securityDeposit", "maintenanceCharges", "lockInPeriod", "tenantOccupied", "roomDimensions", "furnishingItemIds", "approvals"].includes(field)) return false;
@@ -443,7 +453,8 @@ export const PROPERTY_TYPE_LABELS: Record<string, string> = {
   apartment: "Apartment details",
   pg_service_apartment: "PG / Service Apartment details",
   villa: "Villa details",
-  individual_portion: "Individual portion details",
+  individual_portion: "Independent house details",
+  portion: "Individual portion details",
   investment_property: "Investment Property details",
   plot: "Plot details",
   farmland: "Farmland details",
