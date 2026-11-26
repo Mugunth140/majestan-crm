@@ -3,7 +3,7 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException,
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from '../../database/entities/user.entity';
-import { In, Repository } from 'typeorm';
+import { In, Not, Repository } from 'typeorm';
 import { Inbound } from '../../database/entities/inbound.entity';
 import { InboundFollowUp } from '../../database/entities/inbound-follow-up.entity';
 import { InboundContactLog } from '../../database/entities/inbound-contact-log.entity';
@@ -259,8 +259,14 @@ export class InboundsService {
   async assignableStaff() {
     const people = await this.userRepository().find({ where: { is_active: true }, relations: { department: true },
       select: { id: true, name: true, department: { id: true, name: true } }, order: { name: 'ASC' } });
-    return people.filter(person => canHoldInbounds(person.department?.name))
-      .map(person => ({ id: person.id, name: person.name }));
+    const staff = people.filter(person => canHoldInbounds(person.department?.name));
+    // How many open inbounds each person already holds, so Assign can spread the work.
+    const held = staff.length ? await this.inboundsRepository.find({
+      where: { assigned_staff_id: In(staff.map(person => person.id)), status: Not('Closed') }, select: { id: true, assigned_staff_id: true },
+    }) : [];
+    const open = new Map<number, number>();
+    for (const r of held) open.set(r.assigned_staff_id, (open.get(r.assigned_staff_id) ?? 0) + 1);
+    return staff.map(person => ({ id: person.id, name: person.name, department: person.department?.name ?? null, open: open.get(person.id) ?? 0 }));
   }
 
   async assign(ids: number[], staffId: number | null, actor: any) {

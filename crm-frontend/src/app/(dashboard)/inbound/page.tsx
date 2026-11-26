@@ -595,6 +595,7 @@ export default function InboundPage() {
       </div>
 
       <InboundAssignmentDialog open={assignmentIds !== null} count={assignmentIds?.length || 0} busy={assigning}
+        current={assignmentIds?.length === 1 ? inbounds.find(i => i.id === assignmentIds[0])?.assigned_staff_id ?? null : null}
         onClose={() => setAssignmentIds(null)} onConfirm={assignInbounds} />
       <Dialog open={deleteId !== null || bulkDeleteIds !== null} onOpenChange={(open) => {
         if (!open) {

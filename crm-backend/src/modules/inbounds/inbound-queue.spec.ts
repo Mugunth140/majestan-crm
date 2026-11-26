@@ -38,7 +38,10 @@ describe('Inbound Queue', () => {
     users.find.mockResolvedValue([{ id: 20, name: 'Meena', department: { name: 'Sourcing Department' } }, { id: 13, name: 'Arjun', department: { name: 'Sales Department' } },
       { id: 14, name: 'Divya', department: { name: 'Telecalling Department' } }, { id: 15, name: 'Ravi', department: { name: 'HR Department' } }]);
     users.findOne.mockResolvedValue({ id: 20, department: { name: 'Sourcing Department' } });
-    expect(await service.assignableStaff()).toEqual([{ id: 20, name: 'Meena' }, { id: 13, name: 'Arjun' }]);
+    repo.find.mockResolvedValueOnce([{ id: 5, assigned_staff_id: 13 }, { id: 6, assigned_staff_id: 13 }]);
+    expect(await service.assignableStaff()).toEqual([
+      { id: 20, name: 'Meena', department: 'Sourcing Department', open: 0 }, { id: 13, name: 'Arjun', department: 'Sales Department', open: 2 },
+    ]);
     await service.assign([1], 20, { id: 20, role: 'Staff' });
     expect(repo.update).toHaveBeenCalledWith(expect.anything(), { assigned_staff_id: 20, is_queued: false });
   });

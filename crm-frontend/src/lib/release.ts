@@ -13,6 +13,14 @@ export interface Release {
 
 export const RELEASES: Release[] = [
   {
+    version: "2.5.10",
+    date: "2026-11-26",
+    title: "A clearer Assign on Inbound",
+    changes: [
+      { kind: "improved", text: "Assign on Inbound has a search, lists everyone in Sales and Sourcing by team, and shows how many open inbounds each person already holds. Unassign is its own button instead of looking like a person in the list." },
+    ],
+  },
+  {
     version: "2.5.9",
     date: "2026-11-26",
     title: "Inbound assigning, sourcing detail and rent budgets",

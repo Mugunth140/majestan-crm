@@ -122,9 +122,17 @@ describe("2.5.8", () => {
 describe("2.5.9", () => {
   it("is the app version and announces the inbound, sourcing, rent budget, layout and users changes", async () => {
     const { APP_VERSION, RELEASES, releasesSince } = await import("@/lib/release");
-    expect(APP_VERSION).toBe("2.5.9");
-    expect(releasesSince("2.5.8", RELEASES).map((r) => r.version)).toEqual(["2.5.9"]);
-    const text = RELEASES[0].changes.map((c) => c.text).join(" ");
+    expect(APP_VERSION).toBe("2.5.10");
+    expect(releasesSince("2.5.8", RELEASES).map((r) => r.version)).toEqual(["2.5.10", "2.5.9"]);
+    const text = RELEASES.find((r) => r.version === "2.5.9")!.changes.map((c) => c.text).join(" ");
     for (const part of [/Sales and Sourcing/, /Individual \/ Portion House/, /Sourcing has much more detail/, /residential and commercial/, /Active and Inactive/]) expect(text).toMatch(part);
+  });
+});
+
+describe("2.5.10", () => {
+  it("announces the new Assign on Inbound", async () => {
+    const { RELEASES } = await import("@/lib/release");
+    expect(RELEASES[0].version).toBe("2.5.10");
+    expect(RELEASES[0].changes[0].text).toMatch(/Unassign is its own button/);
   });
 });
